@@ -1,0 +1,44 @@
+{
+  "name": "docwellness-backend",
+  "version": "1.0.0",
+  "description": "DocWellness - Health and Wellness Application Backend API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "node chat/tests/chat.test.js",
+    "test:chat": "node chat/tests/chat.test.js"
+  },
+  "keywords": [
+    "health",
+    "wellness",
+    "dietician",
+    "nutrition",
+    "diet-plan",
+    "express",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "engine.io": "^6.6.6",
+    "engine.io-parser": "^5.2.3",
+    "express": "^5.1.0",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.0.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.10",
+    "openai": "^6.9.1",
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
