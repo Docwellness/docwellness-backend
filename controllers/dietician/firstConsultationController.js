@@ -1,6 +1,13 @@
 const fs = require('fs/promises');
-const { FirstConsultation, User } = require('../../models');
+const { FirstConsultation, User, Notification } = require('../../models');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { getChatIO } = require('../../chat');
+
+// Only the patient can set these, via the patient-facing submitConsent
+// endpoint - a dietician's save must never be able to write them, and any
+// edit to the rest of the form invalidates a prior consent (see below).
+const CONSENT_FIELD_IDS = ['consent_acknowledgement', 'consent_signature_name'];
 
 /**
  * @desc    Get the latest first consultation for a patient
@@ -50,16 +57,37 @@ exports.upsertFirstConsultation = async (req, res, next) => {
 
     console.log('FINAL PAYLOAD =>', JSON.stringify(payload, null, 2));
 
+    // A dietician can never write the Consent & Confidentiality answers -
+    // only the patient can, via the patient-facing submitConsent endpoint.
+    // Strip them regardless of what the client sent.
+    if (Array.isArray(payload.customAnswers)) {
+      payload.customAnswers = payload.customAnswers.filter(
+        (a) => !CONSENT_FIELD_IDS.includes(a?.fieldId)
+      );
+    }
+
     const existingConsultation = await FirstConsultation.findOne({
       patient: patientId,
       dietician: dieticianId,
     });
 
+    // Editing any other question invalidates a prior consent - the patient
+    // needs to re-review before the dietician can act on the updated
+    // information again. Only relevant when there's something to invalidate.
+    const hadConsent =
+      !!existingConsultation &&
+      (existingConsultation.customAnswers || []).some(
+        (a) =>
+          a.fieldId === 'consent_acknowledgement' &&
+          Array.isArray(a.value) &&
+          a.value.includes('I consent')
+      );
+
     let consultation;
     let fileUrl = null;
     if (req.file?.path) {
       const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/labs',
+        folder: cloudinaryUserFolder(patientId, 'labs'),
       });
       await fs.unlink(req.file.path).catch(() => {});
       fileUrl = uploadResult.secure_url;
@@ -96,12 +124,41 @@ exports.upsertFirstConsultation = async (req, res, next) => {
     console.log('SAVED DOC ===>', consultation.toObject());
 
     // Update patient's status with firstConsultationId
-    await User.findByIdAndUpdate(patientId, {
-      $set: {
-        'status.firstConsultationId': consultation._id.toString(),
-      },
-    });
+    const statusUpdate = {
+      'status.firstConsultationId': consultation._id.toString(),
+    };
+    if (hadConsent) {
+      statusUpdate['status.patientConsented'] = false;
+    }
+    await User.findByIdAndUpdate(patientId, { $set: statusUpdate });
     console.log('Updated patient status with firstConsultationId:', consultation._id.toString());
+
+    if (hadConsent) {
+      try {
+        const notif = await Notification.create({
+          userId: patientId,
+          title: 'Your first consultation was updated',
+          message:
+            'Your dietician updated your first consultation. Please review it again and re-submit your consent.',
+          type: 'consultation',
+          referenceId: consultation._id,
+          referenceModel: 'FirstConsultation',
+        });
+        const ioRef = getChatIO();
+        if (ioRef) {
+          ioRef.to(patientId.toString()).emit('notification.new', {
+            id: notif._id,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type,
+            referenceId: notif.referenceId?.toString(),
+            createdAt: notif.createdAt,
+          });
+        }
+      } catch (notifError) {
+        console.error('Consent-invalidation notification error:', notifError);
+      }
+    }
 
     res.status(200).json({
       success: true,

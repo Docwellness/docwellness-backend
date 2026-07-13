@@ -17,6 +17,11 @@ module.exports = {
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
+    // Pinned explicit snapshots (not bare aliases) so behavior can't silently
+    // drift when OpenAI repoints an alias to a newer default model.
+    recipeModel: process.env.OPENAI_MODEL_RECIPE || 'gpt-4o',
+    translationModel: process.env.OPENAI_MODEL_TRANSLATION || 'gpt-4o-mini',
+    dietPlanModel: process.env.OPENAI_MODEL_DIET_PLAN || 'gpt-4o',
   },
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB

@@ -7,6 +7,7 @@ const fs = require('fs/promises');
 const { User } = require('../../models');
 const { calculateBMI, calculateCalorieNeeds } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const parseDateFromDDMMYYYY = (value) => {
   if (!value || typeof value !== 'string') {
@@ -100,7 +101,7 @@ exports.uploadProfileImage = async (req, res, next) => {
     }
 
     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/profiles',
+      folder: cloudinaryUserFolder(req.user._id, 'profiles'),
     });
     await fs.unlink(req.file.path).catch(() => {});
     const imageUrl = uploadResult.secure_url;

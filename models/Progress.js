@@ -56,6 +56,24 @@ const progressSchema = new mongoose.Schema(
     afterImage: {
       type: String, // URL (legacy / manual override)
     },
+    // Who/what produced this entry - lets diet-plan generation distinguish
+    // its own weight overrides from the patient's own self-logged weigh-ins.
+    source: {
+      type: String,
+      enum: ['patient', 'dietician'],
+      default: 'patient',
+    },
+    // Set when a dietician-entered weight came from the Create/Regenerate
+    // Diet Plan flow, so it's traceable to exactly which plan/week it informed.
+    dietPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'DietPlan',
+      default: null,
+    },
+    week: {
+      type: Number,
+      default: null,
+    },
   },
   {
     timestamps: true,

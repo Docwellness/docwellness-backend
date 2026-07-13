@@ -28,7 +28,11 @@ const {
   dietController,
   waterController,
   journeyController,
+  firstConsultationController,
 } = require('../controllers/patient');
+const {
+  consultationFormController,
+} = require('../controllers/dietician');
 
 // Middleware for file uploads
 const upload = require('../middlewares/upload');
@@ -249,6 +253,47 @@ router.post('/diet-plan-requests', patientOnly, dietPlanRequestController.create
  * @desc    Get the latest diet plan request status for the patient
  */
 router.get('/diet-plan-requests/status', patientOnly, dietPlanRequestController.getRequestStatus);
+
+/**
+ * @route   GET /api/patient/consultation-form-template
+ * @desc    Get the field definitions for the patient's assigned dietician's
+ *          first-consultation questionnaire (labels/types/sections/etc,
+ *          not the patient's own answers - see /first-consultation for that)
+ */
+router.get(
+  '/consultation-form-template',
+  patientOnly,
+  consultationFormController.getTemplateForPatient
+);
+
+/**
+ * @route   GET /api/patient/first-consultation
+ * @desc    Get the patient's own first consultation (as filled in by their
+ *          dietician), so they can review it before consenting
+ */
+router.get('/first-consultation', patientOnly, firstConsultationController.getMyFirstConsultation);
+
+/**
+ * @route   PUT /api/patient/first-consultation/consent
+ * @desc    Patient submits the Consent & Confidentiality section - the only
+ *          part of the first consultation they can edit themselves
+ * @body    { acknowledged: boolean, signatureName: string }
+ */
+router.put(
+  '/first-consultation/consent',
+  patientOnly,
+  firstConsultationController.submitConsent
+);
+
+/**
+ * @route   PATCH /api/patient/diet-plan-requests/:id/plan
+ * @desc    Set the membership plan chosen for a diet plan request
+ */
+router.patch(
+  '/diet-plan-requests/:id/plan',
+  patientOnly,
+  dietPlanRequestController.selectMembershipPlan
+);
 
 /**
  * @route   GET /api/patient/diet/active

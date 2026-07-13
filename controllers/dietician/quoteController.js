@@ -1,5 +1,6 @@
 const Quote = require('../../models/Quote');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const fs = require('fs');
 
 /**
@@ -18,7 +19,7 @@ exports.addQuote = async (req, res) => {
 
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/quotes',
+      folder: cloudinaryUserFolder(dieticianId, 'quotes'),
       transformation: [{ quality: 'auto', fetch_format: 'auto' }],
     });
 
@@ -86,7 +87,7 @@ exports.updateQuote = async (req, res) => {
       }
 
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/quotes',
+        folder: cloudinaryUserFolder(dieticianId, 'quotes'),
         transformation: [{ quality: 'auto', fetch_format: 'auto' }],
       });
 

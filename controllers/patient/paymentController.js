@@ -7,6 +7,7 @@ const fs = require('fs/promises');
 const mongoose = require('mongoose');
 const { ManualPaymentProof, DietPlanRequest, User } = require('../../models');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 
 
 /**
@@ -61,7 +62,7 @@ exports.submitManualPaymentProof = async (req, res, next) => {
     let proofImagePath = null;
     if (req.file?.path) {
       const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/payments',
+        folder: cloudinaryUserFolder(req.user._id, 'payments'),
       });
       await fs.unlink(req.file.path).catch(() => { });
       proofImagePath = uploadResult.secure_url;

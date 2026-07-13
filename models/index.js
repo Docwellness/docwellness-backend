@@ -1,6 +1,7 @@
 const User = require('./User');
 const DietPlan = require('./DietPlan');
 const Recipe = require('./Recipe');
+const Ingredient = require('./Ingredient');
 const MealLog = require('./MealLog');
 const Progress = require('./Progress');
 const Chat = require('./Chat');
@@ -14,11 +15,13 @@ const Video = require('./Video');
 const Quote = require('./Quote');
 const Coupon = require('./Coupon');
 const ConsultationFormTemplate = require('./ConsultationFormTemplate');
+const GenerationLog = require('./GenerationLog');
 
 module.exports = {
   User,
   DietPlan,
   Recipe,
+  Ingredient,
   MealLog,
   Progress,
   Chat,
@@ -32,4 +35,5 @@ module.exports = {
   Quote,
   Coupon,
   ConsultationFormTemplate,
+  GenerationLog,
 };

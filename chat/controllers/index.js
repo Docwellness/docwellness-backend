@@ -12,6 +12,7 @@ const {
 } = require('../services');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { User } = require('../../models');
 const Notification = require('../../models/Notification');
 
@@ -193,7 +194,7 @@ exports.sendMessage = async (req, res, next) => {
     let attachment = null;
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/chat',
+        folder: cloudinaryUserFolder(req.user._id, 'chat'),
       });
       attachment = {
         url: result.secure_url,

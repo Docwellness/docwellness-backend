@@ -1,7 +1,44 @@
+const crypto = require('crypto');
 const Recipe = require('../../models/Recipe');
+const GenerationLog = require('../../models/GenerationLog');
+const config = require('../../config/environment');
 const { generateRecipeWithAI } = require('../../utils/openaiClient');
+const {
+  validateRecipeConstraints,
+  validateGeneratedIngredients,
+} = require('../../utils/dietaryConstraintValidator');
+const {
+  applyAiNoteQuantityOverrides,
+  enforceFiniteIngredientQuantities,
+} = require('../../utils/ingredientQuantityValidator');
+const { checkTextSafety } = require('../../utils/inputGuardrails');
+const { TOP_CATEGORIES, resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
 const fs = require('fs');
+
+const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
+  crypto
+    .createHash('sha256')
+    .update(JSON.stringify({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote: aiNote || '' }))
+    .digest('hex');
+
+const logRecipeGeneration = async ({ dieticianId, inputHash, latencyMs, warnings, succeeded }) => {
+  try {
+    await GenerationLog.create({
+      kind: 'recipe',
+      dieticianId,
+      model: config.openai.recipeModel,
+      inputHash,
+      latencyMs,
+      validatorWarnings: warnings || [],
+      succeeded,
+    });
+  } catch (logError) {
+    console.error('Failed to write GenerationLog entry:', logError.message);
+  }
+};
 
 exports.uploadRecipeImage = async (req, res, next) => {
   try {
@@ -13,7 +50,7 @@ exports.uploadRecipeImage = async (req, res, next) => {
     }
 
     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/recipes/main',
+      folder: cloudinaryUserFolder(req.user._id, 'recipes/main'),
     });
     await fs.promises.unlink(req.file.path).catch(() => { });
     const imageUrl = uploadResult?.secure_url || uploadResult?.url;
@@ -42,7 +79,7 @@ exports.uploadIngredientImage = async (req, res, next) => {
     }
 
     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/recipes/ingredients',
+      folder: cloudinaryUserFolder(req.user._id, 'recipes/ingredients'),
     });
     await fs.promises.unlink(req.file.path).catch(() => { });
     const imageUrl = uploadResult?.secure_url || uploadResult?.url;
@@ -56,6 +93,91 @@ exports.uploadIngredientImage = async (req, res, next) => {
         size: req.file.size,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Fetch a real photo of an ingredient from the internet (Pexels)
+ *          and mirror it into Cloudinary - replaces the old device-upload
+ *          flow for ingredient images. Can be called repeatedly for the
+ *          same ingredient ("refresh") to get a different result - always
+ *          fetches fresh (forceRefresh) rather than reusing the shared
+ *          library, since a refresh click means "I want something different."
+ * @route   POST /api/dietician/uploads/ingredient-image/fetch
+ * @access  Private (Dietician)
+ * @body    { ingredientName }
+ */
+exports.fetchIngredientImageFromWeb = async (req, res, next) => {
+  try {
+    const { ingredientName } = req.body || {};
+    if (!ingredientName || !ingredientName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'ingredientName is required',
+      });
+    }
+
+    const { image: imageUrl } = await getOrCreateIngredientImage({
+      dieticianId: req.user._id,
+      name: ingredientName,
+      forceRefresh: true,
+    });
+    if (!imageUrl) {
+      return res.status(502).json({
+        success: false,
+        message: `Couldn't find an image for "${ingredientName}". Please try again.`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { url: imageUrl },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Persist a single ingredient's image on an already-saved recipe.
+ *          Needed because editing an ingredient's image while viewing an
+ *          existing recipe previously only updated in-memory preview state
+ *          and never actually reached the database.
+ * @route   PATCH /api/dietician/recipes/:id/ingredient-image
+ * @access  Private (Dietician)
+ * @body    { ingredientIndex, imageUrl }
+ *
+ * Matches by array index rather than ingredient name - a recipe can have
+ * two ingredients with the same name (e.g. "Salt" used at two different
+ * steps), and Mongo's positional `$` operator only updates the FIRST match,
+ * which would silently update the wrong one under name-based matching.
+ */
+exports.updateIngredientImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { ingredientIndex, imageUrl } = req.body || {};
+    if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || !imageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'ingredientIndex (a non-negative integer) and imageUrl are required',
+      });
+    }
+
+    const result = await Recipe.updateOne(
+      { _id: id, dieticianId: req.user._id, [`ingredients.${ingredientIndex}`]: { $exists: true } },
+      { $set: { [`ingredients.${ingredientIndex}.image`]: imageUrl } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Recipe or ingredient at index ${ingredientIndex} not found`,
+      });
+    }
+
+    return res.status(200).json({ success: true });
   } catch (error) {
     next(error);
   }
@@ -111,11 +233,37 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       });
     }
 
+    // Pre-check: reject contradictory dietary habits or custom ingredients
+    // that conflict with the selected restrictions before spending an AI call.
+    const constraintCheck = validateRecipeConstraints({ dietaryHabits, freeFrom, aiNote });
+    if (!constraintCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dietary constraint conflict',
+        errors: constraintCheck.errors,
+      });
+    }
+
+    // Guardrail: aiNote is free text a dietician can enter, and is
+    // interpolated directly into the generation prompt - screen it before
+    // spending an AI call (OWASP LLM01 prompt-injection/unsafe-content defense).
+    if (aiNote) {
+      const safety = await checkTextSafety(aiNote);
+      if (!safety.safe) {
+        return res.status(422).json({
+          success: false,
+          message: "This note couldn't be processed — please rephrase it.",
+        });
+      }
+    }
+
     // Parse languages from comma-separated string
     const languages = language
       ? language.split(',').map((l) => l.trim()).filter(Boolean)
       : ['English'];
 
+    const inputHash = hashRecipeInput({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote });
+    const generationStartedAt = Date.now();
     let modelRecipe;
     try {
       modelRecipe = await generateRecipeWithAI({
@@ -129,6 +277,12 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       });
     } catch (aiError) {
       console.error('AI error in generateRecipeWithAI:', aiError);
+      await logRecipeGeneration({
+        dieticianId: req.user._id,
+        inputHash,
+        latencyMs: Date.now() - generationStartedAt,
+        succeeded: false,
+      });
       return res.status(502).json({
         success: false,
         message: 'AI service error. Please try again later.',
@@ -177,6 +331,51 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       translations: modelRecipe.translations || {},
     };
 
+    // Deterministic backstop: re-derive the dietician's literally-stated
+    // quantities from aiNote and overwrite whatever the model returned for
+    // those ingredients, so quantity fidelity doesn't depend purely on the
+    // model following the prompt's QUANTITY OVERRIDE RULE every time.
+    const { ingredients: correctedIngredients, appliedOverrides } = applyAiNoteQuantityOverrides({
+      aiNote,
+      ingredients: previewRecipe.ingredients,
+      servings,
+    });
+    previewRecipe.ingredients = correctedIngredients;
+    if (appliedOverrides.length > 0) {
+      console.log('generateRecipeWithAI: aiNote quantity override applied:', appliedOverrides);
+    }
+
+    // Final deterministic backstop: any ingredient still left with a
+    // non-positive/non-finite quantity (the model ignored both the prompt
+    // rule and the schema minimum) gets a small sensible default instead of
+    // ever reaching the database as 0/NaN.
+    const { ingredients: finiteIngredients, corrections: quantityCorrections } =
+      enforceFiniteIngredientQuantities(previewRecipe.ingredients);
+    previewRecipe.ingredients = finiteIngredients;
+    const quantityWarnings = quantityCorrections.map(
+      (c) => `Quantity for "${c.ingredient}" wasn't specified - defaulted to ${c.to.quantity}${c.to.unit}, please verify.`
+    );
+    if (quantityCorrections.length > 0) {
+      console.log('generateRecipeWithAI: zero/invalid quantity corrections applied:', quantityCorrections);
+    }
+
+    // Post-check: catch cases where the AI didn't fully honor the dietary
+    // restrictions despite the prompt instructions (defense in depth).
+    const ingredientWarnings = validateGeneratedIngredients({
+      dietaryHabits,
+      freeFrom,
+      ingredients: previewRecipe.ingredients,
+    });
+    previewRecipe.warnings = [...quantityWarnings, ...ingredientWarnings, ...previewRecipe.warnings];
+
+    await logRecipeGeneration({
+      dieticianId: req.user._id,
+      inputHash,
+      latencyMs: Date.now() - generationStartedAt,
+      warnings: previewRecipe.warnings,
+      succeeded: true,
+    });
+
     return res.status(200).json({
       success: true,
       data: previewRecipe,
@@ -185,6 +384,67 @@ exports.generateRecipeWithAI = async (req, res, next) => {
     next(error);
   }
 };
+
+// Allowed enum values from the Recipe schema - shared by createRecipe and
+// updateRecipe, the two handlers that persist a recipe.
+const VALID_CATEGORIES = [
+  'Indian', 'American', 'British', 'Mediterranean', 'Asian', 'Mexican',
+  'Italian', 'French', 'Middle Eastern', 'Japanese', 'Chinese', 'Thai',
+  'Korean', 'Continental', 'Fusion', 'Healthy Bowls', 'Smoothies & Drinks',
+  'Supplements', 'Keto', 'Vegan Specials', 'High Protein', 'Low Carb',
+  'Detox', 'Other', 'Western',
+];
+const VALID_UNITS = ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece'];
+const VALID_PRICE_LEVELS = ['$', '$$', '$$$', '₹', '₹₹', '₹₹₹', '£', '££', '£££'];
+const VALID_INGREDIENT_CATEGORIES = [
+  'Protein Rich', 'Carbohydrate', 'Vegetable', 'Dairy', 'Spice', 'Oil/Fat',
+  'Sweetener', 'Grain', 'Legume', 'Nut/Seed', 'Fruit', 'Herb',
+  'Sauce/Condiment', 'Other',
+];
+
+// Parse quantity safely — values may arrive as strings from AI
+const parseQuantity = (val) => {
+  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+  if (typeof val === 'string') {
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      const num = parseFloat(parts[0]);
+      const den = parseFloat(parts[1]);
+      if (!Number.isNaN(num) && !Number.isNaN(den) && den !== 0) return num / den;
+    }
+    const parsed = parseFloat(val);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return 0;
+};
+
+/**
+ * Sanitizes a raw ingredients array (enum whitelisting + quantity parsing +
+ * the zero/invalid-quantity backstop) so Mongoose validation never rejects
+ * the whole recipe doc and a blank/zero quantity never reaches the database
+ * untouched. Shared by createRecipe and updateRecipe - the two handlers
+ * that actually persist a recipe.
+ * Returns { ingredients, warnings }.
+ */
+function sanitizeRecipeIngredients(ingredients) {
+  const rawSafeIngredients = Array.isArray(ingredients)
+    ? ingredients.map((ing) => ({
+      ...ing,
+      quantity: parseQuantity(ing.quantity),
+      unit: VALID_UNITS.includes(ing.unit) ? ing.unit : 'g',
+      priceLevel: VALID_PRICE_LEVELS.includes(ing.priceLevel) ? ing.priceLevel : '₹₹',
+      category: VALID_INGREDIENT_CATEGORIES.includes(ing.category) ? ing.category : 'Other',
+    }))
+    : [];
+
+  const { ingredients: safeIngredients, corrections: quantityCorrections } =
+    enforceFiniteIngredientQuantities(rawSafeIngredients);
+  const warnings = quantityCorrections.map(
+    (c) => `Quantity for "${c.ingredient}" wasn't specified - defaulted to ${c.to.quantity}${c.to.unit}, please verify.`
+  );
+
+  return { ingredients: safeIngredients, warnings };
+}
 
 /**
  * @desc    Create a new recipe
@@ -218,51 +478,11 @@ exports.createRecipe = async (req, res, next) => {
       });
     }
 
-    // Allowed enum values from Recipe schema
-    const VALID_CATEGORIES = [
-      'Indian', 'American', 'British', 'Mediterranean', 'Asian', 'Mexican',
-      'Italian', 'French', 'Middle Eastern', 'Japanese', 'Chinese', 'Thai',
-      'Korean', 'Continental', 'Fusion', 'Healthy Bowls', 'Smoothies & Drinks',
-      'Supplements', 'Keto', 'Vegan Specials', 'High Protein', 'Low Carb',
-      'Detox', 'Other',
-    ];
-    const VALID_UNITS = ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece'];
-    const VALID_PRICE_LEVELS = ['$', '$$', '$$$', '₹', '₹₹', '₹₹₹', '£', '££', '£££'];
-    const VALID_INGREDIENT_CATEGORIES = [
-      'Protein Rich', 'Carbohydrate', 'Vegetable', 'Dairy', 'Spice', 'Oil/Fat',
-      'Sweetener', 'Grain', 'Legume', 'Nut/Seed', 'Fruit', 'Herb',
-      'Sauce/Condiment', 'Other',
-    ];
-
     // Sanitize category to match schema enum
     const safeCategory = VALID_CATEGORIES.includes(category) ? category : 'Indian';
 
-    // Parse quantity safely — values may arrive as strings from AI
-    const parseQuantity = (val) => {
-      if (typeof val === 'number' && !Number.isNaN(val)) return val;
-      if (typeof val === 'string') {
-        if (val.includes('/')) {
-          const parts = val.split('/');
-          const num = parseFloat(parts[0]);
-          const den = parseFloat(parts[1]);
-          if (!Number.isNaN(num) && !Number.isNaN(den) && den !== 0) return num / den;
-        }
-        const parsed = parseFloat(val);
-        if (!Number.isNaN(parsed)) return parsed;
-      }
-      return 0;
-    };
-
-    // Sanitize ingredient enum fields so Mongoose validation doesn't reject the whole doc
-    const safeIngredients = Array.isArray(ingredients)
-      ? ingredients.map((ing) => ({
-        ...ing,
-        quantity: parseQuantity(ing.quantity),
-        unit: VALID_UNITS.includes(ing.unit) ? ing.unit : 'g',
-        priceLevel: VALID_PRICE_LEVELS.includes(ing.priceLevel) ? ing.priceLevel : '₹₹',
-        category: VALID_INGREDIENT_CATEGORIES.includes(ing.category) ? ing.category : 'Other',
-      }))
-      : [];
+    const { ingredients: safeIngredients, warnings: quantityWarnings } =
+      sanitizeRecipeIngredients(ingredients);
 
     // Parse languages from comma-separated string or array
     let languages;
@@ -274,6 +494,26 @@ exports.createRecipe = async (req, res, next) => {
       languages = ['English'];
     }
 
+    // Auto-fetch an internet photo for every ingredient that doesn't already
+    // have one, so a newly-created recipe never needs a manual refresh click
+    // just to look complete. Reuses the dietician's shared ingredient
+    // library whenever possible (forceRefresh:false) - after a handful of
+    // recipes seed common names like Salt/Onion/Tomato, most ingredients
+    // resolve instantly with no Pexels call at all. Best-effort and
+    // parallel - a failed fetch for one ingredient leaves its image blank
+    // rather than failing the save.
+    const ingredientsWithImages = await Promise.all(
+      safeIngredients.map(async (ing) => {
+        if (ing.image && ing.image.trim()) return ing;
+        const { image: fetchedUrl } = await getOrCreateIngredientImage({
+          dieticianId: req.user._id,
+          name: ing.name,
+          category: ing.category,
+        });
+        return fetchedUrl ? { ...ing, image: fetchedUrl } : ing;
+      })
+    );
+
     const recipe = await Recipe.create({
       dieticianId: req.user._id,
       name,
@@ -284,7 +524,7 @@ exports.createRecipe = async (req, res, next) => {
       dietaryHabits,
       freeFrom,
       servingSize,
-      ingredients: safeIngredients,
+      ingredients: ingredientsWithImages,
       instructions: cookingSteps,
       nutrition,
       image,
@@ -295,6 +535,7 @@ exports.createRecipe = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       data: recipe,
+      warnings: quantityWarnings,
     });
   } catch (error) {
     console.error('❌ createRecipe error:', error.message, error.errors ? JSON.stringify(error.errors) : '');
@@ -349,6 +590,30 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
         success: false,
         message: 'Ingredients array is required and must not be empty',
       });
+    }
+
+    // Pre-check: reject contradictory dietary habits or custom ingredients
+    // that conflict with the selected restrictions before spending an AI call.
+    const constraintCheck = validateRecipeConstraints({ dietaryHabits, freeFrom, aiNote });
+    if (!constraintCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dietary constraint conflict',
+        errors: constraintCheck.errors,
+      });
+    }
+
+    // Guardrail: aiNote is free text a dietician can enter, and is
+    // interpolated directly into the generation prompt - screen it before
+    // spending an AI call (OWASP LLM01 prompt-injection/unsafe-content defense).
+    if (aiNote) {
+      const safety = await checkTextSafety(aiNote);
+      if (!safety.safe) {
+        return res.status(422).json({
+          success: false,
+          message: "This note couldn't be processed — please rephrase it.",
+        });
+      }
     }
 
     // Parse languages from comma-separated string
@@ -410,7 +675,42 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
         ? updatedRecipe.cookingSteps
         : instructions || [];
 
-    const finalWarnings = Array.isArray(updatedRecipe.warnings) ? updatedRecipe.warnings : [];
+    // Deterministic backstop: re-derive the dietician's literally-stated
+    // quantities from aiNote and overwrite whatever the model returned for
+    // those ingredients (see generateRecipeWithAI above for full rationale).
+    const { ingredients: correctedIngredients, appliedOverrides } = applyAiNoteQuantityOverrides({
+      aiNote,
+      ingredients: finalIngredients,
+      servings,
+    });
+    if (appliedOverrides.length > 0) {
+      console.log('updateRecipeFromEdits: aiNote quantity override applied:', appliedOverrides);
+    }
+
+    // Final deterministic backstop (see generateRecipeWithAI above for full
+    // rationale): no ingredient should ever reach the database with a
+    // non-positive/non-finite quantity.
+    const { ingredients: finiteIngredients, corrections: quantityCorrections } =
+      enforceFiniteIngredientQuantities(correctedIngredients);
+    const quantityWarnings = quantityCorrections.map(
+      (c) => `Quantity for "${c.ingredient}" wasn't specified - defaulted to ${c.to.quantity}${c.to.unit}, please verify.`
+    );
+    if (quantityCorrections.length > 0) {
+      console.log('updateRecipeFromEdits: zero/invalid quantity corrections applied:', quantityCorrections);
+    }
+
+    // Post-check: catch cases where the AI didn't fully honor the dietary
+    // restrictions despite the prompt instructions (defense in depth).
+    const ingredientWarnings = validateGeneratedIngredients({
+      dietaryHabits,
+      freeFrom,
+      ingredients: finiteIngredients,
+    });
+    const finalWarnings = [
+      ...quantityWarnings,
+      ...ingredientWarnings,
+      ...(Array.isArray(updatedRecipe.warnings) ? updatedRecipe.warnings : []),
+    ];
 
     const updatedPreview = {
       // Immutable fields: always from request body (AI cannot change these)
@@ -426,7 +726,7 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
       cookingTime: updatedRecipe.cookingTime || null,
 
       // Mutable fields: AI-refined with fallbacks to original values
-      ingredients: finalIngredients,
+      ingredients: finiteIngredients,
       nutrition: finalNutrition,
       cookingSteps: finalCookingSteps,
       warnings: finalWarnings,
@@ -452,7 +752,7 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
 exports.listRecipesByServingTime = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
-    const { servingTime, cuisine, page = '1', limit = '10' } = req.query || {};
+    const { servingTime, cuisine, topCategory, page = '1', limit = '10' } = req.query || {};
 
     const VALID_SERVING_TIMES = [
       'Morning Drink',
@@ -482,10 +782,18 @@ exports.listRecipesByServingTime = async (req, res, next) => {
     const filter = {
       dieticianId,
       servingTime,
+      ...resolveTopCategoryFilter(topCategory),
     };
 
     if (cuisine) {
       filter.cuisine = cuisine;
+    }
+
+    // Supplements are an exclusive shortcut section (see getServingTimeSummary)
+    // - they must never appear while browsing a meal-time bucket unless the
+    // dietician explicitly scoped this query to Supplements via topCategory.
+    if (topCategory !== 'Supplements' && !filter.category) {
+      filter.category = { $ne: 'Supplements' };
     }
 
     // Query with lean() for performance
@@ -577,15 +885,75 @@ exports.getRecipeCategories = async (req, res, next) => {
 };
 
 /**
+ * @desc    Real recipe counts per serving-time slot, optionally scoped to a
+ *          top-level category group, plus the Supplements total - powers
+ *          the "Recipes & Supplements" landing grid's per-card counts.
+ * @route   GET /api/dietician/recipes/serving-time-summary
+ * @access  Private (Dietician)
+ * @query   topCategory (optional: All/Indian/Continental/Western/Supplements)
+ */
+exports.getServingTimeSummary = async (req, res, next) => {
+  try {
+    const dieticianId = req.user._id;
+    const { topCategory } = req.query || {};
+
+    const VALID_SERVING_TIMES = [
+      'Morning Drink', 'Breakfast', 'Brunch', 'Lunch', 'Evening Snack', 'Dinner', 'Night Drink',
+    ];
+
+    const scopedFilter = { dieticianId, ...resolveTopCategoryFilter(topCategory) };
+
+    // Supplements are counted separately below (supplementsCount) and must
+    // not also inflate the per-servingTime meal-time buckets, unless the
+    // dietician explicitly scoped this summary to Supplements.
+    if (topCategory !== 'Supplements' && !scopedFilter.category) {
+      scopedFilter.category = { $ne: 'Supplements' };
+    }
+
+    const counts = await Recipe.aggregate([
+      { $match: scopedFilter },
+      { $group: { _id: '$servingTime', count: { $sum: 1 } } },
+    ]);
+    const countByServingTime = new Map(counts.map((c) => [c._id, c.count]));
+
+    // Supplements/Sides/Salad are fixed shortcut cards regardless of the
+    // selected top category, since none of them are tied to one cuisine.
+    const [supplementsCount, sidesCount, saladCount] = await Promise.all([
+      Recipe.countDocuments({ dieticianId, category: 'Supplements' }),
+      Recipe.countDocuments({ dieticianId, tags: 'side' }),
+      Recipe.countDocuments({ dieticianId, tags: 'salad' }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        servingTimeCounts: VALID_SERVING_TIMES.map((st) => ({
+          servingTime: st,
+          count: countByServingTime.get(st) || 0,
+        })),
+        sidesCount,
+        saladCount,
+        supplementsCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    List all recipes with optional category filter
  * @route   GET /api/dietician/recipes
  * @access  Private (Dietician)
- * @query   category (optional), page (default 1), limit (default 20)
+ * @query   category (optional exact match), topCategory (optional group:
+ *          All/Indian/Continental/Western/Supplements), servingTime
+ *          (optional), tag (optional: side/salad, matches if the recipe's
+ *          tags array contains it), page (default 1), limit (default 20)
  */
 exports.listRecipes = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
-    const { category, page = '1', limit = '20' } = req.query || {};
+    const { category, topCategory, servingTime, tag, page = '1', limit = '20' } = req.query || {};
 
     // Pagination
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -594,9 +962,21 @@ exports.listRecipes = async (req, res, next) => {
     const skip = (pageNum - 1) * limitNum;
 
     // Build filter
-    const filter = { dieticianId };
+    const filter = { dieticianId, ...resolveTopCategoryFilter(topCategory) };
     if (category && category !== 'All') {
       filter.category = category;
+    }
+    if (servingTime) {
+      filter.servingTime = servingTime;
+    }
+    if (tag) {
+      filter.tags = tag;
+    }
+
+    // Supplements are an exclusive shortcut section - never mix into a
+    // general/meal-time listing unless explicitly requested.
+    if (category !== 'Supplements' && topCategory !== 'Supplements' && !filter.category) {
+      filter.category = { $ne: 'Supplements' };
     }
 
     // Query recipes
@@ -642,26 +1022,47 @@ exports.listRecipes = async (req, res, next) => {
   }
 };
 
+// Fields that can be updated as-is (Mongoose's own schema validators, run
+// via runValidators below, catch invalid enum values for these).
+const DIRECT_UPDATE_FIELDS = [
+  'image', 'description', 'servingTime', 'servings', 'dietaryHabits',
+  'freeFrom', 'nutrition', 'translations',
+];
+
 /**
- * @desc    Update selected fields on an existing recipe
+ * @desc    Update an existing recipe - either a single field (e.g. just the
+ *          main image) or the full editable set from the "Save Recipe"
+ *          button on an already-saved recipe's detail screen (ingredients -
+ *          including any refreshed images, instructions, nutrition, etc.).
+ *          Previously this only ever supported `image`, meaning edits made
+ *          via "Update AI Inputs" on an existing recipe (and any ingredient
+ *          image refresh) never actually reached the database.
  * @route   PATCH /api/dietician/recipes/:id
  * @access  Private (Dietician)
- *
- * Currently supports updating:
- *   - image (string URL)
- * More fields can be whitelisted below as needed.
  */
 exports.updateRecipe = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
     const { id } = req.params;
+    const body = req.body || {};
 
-    const allowed = ['image'];
     const updates = {};
-    for (const key of allowed) {
-      if (Object.prototype.hasOwnProperty.call(req.body || {}, key)) {
-        updates[key] = req.body[key];
+    for (const key of DIRECT_UPDATE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        updates[key] = body[key];
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'category')) {
+      updates.category = VALID_CATEGORIES.includes(body.category) ? body.category : 'Indian';
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'ingredients')) {
+      const { ingredients: safeIngredients } = sanitizeRecipeIngredients(body.ingredients);
+      updates.ingredients = safeIngredients;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'instructions')) {
+      updates.instructions = body.instructions;
+    } else if (Object.prototype.hasOwnProperty.call(body, 'cookingSteps')) {
+      updates.instructions = body.cookingSteps;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -674,7 +1075,7 @@ exports.updateRecipe = async (req, res, next) => {
     const recipe = await Recipe.findOneAndUpdate(
       { _id: id, dieticianId },
       { $set: updates },
-      { new: true }
+      { new: true, runValidators: true }
     ).lean();
 
     if (!recipe) {

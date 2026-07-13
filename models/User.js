@@ -86,10 +86,10 @@ const userSchema = new mongoose.Schema(
         enum: [
           'Weight Loss',
           'Weight Gain',
-          'Maintain Weight',
-          'Muscle Building',
-          'Thyroid Control',
-          'PCOD Control',
+          'Weight Maintenance',
+          'Muscle Gain (Body Recomposition)',
+          'Fat Loss',
+          'Healthy Weight Management',
         ],
         required: false,
       },
@@ -133,6 +133,13 @@ const userSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: 'FirstConsultation',
         default: null,
+      },
+      // Set once the patient has reviewed the dietician-filled first
+      // consultation and submitted the Consent & Confidentiality section
+      // themselves - gates the dietician's "Create Diet Plan" button.
+      patientConsented: {
+        type: Boolean,
+        default: false,
       },
       activeDietPlanId: {
         type: mongoose.Schema.Types.ObjectId,

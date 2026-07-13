@@ -1,5 +1,6 @@
 const { MealLog, DietPlan, User, Recipe } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
+const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 
 // Helper: get local date string YYYY-MM-DD without timezone shift
 function localDateStr(date) {
@@ -505,12 +506,19 @@ exports.getPatientMealLogStats = async (req, res, next) => {
     const weekSummary =
       dietPlan.weeksSummary?.find((s) => Number(s.week) === Number(currentWeek)) || null;
 
+    // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
+    // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) - scope
+    // "today's plan" down to just the group `today` falls into, same as
+    // the patient-facing getActiveDietPlanForPatient does.
+    const todayDayGroup = resolveDayGroupForDate(today);
+    const todaysDailyMeals = week
+      ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
+      : [];
+
     const recipeIds = new Set();
-    if (week) {
-      (week.dailyMeals || []).forEach((meal) => {
-        if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
-      });
-    }
+    todaysDailyMeals.forEach((meal) => {
+      if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+    });
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
@@ -553,7 +561,7 @@ exports.getPatientMealLogStats = async (req, res, next) => {
     ];
 
     if (week) {
-      (week.dailyMeals || []).forEach((meal) => {
+      todaysDailyMeals.forEach((meal) => {
         const recipe = recipes[meal.recipeId];
         if (!recipe) return;
 

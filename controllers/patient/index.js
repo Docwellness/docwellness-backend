@@ -13,6 +13,7 @@ const mealLogController = require('./mealLogController');
 const waterController = require('./waterController');
 const journeyController = require('./journeyController');
 const couponController = require('./couponController');
+const firstConsultationController = require('./firstConsultationController');
 
 module.exports = {
   authController,
@@ -25,4 +26,5 @@ module.exports = {
   waterController,
   journeyController,
   couponController,
+  firstConsultationController,
 };

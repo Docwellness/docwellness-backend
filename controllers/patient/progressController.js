@@ -7,6 +7,8 @@ const fs = require('fs/promises');
 const { Progress, User, MealLog } = require('../../models');
 const { calculateBMI } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelpers');
 
 /**
  * @desc    Create a new progress entry
@@ -39,7 +41,7 @@ exports.createProgress = async (req, res, next) => {
     if (imageFile) {
       const filePath = imageFile.path;
       const uploadResult = await cloudinary.uploader.upload(filePath, {
-        folder: 'docwellness/progress',
+        folder: cloudinaryUserFolder(req.user._id, 'progress'),
       });
       bodyImageUrl = uploadResult.secure_url;
       await fs.unlink(filePath).catch(() => {});
@@ -50,7 +52,7 @@ exports.createProgress = async (req, res, next) => {
     if (req.files && req.files.bodyImage2 && req.files.bodyImage2[0]) {
       const filePath2 = req.files.bodyImage2[0].path;
       const uploadResult2 = await cloudinary.uploader.upload(filePath2, {
-        folder: 'docwellness/progress',
+        folder: cloudinaryUserFolder(req.user._id, 'progress'),
       });
       bodyImage2Url = uploadResult2.secure_url;
       await fs.unlink(filePath2).catch(() => {});
@@ -368,7 +370,7 @@ exports.uploadProgressImages = async (req, res, next) => {
         const beforePath = req.files.beforeImage[0]?.path;
         if (beforePath) {
           const uploadResult = await cloudinary.uploader.upload(beforePath, {
-            folder: 'docwellness/progress',
+            folder: cloudinaryUserFolder(progress.patientId, 'progress'),
           });
           await fs.unlink(beforePath).catch(() => {});
           progress.beforeImage = uploadResult.secure_url;
@@ -378,7 +380,7 @@ exports.uploadProgressImages = async (req, res, next) => {
         const afterPath = req.files.afterImage[0]?.path;
         if (afterPath) {
           const uploadResult = await cloudinary.uploader.upload(afterPath, {
-            folder: 'docwellness/progress',
+            folder: cloudinaryUserFolder(progress.patientId, 'progress'),
           });
           await fs.unlink(afterPath).catch(() => {});
           progress.afterImage = uploadResult.secure_url;
@@ -522,12 +524,15 @@ exports.getTrackingData = async (req, res, next) => {
     const patientId = req.user._id;
     const period = req.query.period || 'week';
 
-    const patient = await User.findById(patientId).select('healthProfile').lean();
+    const patient = await User.findById(patientId)
+      .select('healthProfile profile.gender profile.dateOfBirth')
+      .lean();
     if (!patient) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
 
     const healthProfile = patient.healthProfile || {};
+    const profile = patient.profile || {};
     const latestProgressWithWeight = await Progress.findOne({
       patientId,
       weight: { $exists: true, $ne: null },
@@ -591,19 +596,11 @@ exports.getTrackingData = async (req, res, next) => {
       .select('date totalCalories meals')
       .lean();
 
-    // TDEE calculation
-    const activityMultipliers = {
-      Sedentary: 1.2,
-      'Lightly Active': 1.375,
-      'Lightly Activity': 1.375,
-      Moderate: 1.55,
-      'Moderately Activity': 1.55,
-      'Very Active': 1.725,
-      'Extra Active': 1.9,
-    };
-    const activityMultiplier = activityMultipliers[activityLevel] || 1.55;
-    const bmr = 10 * currentWeight + 6.25 * height - 5 * 30 + 5;
-    const tdee = bmr * activityMultiplier;
+    // TDEE calculation - real age/gender from the patient's profile, not a
+    // hardcoded age-30/always-male assumption.
+    const age = calcAge(profile.dateOfBirth) || 30;
+    const bmr = calcBmr({ weight: currentWeight, height, age, gender: profile.gender }) || 1800;
+    const tdee = calcTdee(bmr, activityLevel) || bmr * 1.55;
 
     let calorieData = [];
     let weightTrend = [];

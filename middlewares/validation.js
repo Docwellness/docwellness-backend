@@ -67,10 +67,10 @@ const schemas = {
         .valid(
           'Weight Loss',
           'Weight Gain',
-          'Maintain Weight',
-          'Muscle Building',
-          'Thyroid Control',
-          'PCOD Control'
+          'Weight Maintenance',
+          'Muscle Gain (Body Recomposition)',
+          'Fat Loss',
+          'Healthy Weight Management'
         )
         .required()
         .messages({
@@ -147,10 +147,10 @@ const schemas = {
       primaryGoal: Joi.string().valid(
         'Weight Loss',
         'Weight Gain',
-        'Maintain Weight',
-        'Muscle Building',
-        'Thyroid Control',
-        'PCOD Control'
+        'Weight Maintenance',
+        'Muscle Gain (Body Recomposition)',
+        'Fat Loss',
+        'Healthy Weight Management'
       ),
       targetWeight: Joi.string(),
       activityLevel: Joi.string().valid(

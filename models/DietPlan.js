@@ -74,12 +74,40 @@ const dietPlanSchema = new mongoose.Schema(
       fatPercent: { type: Number },
       carbsPercent: { type: Number },
       proteinPercent: { type: Number },
+      fiberGrams: { type: Number },
     },
     generatedPlan: {
       type: String,
     },
     generatedAt: {
       type: Date,
+    },
+    // Deterministic post-generation checks (utils/dietPlanValidator.js) - not
+    // blocking, surfaced to the dietician during the existing review/finalize
+    // flow rather than gating generation itself.
+    validationWarnings: {
+      type: [String],
+      default: [],
+    },
+    // Special-population safety flags (utils/dieticianPatientHelpers.js +
+    // calcAge), e.g. "isMinor", "highProteinForWeight" - make the dietician's
+    // mandatory human review well-informed rather than adding a new gate.
+    riskFlags: {
+      type: [String],
+      default: [],
+    },
+    // Generation lineage for auditability/reproducibility.
+    promptVersion: {
+      type: String,
+      default: null,
+    },
+    modelSnapshot: {
+      type: String,
+      default: null,
+    },
+    inputHash: {
+      type: String,
+      default: null,
     },
     finalizedPlan: {
       type: Object,

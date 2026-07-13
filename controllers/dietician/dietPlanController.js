@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const {
   DietPlan,
@@ -7,7 +8,9 @@ const {
   ManualPaymentProof,
   User,
   MealLog,
+  GenerationLog,
 } = require('../../models');
+const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const {
   buildFirstConsultationPayload,
@@ -17,9 +20,26 @@ const {
   calcAge,
   calcBmr,
   calcTdee,
+  calcProteinTargetG,
   getNewTabStatusCode,
   mapStatusCodeToLabel,
 } = require('../../utils/dieticianPatientHelpers');
+const {
+  mapEatingStyleToDietFlag,
+  findAllergenConflicts,
+  getConsultationAnswer,
+} = require('../../utils/dietaryConstraintValidator');
+const { validateDietPlan } = require('../../utils/dietPlanValidator');
+const { checkTextSafety } = require('../../utils/inputGuardrails');
+const { SAFETY_FIELD_IDS } = require('../../utils/consultationFormSeed');
+const { logWeight } = require('../../utils/weightLog');
+const {
+  getMembershipTier,
+  TIER_INITIAL_WEEKS,
+  validateRegenerateRequest,
+} = require('../../utils/membershipTiers');
+const { buildServingTimeOptions, buildDayGroupsOptions, fetchRecipePoolForOptions } = require('../../utils/dietPlanOptions');
+const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -31,14 +51,47 @@ const REQUIRED_SERVING_TIMES = [
   'Night Drink',
 ];
 
+// servings mirrors the field name/semantics the patient's own meal-logging
+// flow already uses (see controllers/patient/dietController.js's
+// `m.servings || 1` multiplications) - how much of this recipe the
+// dietician actually prescribed for this slot (e.g. 3 chapatis, or 400g of
+// Chole), not just whether it was picked. Defaults to 1 so older payloads
+// without it (or a bad value) still behave exactly as before.
 const cleanSelectedMeals = (rawSelectedMeals) =>
-  (Array.isArray(rawSelectedMeals) ? rawSelectedMeals : []).filter(
-    (meal) =>
-      meal &&
-      typeof meal.servingTime === 'string' &&
-      typeof meal.recipeId === 'string' &&
-      meal.recipeId.trim().length > 0
-  );
+  (Array.isArray(rawSelectedMeals) ? rawSelectedMeals : [])
+    .filter(
+      (meal) =>
+        meal &&
+        typeof meal.servingTime === 'string' &&
+        typeof meal.recipeId === 'string' &&
+        meal.recipeId.trim().length > 0 &&
+        DAY_GROUPS.includes(meal.dayGroup)
+    )
+    .map((meal) => ({
+      dayGroup: meal.dayGroup,
+      servingTime: meal.servingTime,
+      recipeId: meal.recipeId,
+      servings: typeof meal.servings === 'number' && meal.servings > 0 ? meal.servings : 1,
+      // Only meaningful for recipes with a secondaryComponent (e.g. the
+      // seeds/chikki mix-in alongside a fruit) - omitted (not defaulted to
+      // 1) for every ordinary recipe so it doesn't show up as spurious data.
+      ...(typeof meal.secondaryServings === 'number' && meal.secondaryServings > 0
+        ? { secondaryServings: meal.secondaryServings }
+        : {}),
+    }));
+
+// 'Weight Loss'/'Fat Loss' -> smaller default portions; every other goal
+// (Weight Gain, Muscle Gain, Weight Maintenance, Healthy Weight Management)
+// -> the less-restrictive weight-gain-style portions, since none of those
+// are actively cutting calories. Drives the dietician app's trend-aware
+// sabji/side/salad default quantities and stepper clamps (patients_
+// controller.dart) - purely a display/default concern, not persisted.
+const LOSS_GOALS = new Set(['Weight Loss', 'Fat Loss']);
+async function resolveWeightTrend(patientId) {
+  const patient = await User.findById(patientId).select('healthProfile.primaryGoal').lean();
+  const primaryGoal = patient?.healthProfile?.primaryGoal;
+  return LOSS_GOALS.has(primaryGoal) ? 'loss' : 'gain';
+}
 
 /**
  * @desc    List patients for dietician dashboard tabs (New/Ongoing/Past) with pagination, powering both dashboard top-3 and full "See all" lists
@@ -126,6 +179,8 @@ exports.listPatientsForDietician = async (req, res, next) => {
           weight,
           height,
           bmi,
+          bmr,
+          tdee,
           primaryGoal: healthProfile.primaryGoal || null,
           activityLevel: healthProfile.activityLevel || null,
           requestId: request._id.toString(),
@@ -237,22 +292,10 @@ exports.listPatientsForDietician = async (req, res, next) => {
         const startWeight = patient.weight || 0;
         let currentWeight = startWeight;
         if (plan && logs.length > 0) {
-          // Simple: sum total surplus/deficit from activation
-          const heightVal = patient.height && patient.height >= 100 ? patient.height : 170;
-          const ageEst = 30; // rough estimate since we don't have DOB here
-          const bmrEst = patient.weight
-            ? 10 * patient.weight + 6.25 * heightVal - 5 * ageEst + 5
-            : 1800;
-          const actMultiplier = {
-            Sedentary: 1.2,
-            'Lightly Activity': 1.375,
-            'Lightly Active': 1.375,
-            'Moderately Activity': 1.55,
-            Moderate: 1.55,
-            'Very Active': 1.725,
-            'Extra Active': 1.9,
-          };
-          const tdeeEst = bmrEst * (actMultiplier[patient.activityLevel] || 1.55);
+          // Simple: sum total surplus/deficit from activation - tdee is
+          // already computed above with the patient's real age/gender via
+          // calcBmr/calcTdee, no need to re-derive it here.
+          const tdeeEst = patient.tdee || 1800;
 
           let totalSurplus = 0;
           for (const log of logs) {
@@ -385,9 +428,15 @@ exports.markPatientCompleted = async (req, res, next) => {
           .lean();
 
         if (logs.length > 0) {
+          // request.gender/dateOfBirth/activityLevel are the frozen
+          // snapshot taken at request time - already loaded, no extra
+          // populate needed, and accurate (age/gender don't change in a
+          // way that matters over a few weeks).
+          const age = calcAge(request.dateOfBirth);
           const bmrEst =
-            startWeight && heightM ? 10 * startWeight + 6.25 * (heightM * 100) - 5 * 30 + 5 : 1800;
-          const tdeeEst = bmrEst * 1.55;
+            calcBmr({ weight: startWeight, height: heightM ? heightM * 100 : null, age, gender: request.gender }) ||
+            1800;
+          const tdeeEst = calcTdee(bmrEst, request.activityLevel) || bmrEst * 1.55;
           let totalSurplus = 0;
           for (const log of logs) {
             totalSurplus += (log.totalCalories || 0) - tdeeEst;
@@ -566,6 +615,214 @@ exports.sendPaymentRequest = async (req, res, next) => {
 };
 
 /**
+ * Shared AI-generation pipeline: recipe-pool filtering, prompt-injection
+ * safety check, the AI call scoped to weekNumbers, deterministic validation,
+ * risk-flagging, and merging the result into dietPlan.generatedPlan. Used by
+ * both the initial createAndGenerateDietPlan (weekNumbers derived from
+ * membership tier) and generateWeekForExistingPlan (a later tier-gated
+ * regeneration of specific weeks) so the two never drift apart.
+ *
+ * dietPlan must already be saved with patientId/firstConsultation populated.
+ * Mutates and saves dietPlan. Returns { ok: true, validationWarnings,
+ * riskFlags } or { ok: false, status, message } (e.g. a safety-check block)
+ * for the caller to turn into an HTTP response.
+ */
+exports.runDietPlanGeneration = runDietPlanGeneration;
+
+async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
+  const patientId = dietPlan.patientId?._id?.toString() || dietPlan.patientId?.toString();
+  const firstConsultationId =
+    dietPlan.firstConsultation?._id?.toString() || dietPlan.firstConsultation?.toString();
+
+  const customAnswers = dietPlan.firstConsultation?.customAnswers || [];
+  const getAnswer = (fieldId) => getConsultationAnswer(customAnswers, fieldId);
+
+  const foodsToAvoidText = getAnswer(SAFETY_FIELD_IDS.FOODS_TO_AVOID) || '';
+  const finalNotesConcerns = getAnswer(SAFETY_FIELD_IDS.FINAL_NOTES_CONCERNS) || '';
+  const freeTextForSafetyCheck = [foodsToAvoidText, finalNotesConcerns].filter(Boolean).join('\n');
+  if (freeTextForSafetyCheck) {
+    const safety = await checkTextSafety(freeTextForSafetyCheck);
+    if (!safety.safe) {
+      return {
+        ok: false,
+        status: 422,
+        message:
+          "This patient's consultation notes couldn't be processed for AI generation — please review and rephrase them.",
+      };
+    }
+  }
+
+  const eatingStyleValue = getAnswer(SAFETY_FIELD_IDS.EATING_STYLE);
+  const eatingStyleFlag = mapEatingStyleToDietFlag(eatingStyleValue ? [eatingStyleValue] : []);
+
+  const recipeFilter = { dieticianId };
+  if (eatingStyleFlag) {
+    recipeFilter[`dietaryHabits.${eatingStyleFlag}`] = true;
+  }
+
+  const candidateRecipes = await Recipe.find(recipeFilter).select(
+    'name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags _id'
+  );
+
+  const allergyOptions = getAnswer(SAFETY_FIELD_IDS.ALLERGIES) || [];
+  const allergyOtherInfo = getAnswer(SAFETY_FIELD_IDS.ALLERGIES_OTHER) || '';
+
+  const excludedForAllergens = [];
+  const recipes = candidateRecipes.filter((r) => {
+    const conflicts = findAllergenConflicts({
+      ingredients: r.ingredients,
+      allergyOptions,
+      allergyOtherInfo,
+      foodsToAvoidText,
+    });
+    if (conflicts.length > 0) {
+      excludedForAllergens.push({ recipeId: r._id.toString(), name: r.name, conflicts });
+      return false;
+    }
+    return true;
+  });
+
+  const recipePool = recipes.map((r) => ({
+    id: r._id.toString(),
+    name: r.name,
+    servingTime: r.servingTime,
+    calories: r.nutrition?.calories || null,
+    protein: r.nutrition?.protein || null,
+    carbs: r.nutrition?.carbs || null,
+    fats: r.nutrition?.fats || null,
+    dietaryHabits: r.dietaryHabits || {},
+    freeFrom: r.freeFrom || {},
+    // Lets the AI identify accompaniments (side/salad) and their portions
+    // so it can compose a main + sides combo for Lunch/Dinner, instead of
+    // picking exactly one recipe per slot - see buildPrompt's combo rule.
+    tags: r.tags || [],
+    servingSize: r.servingSize || null,
+  }));
+
+  const generationStartedAt = Date.now();
+  const generatedText = await generateDietPlanWithAI({
+    patient: dietPlan.patientId,
+    firstConsultation: dietPlan.firstConsultation,
+    calorieStrategy: dietPlan.calorieStrategy,
+    macroStrategy: dietPlan.macroStrategy,
+    recipes: recipePool,
+    weekNumbers,
+  });
+  const generationLatencyMs = Date.now() - generationStartedAt;
+  const inputHash = crypto
+    .createHash('sha256')
+    .update(
+      JSON.stringify({
+        patientId,
+        firstConsultationId,
+        calorieStrategy: dietPlan.calorieStrategy,
+        macroStrategy: dietPlan.macroStrategy,
+        recipeIds: recipePool.map((r) => r.id).sort(),
+        weekNumbers,
+      })
+    )
+    .digest('hex');
+
+  let parsedGeneratedPlan = null;
+  try {
+    parsedGeneratedPlan = JSON.parse(generatedText);
+  } catch (_) {
+    // Leave null - validateDietPlan treats a missing/invalid plan as zero weeks.
+  }
+  const { warnings: newValidationWarnings } = validateDietPlan({
+    parsedPlan: parsedGeneratedPlan,
+    recipePool,
+    calorieStrategy: dietPlan.calorieStrategy,
+    weightTrend: await resolveWeightTrend(patientId),
+  });
+  if (excludedForAllergens.length > 0) {
+    newValidationWarnings.push(
+      `${excludedForAllergens.length} recipe(s) were excluded from selection due to a potential allergen/foods-to-avoid conflict: ${excludedForAllergens
+        .map((e) => e.name)
+        .join(', ')}.`
+    );
+  }
+
+  const newRiskFlags = [];
+  const patientProfile = dietPlan.patientId?.profile || {};
+  const patientHealth = dietPlan.patientId?.healthProfile || {};
+  const patientAge = calcAge(patientProfile.dateOfBirth);
+  if (typeof patientAge === 'number' && patientAge < 18) {
+    newRiskFlags.push('isMinor');
+  }
+  const requestedCalorieBudget = dietPlan.calorieStrategy?.calorieBudget;
+  const requestedProteinPercent = dietPlan.macroStrategy?.proteinPercent;
+  const patientWeight = patientHealth.weight;
+  if (
+    typeof requestedCalorieBudget === 'number' &&
+    typeof requestedProteinPercent === 'number' &&
+    typeof patientWeight === 'number' &&
+    patientWeight > 0
+  ) {
+    const requestedProteinG = (requestedCalorieBudget * (requestedProteinPercent / 100)) / 4;
+    const proteinTarget = calcProteinTargetG({
+      weightKg: patientWeight,
+      isCaloricDeficit: (dietPlan.calorieStrategy?.calorieDeficit || 0) > 0,
+    });
+    if (proteinTarget && requestedProteinG > proteinTarget.maxG) {
+      newRiskFlags.push('highProteinForWeight');
+    }
+  }
+  if (newRiskFlags.includes('isMinor') && newRiskFlags.includes('highProteinForWeight')) {
+    newRiskFlags.push('minorOnHighProteinPlan');
+  }
+
+  // Merge the newly generated week(s) into any existing generatedPlan
+  // instead of overwriting it wholesale, so a later regeneration of weeks
+  // 3-4 doesn't wipe out weeks 1-2 generated earlier.
+  let existingWeeks = [];
+  if (dietPlan.generatedPlan) {
+    try {
+      const existingParsed = JSON.parse(dietPlan.generatedPlan);
+      existingWeeks = Array.isArray(existingParsed?.weeks) ? existingParsed.weeks : [];
+    } catch (_) {
+      existingWeeks = [];
+    }
+  }
+  const newWeeks = Array.isArray(parsedGeneratedPlan?.weeks) ? parsedGeneratedPlan.weeks : [];
+  const newWeekNumbers = new Set(newWeeks.map((w) => w.week));
+  const mergedWeeks = [
+    ...existingWeeks.filter((w) => !newWeekNumbers.has(w.week)),
+    ...newWeeks,
+  ].sort((a, b) => a.week - b.week);
+
+  dietPlan.generatedPlan = JSON.stringify({ weeks: mergedWeeks });
+  dietPlan.generatedAt = new Date();
+  // Warnings/risk flags are already labeled per-week by validateDietPlan, so
+  // concatenating across generation runs (rather than replacing) keeps the
+  // full history visible instead of losing week 1's warnings when weeks 3-4
+  // are generated later. Dedupe defensively in case the same week is
+  // regenerated and produces an identical warning twice.
+  dietPlan.validationWarnings = [...new Set([...(dietPlan.validationWarnings || []), ...newValidationWarnings])];
+  dietPlan.riskFlags = [...new Set([...(dietPlan.riskFlags || []), ...newRiskFlags])];
+  dietPlan.modelSnapshot = config.openai.dietPlanModel;
+  dietPlan.inputHash = inputHash;
+  await dietPlan.save();
+
+  try {
+    await GenerationLog.create({
+      kind: 'dietPlan',
+      dieticianId,
+      refId: dietPlan._id,
+      model: config.openai.dietPlanModel,
+      inputHash,
+      latencyMs: generationLatencyMs,
+      validatorWarnings: newValidationWarnings,
+      succeeded: true,
+    });
+  } catch (logError) {
+    console.error('Failed to write GenerationLog entry:', logError.message);
+  }
+
+  return { ok: true, validationWarnings: newValidationWarnings, riskFlags: newRiskFlags };
+}
+
+/**
  * @desc    Create a diet plan and immediately generate AI content
  * @route   POST /api/dietician/patients/:patientId/diet-plans/generate
  * @access  Private (Dietician)
@@ -574,7 +831,8 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
   try {
     const { patientId } = req.params;
     const dieticianId = req.user._id;
-    const { requestId, firstConsultationId, calorieStrategy, macroStrategy } = req.body;
+    const { requestId, firstConsultationId, calorieStrategy, macroStrategy, startDate, currentWeight } =
+      req.body;
 
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
       return res.status(400).json({
@@ -643,6 +901,18 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       });
     }
 
+    const tier = getMembershipTier(dietPlanRequest.membershipPlan);
+    const weekNumbers = TIER_INITIAL_WEEKS[tier];
+    if (!weekNumbers) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'This patient has no recognized membership plan selected yet - a plan must be chosen before a diet plan can be generated.',
+      });
+    }
+
+    const parsedStartDate = startDate ? new Date(startDate) : undefined;
+
     const dietPlan = new DietPlan({
       patientId,
       dieticianId,
@@ -651,43 +921,39 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       calorieStrategy,
       macroStrategy,
       status: 'Draft',
+      ...(parsedStartDate && !Number.isNaN(parsedStartDate.getTime())
+        ? { startDate: parsedStartDate }
+        : {}),
     });
 
     await dietPlan.save();
+
+    // Log the weight that informed this plan's calorie strategy - keeps
+    // healthProfile.weight in sync the same way a patient's own log does,
+    // but with a real Progress entry instead of a blind overwrite.
+    const parsedWeight = typeof currentWeight === 'number' ? currentWeight : Number(currentWeight);
+    if (typeof parsedWeight === 'number' && !Number.isNaN(parsedWeight) && parsedWeight > 0) {
+      await logWeight(patientId, parsedWeight, {
+        dieticianId,
+        source: 'dietician',
+        dietPlanId: dietPlan._id,
+        week: 1,
+      });
+    }
 
     await dietPlan.populate([
       { path: 'patientId', select: 'profile healthProfile' },
       { path: 'firstConsultation' },
     ]);
 
-    const recipes = await Recipe.find({ dieticianId }).select(
-      'name servingTime dietaryHabits freeFrom nutrition _id'
-    );
-
-    const recipePool = recipes.map((r) => ({
-      id: r._id.toString(),
-      name: r.name,
-      servingTime: r.servingTime,
-      calories: r.nutrition?.calories || null,
-      protein: r.nutrition?.protein || null,
-      carbs: r.nutrition?.carbs || null,
-      fats: r.nutrition?.fats || null,
-      dietaryHabits: r.dietaryHabits || {},
-      freeFrom: r.freeFrom || {},
-    }));
-
-    const generatedText = await generateDietPlanWithAI({
-      patient: dietPlan.patientId,
-      firstConsultation: dietPlan.firstConsultation,
-      calorieStrategy: dietPlan.calorieStrategy,
-      macroStrategy: dietPlan.macroStrategy,
-      recipes: recipePool,
-    });
-
-    dietPlan.generatedPlan = generatedText;
-    dietPlan.generatedAt = new Date();
-    dietPlan.status = 'Draft';
-    await dietPlan.save();
+    // dietPlan.status is already 'Draft' from construction above -
+    // runDietPlanGeneration saves generatedPlan/validationWarnings/etc.
+    // without touching status, which is what a later regeneration (that
+    // must not downgrade an already-Finalized/Active plan) needs too.
+    const generationResult = await runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers });
+    if (!generationResult.ok) {
+      return res.status(generationResult.status).json({ success: false, message: generationResult.message });
+    }
 
     // Update patient status with requestId if it was auto-created
     await User.findByIdAndUpdate(patientId, {
@@ -704,6 +970,123 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
         dietPlanId: dietPlan._id,
         status: dietPlan.status,
         generatedPlan: dietPlan.generatedPlan,
+        riskFlags: dietPlan.riskFlags,
+        validationWarnings: dietPlan.validationWarnings,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Generate (or regenerate) specific week(s) of an existing diet
+ *          plan - the dietician-initiated cadence for Golden (weeks 3-4,
+ *          once week 2 is finalized) and Platinum (one week at a time, each
+ *          gated on the immediately-prior week being finalized) tiers.
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/generate-week
+ * @access  Private (Dietician)
+ */
+exports.generateWeekForExistingPlan = async (req, res, next) => {
+  try {
+    const { patientId, dietPlanId } = req.params;
+    const dieticianId = req.user._id;
+    const { weekNumbers, currentWeight, calorieStrategy, macroStrategy } = req.body;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(patientId) ||
+      !mongoose.Types.ObjectId.isValid(dietPlanId)
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid patient or diet plan id' });
+    }
+
+    if (
+      !Array.isArray(weekNumbers) ||
+      weekNumbers.length === 0 ||
+      weekNumbers.some((w) => !Number.isInteger(w) || w < 1 || w > 4)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'weekNumbers must be a non-empty array of integers between 1 and 4',
+      });
+    }
+    const sortedWeekNumbers = [...weekNumbers].sort((a, b) => a - b);
+
+    if (!calorieStrategy || !macroStrategy) {
+      return res.status(400).json({
+        success: false,
+        message: 'calorieStrategy and macroStrategy are required',
+      });
+    }
+
+    const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId }).populate([
+      { path: 'request' },
+      { path: 'patientId', select: 'profile healthProfile' },
+      { path: 'firstConsultation' },
+    ]);
+
+    if (!dietPlan) {
+      return res.status(404).json({ success: false, message: 'Diet plan not found for this patient' });
+    }
+
+    const tier = getMembershipTier(dietPlan.request?.membershipPlan);
+
+    let existingWeekNumbers = [];
+    if (dietPlan.generatedPlan) {
+      try {
+        const parsed = JSON.parse(dietPlan.generatedPlan);
+        existingWeekNumbers = Array.isArray(parsed?.weeks) ? parsed.weeks.map((w) => w.week) : [];
+      } catch (_) {
+        existingWeekNumbers = [];
+      }
+    }
+    const finalizedWeekNumbers = Array.isArray(dietPlan.finalizedPlan?.weeks)
+      ? dietPlan.finalizedPlan.weeks.map((w) => w.week)
+      : [];
+
+    const validation = validateRegenerateRequest({
+      tier,
+      weekNumbers: sortedWeekNumbers,
+      existingWeekNumbers,
+      finalizedWeekNumbers,
+    });
+    if (!validation.ok) {
+      return res.status(403).json({ success: false, message: validation.message });
+    }
+
+    // The newly submitted strategy becomes "current" - weeksSummary (written
+    // at finalize time, per-week) is what preserves each week's actual
+    // historical breakdown even as this top-level field moves forward.
+    dietPlan.calorieStrategy = calorieStrategy;
+    dietPlan.macroStrategy = macroStrategy;
+
+    const parsedWeight = typeof currentWeight === 'number' ? currentWeight : Number(currentWeight);
+    if (typeof parsedWeight === 'number' && !Number.isNaN(parsedWeight) && parsedWeight > 0) {
+      await logWeight(patientId, parsedWeight, {
+        dieticianId,
+        source: 'dietician',
+        dietPlanId: dietPlan._id,
+        week: sortedWeekNumbers[0],
+      });
+    }
+
+    const generationResult = await runDietPlanGeneration({
+      dietPlan,
+      dieticianId,
+      weekNumbers: sortedWeekNumbers,
+    });
+    if (!generationResult.ok) {
+      return res.status(generationResult.status).json({ success: false, message: generationResult.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        dietPlanId: dietPlan._id,
+        status: dietPlan.status,
+        generatedPlan: dietPlan.generatedPlan,
+        riskFlags: dietPlan.riskFlags,
+        validationWarnings: dietPlan.validationWarnings,
       },
     });
   } catch (error) {
@@ -814,6 +1197,8 @@ exports.getDietPlanDetails = async (req, res, next) => {
         status: dietPlan.status,
         weeks: parsedPlan.weeks || [],
         recipes: recipeMap,
+        riskFlags: dietPlan.riskFlags || [],
+        validationWarnings: dietPlan.validationWarnings || [],
       },
     });
   } catch (error) {
@@ -890,59 +1275,16 @@ exports.getFinalizedWeekDetails = async (req, res, next) => {
       proteinGrams: summaryEntry?.proteinGrams ?? 0,
     };
 
-    const selectedByServingTime = {};
-    (currentWeekEntry.dailyMeals || []).forEach((meal) => {
-      if (meal?.servingTime && meal?.recipeId) {
-        selectedByServingTime[meal.servingTime] = meal.recipeId.toString();
-      }
-    });
+    const [recipeDocs, weightTrend] = await Promise.all([
+      fetchRecipePoolForOptions({ Recipe, dieticianId }),
+      resolveWeightTrend(patientId),
+    ]);
 
-    const nextWeekRecipeIds = new Set();
-    if (nextWeekEntry && Array.isArray(nextWeekEntry.dailyMeals)) {
-      nextWeekEntry.dailyMeals.forEach((meal) => {
-        if (meal?.recipeId) {
-          nextWeekRecipeIds.add(meal.recipeId.toString());
-        }
-      });
-    }
-
-    const recipeDocs = await Recipe.find({ dieticianId })
-      .select('name servingTime nutrition image ingredients servingSize _id') // Added servingSize
-      .lean();
-
-    const recipesByServingTime = recipeDocs.reduce((acc, recipe) => {
-      const key = recipe.servingTime || 'Other';
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(recipe);
-      return acc;
-    }, {});
-
-    const servingTimes = REQUIRED_SERVING_TIMES.map((servingTime) => {
-      const selectedRecipeId = selectedByServingTime[servingTime] || null;
-      const recipesForTime = (recipesByServingTime[servingTime] || []).map((recipe) => {
-        const id = recipe._id.toString();
-        return {
-          id,
-          name: recipe.name || null,
-          image: recipe.image || null,
-          nutrition: recipe.nutrition || null,
-          servingTime: recipe.servingTime || servingTime,
-          servingSize: recipe.servingSize || null, // Added servingSize
-          isSelected: selectedRecipeId ? id === selectedRecipeId : false,
-          nextWeekTag:
-            parsedWeekNumber < 4 && nextWeekRecipeIds.has(id)
-              ? `Week ${parsedWeekNumber + 1}`
-              : null,
-        };
-      });
-
-      return {
-        servingTime,
-        selectedRecipeId,
-        recipes: recipesForTime,
-      };
+    const dayGroups = buildDayGroupsOptions({
+      recipeDocs,
+      dailyMeals: currentWeekEntry.dailyMeals || [],
+      nextWeekDailyMeals: nextWeekEntry?.dailyMeals || [],
+      currentWeekNumber: parsedWeekNumber,
     });
 
     return res.status(200).json({
@@ -951,7 +1293,126 @@ exports.getFinalizedWeekDetails = async (req, res, next) => {
         dietPlanId: dietPlan._id,
         week: parsedWeekNumber,
         summary,
-        servingTimes,
+        dayGroups,
+        weightTrend,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    View a not-yet-finalized (AI-generated Draft) week's recipe
+ *          options - the same shape as getFinalizedWeekDetails, but reads
+ *          `generatedPlan` and works for any diet plan status, so the
+ *          dietician can review/select from the full options pool (not
+ *          just the AI's single pick per slot) before finalizing.
+ * @route   GET /api/dietician/patients/:patientId/diet-plans/:dietPlanId/weeks/:weekNumber/draft-options
+ * @access  Private (Dietician)
+ */
+exports.getDraftWeekOptions = async (req, res, next) => {
+  try {
+    const { patientId, dietPlanId, weekNumber } = req.params;
+    const dieticianId = req.user._id;
+
+    const parsedWeekNumber = Number(weekNumber);
+    if (!Number.isInteger(parsedWeekNumber) || parsedWeekNumber < 1 || parsedWeekNumber > 4) {
+      return res.status(400).json({
+        success: false,
+        message: 'weekNumber must be an integer between 1 and 4',
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(patientId) ||
+      !mongoose.Types.ObjectId.isValid(dietPlanId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid patient or diet plan id',
+      });
+    }
+
+    const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId }).lean();
+
+    if (!dietPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Diet plan not found for this patient',
+      });
+    }
+
+    let parsedPlan;
+    try {
+      parsedPlan = dietPlan.generatedPlan ? JSON.parse(dietPlan.generatedPlan) : { weeks: [] };
+    } catch (err) {
+      return res.status(422).json({
+        success: false,
+        message: 'Generated plan is not valid JSON',
+      });
+    }
+
+    const planWeeks = Array.isArray(parsedPlan.weeks) ? parsedPlan.weeks : [];
+    const currentWeekEntry = planWeeks.find((entry) => entry?.week === parsedWeekNumber);
+
+    if (!currentWeekEntry) {
+      return res.status(404).json({
+        success: false,
+        message: 'This week has not been generated yet',
+      });
+    }
+
+    const nextWeekEntry =
+      parsedWeekNumber < 4 ? planWeeks.find((entry) => entry?.week === parsedWeekNumber + 1) : null;
+
+    const [recipeDocs, weightTrend] = await Promise.all([
+      fetchRecipePoolForOptions({ Recipe, dieticianId }),
+      resolveWeightTrend(patientId),
+    ]);
+
+    const dayGroups = buildDayGroupsOptions({
+      recipeDocs,
+      dailyMeals: currentWeekEntry.dailyMeals || [],
+      nextWeekDailyMeals: nextWeekEntry?.dailyMeals || [],
+      currentWeekNumber: parsedWeekNumber,
+    });
+
+    // Summary = the AI's actually-selected recipes' nutrition totals across
+    // every day-group's picks for this week (an "all varieties combined"
+    // figure, not one representative day) - superseded by the dietician
+    // app's own live per-day-group totals (calculateTotalsForWeek), kept
+    // here mainly for response-shape compatibility.
+    const selectedRecipeIds = [
+      ...new Set(
+        (currentWeekEntry.dailyMeals || [])
+          .filter((m) => m?.recipeId)
+          .map((m) => m.recipeId.toString())
+      ),
+    ];
+    const nutritionById = new Map(recipeDocs.map((r) => [r._id.toString(), r.nutrition || {}]));
+    const summary = selectedRecipeIds.reduce(
+      (acc, id) => {
+        const n = nutritionById.get(id) || {};
+        acc.totalCalories += n.calories || 0;
+        acc.fatGrams += n.fats || 0;
+        acc.carbGrams += n.carbs || 0;
+        acc.proteinGrams += n.protein || 0;
+        return acc;
+      },
+      { totalCalories: 0, fatPercent: 0, fatGrams: 0, carbPercent: 0, carbGrams: 0, proteinPercent: 0, proteinGrams: 0 }
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        dietPlanId: dietPlan._id,
+        week: parsedWeekNumber,
+        summary,
+        dayGroups,
+        weightTrend,
+        riskFlags: dietPlan.riskFlags || [],
+        validationWarnings: dietPlan.validationWarnings || [],
       },
     });
   } catch (error) {
@@ -983,12 +1444,20 @@ exports.finalizeWeekPlan = async (req, res, next) => {
 
     const cleanedSelectedMeals = cleanSelectedMeals(req.body.selectedMeals);
 
-    const normalizedMeals = REQUIRED_SERVING_TIMES.map((servingTime) => {
-      const match = cleanedSelectedMeals.find((meal) => meal.servingTime === servingTime);
-      return {
-        servingTime,
-        recipeId: match ? match.recipeId : null,
-      };
+    // Keep every selected recipe for a slot (not just one) - a Lunch/Dinner
+    // slot legitimately holds a main dish plus separately-selected sides/
+    // salad, each its own dailyMeals entry sharing the same dayGroup+
+    // servingTime. De-dupe exact {dayGroup, servingTime, recipeId} repeats
+    // defensively - the same recipe/slot legitimately repeats across
+    // *different* day-groups (e.g. Chapati at Monday-group's Lunch AND
+    // Tuesday-group's Lunch), so dayGroup must be part of the key.
+    const seenMealKeys = new Set();
+    const normalizedMeals = cleanedSelectedMeals.filter((meal) => {
+      if (!REQUIRED_SERVING_TIMES.includes(meal.servingTime)) return false;
+      const key = `${meal.dayGroup}|${meal.servingTime}|${meal.recipeId}`;
+      if (seenMealKeys.has(key)) return false;
+      seenMealKeys.add(key);
+      return true;
     });
 
     if (
@@ -1041,15 +1510,23 @@ exports.finalizeWeekPlan = async (req, res, next) => {
       return Number.isFinite(parsed) ? parsed : 0;
     };
 
+    const totalCaloriesForWeek = toNum(summaryPayload.totalCalories);
     const normalizedSummary = {
       week: weekNumber,
-      totalCalories: toNum(summaryPayload.totalCalories),
+      totalCalories: totalCaloriesForWeek,
       fatPercent: toNum(summaryPayload.fatPercent),
       fatGrams: toNum(summaryPayload.fatGrams),
       carbPercent: toNum(summaryPayload.carbPercent),
       carbGrams: toNum(summaryPayload.carbGrams),
       proteinPercent: toNum(summaryPayload.proteinPercent),
       proteinGrams: toNum(summaryPayload.proteinGrams),
+      // Prefer an actual sum from the selected recipes if the client sent
+      // one; otherwise fall back to the standard 14g/1000kcal heuristic so
+      // this field is never left at its dead default of 0.
+      fiberGrams:
+        summaryPayload.fiberGrams !== undefined && summaryPayload.fiberGrams !== null
+          ? toNum(summaryPayload.fiberGrams)
+          : Math.round((totalCaloriesForWeek / 1000) * 14),
     };
 
     if (!Array.isArray(dietPlan.weeksSummary)) {
@@ -1096,17 +1573,17 @@ exports.finalizeWeekPlan = async (req, res, next) => {
       }
     }
 
-    // Update patient weight if provided (for week 2/3/4 recalculations)
+    // Log the weight used for this week's recalculation (for week 2/3/4) -
+    // a real Progress entry instead of a blind healthProfile overwrite, so
+    // there's an auditable record of what weight informed which week.
     const currentWeight = Number(req.body?.currentWeight);
     if (currentWeight > 0 && Number.isFinite(currentWeight)) {
-      const patient = await User.findById(patientId);
-      if (patient && patient.healthProfile) {
-        patient.healthProfile.weight = currentWeight;
-        // Recalculate BMI: weight / (height/100)^2
-        const heightM = (patient.healthProfile.height || 170) / 100;
-        patient.healthProfile.bmi = parseFloat((currentWeight / (heightM * heightM)).toFixed(1));
-        await patient.save();
-      }
+      await logWeight(patientId, currentWeight, {
+        dieticianId,
+        source: 'dietician',
+        dietPlanId: dietPlan._id,
+        week: weekNumber,
+      });
     }
 
     return res.status(200).json({
@@ -1213,12 +1690,15 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
 
       // Removed validation for missing servingTimes
 
-      const normalizedMeals = REQUIRED_SERVING_TIMES.map((servingTime) => {
-        const match = cleanedDailyMeals.find((meal) => meal.servingTime === servingTime);
-        return {
-          servingTime,
-          recipeId: match ? match.recipeId : null,
-        };
+      // Keep every selected recipe for a slot (not just one) - see the
+      // matching fix/comment in finalizeWeekPlan above.
+      const seenMealKeys = new Set();
+      const normalizedMeals = cleanedDailyMeals.filter((meal) => {
+        if (!REQUIRED_SERVING_TIMES.includes(meal.servingTime)) return false;
+        const key = `${meal.dayGroup}|${meal.servingTime}|${meal.recipeId}`;
+        if (seenMealKeys.has(key)) return false;
+        seenMealKeys.add(key);
+        return true;
       });
 
       normalizedWeeks.push({
@@ -1227,15 +1707,20 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
       });
 
       const summaryPayload = weekEntry.summary || {};
+      const totalCaloriesForWeek = toNum(summaryPayload.totalCalories);
       normalizedSummaries.push({
         week: weekEntry.week,
-        totalCalories: toNum(summaryPayload.totalCalories),
+        totalCalories: totalCaloriesForWeek,
         fatPercent: toNum(summaryPayload.fatPercent),
         fatGrams: toNum(summaryPayload.fatGrams),
         carbPercent: toNum(summaryPayload.carbPercent),
         carbGrams: toNum(summaryPayload.carbGrams),
         proteinPercent: toNum(summaryPayload.proteinPercent),
         proteinGrams: toNum(summaryPayload.proteinGrams),
+        fiberGrams:
+          summaryPayload.fiberGrams !== undefined && summaryPayload.fiberGrams !== null
+            ? toNum(summaryPayload.fiberGrams)
+            : Math.round((totalCaloriesForWeek / 1000) * 14),
       });
     });
 

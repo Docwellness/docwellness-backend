@@ -2,6 +2,8 @@ const { DietPlan, Recipe, MealLog, Chat, Conversation } = require('../../models'
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -156,12 +158,21 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         : null;
 
     if (week) {
+      // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
+      // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) instead
+      // of one flat meal set applying to all 7 days - filter down to just
+      // the group referenceDate actually falls into. A meal with no
+      // dayGroup (pre-migration plans) matches every group, so old plans
+      // keep returning their full unfiltered set exactly as before.
+      const todayDayGroup = resolveDayGroupForDate(referenceDate);
       const weekWithFixedMeals = {
         ...week,
-        dailyMeals: week.dailyMeals.map((meal) => ({
-          ...meal,
-          recipeId: meal.recipeId || '',
-        })),
+        dailyMeals: week.dailyMeals
+          .filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
+          .map((meal) => ({
+            ...meal,
+            recipeId: meal.recipeId || '',
+          })),
       };
 
       return res.status(200).json({
@@ -172,6 +183,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           activationDate: dietPlan.activationDate || null,
           currentWeek,
           totalWeeks,
+          dayGroup: todayDayGroup,
           weekSummary, // single object for the current week
           week: weekWithFixedMeals, // the current week’s dailyMeals with fixed recipeId
           recipes, // keep as-is (all recipes map)
@@ -1102,7 +1114,7 @@ exports.addMealNote = async (req, res, next) => {
     let imageUrl = null;
     if (file) {
       const result = await cloudinary.uploader.upload(file.path, {
-        folder: 'docwellness/meal-notes',
+        folder: cloudinaryUserFolder(senderId, 'meal-notes'),
       });
       imageUrl = result.secure_url;
       await fs.unlink(file.path).catch(() => { });

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const CustomFoodRequest = require('../models/CustomFoodRequest');
 const config = require('../config/environment');
 const cloudinary = require('../config/cloudinary');
+const { cloudinaryUserFolder } = require('../utils/cloudinaryFolder');
 const fs = require('fs/promises');
 const { getChatIO } = require('../chat');
 const { ConversationV1, MessageV1 } = require('../chat/models');
@@ -381,12 +382,20 @@ exports.sendMessage = async (req, res, next) => {
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/chat',
+        folder: cloudinaryUserFolder(senderId, 'chat'),
       });
       attachmentUrl = result.secure_url;
       messageType = 'image';
 
       await fs.unlink(req.file.path).catch(() => { });
+    } else if (messageType === 'image' && message) {
+      // Client already uploaded the image separately (e.g. via
+      // /chat/upload-image) and is sending just the resulting URL - treat it
+      // as the attachment, not free-text message content, matching the
+      // multipart upload path above. Without this, image sends that go
+      // through this JSON path ended up with attachment: null and the URL
+      // sitting in the text message field instead.
+      attachmentUrl = message;
     }
 
     if (!message && !attachmentUrl) {
@@ -431,7 +440,7 @@ exports.sendMessage = async (req, res, next) => {
       conversationId: conversation._id,
       senderId,
       receiverId,
-      message: message || (messageType === 'image' ? '' : ''),
+      message: messageType === 'image' ? '' : message || '',
       messageType,
       attachment: attachmentUrl,
       replyTo: replyTo || null,
@@ -463,7 +472,7 @@ exports.sendMessage = async (req, res, next) => {
           conversationId: conversation._id,
           senderId: senderId,
           receiverId: receiverId,
-          content: message || '',
+          content: messageType === 'image' ? '' : message || '',
           type: messageType,
           attachment: attachmentUrl,
           replyTo: populatedMessage.replyTo,
@@ -540,7 +549,7 @@ exports.uploadChatImage = async (req, res, next) => {
     }
 
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/chat',
+      folder: cloudinaryUserFolder(req.user._id, 'chat'),
     });
 
     await fs.unlink(req.file.path).catch(() => { });

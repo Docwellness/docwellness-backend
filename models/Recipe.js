@@ -39,12 +39,24 @@ const recipeSchema = new mongoose.Schema(
         'Low Carb',
         'Detox',
         'Other',
+        'Western',
       ],
       default: 'Indian',
     },
     cuisine: {
       type: String,
       trim: true,
+    },
+    // Cross-cutting role tags, independent of `category` - e.g. a Jowar
+    // Bhakri stays category:'Indian' + servingTime:'Lunch' (so it still
+    // shows under the Indian/Lunch browsing) while ALSO being tagged
+    // 'side' so it surfaces in the dedicated Sides shortcut section.
+    // Extend this enum additively for future cross-cutting sections, same
+    // convention as `category`.
+    tags: {
+      type: [String],
+      enum: ['side', 'salad'],
+      default: [],
     },
     servings: {
       type: Number,
@@ -73,6 +85,21 @@ const recipeSchema = new mongoose.Schema(
     servingSize: {
       quantity: { type: Number, default: null },
       unit: { type: String, default: null },
+    },
+    // For a handful of compound snacks (e.g. "Banana with Roasted Chana and
+    // Seeds") that combine a countable fruit with a scoopable mix-in -
+    // servingSize represents the primary component (the fruit, in pieces),
+    // this represents the second one (e.g. seeds/chikki, in tbsp/grams) -
+    // the dietician app renders a second independent +/- stepper for it
+    // when present. Absent (undefined) for every ordinary single-quantity
+    // recipe.
+    secondaryComponent: {
+      type: {
+        label: { type: String },
+        quantity: { type: Number },
+        unit: { type: String },
+      },
+      default: undefined,
     },
     ingredients: [
       {
@@ -106,7 +133,7 @@ const recipeSchema = new mongoose.Schema(
         priceLevel: {
           type: String,
           enum: ['$', '$$', '$$$', '₹', '₹₹', '₹₹₹', '£', '££', '£££'],
-          default: '$$',
+          default: '₹₹',
         },
         description: { type: String, default: '' },
         image: String,

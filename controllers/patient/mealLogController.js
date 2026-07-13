@@ -4,6 +4,7 @@ const Conversation = require('../../models/Conversation');
 const DietPlan = require('../../models/DietPlan');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const fs = require('fs/promises');
 
 // v1 Chat Integration
@@ -391,7 +392,7 @@ exports.addMealNote = async (req, res, next) => {
     let imageUrl = null;
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'docwellness/meal-notes',
+        folder: cloudinaryUserFolder(patientId, 'meal-notes'),
       });
       imageUrl = result.secure_url;
       await fs.unlink(req.file.path).catch(() => {});

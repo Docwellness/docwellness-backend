@@ -6,6 +6,7 @@
 const JourneyImage = require('../../models/JourneyImage');
 const Progress = require('../../models/Progress');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const fs = require('fs').promises;
 
 /**
@@ -56,7 +57,7 @@ exports.uploadJourneyImage = async (req, res, next) => {
 
     if (beforeFile) {
       const result = await cloudinary.uploader.upload(beforeFile.path, {
-        folder: 'docwellness/journey',
+        folder: cloudinaryUserFolder(patientId, 'journey'),
       });
       beforeImageUrl = result.secure_url;
       await fs.unlink(beforeFile.path).catch(() => {});
@@ -64,7 +65,7 @@ exports.uploadJourneyImage = async (req, res, next) => {
 
     if (afterFile) {
       const result = await cloudinary.uploader.upload(afterFile.path, {
-        folder: 'docwellness/journey',
+        folder: cloudinaryUserFolder(patientId, 'journey'),
       });
       afterImageUrl = result.secure_url;
       await fs.unlink(afterFile.path).catch(() => {});
@@ -121,7 +122,7 @@ exports.updateJourneyImage = async (req, res, next) => {
     const beforeFile = req.files?.beforeImage?.[0];
     if (beforeFile) {
       const result = await cloudinary.uploader.upload(beforeFile.path, {
-        folder: 'docwellness/journey',
+        folder: cloudinaryUserFolder(patientId, 'journey'),
       });
       await fs.unlink(beforeFile.path).catch(() => {});
       journeyImage.beforeImageUrl = result.secure_url;
@@ -131,7 +132,7 @@ exports.updateJourneyImage = async (req, res, next) => {
     const afterFile = req.files?.afterImage?.[0];
     if (afterFile) {
       const result = await cloudinary.uploader.upload(afterFile.path, {
-        folder: 'docwellness/journey',
+        folder: cloudinaryUserFolder(patientId, 'journey'),
       });
       await fs.unlink(afterFile.path).catch(() => {});
       journeyImage.afterImageUrl = result.secure_url;

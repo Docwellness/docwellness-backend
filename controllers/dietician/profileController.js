@@ -6,6 +6,7 @@
 const fs = require('fs/promises');
 const { User } = require('../../models');
 const cloudinary = require('../../config/cloudinary');
+const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 
 /**
  * @desc    Get dietician profile
@@ -105,7 +106,7 @@ exports.uploadDoctorProfileImage = async (req, res, next) => {
     }
 
     const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'docwellness/profiles',
+      folder: cloudinaryUserFolder(req.user._id, 'profiles'),
     });
     await fs.unlink(req.file.path).catch(() => {});
     const imageUrl = uploadResult.secure_url;

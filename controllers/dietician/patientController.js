@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const {
   User,
   DietPlan,
@@ -5,6 +6,7 @@ const {
   FirstConsultation,
   ManualPaymentProof,
 } = require('../../models');
+const { getMembershipTier } = require('../../utils/membershipTiers');
 
 const formatDate = (value) => {
   if (!value) {
@@ -58,21 +60,14 @@ exports.getPatientProfile = async (req, res, next) => {
       });
     }
 
-    const [firstConsultation, dietPlanForSummary, latestRequest] = await Promise.all([
+    const [firstConsultation, latestRequest] = await Promise.all([
       FirstConsultation.findOne({ patient: patient._id })
         .sort({ createdAt: 1 })
         .select('_id')
         .lean(),
-      DietPlan.findOne({
-        patientId: patient._id,
-        status: { $in: ['Finalized', 'Active'] },
-      })
-        .sort({ createdAt: -1 })
-        .select('_id status weeksSummary')
-        .lean(),
       DietPlanRequest.findOne({ patient: patient._id })
         .sort({ createdAt: -1 })
-        .select('_id status latestPaymentProof')
+        .select('_id status latestPaymentProof startDateForDiet membershipPlan')
         .lean(),
     ]);
 
@@ -97,8 +92,29 @@ exports.getPatientProfile = async (req, res, next) => {
     const rawTargetWeight = patient.healthProfile?.targetWeight;
 
     const statusSnapshot = patient.status || {};
-    const activeDietPlan =
-      dietPlanForSummary && dietPlanForSummary.status === 'Active' ? dietPlanForSummary : null;
+
+    // Prefer the patient's tracked activeDietPlanId - set as soon as any
+    // generation happens, even while the plan is still Draft - so weekly
+    // card state (which weeks are generated vs. finalized) is visible
+    // before the plan reaches Finalized/Active. Falls back to the newest
+    // Finalized/Active plan for older records predating this being set
+    // unconditionally.
+    let dietPlanForSummary = null;
+    if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
+      dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
+        .select('_id status weeksSummary generatedPlan')
+        .lean();
+    }
+    if (!dietPlanForSummary) {
+      dietPlanForSummary = await DietPlan.findOne({
+        patientId: patient._id,
+        status: { $in: ['Finalized', 'Active'] },
+      })
+        .sort({ createdAt: -1 })
+        .select('_id status weeksSummary generatedPlan')
+        .lean();
+    }
+
     const weeklyDietPlans = Array.isArray(dietPlanForSummary?.weeksSummary)
       ? dietPlanForSummary.weeksSummary.map((weekEntry) => ({
         week: weekEntry.week,
@@ -106,15 +122,23 @@ exports.getPatientProfile = async (req, res, next) => {
       }))
       : [];
 
-    const latestPlan = await DietPlan.findOne({
-      patientId: patient._id,
-      status: { $in: ['Finalized', 'Active'] },
-    })
-      .sort({ createdAt: -1 })
-      .select('_id')
-      .lean();
+    // Which weeks have AI-generated content ready for meal selection, even
+    // before finalization (weeklyDietPlans/weeksSummary only reflects
+    // finalized weeks) - lets the frontend distinguish "generated, tap to
+    // pick meals" from "not yet generated" for the tier-gated regeneration UI.
+    let generatedWeekNumbers = [];
+    if (dietPlanForSummary?.generatedPlan) {
+      try {
+        const parsedGeneratedPlan = JSON.parse(dietPlanForSummary.generatedPlan);
+        generatedWeekNumbers = Array.isArray(parsedGeneratedPlan?.weeks)
+          ? parsedGeneratedPlan.weeks.map((w) => w.week)
+          : [];
+      } catch (_) {
+        generatedWeekNumbers = [];
+      }
+    }
 
-    const activeDietPlanId = statusSnapshot.activeDietPlanId || latestPlan?._id || null;
+    const activeDietPlanId = statusSnapshot.activeDietPlanId || dietPlanForSummary?._id || null;
 
     res.status(200).json({
       success: true,
@@ -130,6 +154,7 @@ exports.getPatientProfile = async (req, res, next) => {
           profileImage: patient.profile?.profileImage || null,
         },
         healthSummary: {
+          startDateForDiet: formatDate(latestRequest?.startDateForDiet),
           height: patient.healthProfile?.height ?? null,
           weight: patient.healthProfile?.weight ?? null,
           bmi: patient.healthProfile?.bmi ?? null,
@@ -144,7 +169,12 @@ exports.getPatientProfile = async (req, res, next) => {
           requestId: statusSnapshot.requestId || latestRequest?._id || null,
           requestStatus: statusSnapshot.requestStatus || latestRequest?.status || null,
           firstConsultationId: statusSnapshot.firstConsultationId || firstConsultation?._id || null,
+          patientConsented: statusSnapshot.patientConsented === true,
           activeDietPlanId, // Updated to use the fallback logic
+          membershipPlan: latestRequest?.membershipPlan || null,
+          // Normalized 'silver'|'golden'|'platinum'|null so the frontend
+          // branches on a clean enum instead of re-parsing the raw string.
+          membershipTier: getMembershipTier(latestRequest?.membershipPlan),
           canSendPaymentRequest:
             typeof statusSnapshot.canSendPaymentRequest === 'boolean'
               ? statusSnapshot.canSendPaymentRequest
@@ -157,6 +187,7 @@ exports.getPatientProfile = async (req, res, next) => {
           paymentSummary,
         },
         weeklyDietPlans,
+        generatedWeekNumbers,
       },
     });
   } catch (error) {

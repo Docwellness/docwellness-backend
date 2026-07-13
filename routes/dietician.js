@@ -140,6 +140,12 @@ router.post(
   dietPlanController.createAndGenerateDietPlan
 );
 
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/generate-week',
+  dieticianOnlyMiddleware,
+  dietPlanController.generateWeekForExistingPlan
+);
+
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/details',
   dieticianOnlyMiddleware,
@@ -150,6 +156,17 @@ router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/weeks/:weekNumber',
   dieticianOnlyMiddleware,
   dietPlanController.getFinalizedWeekDetails
+);
+
+// Same shape as the route above but works on a not-yet-finalized (Draft)
+// plan's AI-generated week, so the dietician can review the full recipe
+// options pool before finalizing - see getFinalizedWeekDetails' doc comment
+// for why these are two separate endpoints (different status gating and
+// different underlying plan field: generatedPlan vs finalizedPlan).
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:weekNumber/draft-options',
+  dieticianOnlyMiddleware,
+  dietPlanController.getDraftWeekOptions
 );
 
 router.put(
@@ -226,6 +243,26 @@ router.get(
   uploadRecipieController.getRecipeCategories
 );
 
+// Real per-serving-time recipe counts, optionally scoped to a top-level
+// category group - powers the "Recipes & Supplements" landing grid.
+// Must be registered before the '/recipes/:id' route below, or Express
+// would match this path as :id='serving-time-summary' instead.
+router.get(
+  '/recipes/serving-time-summary',
+  dieticianOnlyMiddleware,
+  uploadRecipieController.getServingTimeSummary
+);
+
+// List recipes by serving time (with optional cuisine filter). Also must be
+// registered before '/recipes/:id' for the same reason - previously placed
+// after it, which silently shadowed this route (matches the "zero callers"
+// dead-code state this endpoint was found in).
+router.get(
+  '/recipes/by-serving-time',
+  dieticianOnlyMiddleware,
+  uploadRecipieController.listRecipesByServingTime
+);
+
 // List all recipes with optional category filter
 router.get('/recipes', dieticianOnlyMiddleware, uploadRecipieController.listRecipes);
 
@@ -239,11 +276,11 @@ router.patch(
   uploadRecipieController.updateRecipe
 );
 
-// List recipes by serving time (with optional cuisine filter)
-router.get(
-  '/recipes/by-serving-time',
+// Persist a single ingredient's refreshed image on an already-saved recipe
+router.patch(
+  '/recipes/:id/ingredient-image',
   dieticianOnlyMiddleware,
-  uploadRecipieController.listRecipesByServingTime
+  uploadRecipieController.updateIngredientImage
 );
 
 // Create final recipe (with images URLs already set in JSON)
@@ -263,6 +300,14 @@ router.post(
   dieticianOnlyMiddleware,
   upload.single('file'),
   uploadRecipieController.uploadIngredientImage
+);
+
+// Fetch an ingredient image from the internet (Pexels) - JSON body, not a
+// file upload, so no multer middleware needed.
+router.post(
+  '/uploads/ingredient-image/fetch',
+  dieticianOnlyMiddleware,
+  uploadRecipieController.fetchIngredientImageFromWeb
 );
 
 // ==========================================
@@ -295,6 +340,19 @@ router.get(
  * @route   POST /api/dietician/chat/message
  * @desc    Send a message (dietician must specify receiverId)
  */
+
+// sendMessage reads receiverId from req.params first, falling back to
+// req.body - this bare route covers text-message sends, which post
+// receiverId in the JSON body instead of the URL (the /:receiverId route
+// below is for the multipart image-upload send, which needs it in the URL
+// since the body is form-data). Without this, every dietician text send
+// 404'd - the frontend only ever posts to '/chat/message'.
+router.post(
+  '/chat/message',
+  dieticianOnlyMiddleware,
+  upload.single('image'),
+  chatController.sendMessage
+);
 
 router.post(
   '/chat/message/:receiverId',
