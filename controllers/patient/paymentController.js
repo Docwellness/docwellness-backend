@@ -17,7 +17,7 @@ const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
  */
 exports.submitManualPaymentProof = async (req, res, next) => {
   try {
-    const { amountReceived, amountPending, description, requestId, couponCode, discountPercentage, originalAmount } = req.body;
+    const { amountReceived, amountPending, description, requestId, couponCode, discountPercentage, originalAmount, pendingPaymentDate } = req.body;
 
     if (!requestId) {
       return res.status(400).json({
@@ -82,6 +82,14 @@ exports.submitManualPaymentProof = async (req, res, next) => {
     if (discountPercentage) proofData.discountPercentage = Number(discountPercentage);
     if (originalAmount) proofData.originalAmount = Number(originalAmount);
 
+    // Only meaningful when there's still a balance left to pay
+    if (parsedAmountPending > 0 && pendingPaymentDate) {
+      const parsedDate = new Date(pendingPaymentDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        proofData.pendingPaymentDate = parsedDate;
+      }
+    }
+
     const proof = await ManualPaymentProof.create(proofData);
 
     dietPlanRequest.latestPaymentProof = proof._id;
@@ -112,6 +120,7 @@ exports.submitManualPaymentProof = async (req, res, next) => {
         amountPending: proof.amountPending,
         totalAmount: proof.totalAmount,
         description: proof.description,
+        pendingPaymentDate: proof.pendingPaymentDate,
         status: proof.status,
         proofImage: proof.proofImage,
         createdAt: proof.createdAt,

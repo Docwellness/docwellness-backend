@@ -648,9 +648,11 @@ exports.listChatPatientsForDietician = async (req, res, next) => {
     const filter = {
       dieticianId,
       $or: [
-        // Active: Paid + hasActivePlan + not completed
+        // Active: Paid or PartiallyPaid + hasActivePlan + not completed -
+        // a partially-paid patient still has an activated plan and needs
+        // to be reachable for chat like any other active patient.
         {
-          status: 'Paid',
+          status: { $in: ['Paid', 'PartiallyPaid'] },
           hasActivePlan: true,
           completedAt: null,
         },

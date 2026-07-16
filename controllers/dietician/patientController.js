@@ -72,19 +72,70 @@ exports.getPatientProfile = async (req, res, next) => {
     ]);
 
     let paymentSummary = null;
-    if (latestRequest?.latestPaymentProof) {
-      const latestProof = await ManualPaymentProof.findById(
-        latestRequest.latestPaymentProof
-      )
-        .select('amountReceived amountPending totalAmount status')
+    if (latestRequest?._id) {
+      // A "pay remaining balance" submission creates its own ManualPaymentProof
+      // (see submitManualPaymentProof) that only carries that follow-up
+      // amount and drops the coupon/subscription context - reading just the
+      // latest proof would make an already fully-paid, coupon-discounted
+      // subscription look like a bare, coupon-less ₹400 payment. Aggregate
+      // across every Approved proof for this request instead: the earliest
+      // one (with originalAmount set) is the source of truth for the
+      // coupon/subscription total, the latest one is the source of truth
+      // for what's still outstanding right now.
+      const allProofs = await ManualPaymentProof.find({
+        request: latestRequest._id,
+      })
+        .select(
+          'amountReceived amountPending totalAmount status couponCode discountPercentage originalAmount pendingPaymentDate reviewedAt createdAt'
+        )
+        .sort({ createdAt: 1 })
         .lean();
+      const approvedProofs = allProofs.filter((p) => p.status === 'Approved');
 
-      if (latestProof) {
+      if (approvedProofs.length > 0) {
+        const baseProof =
+          approvedProofs.find((p) => p.originalAmount != null) || approvedProofs[0];
+        const latestProof = approvedProofs[approvedProofs.length - 1];
+        const cumulativeReceived = approvedProofs.reduce(
+          (sum, p) => sum + (p.amountReceived || 0),
+          0
+        );
+        const currentPending = latestProof.amountPending ?? 0;
+        const hadPriorPending =
+          approvedProofs.length > 1 &&
+          approvedProofs.slice(0, -1).some((p) => (p.amountPending || 0) > 0);
+
+        paymentSummary = {
+          amountReceived: cumulativeReceived,
+          amountPending: currentPending,
+          totalAmount: baseProof.totalAmount ?? cumulativeReceived + currentPending,
+          proofStatus: 'Approved',
+          couponCode: baseProof.couponCode || null,
+          discountPercentage: baseProof.discountPercentage ?? null,
+          originalAmount: baseProof.originalAmount ?? null,
+          // Once fully paid, the old promise date is resolved - no longer
+          // useful to show. balanceClearedAt takes over as "paid on" instead.
+          pendingPaymentDate:
+            currentPending > 0 ? latestProof.pendingPaymentDate || null : null,
+          balanceClearedAt:
+            currentPending === 0 && hadPriorPending
+              ? latestProof.reviewedAt || null
+              : null,
+        };
+      } else if (allProofs.length > 0) {
+        // Nothing approved yet - show the just-submitted proof's own numbers
+        // as a preview while the dietician reviews it (unchanged from before).
+        const latestProof = allProofs[allProofs.length - 1];
         paymentSummary = {
           amountReceived: latestProof.amountReceived ?? 0,
           amountPending: latestProof.amountPending ?? 0,
           totalAmount: latestProof.totalAmount ?? 0,
           proofStatus: latestProof.status || null,
+          couponCode: latestProof.couponCode || null,
+          discountPercentage: latestProof.discountPercentage ?? null,
+          originalAmount: latestProof.originalAmount ?? null,
+          pendingPaymentDate: latestProof.pendingPaymentDate || null,
+          balanceClearedAt: null,
         };
       }
     }
@@ -102,7 +153,7 @@ exports.getPatientProfile = async (req, res, next) => {
     let dietPlanForSummary = null;
     if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
       dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
-        .select('_id status weeksSummary generatedPlan')
+        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy')
         .lean();
     }
     if (!dietPlanForSummary) {
@@ -111,7 +162,7 @@ exports.getPatientProfile = async (req, res, next) => {
         status: { $in: ['Finalized', 'Active'] },
       })
         .sort({ createdAt: -1 })
-        .select('_id status weeksSummary generatedPlan')
+        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy')
         .lean();
     }
 
@@ -171,6 +222,12 @@ exports.getPatientProfile = async (req, res, next) => {
           firstConsultationId: statusSnapshot.firstConsultationId || firstConsultation?._id || null,
           patientConsented: statusSnapshot.patientConsented === true,
           activeDietPlanId, // Updated to use the fallback logic
+          // Status of the plan activeDietPlanId actually points at right
+          // now - lets the frontend tell a genuine first activation
+          // ('Finalized', needs Confirm & Activate) apart from a renewal
+          // payment where the referenced plan is already 'Active' (needs
+          // only a lightweight bill-settle, no plan changes).
+          activeDietPlanStatus: dietPlanForSummary?.status || null,
           membershipPlan: latestRequest?.membershipPlan || null,
           // Normalized 'silver'|'golden'|'platinum'|null so the frontend
           // branches on a clean enum instead of re-parsing the raw string.
@@ -188,6 +245,16 @@ exports.getPatientProfile = async (req, res, next) => {
         },
         weeklyDietPlans,
         generatedWeekNumbers,
+        // Lets the dietician app re-open an already-generated/finalized
+        // week's Create Diet Plan screen with the Calorie/Macro strategy
+        // that was actually used pre-selected, instead of showing a blank
+        // form the dietician has to re-fill from scratch every time.
+        activePlanStrategy: dietPlanForSummary
+          ? {
+            calorieStrategy: dietPlanForSummary.calorieStrategy || null,
+            macroStrategy: dietPlanForSummary.macroStrategy || null,
+          }
+          : null,
       },
     });
   } catch (error) {

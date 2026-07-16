@@ -191,6 +191,31 @@ const recipeSchema = new mongoose.Schema(
       fats: { type: Number }, // grams
       fiber: { type: Number, default: 0 }, // grams
     },
+    // Real per-serving active-ingredient facts for category:'Supplements'
+    // recipes - a vitamin/mineral tablet's meaningful numbers are its
+    // ingredient amounts and %NRV, not calories/protein/carbs/fats, so
+    // supplements carry this instead of relying on `nutrition` (which stays
+    // zeroed for them - see scripts/update-supplement-nutrition-facts.js).
+    supplementFacts: {
+      type: {
+        brand: { type: String },
+        servingSize: {
+          quantity: { type: Number },
+          unit: { type: String },
+          label: { type: String },
+        },
+        servingsPerContainer: { type: Number },
+        nutrients: [
+          {
+            name: { type: String, required: true },
+            amount: { type: Number, required: true },
+            unit: { type: String, required: true },
+            percentNRV: { type: Number, default: null },
+          },
+        ],
+      },
+      default: undefined,
+    },
   },
   {
     timestamps: true,

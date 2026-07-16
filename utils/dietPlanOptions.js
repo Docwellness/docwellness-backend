@@ -56,7 +56,7 @@ const SIDE_SALAD_ELIGIBLE_SLOTS = new Set(['Lunch', 'Dinner', 'Evening Snack']);
  */
 async function fetchRecipePoolForOptions({ Recipe, dieticianId }) {
   return Recipe.find({ dieticianId })
-    .select('name servingTime nutrition image ingredients servingSize secondaryComponent tags category _id')
+    .select('name servingTime nutrition supplementFacts image ingredients servingSize secondaryComponent tags category _id')
     .lean();
 }
 
@@ -146,6 +146,7 @@ function buildServingTimeOptionsFromDocs({
         name: recipe.name || null,
         image: recipe.image || null,
         nutrition: recipe.nutrition || null,
+        supplementFacts: recipe.supplementFacts || null,
         secondaryComponent: recipe.secondaryComponent || null,
         servingTime: recipe.servingTime || servingTime,
         servingSize: recipe.servingSize || null,

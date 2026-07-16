@@ -38,6 +38,14 @@ function validateRegenerateRequest({ tier, weekNumbers, existingWeekNumbers, fin
   const existing = new Set(existingWeekNumbers || []);
   const finalized = new Set(finalizedWeekNumbers || []);
 
+  // Week 1 has no prior week to gate on - it's the dietician's own initial
+  // plan and regenerating it only touches generatedPlan.weeks[0] in place
+  // (see runDietPlanGeneration's per-week merge) - finalizedPlan/weeksSummary
+  // for other weeks are separate fields, untouched either way.
+  if (weekNumbers.length === 1 && weekNumbers[0] === 1) {
+    return { ok: true };
+  }
+
   if (tier === 'golden') {
     const isWeeks3And4 = weekNumbers.length === 2 && weekNumbers[0] === 3 && weekNumbers[1] === 4;
     if (!isWeeks3And4) {

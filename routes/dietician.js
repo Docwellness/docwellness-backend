@@ -106,6 +106,14 @@ router.put(
   manualPaymentController.rejectPaymentProof
 );
 
+// Confirm a renewal payment (patient already has an active plan) without
+// requiring a new diet plan to be built/finalized/activated
+router.put(
+  '/patients/:patientId/payments/manual-proofs/:proofId/confirm',
+  dieticianOnlyMiddleware,
+  manualPaymentController.confirmRenewalPayment
+);
+
 // Patient profile summary for Flutter "Patient profile" screen
 router.get(
   '/patients/:patientId/profile',

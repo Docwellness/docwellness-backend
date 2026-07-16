@@ -40,6 +40,7 @@ const {
 } = require('../../utils/membershipTiers');
 const { buildServingTimeOptions, buildDayGroupsOptions, fetchRecipePoolForOptions } = require('../../utils/dietPlanOptions');
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
+const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -124,7 +125,15 @@ exports.listPatientsForDietician = async (req, res, next) => {
     } else if (normalizedTab === 'ongoing') {
       filter = {
         ...baseFilter,
-        status: 'Paid',
+        // PartiallyPaid patients are still activated/active (see
+        // activateDietPlan) with just an outstanding balance - they belong
+        // in "ongoing", not stuck out of every tab. Same for PaymentSubmitted
+        // with hasActivePlan already true - that's a renewal/balance payment
+        // under review, not a fresh signup; their existing plan is still
+        // live, so they'd otherwise vanish from every tab (not "new" since
+        // hasActivePlan is true, not "ongoing" since status isn't
+        // Paid/PartiallyPaid, not "past" since nothing completed).
+        status: { $in: ['Paid', 'PartiallyPaid', 'PaymentSubmitted'] },
         hasActivePlan: true,
         completedAt: null,
       };
@@ -185,6 +194,8 @@ exports.listPatientsForDietician = async (req, res, next) => {
           activityLevel: healthProfile.activityLevel || null,
           requestId: request._id.toString(),
           isActive: patient.isActive !== false,
+          status: request.status || 'Unpaid',
+          membershipPlan: request.membershipPlan || null,
         };
       }
 
@@ -218,6 +229,7 @@ exports.listPatientsForDietician = async (req, res, next) => {
         tdee,
         statusCode,
         statusLabel: mapStatusCodeToLabel(statusCode),
+        membershipPlan: request.membershipPlan || null,
       };
     });
 
@@ -349,6 +361,8 @@ exports.listPatientsForDietician = async (req, res, next) => {
           adherencePercent,
           bmiValue: currentBmi,
           isActive: patient.isActive !== false,
+          status: patient.status,
+          membershipPlan: patient.membershipPlan,
         };
       });
     }
@@ -517,6 +531,7 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
         startDateForDiet: request.startDateForDiet,
         status: request.status,
         totalAmount: request.totalAmount,
+        membershipPlan: request.membershipPlan || null,
       };
     });
 
@@ -1354,7 +1369,21 @@ exports.getDraftWeekOptions = async (req, res, next) => {
     }
 
     const planWeeks = Array.isArray(parsedPlan.weeks) ? parsedPlan.weeks : [];
-    const currentWeekEntry = planWeeks.find((entry) => entry?.week === parsedWeekNumber);
+    const finalizedWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+
+    // Prefer the dietician's actual finalized selections (real servings,
+    // and possibly more recipes than the AI's original picks - e.g. an
+    // additionally-selected side/salad) over the AI's raw draft once a
+    // week has been finalized. generatedPlan is never updated at finalize
+    // time (see finalizeWeekPlan below), so re-opening an already-
+    // finalized week via "Update Diet Plan" must read from finalizedPlan
+    // or it silently resets every serving/selection back to the AI's
+    // original defaults.
+    const findWeekEntry = (weekNum) =>
+      finalizedWeeks.find((entry) => entry?.week === weekNum) ||
+      planWeeks.find((entry) => entry?.week === weekNum);
+
+    const currentWeekEntry = findWeekEntry(parsedWeekNumber);
 
     if (!currentWeekEntry) {
       return res.status(404).json({
@@ -1363,8 +1392,15 @@ exports.getDraftWeekOptions = async (req, res, next) => {
       });
     }
 
-    const nextWeekEntry =
-      parsedWeekNumber < 4 ? planWeeks.find((entry) => entry?.week === parsedWeekNumber + 1) : null;
+    const nextWeekEntry = parsedWeekNumber < 4 ? findWeekEntry(parsedWeekNumber + 1) : null;
+
+    // Whether currentWeekEntry came from finalizedPlan (real, dietician-set
+    // servings) vs generatedPlan (the AI's draft, which has no `servings`
+    // field at all - see dietPlanJsonSchema.js). The dietician app needs
+    // this to know whether a `servings` of exactly 1 is a genuine explicit
+    // choice or just the "not yet set" placeholder default - see
+    // isUnexplicitDefault in patients_controller.dart.
+    const isFinalized = finalizedWeeks.some((entry) => entry?.week === parsedWeekNumber);
 
     const [recipeDocs, weightTrend] = await Promise.all([
       fetchRecipePoolForOptions({ Recipe, dieticianId }),
@@ -1411,6 +1447,7 @@ exports.getDraftWeekOptions = async (req, res, next) => {
         summary,
         dayGroups,
         weightTrend,
+        isFinalized,
         riskFlags: dietPlan.riskFlags || [],
         validationWarnings: dietPlan.validationWarnings || [],
       },
@@ -1501,32 +1538,32 @@ exports.finalizeWeekPlan = async (req, res, next) => {
       dietPlan.finalizedPlan.weeks.push(weekPayload);
     }
 
-    const summaryPayload = req.body?.summary || {};
-    const toNum = (value) => {
-      if (value === '' || value === null || value === undefined) {
-        return 0;
-      }
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
+    // Computed server-side from each selected recipe's *current* nutrition
+    // data (fetched by id), not trusted from whatever the client submitted -
+    // see computeWeekSummary's doc comment. This is what makes the
+    // dietician's live "Total Budget" preview, the stored weeksSummary, and
+    // the patient app's reading of it impossible to drift apart, and keeps
+    // it in sync if a recipe's nutrition is corrected later.
+    const summaryRecipeIds = [
+      ...new Set(normalizedMeals.map((m) => m.recipeId).filter(Boolean)),
+    ];
+    const summaryRecipeDocs = summaryRecipeIds.length
+      ? await Recipe.find({ _id: { $in: summaryRecipeIds } })
+          .select('nutrition servingSize secondaryComponent category')
+          .lean()
+      : [];
+    const computedSummary = computeWeekSummary(normalizedMeals, summaryRecipeDocs);
 
-    const totalCaloriesForWeek = toNum(summaryPayload.totalCalories);
     const normalizedSummary = {
       week: weekNumber,
-      totalCalories: totalCaloriesForWeek,
-      fatPercent: toNum(summaryPayload.fatPercent),
-      fatGrams: toNum(summaryPayload.fatGrams),
-      carbPercent: toNum(summaryPayload.carbPercent),
-      carbGrams: toNum(summaryPayload.carbGrams),
-      proteinPercent: toNum(summaryPayload.proteinPercent),
-      proteinGrams: toNum(summaryPayload.proteinGrams),
-      // Prefer an actual sum from the selected recipes if the client sent
-      // one; otherwise fall back to the standard 14g/1000kcal heuristic so
-      // this field is never left at its dead default of 0.
-      fiberGrams:
-        summaryPayload.fiberGrams !== undefined && summaryPayload.fiberGrams !== null
-          ? toNum(summaryPayload.fiberGrams)
-          : Math.round((totalCaloriesForWeek / 1000) * 14),
+      totalCalories: computedSummary.totalCalories,
+      fatPercent: 0,
+      fatGrams: computedSummary.fatGrams,
+      carbPercent: 0,
+      carbGrams: computedSummary.carbGrams,
+      proteinPercent: 0,
+      proteinGrams: computedSummary.proteinGrams,
+      fiberGrams: computedSummary.fiberGrams,
     };
 
     if (!Array.isArray(dietPlan.weeksSummary)) {
@@ -1611,14 +1648,6 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
     const dieticianId = req.user._id;
     const { weeks } = req.body || {};
 
-    const toNum = (value) => {
-      if (value === '' || value === null || value === undefined) {
-        return 0;
-      }
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-
     if (!Array.isArray(weeks) || weeks.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1681,7 +1710,10 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
     const normalizedWeeks = [];
     const normalizedSummaries = [];
 
-    weeks.forEach((weekEntry) => {
+    // Clean/dedupe every week's meals first (no DB access needed for this
+    // part), so every recipeId referenced across all 4 weeks can be fetched
+    // in a single query before computing each week's summary.
+    const weeksWithNormalizedMeals = weeks.map((weekEntry) => {
       if (!Array.isArray(weekEntry.dailyMeals)) {
         throw new Error(`Week ${weekEntry.week}: dailyMeals must be an array`);
       }
@@ -1701,26 +1733,40 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
         return true;
       });
 
-      normalizedWeeks.push({
-        week: weekEntry.week,
-        dailyMeals: normalizedMeals,
-      });
+      return { week: weekEntry.week, normalizedMeals };
+    });
 
-      const summaryPayload = weekEntry.summary || {};
-      const totalCaloriesForWeek = toNum(summaryPayload.totalCalories);
+    const allRecipeIds = [
+      ...new Set(
+        weeksWithNormalizedMeals
+          .flatMap((w) => w.normalizedMeals.map((m) => m.recipeId))
+          .filter(Boolean)
+      ),
+    ];
+    const allRecipeDocs = allRecipeIds.length
+      ? await Recipe.find({ _id: { $in: allRecipeIds } })
+          .select('nutrition servingSize secondaryComponent category')
+          .lean()
+      : [];
+
+    weeksWithNormalizedMeals.forEach(({ week, normalizedMeals }) => {
+      normalizedWeeks.push({ week, dailyMeals: normalizedMeals });
+
+      // Computed server-side from each recipe's *current* nutrition data,
+      // not trusted from the client's submitted summary - see
+      // computeWeekSummary's doc comment and the matching fix in
+      // finalizeWeekPlan above.
+      const computedSummary = computeWeekSummary(normalizedMeals, allRecipeDocs);
       normalizedSummaries.push({
-        week: weekEntry.week,
-        totalCalories: totalCaloriesForWeek,
-        fatPercent: toNum(summaryPayload.fatPercent),
-        fatGrams: toNum(summaryPayload.fatGrams),
-        carbPercent: toNum(summaryPayload.carbPercent),
-        carbGrams: toNum(summaryPayload.carbGrams),
-        proteinPercent: toNum(summaryPayload.proteinPercent),
-        proteinGrams: toNum(summaryPayload.proteinGrams),
-        fiberGrams:
-          summaryPayload.fiberGrams !== undefined && summaryPayload.fiberGrams !== null
-            ? toNum(summaryPayload.fiberGrams)
-            : Math.round((totalCaloriesForWeek / 1000) * 14),
+        week,
+        totalCalories: computedSummary.totalCalories,
+        fatPercent: 0,
+        fatGrams: computedSummary.fatGrams,
+        carbPercent: 0,
+        carbGrams: computedSummary.carbGrams,
+        proteinPercent: 0,
+        proteinGrams: computedSummary.proteinGrams,
+        fiberGrams: computedSummary.fiberGrams,
       });
     });
 
@@ -1914,11 +1960,14 @@ exports.activateDietPlan = async (req, res, next) => {
     }
 
     if (dietPlan.request) {
-      if (dietPlan.request.status !== 'Paid') {
-        dietPlan.request.status = 'Paid';
-      }
+      // An approved proof can still leave a balance owed (the dietician
+      // chose to activate anyway, trusting the rest is paid later) - that's
+      // 'PartiallyPaid', not 'Paid'. Without a proof (e.g. reactivating an
+      // already-paid plan), there's nothing to be partial about.
+      const amountPending = proofDocument ? proofDocument.amountPending || 0 : 0;
+      dietPlan.request.status = amountPending > 0 ? 'PartiallyPaid' : 'Paid';
       dietPlan.request.hasActivePlan = true;
-      dietPlan.request.latestPaymentStatus = 'Paid';
+      dietPlan.request.latestPaymentStatus = amountPending > 0 ? 'Pending' : 'Paid';
       if (proofDocument) {
         dietPlan.request.latestPaymentProof = proofDocument._id;
         dietPlan.request.collectedAmount = proofDocument.amountReceived || 0;

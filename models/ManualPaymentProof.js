@@ -63,6 +63,12 @@ const manualPaymentProofSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // Only meaningful when amountPending > 0 - when the patient expects to
+    // clear the remaining balance, so the dietician isn't left guessing.
+    pendingPaymentDate: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

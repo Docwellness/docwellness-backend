@@ -520,6 +520,21 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
     });
 
+    const existingLog = await MealLog.findOne({
+      patientId,
+      date: today,
+    }).lean();
+
+    const loggedMeals = existingLog?.meals || [];
+    // Also fetch recipes for anything already logged, even if it falls
+    // outside today's actual day-group plan - needed so consumed calories/
+    // macros below can always be recomputed live from the recipe's current
+    // data instead of trusting whatever was frozen into the log at submit
+    // time.
+    loggedMeals.forEach((m) => {
+      if (m?.recipeId) recipeIds.add(m.recipeId.toString());
+    });
+
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
           .select('name image servingSize nutrition servingTime')
@@ -534,6 +549,15 @@ exports.getPatientMealLogStats = async (req, res, next) => {
         name: recipe.name || null,
         image: recipe.image || null,
         servingTime: recipe.servingTime || null,
+        // Base (per-recipe) nutrition/quantity - a recipe's own reference
+        // serving (e.g. Steamed Rice = 300g/521kcal), not what the dietician
+        // actually assigned for this specific meal slot (dailyMeals[].servings,
+        // e.g. 75g). Only used below to compute the assigned-quantity ratio -
+        // using these raw here previously made every planned/consumed number
+        // reflect the recipe's full base size regardless of the real
+        // prescribed portion (e.g. a 75g assignment showing as 300g/521kcal,
+        // ~4x too much).
+        baseQuantity: recipe.servingSize?.quantity || 1,
         calories: recipe.nutrition?.calories || 0,
         protein: recipe.nutrition?.protein || 0,
         carbs: recipe.nutrition?.carbs || 0,
@@ -542,12 +566,34 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       };
     });
 
-    const existingLog = await MealLog.findOne({
-      patientId,
-      date: today,
-    }).lean();
+    // Ratio of what the dietician actually assigned vs. the recipe's own base
+    // serving, keyed by servingTime+recipeId - the single scale factor that
+    // must apply to every calorie/macro number below (planned and consumed
+    // alike) instead of the recipe's raw, unscaled base nutrition.
+    const assignedRatioByKey = {};
+    todaysDailyMeals.forEach((meal) => {
+      const recipe = recipes[meal.recipeId];
+      if (!recipe) return;
+      const key = `${meal.servingTime}:${recipe.id}`;
+      const assignedQuantity = meal.servings ?? recipe.baseQuantity;
+      assignedRatioByKey[key] = recipe.baseQuantity ? assignedQuantity / recipe.baseQuantity : 1;
+    });
 
-    const loggedMeals = existingLog?.meals || [];
+    // Recomputed live from the recipe's *current* data (fetched by id) each
+    // time, rather than trusting MealLog's frozen caloriesConsumed snapshot -
+    // so if a recipe's nutrition is corrected later, every already-logged
+    // meal using it reflects the correction instead of perpetuating the old
+    // wrong number forever. Falls back to the stored snapshot only when the
+    // recipe/ratio can't be resolved (e.g. a custom food entry).
+    const liveCaloriesConsumed = (loggedMeal) => {
+      const recipe = recipes[loggedMeal.recipeId?.toString()];
+      const ratio =
+        assignedRatioByKey[`${loggedMeal.servingTime}:${loggedMeal.recipeId?.toString()}`];
+      if (recipe && ratio !== undefined) {
+        return (recipe.calories || 0) * ratio * (loggedMeal.servings || 1);
+      }
+      return loggedMeal.caloriesConsumed || 0;
+    };
 
     const plannedMeals = [];
     const servingTimeOrder = [
@@ -568,19 +614,20 @@ exports.getPatientMealLogStats = async (req, res, next) => {
         const logged = loggedMeals.find(
           (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === recipe.id
         );
+        const ratio = assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] ?? 1;
 
         plannedMeals.push({
           recipeId: recipe.id,
           name: recipe.name,
           image: recipe.image,
           servingTime: meal.servingTime,
-          plannedCalories: recipe.calories,
-          protein: recipe.protein,
-          carbs: recipe.carbs,
-          fats: recipe.fats,
-          fiber: recipe.fiber,
+          plannedCalories: recipe.calories * ratio,
+          protein: recipe.protein * ratio,
+          carbs: recipe.carbs * ratio,
+          fats: recipe.fats * ratio,
+          fiber: recipe.fiber * ratio,
           loggedServings: logged?.servings || 0,
-          caloriesConsumed: logged?.caloriesConsumed || 0,
+          caloriesConsumed: logged ? liveCaloriesConsumed(logged) : 0,
           isLogged: !!logged,
           notes: logged?.notes || '',
         });
@@ -591,38 +638,66 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
     });
 
+    // weekSummary (see finalizeWeekPlan's normalizedSummary/DietPlan.weeksSummary
+    // schema) is the authoritative daily target - the dietician's actual
+    // weighted 7-day average. Field names here must match the schema
+    // (totalCalories/proteinGrams/carbGrams/fatGrams/fiberGrams) - they
+    // previously read dailyCalories/dailyProtein/dailyCarbs/dailyFat, which
+    // don't exist on the schema, so this always silently fell through to the
+    // plannedMeals fallback sum even when a correct weekSummary existed.
     const totalPlannedCalories =
-      weekSummary?.dailyCalories || plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
-    const totalConsumedCalories = existingLog?.totalCalories || 0;
+      weekSummary?.totalCalories ?? plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
+    // Recomputed live per logged meal (see liveCaloriesConsumed above)
+    // instead of trusting MealLog.totalCalories, a snapshot frozen at
+    // whatever the recipe's calorie count was at the moment each meal was
+    // logged - keeps this dietician-facing view in sync with the same
+    // current recipe data the patient's own view uses.
+    const totalConsumedCalories = Math.round(
+      loggedMeals.reduce((sum, m) => sum + liveCaloriesConsumed(m), 0)
+    );
     const remainingCalories = totalPlannedCalories - totalConsumedCalories;
 
     const loggedCount = plannedMeals.filter((m) => m.isLogged).length;
     const totalMeals = plannedMeals.length;
 
+    // m.servings on a *logged* meal (MealLog.meals) is the patient's portion
+    // multiplier of what was actually assigned (see getMealLogScreenData /
+    // sendLogMeal on the client - "Portion 1" = ate exactly the prescribed
+    // amount), not a multiplier of the recipe's raw base serving - so each
+    // macro must go through the same assignedRatioByKey scale factor used
+    // for plannedMeals above before applying that portion count.
+    // Scaling by assignedRatioByKey (a fraction, e.g. 75g/300g = 0.25) turns
+    // these into non-integer values - round at the API boundary so every
+    // macro field stays a whole-gram number, same as the calorie fields
+    // above.
     const macroConsumed = {
-      protein: loggedMeals.reduce((sum, m) => {
+      protein: Math.round(loggedMeals.reduce((sum, m) => {
         const recipe = recipes[m.recipeId?.toString()];
-        return sum + (recipe?.protein || 0) * (m.servings || 1);
-      }, 0),
-      carbs: loggedMeals.reduce((sum, m) => {
+        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+        return sum + (recipe?.protein || 0) * ratio * (m.servings || 1);
+      }, 0)),
+      carbs: Math.round(loggedMeals.reduce((sum, m) => {
         const recipe = recipes[m.recipeId?.toString()];
-        return sum + (recipe?.carbs || 0) * (m.servings || 1);
-      }, 0),
-      fats: loggedMeals.reduce((sum, m) => {
+        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+        return sum + (recipe?.carbs || 0) * ratio * (m.servings || 1);
+      }, 0)),
+      fats: Math.round(loggedMeals.reduce((sum, m) => {
         const recipe = recipes[m.recipeId?.toString()];
-        return sum + (recipe?.fats || 0) * (m.servings || 1);
-      }, 0),
-      fiber: loggedMeals.reduce((sum, m) => {
+        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+        return sum + (recipe?.fats || 0) * ratio * (m.servings || 1);
+      }, 0)),
+      fiber: Math.round(loggedMeals.reduce((sum, m) => {
         const recipe = recipes[m.recipeId?.toString()];
-        return sum + (recipe?.fiber || 0) * (m.servings || 1);
-      }, 0),
+        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+        return sum + (recipe?.fiber || 0) * ratio * (m.servings || 1);
+      }, 0)),
     };
 
     const macroPlanned = {
-      protein: weekSummary?.dailyProtein || plannedMeals.reduce((sum, m) => sum + m.protein, 0),
-      carbs: weekSummary?.dailyCarbs || plannedMeals.reduce((sum, m) => sum + m.carbs, 0),
-      fats: weekSummary?.dailyFat || plannedMeals.reduce((sum, m) => sum + m.fats, 0),
-      fiber: plannedMeals.reduce((sum, m) => sum + m.fiber, 0),
+      protein: Math.round(weekSummary?.proteinGrams ?? plannedMeals.reduce((sum, m) => sum + m.protein, 0)),
+      carbs: Math.round(weekSummary?.carbGrams ?? plannedMeals.reduce((sum, m) => sum + m.carbs, 0)),
+      fats: Math.round(weekSummary?.fatGrams ?? plannedMeals.reduce((sum, m) => sum + m.fats, 0)),
+      fiber: Math.round(weekSummary?.fiberGrams ?? plannedMeals.reduce((sum, m) => sum + m.fiber, 0)),
     };
 
     return res.status(200).json({

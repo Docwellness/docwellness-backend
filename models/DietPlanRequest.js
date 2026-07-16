@@ -37,9 +37,14 @@ const dietPlanRequestSchema = new mongoose.Schema(
     // separate call after the request itself is created.
     membershipPlan: { type: String, default: null },
     membershipAmount: { type: Number, default: null },
+    // 'PartiallyPaid' is a resting state like 'Paid' (plan is activated,
+    // hasActivePlan: true) but the dietician approved activation with an
+    // outstanding balance still owed - see activateDietPlan, which is the
+    // only place this gets set, based on the approved payment proof's
+    // amountPending.
     status: {
       type: String,
-      enum: ['Unpaid', 'PaymentRequested', 'PaymentSubmitted', 'Paid'],
+      enum: ['Unpaid', 'PaymentRequested', 'PaymentSubmitted', 'PartiallyPaid', 'Paid'],
       default: 'Unpaid',
     },
     paymentRequested: {
