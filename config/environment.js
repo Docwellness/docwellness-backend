@@ -26,4 +26,5 @@ module.exports = {
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB
   defaultDieticianId: process.env.DEFAULT_DIETICIAN_ID,
+  sentryDsn: process.env.SENTRY_DSN,
 };

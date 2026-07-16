@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const Sentry = require('@sentry/node');
 const { errorHandler } = require('../middlewares');
 
 // v1 Chat Module
@@ -110,6 +111,10 @@ function createApp() {
       message: `Route ${req.originalUrl} not found`,
     });
   });
+
+  // Sentry needs to see errors before our own handler formats/logs them.
+  // No-ops when SENTRY_DSN isn't configured.
+  Sentry.setupExpressErrorHandler(app);
 
   // Global error handler
   app.use(errorHandler);
