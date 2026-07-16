@@ -1,17 +1,20 @@
 const mongoose = require('mongoose');
 
 /**
- * Database connection configuration
+ * Database connection configuration.
+ *
+ * Reuses an existing connection when one is already open/connecting so this
+ * is safe to call on every invocation of a serverless function (Vercel),
+ * not just once at process startup like on the VPS.
  */
 const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error('Database connection error:', error.message);
-    process.exit(1);
+  if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
+    return mongoose.connection;
   }
+
+  const conn = await mongoose.connect(process.env.MONGODB_URI);
+  console.log(`MongoDB Connected: ${conn.connection.host}`);
+  return conn.connection;
 };
 
 module.exports = connectDB;

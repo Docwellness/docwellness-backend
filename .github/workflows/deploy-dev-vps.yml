@@ -1,0 +1,26 @@
+name: Deploy backend (dev - VPS realtime testing)
+
+# Separate from the Vercel dev deployment (which handles native Git
+# integration on its own). This workflow only exists so Socket.io/realtime
+# features can be tested end-to-end somewhere, since Vercel serverless
+# functions can't hold persistent connections.
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            bash /root/docwellness-dev/docwellness-backend/deploy.sh \
+              docwellness-backend-dev \
+              dev \
+              /root/docwellness-dev/docwellness-backend

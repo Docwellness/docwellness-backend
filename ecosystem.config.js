@@ -19,5 +19,28 @@ module.exports = {
       kill_timeout: 5000,
       listen_timeout: 10000,
     },
+    {
+      // Runs the `dev` branch checkout on the same VPS, purely so
+      // Socket.io/realtime features can be tested end-to-end (the
+      // Vercel-hosted dev deployment can't hold persistent connections).
+      name: 'docwellness-backend-dev',
+      script: 'app.js',
+      cwd: '/root/docwellness-dev/docwellness-backend',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'development',
+        PORT: 5001,
+      },
+      // Logging
+      error_file: '/root/docwellness-dev/logs/backend-error.log',
+      out_file: '/root/docwellness-dev/logs/backend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      // Graceful restart
+      kill_timeout: 5000,
+      listen_timeout: 10000,
+    },
   ],
 };
