@@ -55,3 +55,5 @@ check-*.js
 create-*.js
 fix-*.js
 finalize-*.js
+.vercel
+.env*
