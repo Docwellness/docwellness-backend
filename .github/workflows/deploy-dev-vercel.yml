@@ -1,0 +1,24 @@
+name: Deploy backend (dev - Vercel)
+
+# Deploys via the Vercel CLI instead of Vercel's native GitHub integration,
+# because Vercel's free Hobby plan blocks importing/connecting repos that
+# live under a GitHub Organization (Docwellness). CLI deploys don't need
+# Vercel's GitHub App to have any org access - GitHub Actions just checks
+# out the code and uploads it directly.
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
