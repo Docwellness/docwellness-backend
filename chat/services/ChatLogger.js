@@ -7,9 +7,13 @@
 const fs = require('fs');
 const path = require('path');
 
+// Vercel's filesystem is read-only outside /tmp, and console logs are
+// already captured by its own log viewer - so file logging is VPS-only.
+const IS_SERVERLESS = !!process.env.VERCEL;
+
 // Ensure logs directory exists
 const LOGS_DIR = path.join(__dirname, '../../logs');
-if (!fs.existsSync(LOGS_DIR)) {
+if (!IS_SERVERLESS && !fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
@@ -108,6 +112,7 @@ function getLogFilePath() {
  * Write log entry to file (append mode)
  */
 function writeToFile(logEntry) {
+  if (IS_SERVERLESS) return;
   const logLine = JSON.stringify(logEntry) + '\n';
   fs.appendFileSync(getLogFilePath(), logLine, { encoding: 'utf8' });
 }

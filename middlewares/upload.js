@@ -1,9 +1,14 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const multer = require('multer');
 const config = require('../config/environment');
 
-const uploadDir = path.resolve(config.uploadPath);
+// Vercel's filesystem is read-only outside /tmp, and whatever lands there
+// doesn't persist or serve statically anyway - route uploads through /tmp
+// there so the module doesn't crash, matching this project's existing
+// use of Cloudinary as the actual persistent image store.
+const uploadDir = process.env.VERCEL ? os.tmpdir() : path.resolve(config.uploadPath);
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
