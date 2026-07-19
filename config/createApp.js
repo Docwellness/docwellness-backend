@@ -37,22 +37,6 @@ function createApp() {
   // Dietician API Routes
   app.use('/api/dietician', dieticianRoutes);
 
-  // TEMPORARY: verifies Resend email delivery end-to-end. Remove after testing.
-  app.get('/email-test', async (req, res) => {
-    try {
-      const { sendEmail } = require('../utils/emailService');
-      const result = await sendEmail({
-        to: 'pawarbhushan08@gmail.com',
-        subject: 'DocWellness - Resend verification test',
-        text: 'This confirms Resend is wired up correctly on the dev backend.',
-        html: '<p>This confirms Resend is wired up correctly on the dev backend.</p>',
-      });
-      res.status(200).json({ success: true, id: result.id });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
   // Health check route
   app.get('/health', (req, res) => {
     res.status(200).json({
