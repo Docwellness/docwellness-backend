@@ -22,11 +22,13 @@ const getResendClient = () => {
   return resend;
 };
 
-// Send email
-const sendEmail = async ({ to, subject, text, html }) => {
+// Send email. `from` defaults to the general/promotional sender; pass
+// config.email.fromAddressPersonal explicitly for onboarding-style emails
+// that should come from a real person instead.
+const sendEmail = async ({ to, subject, text, html, from }) => {
   try {
     const { data, error } = await getResendClient().emails.send({
-      from: config.email.fromAddress,
+      from: from || config.email.fromAddress,
       to,
       subject,
       text,
@@ -70,6 +72,7 @@ const sendWelcomeEmail = async (user) => {
     subject,
     text: `Welcome to DocWellness! Thank you for joining us.`,
     html,
+    from: config.email.fromAddressPersonal,
   });
 };
 
