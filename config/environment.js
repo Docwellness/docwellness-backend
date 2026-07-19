@@ -11,9 +11,12 @@ module.exports = {
     keySecret: process.env.RAZORPAY_KEY_SECRET,
   },
   email: {
-    service: process.env.EMAIL_SERVICE,
-    user: process.env.EMAIL_USER,
-    password: process.env.EMAIL_PASSWORD,
+    resendApiKey: process.env.RESEND_API_KEY,
+    // Resend's shared sandbox sender until docwellness.fit is verified in
+    // Resend (SPF/DKIM/DMARC records) - sandbox can only deliver to the
+    // Resend account's own verified email, not real users. Override with
+    // RESEND_FROM_EMAIL once the domain is verified.
+    fromAddress: process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY,

@@ -9,36 +9,34 @@
 // - sendDietPlanNotification: Notifies users about diet plan updates
 // - sendPaymentConfirmation: Confirms payment to users
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const config = require('../config/environment');
 
-// Create transporter
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: config.email.service,
-    auth: {
-      user: config.email.user,
-      pass: config.email.password,
-    },
-  });
+// Constructed lazily (not at module load) so a missing RESEND_API_KEY only
+// breaks actual send attempts, not the whole app's startup - this file is
+// required by authController.js/paymentController.js regardless of whether
+// any email is ever sent.
+let resend;
+const getResendClient = () => {
+  if (!resend) resend = new Resend(config.email.resendApiKey);
+  return resend;
 };
 
 // Send email
 const sendEmail = async ({ to, subject, text, html }) => {
   try {
-    const transporter = createTransporter();
-
-    const mailOptions = {
-      from: `DocWellness <${config.email.user}>`,
+    const { data, error } = await getResendClient().emails.send({
+      from: config.email.fromAddress,
       to,
       subject,
       text,
       html,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
-    return info;
+    if (error) throw error;
+
+    console.log('Email sent:', data.id);
+    return data;
   } catch (error) {
     console.error('Email error:', error);
     throw error;
