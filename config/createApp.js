@@ -37,6 +37,20 @@ function createApp() {
   // Dietician API Routes
   app.use('/api/dietician', dieticianRoutes);
 
+  // TEMPORARY: verifies the personal sender address. Remove after testing.
+  app.get('/email-test-personal', async (req, res) => {
+    try {
+      const { sendWelcomeEmail } = require('../utils/emailService');
+      const result = await sendWelcomeEmail({
+        email: 'pawarbhushan08@gmail.com',
+        profile: { firstName: 'Bhushan' },
+      });
+      res.status(200).json({ success: true, id: result.id });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Health check route
   app.get('/health', (req, res) => {
     res.status(200).json({
