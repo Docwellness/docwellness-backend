@@ -37,11 +37,6 @@ function createApp() {
   // Dietician API Routes
   app.use('/api/dietician', dieticianRoutes);
 
-  // TEMPORARY: verifies Sentry error capture end-to-end. Remove after testing.
-  app.get('/sentry-test', () => {
-    throw new Error('Sentry verification test error');
-  });
-
   // Health check route
   app.get('/health', (req, res) => {
     res.status(200).json({
