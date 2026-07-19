@@ -2,20 +2,14 @@ const Joi = require('joi');
 
 // Validation schemas
 const schemas = {
-  // Unified Registration
+  // Registration-completion (email comes from the verified Supabase token,
+  // not the request body - password is handled entirely by Supabase and
+  // never reaches this endpoint)
   register: Joi.object({
     username: Joi.string().min(3).max(30).required().messages({
       'string.min': 'Username must be at least 3 characters',
       'string.max': 'Username cannot exceed 30 characters',
       'any.required': 'Username is required',
-    }),
-    email: Joi.string().email().required().messages({
-      'string.email': 'Please enter a valid email',
-      'any.required': 'Email is required',
-    }),
-    password: Joi.string().min(6).required().messages({
-      'string.min': 'Password must be at least 6 characters',
-      'any.required': 'Password is required',
     }),
     profile: Joi.object({
       fullName: Joi.string().trim().required().messages({
@@ -118,16 +112,6 @@ const schemas = {
       }),
   }),
 
-  // Login with email or username
-  login: Joi.object({
-    email: Joi.string().email(),
-    username: Joi.string().min(3),
-    password: Joi.string().required(),
-  })
-    .xor('email', 'username')
-    .messages({
-      'object.xor': 'Either email or username is required for login',
-    }),
   updateProfile: Joi.object({
     profile: Joi.object({
       fullName: Joi.string().trim(),
@@ -227,7 +211,6 @@ const validate = (schemaName) => {
 
 // Export individual validators for routes
 const validateRegister = validate('register');
-const validateLogin = validate('login');
 const validateUpdateProfile = validate('updateProfile');
 const validateManualPaymentProof = validate('manualPaymentProof');
 
@@ -235,7 +218,6 @@ module.exports = {
   validate,
   schemas,
   validateRegister,
-  validateLogin,
   validateUpdateProfile,
   validateManualPaymentProof,
 };

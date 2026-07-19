@@ -9,10 +9,10 @@ const router = express.Router();
 
 // Import middlewares
 const authenticate = require('../middlewares/auth');
+const supabaseTokenOnly = require('../middlewares/supabaseTokenOnly');
 const { roleCheck } = require('../middlewares/roleCheck');
 const {
   validateRegister,
-  validateLogin,
   validateUpdateProfile,
   validateManualPaymentProof,
 } = require('../middlewares/validation');
@@ -46,15 +46,12 @@ const patientOnly = [authenticate, roleCheck('patient')];
 
 /**
  * @route   POST /api/patient/auth/register
- * @desc    Step 1: Register a new patient (username, email, password)
+ * @desc    Complete registration - links a verified Supabase identity
+ *          (created client-side via supabase.auth.signUp) to a new Mongo
+ *          profile. Requires a valid Supabase access token, but no linked
+ *          profile is expected to exist yet (that's what this creates).
  */
-router.post('/auth/register', validateRegister, authController.register);
-
-/**
- * @route   POST /api/patient/auth/login
- * @desc    Login patient (email or username + password)
- */
-router.post('/auth/login', validateLogin, authController.login);
+router.post('/auth/register', supabaseTokenOnly, validateRegister, authController.register);
 
 /**
  * @route   GET /api/patient/auth/check-username/:username
@@ -68,21 +65,8 @@ router.get('/auth/check-username/:username', authController.checkUsername);
  */
 router.get('/auth/check-email/:email', authController.checkEmail);
 
-/**
- * @route   POST /api/patient/auth/forgot-password
- * @desc    Request password reset
- */
-router.post('/auth/forgot-password', authController.forgotPassword);
-
-/**
- * @route   POST /api/patient/auth/reset-password/:token
- * @desc    Reset password with token
- */
-router.post('/auth/reset-password/:token', authController.resetPassword);
-
-// ==========================================
-// Profile Completion Routes (After Registration)
-// ==========================================
+// Login, logout, forgot/reset/change-password all happen client-side via
+// the Supabase SDK directly - no backend endpoints needed for those.
 
 // ==========================================
 // Authentication Routes (Protected)
@@ -96,15 +80,9 @@ router.get('/auth/me', patientOnly, authController.getMe);
 
 /**
  * @route   POST /api/patient/auth/logout
- * @desc    Logout patient
+ * @desc    Logout patient (best-effort no-op, kept for backward compat)
  */
 router.post('/auth/logout', patientOnly, authController.logout);
-
-/**
- * @route   PUT /api/patient/auth/change-password
- * @desc    Change password
- */
-router.put('/auth/change-password', patientOnly, authController.changePassword);
 
 // ==========================================
 // Profile Routes

@@ -1,6 +1,5 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const connectDB = async () => {
   try {
@@ -22,8 +21,10 @@ const setup = async () => {
 
   try {
     console.log('\n🔧 Setting up test environment...\n');
-
-    const hashedPassword = await bcrypt.hash('test123', 10);
+    console.log(
+      'Note: credentials now live in Supabase, not here - use scripts/createDieticianAccount.js\n' +
+        'to create accounts, or the Supabase dashboard to reset an existing user\'s password.\n'
+    );
 
     const allUsers = await User.find({}).lean();
     console.log('📋 Current users:');
@@ -37,20 +38,9 @@ const setup = async () => {
     let dietician = dieticians[0];
     let patient = patients[0];
 
-    if (dietician) {
-      await User.updateOne({ _id: dietician._id }, { $set: { password: hashedPassword } });
-      console.log(`\n✅ Updated dietician password: ${dietician.email}`);
-    }
-
     if (patient) {
-      await User.updateOne(
-        { _id: patient._id },
-        {
-          $set: { password: hashedPassword },
-          $unset: { status: 1 },
-        }
-      );
-      console.log(`✅ Updated patient password: ${patient.email}`);
+      await User.updateOne({ _id: patient._id }, { $unset: { status: 1 } });
+      console.log(`✅ Reset patient status: ${patient.email}`);
     }
 
     if (!dietician || !patient) {
@@ -77,7 +67,7 @@ const setup = async () => {
     console.log(`   Request ID: ${newRequest._id}`);
     console.log(`   Status: ${newRequest.status}`);
 
-    console.log('\n📋 Test credentials (password: test123):');
+    console.log('\n📋 Test accounts (passwords managed in Supabase, not here):');
     console.log(`   Dietician: ${dietician.email}`);
     console.log(`   Patient: ${patient.email}`);
   } catch (error) {

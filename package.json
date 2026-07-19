@@ -23,6 +23,7 @@
   "type": "commonjs",
   "dependencies": {
     "@sentry/node": "^10.66.0",
+    "@supabase/supabase-js": "^2.110.7",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",

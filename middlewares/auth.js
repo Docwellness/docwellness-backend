@@ -1,6 +1,4 @@
-const jwt = require('jsonwebtoken');
-const { User } = require('../models');
-const config = require('../config/environment');
+const { getUserFromSupabaseToken } = require('../utils/supabaseAuth');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -19,21 +17,16 @@ const authMiddleware = async (req, res, next) => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, config.jwtSecret);
-
-      // Get user from token
-      req.user = await User.findById(decoded.id).select('-password');
-
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found',
-        });
-      }
-
+      req.user = await getUserFromSupabaseToken(token);
       next();
     } catch (error) {
+      if (error.code === 'no_profile') {
+        return res.status(409).json({
+          success: false,
+          message: 'Account exists but registration was never completed',
+          code: 'no_profile',
+        });
+      }
       return res.status(401).json({
         success: false,
         message: 'Not authorized, token invalid',

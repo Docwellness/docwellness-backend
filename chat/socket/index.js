@@ -3,7 +3,6 @@
  * WhatsApp-like real-time messaging with proper ACKs and presence
  */
 
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { User } = require('../../models');
 const { ConversationV1, MessageV1 } = require('../models');
@@ -16,6 +15,7 @@ const {
 } = require('../services');
 const config = require('../../config/environment');
 const Notification = require('../../models/Notification');
+const { getUserFromSupabaseToken } = require('../../utils/supabaseAuth');
 
 const { EVENTS } = ChatLogger;
 
@@ -74,17 +74,7 @@ function initializeChatSocketV1(io) {
         return next(new Error('Authentication required'));
       }
 
-      const decoded = jwt.verify(token, config.jwtSecret);
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        ChatLogger.warn(EVENTS.WS_AUTH_FAIL, {
-          ...socket.logContext,
-          reason: 'user_not_found',
-          latency_ms: Date.now() - startTime,
-        });
-        return next(new Error('User not found'));
-      }
+      const user = await getUserFromSupabaseToken(token);
 
       socket.user = user;
       socket.logContext.user_id = user._id.toString();
@@ -102,7 +92,7 @@ function initializeChatSocketV1(io) {
         reason: error.message,
         latency_ms: Date.now() - startTime,
       });
-      next(new Error('Invalid token'));
+      next(new Error(error.code === 'no_profile' ? 'Registration not completed' : 'Invalid token'));
     }
   });
 

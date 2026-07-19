@@ -1,9 +1,17 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
   {
-    // Login credentials
+    // Links this profile to its Supabase Auth identity - Supabase owns
+    // credentials (password, sessions, password reset) entirely; this Mongo
+    // document only holds profile/health/app data. Sparse because it's only
+    // set once registration is completed (see the profile-linking flow).
+    supabaseUserId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     username: {
       type: String,
       required: [true, 'Username is required'],
@@ -18,12 +26,6 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
-    },
-    password: {
-      type: String,
-      required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters'],
-      select: false,
     },
     role: {
       type: String,
@@ -187,10 +189,6 @@ const userSchema = new mongoose.Schema(
       isApproved: { type: Boolean, default: false },
     },
 
-    // Password reset
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
-
     // For tracking
     lastLogin: Date,
     deviceToken: String, // For push notifications
@@ -244,20 +242,6 @@ userSchema.pre('validate', function () {
     }
   }
 });
-
-// Hash password before saving
-userSchema.pre('save', async function () {
-  if (!this.isModified('password')) {
-    return;
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-// Compare password method
-userSchema.methods.comparePassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
 
 // Format dates for frontend (DD-MM-YYYY)
 userSchema.set('toJSON', {

@@ -9,6 +9,7 @@ const { calculateBMI, calculateCalorieNeeds } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
+const { verifyPassword, getSupabaseAdmin } = require('../../utils/supabaseAuth');
 const parseDateFromDDMMYYYY = (value) => {
   if (!value || typeof value !== 'string') {
     return null;
@@ -256,9 +257,8 @@ exports.deleteAccount = async (req, res, next) => {
   try {
     const { password } = req.body;
 
-    // Verify password before deletion
-    const user = await User.findById(req.user._id).select('+password');
-    const isMatch = await user.comparePassword(password);
+    // Verify password before deletion (against Supabase, which owns credentials)
+    const isMatch = await verifyPassword(req.user.email, password);
 
     if (!isMatch) {
       return res.status(401).json({
@@ -269,6 +269,13 @@ exports.deleteAccount = async (req, res, next) => {
 
     // Soft delete or hard delete based on your requirements
     await User.findByIdAndDelete(req.user._id);
+
+    // Also remove the Supabase identity so no orphaned auth account remains
+    if (req.user.supabaseUserId) {
+      await getSupabaseAdmin().auth.admin.deleteUser(req.user.supabaseUserId).catch((err) => {
+        console.error('Failed to delete Supabase user after account deletion:', err.message);
+      });
+    }
 
     res.status(200).json({
       success: true,

@@ -1,16 +1,17 @@
 const authMiddleware = require('./auth');
+const supabaseTokenOnly = require('./supabaseTokenOnly');
 const { roleCheck, patientOnly, dieticianOnly, adminOnly } = require('./roleCheck');
 const errorHandler = require('./errorHandler');
 const {
   validate,
   schemas,
   validateRegister,
-  validateLogin,
   validateUpdateProfile,
 } = require('./validation');
 
 module.exports = {
   authMiddleware,
+  supabaseTokenOnly,
   roleCheck,
   patientOnly,
   dieticianOnly,
@@ -19,6 +20,5 @@ module.exports = {
   validate,
   schemas,
   validateRegister,
-  validateLogin,
   validateUpdateProfile,
 };

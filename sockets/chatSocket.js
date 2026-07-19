@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
 const { Chat, User, Conversation } = require('../models');
 const config = require('../config/environment');
+const { getUserFromSupabaseToken } = require('../utils/supabaseAuth');
 
 // Store online users
 const onlineUsers = new Map();
@@ -37,17 +37,12 @@ const initializeChatSocket = (io) => {
         return next(new Error('Authentication required'));
       }
 
-      const decoded = jwt.verify(token, config.jwtSecret);
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        return next(new Error('User not found'));
-      }
+      const user = await getUserFromSupabaseToken(token);
 
       socket.user = user;
       next();
     } catch (error) {
-      next(new Error('Invalid token'));
+      next(new Error(error.code === 'no_profile' ? 'Registration not completed' : 'Invalid token'));
     }
   });
 
