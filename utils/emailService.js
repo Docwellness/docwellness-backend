@@ -102,6 +102,33 @@ const sendPasswordResetOtp = async (user, otp) => {
   });
 };
 
+// Send signup verification code (same OTP-via-Resend pattern as password
+// reset - see signupRequest in authController.js). Takes a plain email
+// string rather than a user object since no Mongo profile exists yet at
+// this point in the flow.
+const sendSignupOtp = async (email, otp) => {
+  const subject = 'Verify your DocWellness account';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #4CAF50;">Welcome to DocWellness!</h1>
+      <p>Use this code in the app to verify your email and finish creating your account:</p>
+      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center;">
+        <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px;">${otp}</span>
+      </div>
+      <p>This code expires shortly. If you didn't request this, you can safely ignore this email.</p>
+      <p style="margin-top: 30px; color: #666;">Best regards,<br>The DocWellness Team</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject,
+    text: `Your DocWellness verification code is: ${otp}`,
+    html,
+    from: config.email.fromAddressPersonal,
+  });
+};
+
 // Send diet plan notification
 const sendDietPlanNotification = async (user, dietPlan, action) => {
   const actionMessages = {
@@ -168,6 +195,7 @@ module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetOtp,
+  sendSignupOtp,
   sendDietPlanNotification,
   sendPaymentConfirmation,
 };

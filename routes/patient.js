@@ -45,11 +45,20 @@ const patientOnly = [authenticate, roleCheck('patient')];
 // ==========================================
 
 /**
+ * @route   POST /api/patient/auth/signup-request
+ * @desc    Creates the Supabase identity (unconfirmed) and emails a
+ *          verification code via Resend. The app then verifies that code
+ *          directly against Supabase to get a session before calling
+ *          /auth/register below.
+ */
+router.post('/auth/signup-request', authController.signupRequest);
+
+/**
  * @route   POST /api/patient/auth/register
- * @desc    Complete registration - links a verified Supabase identity
- *          (created client-side via supabase.auth.signUp) to a new Mongo
- *          profile. Requires a valid Supabase access token, but no linked
- *          profile is expected to exist yet (that's what this creates).
+ * @desc    Complete registration - links a verified Supabase identity to a
+ *          new Mongo profile. Requires a valid Supabase access token (from
+ *          verifying the signup-request code), but no linked profile is
+ *          expected to exist yet (that's what this creates).
  */
 router.post('/auth/register', supabaseTokenOnly, validateRegister, authController.register);
 

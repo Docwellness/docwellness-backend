@@ -77,10 +77,32 @@ async function generateRecoveryOtp(email) {
   return data.properties.email_otp;
 }
 
+/**
+ * Creates a new Supabase identity (unconfirmed) and returns a signup OTP
+ * code for it, via the same admin.generateLink approach as recovery -
+ * again, Supabase's own signup email is never triggered, we deliver the
+ * code ourselves (via Resend). Throws with `.code = 'email_taken'` if a
+ * Supabase user already exists for this email.
+ */
+async function generateSignupOtp(email, password) {
+  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({
+    type: 'signup',
+    email,
+    password,
+  });
+  if (error) {
+    const err = new Error(error.message);
+    err.code = error.code === 'email_exists' ? 'email_taken' : 'signup_failed';
+    throw err;
+  }
+  return data.properties.email_otp;
+}
+
 module.exports = {
   getSupabaseAdmin,
   verifySupabaseToken,
   getUserFromSupabaseToken,
   verifyPassword,
   generateRecoveryOtp,
+  generateSignupOtp,
 };

@@ -1,23 +1,79 @@
 /**
  * Patient Authentication Controller
  *
- * Auth itself (sign up, sign in, sign out, password reset) happens
- * client-side via Supabase - the Flutter apps talk to Supabase directly and
- * get a Supabase session/access token. This controller's job is narrower:
- * link a Supabase identity to its Mongo profile (completeRegistration), and
- * serve/manage that profile data for already-linked accounts.
+ * Sign in, sign out, and password reset happen entirely client-side via
+ * Supabase. Sign-up needs two backend touchpoints because this project
+ * requires email confirmation (so a plain client-side signUp() returns no
+ * session): signupRequest creates the Supabase identity and emails a code
+ * via Resend, then - once the app verifies that code directly against
+ * Supabase and gets a session - register links the resulting identity to a
+ * new Mongo profile.
  */
 
 const { User } = require('../../models');
-const { sendWelcomeEmail, sendPasswordResetOtp } = require('../../utils/emailService');
+const { sendWelcomeEmail, sendPasswordResetOtp, sendSignupOtp } = require('../../utils/emailService');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
-const { generateRecoveryOtp } = require('../../utils/supabaseAuth');
+const { generateRecoveryOtp, generateSignupOtp } = require('../../utils/supabaseAuth');
+
+/**
+ * @desc    Start registration: creates the Supabase identity (unconfirmed)
+ *          and emails a verification code via Resend. This project has
+ *          email confirmation required, so a plain client-side
+ *          supabase.auth.signUp() wouldn't return a session immediately -
+ *          the app instead calls this, then supabase.auth.verifyOtp(type:
+ *          signup) directly to confirm and get a session, then register
+ *          (below) to link the profile.
+ * @route   POST /api/patient/auth/signup-request
+ * @access  Public
+ * @body    { email, password, username }
+ */
+exports.signupRequest = async (req, res, next) => {
+  try {
+    const { email, password, username } = req.body || {};
+    if (!email || !password || !username) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, and username are required',
+      });
+    }
+
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({ success: false, message: 'Username is already taken' });
+    }
+    const existingEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingEmail) {
+      return res.status(400).json({ success: false, message: 'User already exists with this email' });
+    }
+
+    let otp;
+    try {
+      otp = await generateSignupOtp(email, password);
+    } catch (err) {
+      if (err.code === 'email_taken') {
+        return res.status(400).json({ success: false, message: 'User already exists with this email' });
+      }
+      throw err;
+    }
+
+    await sendSignupOtp(email, otp);
+    console.log('Signup verification code sent to:', email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email',
+    });
+  } catch (error) {
+    console.log('Signup request error:', error.message);
+    next(error);
+  }
+};
 
 /**
  * @desc    Complete registration - links the caller's verified Supabase
  *          identity (req.supabaseUser, set by the supabaseTokenOnly
- *          middleware) to a new Mongo profile. Call this immediately after
- *          `supabase.auth.signUp()` succeeds client-side.
+ *          middleware) to a new Mongo profile. Call this after
+ *          `supabase.auth.verifyOtp(type: signup)` succeeds client-side.
  * @route   POST /api/patient/auth/register
  * @access  Private (valid Supabase token required, no linked profile yet)
  * @body    { username, profile, healthProfile }
