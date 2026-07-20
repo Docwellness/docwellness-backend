@@ -161,6 +161,8 @@ exports.listPatientsForDietician = async (req, res, next) => {
           'healthProfile.activityLevel',
           'healthProfile.primaryGoal',
           'isActive',
+          'status.firstConsultationId',
+          'status.patientConsented',
         ].join(' ')
       );
 
@@ -217,7 +219,10 @@ exports.listPatientsForDietician = async (req, res, next) => {
         hasActivePlan: Boolean(request.hasActivePlan),
         latestPaymentStatus: request.latestPaymentStatus || null,
         status: request.status || 'Unpaid',
+        hasFirstConsultation: Boolean(patient.status?.firstConsultationId),
+        patientConsented: patient.status?.patientConsented === true,
       });
+      const { label: statusLabel, category: statusCategory } = mapStatusCodeToLabel(statusCode);
 
       return {
         patientId,
@@ -228,7 +233,8 @@ exports.listPatientsForDietician = async (req, res, next) => {
         bmr,
         tdee,
         statusCode,
-        statusLabel: mapStatusCodeToLabel(statusCode),
+        statusLabel,
+        statusCategory,
         membershipPlan: request.membershipPlan || null,
       };
     });

@@ -26,11 +26,17 @@ const WATER_ACTIVITY_EXTRA_L = {
   extra_active: 1.0,
 };
 
+// Category drives the status box's color on the "New" tab patient card -
+// distinguishes whose turn it is to act (or that there's nothing left to
+// do) rather than just naming the raw DB status.
 const STATUS_LABELS = {
-  0: 'New Patient',
-  1: 'Unpaid',
-  2: 'Payment Pending',
-  3: 'Paid',
+  0: { label: 'Awaiting Consultation', category: 'dietician' },
+  1: { label: 'Awaiting Patient Consent', category: 'patient' },
+  2: { label: 'Diet Plan Pending', category: 'dietician' },
+  3: { label: 'Awaiting Payment Request', category: 'dietician' },
+  4: { label: 'Awaiting Payment', category: 'patient' },
+  5: { label: 'Payment Review', category: 'review' },
+  6: { label: 'Payment Confirmed', category: 'done' },
 };
 
 const calcAge = (dateOfBirth) => {
@@ -145,18 +151,39 @@ const calcWaterTargetL = ({ weightKg, activityLevel }) => {
   };
 };
 
-const getNewTabStatusCode = ({ plansCount, hasActivePlan, latestPaymentStatus, status }) => {
-  if (status === 'Paid' || latestPaymentStatus === 'Paid') {
-    return 3;
+/**
+ * Granular pre-activation status for the "New" tab's status box - walks the
+ * same real fields the rest of the app already gates on (DietPlanRequest
+ * .status/.plansCount and the patient's status.firstConsultationId/
+ * .patientConsented - see patient_profile_view.dart's Unpaid sub-branches
+ * and docwellness-user's Home _buildActionButton for the equivalent
+ * patient-facing logic) instead of collapsing everything pre-payment into
+ * a single "New Patient" bucket.
+ */
+const getNewTabStatusCode = ({
+  plansCount,
+  hasActivePlan,
+  latestPaymentStatus,
+  status,
+  hasFirstConsultation = false,
+  patientConsented = false,
+}) => {
+  if (status === 'Paid' || status === 'PartiallyPaid' || latestPaymentStatus === 'Paid') {
+    return 6;
   }
-  if (
-    status === 'PaymentSubmitted' ||
-    status === 'PaymentRequested' ||
-    latestPaymentStatus === 'Pending'
-  ) {
-    return 2;
+  if (status === 'PaymentSubmitted' || latestPaymentStatus === 'Pending') {
+    return 5;
+  }
+  if (status === 'PaymentRequested') {
+    return 4;
   }
   if (status === 'Unpaid' && plansCount > 0) {
+    return 3;
+  }
+  if (hasFirstConsultation && patientConsented) {
+    return 2;
+  }
+  if (hasFirstConsultation) {
     return 1;
   }
   return 0;
