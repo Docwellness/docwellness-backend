@@ -66,6 +66,12 @@ router.get('/auth/check-username/:username', authController.checkUsername);
 router.get('/auth/check-email/:email', authController.checkEmail);
 
 /**
+ * @route   GET /api/patient/auth/resolve-username/:username
+ * @desc    Resolve a username to its email for Supabase (email-only) sign-in
+ */
+router.get('/auth/resolve-username/:username', authController.resolveUsername);
+
+/**
  * @route   POST /api/patient/auth/forgot-password
  * @desc    Request a password reset code (delivered via Resend, not
  *          Supabase's own email templates). See §"Recovery via OTP" -

@@ -252,3 +252,34 @@ exports.checkEmail = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Resolve a username to its email, so the app can sign in via
+ *          Supabase (email-only) even when the user typed a username.
+ *          Same information-disclosure profile as check-username (both
+ *          confirm a username exists) - just also returns the email, since
+ *          that's genuinely needed for username-based sign-in to work at
+ *          all under Supabase.
+ * @route   GET /api/patient/auth/resolve-username/:username
+ * @access  Public
+ */
+exports.resolveUsername = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this username',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { email: user.email },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
