@@ -9,8 +9,9 @@
  */
 
 const { User } = require('../../models');
-const { sendWelcomeEmail } = require('../../utils/emailService');
+const { sendWelcomeEmail, sendPasswordResetOtp } = require('../../utils/emailService');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
+const { generateRecoveryOtp } = require('../../utils/supabaseAuth');
 
 /**
  * @desc    Complete registration - links the caller's verified Supabase
@@ -102,6 +103,48 @@ exports.register = async (req, res, next) => {
     });
   } catch (error) {
     console.log('Registration error:', error.message);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Request a password reset code. Generates an OTP via Supabase's
+ *          admin API and emails it via Resend (Supabase's own email
+ *          templates/sending are never used). Always responds with the same
+ *          generic message regardless of whether the email is registered,
+ *          to avoid leaking which emails have accounts.
+ * @route   POST /api/patient/auth/forgot-password
+ * @access  Public
+ * @body    { email }
+ */
+exports.forgotPassword = async (req, res, next) => {
+  const genericResponse = {
+    success: true,
+    message: 'If an account exists with this email, a reset code has been sent.',
+  };
+
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal whether the email is registered
+      return res.status(200).json(genericResponse);
+    }
+
+    const otp = await generateRecoveryOtp(email);
+    if (otp) {
+      await sendPasswordResetOtp(user, otp);
+      console.log('Password reset code sent to:', email);
+    } else {
+      console.log('Password reset requested but Supabase had no matching identity:', email);
+    }
+
+    res.status(200).json(genericResponse);
+  } catch (error) {
     next(error);
   }
 };

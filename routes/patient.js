@@ -65,8 +65,18 @@ router.get('/auth/check-username/:username', authController.checkUsername);
  */
 router.get('/auth/check-email/:email', authController.checkEmail);
 
-// Login, logout, forgot/reset/change-password all happen client-side via
-// the Supabase SDK directly - no backend endpoints needed for those.
+/**
+ * @route   POST /api/patient/auth/forgot-password
+ * @desc    Request a password reset code (delivered via Resend, not
+ *          Supabase's own email templates). See §"Recovery via OTP" -
+ *          the app then calls supabase.auth.verifyOtp(type: recovery)
+ *          and supabase.auth.updateUser() directly, no backend involved.
+ */
+router.post('/auth/forgot-password', authController.forgotPassword);
+
+// Login, logout (sign-out), and the rest of the reset flow (verify code +
+// set new password) all happen client-side via the Supabase SDK directly -
+// no backend endpoints needed for those.
 
 // ==========================================
 // Authentication Routes (Protected)

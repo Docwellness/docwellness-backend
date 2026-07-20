@@ -51,7 +51,7 @@ const sendWelcomeEmail = async (user) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #4CAF50;">Welcome to DocWellness!</h1>
-      <p>Hi ${user.profile?.firstName || 'there'},</p>
+      <p>Hi ${user.profile?.fullName || 'there'},</p>
       <p>Thank you for joining DocWellness. We're excited to have you on board!</p>
       <p>With DocWellness, you can:</p>
       <ul>
@@ -76,6 +76,32 @@ const sendWelcomeEmail = async (user) => {
   });
 };
 
+// Send password reset code (Supabase-generated OTP, sent via our own
+// branding instead of Supabase's default templates - see forgotPassword in
+// authController.js)
+const sendPasswordResetOtp = async (user, otp) => {
+  const subject = 'Your DocWellness password reset code';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #4CAF50;">Password Reset Code</h1>
+      <p>Hi ${user.profile?.fullName || 'there'},</p>
+      <p>Use this code in the app to reset your password:</p>
+      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center;">
+        <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px;">${otp}</span>
+      </div>
+      <p>This code expires shortly. If you didn't request this, you can safely ignore this email.</p>
+      <p style="margin-top: 30px; color: #666;">Best regards,<br>The DocWellness Team</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: user.email,
+    subject,
+    text: `Your DocWellness password reset code is: ${otp}`,
+    html,
+  });
+};
+
 // Send diet plan notification
 const sendDietPlanNotification = async (user, dietPlan, action) => {
   const actionMessages = {
@@ -89,7 +115,7 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #4CAF50;">Diet Plan Update</h1>
-      <p>Hi ${user.profile?.firstName || 'there'},</p>
+      <p>Hi ${user.profile?.fullName || 'there'},</p>
       <p>${actionMessages[action]}</p>
       <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
         <h3 style="margin-top: 0;">${dietPlan.name}</h3>
@@ -115,7 +141,7 @@ const sendPaymentConfirmation = async (user, payment, dietPlan) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #4CAF50;">Payment Successful!</h1>
-      <p>Hi ${user.profile?.firstName || 'there'},</p>
+      <p>Hi ${user.profile?.fullName || 'there'},</p>
       <p>Your payment has been successfully processed.</p>
       <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
         <h3 style="margin-top: 0;">Payment Details</h3>
@@ -141,6 +167,7 @@ const sendPaymentConfirmation = async (user, payment, dietPlan) => {
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
+  sendPasswordResetOtp,
   sendDietPlanNotification,
   sendPaymentConfirmation,
 };

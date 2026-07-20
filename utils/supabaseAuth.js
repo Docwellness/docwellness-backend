@@ -60,4 +60,27 @@ async function verifyPassword(email, password) {
   return !error;
 }
 
-module.exports = { getSupabaseAdmin, verifySupabaseToken, getUserFromSupabaseToken, verifyPassword };
+/**
+ * Generates a password-recovery OTP code for an email via Supabase's admin
+ * API, without sending anything (Supabase's own email templates are never
+ * used - the caller is responsible for delivering the code, e.g. via
+ * Resend). Returns null if the email isn't a Supabase user rather than
+ * throwing, so callers can respond generically without leaking which
+ * emails are registered.
+ */
+async function generateRecoveryOtp(email) {
+  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({
+    type: 'recovery',
+    email,
+  });
+  if (error) return null;
+  return data.properties.email_otp;
+}
+
+module.exports = {
+  getSupabaseAdmin,
+  verifySupabaseToken,
+  getUserFromSupabaseToken,
+  verifyPassword,
+  generateRecoveryOtp,
+};
