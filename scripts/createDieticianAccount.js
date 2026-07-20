@@ -45,20 +45,32 @@ const run = async () => {
       process.exit(1);
     }
 
-    const user = await User.create({
-      supabaseUserId: data.user.id,
-      username,
-      email,
-      role: 'dietician',
-      profile: { fullName },
-      isVerified: true,
-    });
+    try {
+      // healthProfile.bmi/weightIndex are `required` on the shared User
+      // schema even though they're meaningless for a dietician - the
+      // schema has no per-role conditional requirements, so every role
+      // needs placeholder values here.
+      const user = await User.create({
+        supabaseUserId: data.user.id,
+        username,
+        email,
+        role: 'dietician',
+        profile: { fullName },
+        healthProfile: { bmi: 0, weightIndex: 0 },
+        isVerified: true,
+      });
 
-    console.log('\n✅ Dietician account created:');
-    console.log(`   Mongo User ID: ${user._id}`);
-    console.log(`   Supabase User ID: ${data.user.id}`);
-    console.log(`   Email: ${email}`);
-    console.log(`   Username: ${username}`);
+      console.log('\n✅ Dietician account created:');
+      console.log(`   Mongo User ID: ${user._id}`);
+      console.log(`   Supabase User ID: ${data.user.id}`);
+      console.log(`   Email: ${email}`);
+      console.log(`   Username: ${username}`);
+    } catch (mongoErr) {
+      // Roll back the Supabase identity so a failed run doesn't leave an
+      // orphaned account that then blocks retrying with the same email.
+      await getSupabaseAdmin().auth.admin.deleteUser(data.user.id).catch(() => {});
+      throw mongoErr;
+    }
   } catch (err) {
     console.error('Error:', err);
     process.exit(1);
