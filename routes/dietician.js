@@ -23,8 +23,18 @@ const {
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
+const { authController } = require('../controllers/patient');
 
 const dieticianOnlyMiddleware = [authenticate, dieticianOnly];
+
+/**
+ * @route   GET /api/dietician/auth/me
+ * @desc    Get current logged in dietician. Reuses the same generic getMe
+ *          handler patient auth uses - the User model is shared across
+ *          roles, and this endpoint doesn't filter by role itself (the
+ *          dieticianOnlyMiddleware wrapper does that).
+ */
+router.get('/auth/me', dieticianOnlyMiddleware, authController.getMe);
 
 // ==========================================
 // Doctor Profile Routes
