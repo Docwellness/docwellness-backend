@@ -29,7 +29,8 @@ const {
   findAllergenConflicts,
   getConsultationAnswer,
 } = require('../../utils/dietaryConstraintValidator');
-const { validateDietPlan } = require('../../utils/dietPlanValidator');
+const { validateDietPlan, formatSevereIssuesForPrompt, SEVERE_CALORIE_DEVIATION_TOLERANCE } = require('../../utils/dietPlanValidator');
+const { computeFinalizeBlockingIssues } = require('../../utils/dietPlanFinalizeChecks');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { SAFETY_FIELD_IDS } = require('../../utils/consultationFormSeed');
 const { logWeight } = require('../../utils/weightLog');
@@ -38,7 +39,13 @@ const {
   TIER_INITIAL_WEEKS,
   validateRegenerateRequest,
 } = require('../../utils/membershipTiers');
-const { buildServingTimeOptions, buildDayGroupsOptions, fetchRecipePoolForOptions } = require('../../utils/dietPlanOptions');
+const {
+  buildServingTimeOptions,
+  buildDayGroupsOptions,
+  fetchRecipePoolForOptions,
+  buildRecipesByServingTimeMap,
+  SIDE_SALAD_ELIGIBLE_SLOTS,
+} = require('../../utils/dietPlanOptions');
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
 
@@ -682,7 +689,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   }
 
   const candidateRecipes = await Recipe.find(recipeFilter).select(
-    'name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags _id'
+    'name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags category _id'
   );
 
   const allergyOptions = getAnswer(SAFETY_FIELD_IDS.ALLERGIES) || [];
@@ -703,7 +710,17 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     return true;
   });
 
-  const recipePool = recipes.map((r) => ({
+  // Supplements already have a dedicated, working manual-selection UX (the
+  // Supplements pseudo-slot, see dietPlanOptions.js) - excluded from the AI
+  // pool entirely rather than trusting the model to recognize them (the
+  // recipePool sent to the prompt doesn't carry `category` at all, so the
+  // old prompt instruction asking it to identify "category Supplements"
+  // was unenforceable) and to consistently repeat the same recipeId across
+  // all 4 day-groups. The dietician adds supplements manually after
+  // generation, same as always.
+  const recipesForAIPool = recipes.filter((r) => r.category !== 'Supplements');
+
+  const recipeToPromptShape = (r) => ({
     id: r._id.toString(),
     name: r.name,
     servingTime: r.servingTime,
@@ -718,18 +735,24 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     // picking exactly one recipe per slot - see buildPrompt's combo rule.
     tags: r.tags || [],
     servingSize: r.servingSize || null,
-  }));
-
-  const generationStartedAt = Date.now();
-  const generatedText = await generateDietPlanWithAI({
-    patient: dietPlan.patientId,
-    firstConsultation: dietPlan.firstConsultation,
-    calorieStrategy: dietPlan.calorieStrategy,
-    macroStrategy: dietPlan.macroStrategy,
-    recipes: recipePool,
-    weekNumbers,
   });
-  const generationLatencyMs = Date.now() - generationStartedAt;
+
+  // Flat pool: used by validateDietPlan's closed-world check and the
+  // inputHash - unchanged shape from before, just built from
+  // recipesForAIPool (Supplements excluded).
+  const recipePool = recipesForAIPool.map(recipeToPromptShape);
+
+  // Per-slot pool for the prompt - reuses dietPlanOptions.js's exact
+  // side/salad/Supplements-aware bucketing (Supplements bucket will
+  // naturally be empty/absent since recipesForAIPool already excludes
+  // every Supplements-category doc), so a Dinner-only recipe is never even
+  // shown to the model under any other slot's heading.
+  const recipesByServingTimeDocs = buildRecipesByServingTimeMap(recipesForAIPool);
+  const recipePoolByServingTime = {};
+  REQUIRED_SERVING_TIMES.forEach((slot) => {
+    recipePoolByServingTime[slot] = (recipesByServingTimeDocs[slot] || []).map(recipeToPromptShape);
+  });
+
   const inputHash = crypto
     .createHash('sha256')
     .update(
@@ -744,18 +767,81 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     )
     .digest('hex');
 
+  // Outer, content-aware retry loop: up to 3 total attempts (1 initial + 2
+  // corrective retries). Distinct from generateDietPlanWithAI's own inner
+  // retry loop (2 attempts, transport/refusal errors only, same prompt) -
+  // this loop inspects validateDietPlan's findings and rewrites the prompt
+  // with a corrective note between attempts, so the model gets a real
+  // chance to fix specifically what it got wrong last time before we ever
+  // consider saving/showing a broken plan.
+  const MAX_GENERATION_ATTEMPTS = 3;
+  const weightTrend = await resolveWeightTrend(patientId);
+
+  const generationStartedAt = Date.now();
+  let generatedText = '';
   let parsedGeneratedPlan = null;
-  try {
-    parsedGeneratedPlan = JSON.parse(generatedText);
-  } catch (_) {
-    // Leave null - validateDietPlan treats a missing/invalid plan as zero weeks.
+  let validationResult = null;
+  let correctiveNote = '';
+  let attemptsUsed = 0;
+
+  for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
+    attemptsUsed = attempt;
+    generatedText = await generateDietPlanWithAI({
+      patient: dietPlan.patientId,
+      firstConsultation: dietPlan.firstConsultation,
+      calorieStrategy: dietPlan.calorieStrategy,
+      macroStrategy: dietPlan.macroStrategy,
+      recipesByServingTime: recipePoolByServingTime,
+      weekNumbers,
+      correctiveNote,
+    });
+
+    try {
+      parsedGeneratedPlan = JSON.parse(generatedText);
+    } catch (_) {
+      parsedGeneratedPlan = null; // validateDietPlan treats this as zero weeks
+    }
+
+    validationResult = validateDietPlan({
+      parsedPlan: parsedGeneratedPlan,
+      recipePool,
+      calorieStrategy: dietPlan.calorieStrategy,
+      weightTrend,
+    });
+
+    if (!validationResult.hasSevereIssues) break;
+    if (attempt === MAX_GENERATION_ATTEMPTS) break;
+    correctiveNote = formatSevereIssuesForPrompt(validationResult.severeIssues);
   }
-  const { warnings: newValidationWarnings } = validateDietPlan({
-    parsedPlan: parsedGeneratedPlan,
-    recipePool,
-    calorieStrategy: dietPlan.calorieStrategy,
-    weightTrend: await resolveWeightTrend(patientId),
-  });
+  const generationLatencyMs = Date.now() - generationStartedAt;
+
+  if (validationResult.hasSevereIssues) {
+    try {
+      await GenerationLog.create({
+        kind: 'dietPlan',
+        dieticianId,
+        refId: dietPlan._id,
+        model: config.openai.dietPlanModel,
+        inputHash,
+        latencyMs: generationLatencyMs,
+        validatorWarnings: validationResult.warnings,
+        succeeded: false,
+      });
+    } catch (logError) {
+      console.error('Failed to write GenerationLog entry:', logError.message);
+    }
+
+    return {
+      ok: false,
+      status: 502,
+      message: `AI diet-plan generation produced severe, unresolvable issues after ${attemptsUsed} attempt(s) (e.g. wrong-meal-slot assignments or calories far outside the target budget). No plan was saved - please try regenerating, or contact support if this persists. Details: ${validationResult.severeIssues
+        .slice(0, 5)
+        .map((i) => i.message)
+        .join(' | ')}`,
+    };
+  }
+
+  const newValidationWarnings = validationResult.warnings;
   if (excludedForAllergens.length > 0) {
     newValidationWarnings.push(
       `${excludedForAllergens.length} recipe(s) were excluded from selection due to a potential allergen/foods-to-avoid conflict: ${excludedForAllergens
@@ -1530,6 +1616,55 @@ exports.finalizeWeekPlan = async (req, res, next) => {
       dietPlan.finalizedPlan = { weeks: [] };
     }
 
+    // Computed server-side from each selected recipe's *current* nutrition
+    // data (fetched by id), not trusted from whatever the client submitted -
+    // see computeWeekSummary's doc comment. This is what makes the
+    // dietician's live "Total Budget" preview, the stored weeksSummary, and
+    // the patient app's reading of it impossible to drift apart, and keeps
+    // it in sync if a recipe's nutrition is corrected later.
+    const summaryRecipeIds = [
+      ...new Set(normalizedMeals.map((m) => m.recipeId).filter(Boolean)),
+    ];
+    const summaryRecipeDocs = summaryRecipeIds.length
+      ? await Recipe.find({ _id: { $in: summaryRecipeIds } })
+          .select('nutrition servingSize secondaryComponent category servingTime name tags')
+          .lean()
+      : [];
+    const computedSummary = computeWeekSummary(normalizedMeals, summaryRecipeDocs);
+
+    // Re-verify the dietician's actual submitted selections - generation-
+    // time warnings go stale the instant a recipe is added/swapped, so this
+    // is the real gate: a wrong-slot recipe or a calorie total far outside
+    // the target budget blocks finalize outright instead of just warning.
+    const recipeDocsById = new Map(summaryRecipeDocs.map((r) => [r._id.toString(), r]));
+    const blockingIssues = computeFinalizeBlockingIssues({
+      normalizedMeals,
+      recipeDocsById,
+      calorieBudget: dietPlan.calorieStrategy?.calorieBudget,
+      computedSummary,
+    });
+
+    if (blockingIssues.unknownRecipeIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Week ${weekNumber}: ${blockingIssues.unknownRecipeIds.length} selected recipe(s) could not be found - they may have been deleted. Please reselect: ${blockingIssues.unknownRecipeIds.join(', ')}`,
+      });
+    }
+    if (blockingIssues.slotMismatches.length > 0) {
+      return res.status(422).json({
+        success: false,
+        message: `Week ${weekNumber} cannot be finalized: ${blockingIssues.slotMismatches.length} recipe(s) are assigned to the wrong meal slot.`,
+        details: blockingIssues.slotMismatches,
+      });
+    }
+    if (blockingIssues.calorieSevere) {
+      return res.status(422).json({
+        success: false,
+        message: `Week ${weekNumber} cannot be finalized: ${blockingIssues.calorieSevere.message} Please adjust portions/selections before finalizing.`,
+        details: [blockingIssues.calorieSevere],
+      });
+    }
+
     const existingIndex = dietPlan.finalizedPlan.weeks.findIndex(
       (entry) => entry.week === weekNumber
     );
@@ -1543,22 +1678,6 @@ exports.finalizeWeekPlan = async (req, res, next) => {
     } else {
       dietPlan.finalizedPlan.weeks.push(weekPayload);
     }
-
-    // Computed server-side from each selected recipe's *current* nutrition
-    // data (fetched by id), not trusted from whatever the client submitted -
-    // see computeWeekSummary's doc comment. This is what makes the
-    // dietician's live "Total Budget" preview, the stored weeksSummary, and
-    // the patient app's reading of it impossible to drift apart, and keeps
-    // it in sync if a recipe's nutrition is corrected later.
-    const summaryRecipeIds = [
-      ...new Set(normalizedMeals.map((m) => m.recipeId).filter(Boolean)),
-    ];
-    const summaryRecipeDocs = summaryRecipeIds.length
-      ? await Recipe.find({ _id: { $in: summaryRecipeIds } })
-          .select('nutrition servingSize secondaryComponent category')
-          .lean()
-      : [];
-    const computedSummary = computeWeekSummary(normalizedMeals, summaryRecipeDocs);
 
     const normalizedSummary = {
       week: weekNumber,
@@ -1751,9 +1870,17 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
     ];
     const allRecipeDocs = allRecipeIds.length
       ? await Recipe.find({ _id: { $in: allRecipeIds } })
-          .select('nutrition servingSize secondaryComponent category')
+          .select('nutrition servingSize secondaryComponent category servingTime name tags')
           .lean()
       : [];
+    const recipeDocsById = new Map(allRecipeDocs.map((r) => [r._id.toString(), r]));
+
+    // Re-verify every week's actual submitted selections before saving
+    // anything - see the matching check/rationale in finalizeWeekPlan.
+    // Accumulated across all 4 weeks so the dietician sees every problem
+    // at once instead of fixing one week, resubmitting, and hitting the
+    // next.
+    const blockingIssuesByWeek = [];
 
     weeksWithNormalizedMeals.forEach(({ week, normalizedMeals }) => {
       normalizedWeeks.push({ week, dailyMeals: normalizedMeals });
@@ -1774,7 +1901,25 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
         proteinGrams: computedSummary.proteinGrams,
         fiberGrams: computedSummary.fiberGrams,
       });
+
+      const blockingIssues = computeFinalizeBlockingIssues({
+        normalizedMeals,
+        recipeDocsById,
+        calorieBudget: dietPlan.calorieStrategy?.calorieBudget,
+        computedSummary,
+      });
+      if (blockingIssues.hasBlockingIssues) {
+        blockingIssuesByWeek.push({ week, ...blockingIssues });
+      }
     });
+
+    if (blockingIssuesByWeek.length > 0) {
+      return res.status(422).json({
+        success: false,
+        message: `Cannot finalize: severe issues found in ${blockingIssuesByWeek.length} week(s).`,
+        details: blockingIssuesByWeek,
+      });
+    }
 
     dietPlan.finalizedPlan = { weeks: normalizedWeeks };
     dietPlan.weeksSummary = normalizedSummaries;

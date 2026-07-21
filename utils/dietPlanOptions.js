@@ -78,6 +78,42 @@ async function fetchRecipePoolForOptions({ Recipe, dieticianId }) {
  * @param nextWeekRecipeIds  Set<string> - optional, tags a recipe with
  *   `nextWeekTag` if it's already selected for the following week.
  */
+/**
+ * Buckets a flat recipe-doc array by eligible servingTime slot - a recipe
+ * is eligible for a slot if either its own stored `servingTime` matches, or
+ * it's tagged 'side'/'salad' and the slot is in SIDE_SALAD_ELIGIBLE_SLOTS,
+ * or (Supplements pseudo-slot) its category is 'Supplements'. Pure function
+ * of recipeDocs alone - no selection state - so it's reusable by both the
+ * dietician app's options-building (via buildServingTimeOptionsFromDocs
+ * below) and the AI-generation candidate pool (dietPlanController.js),
+ * without duplicating this bucketing logic in two places.
+ */
+function buildRecipesByServingTimeMap(recipeDocs) {
+  const recipesByServingTime = {};
+  recipeDocs.forEach((recipe) => {
+    const isSupplement = recipe.category === 'Supplements';
+    const ownSlot = recipe.servingTime || 'Other';
+
+    if (!recipesByServingTime[ownSlot]) recipesByServingTime[ownSlot] = [];
+    recipesByServingTime[ownSlot].push(recipe);
+
+    const isSideOrSalad = Array.isArray(recipe.tags) && recipe.tags.some((t) => t === 'side' || t === 'salad');
+    if (isSideOrSalad) {
+      SIDE_SALAD_ELIGIBLE_SLOTS.forEach((slot) => {
+        if (slot === ownSlot) return; // already added above, don't duplicate
+        if (!recipesByServingTime[slot]) recipesByServingTime[slot] = [];
+        recipesByServingTime[slot].push(recipe);
+      });
+    }
+
+    if (isSupplement) {
+      if (!recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT]) recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT] = [];
+      recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT].push(recipe);
+    }
+  });
+  return recipesByServingTime;
+}
+
 function buildServingTimeOptionsFromDocs({
   recipeDocs,
   selectedByServingTime = {},
@@ -95,35 +131,19 @@ function buildServingTimeOptionsFromDocs({
     Object.values(selectedByServingTime).flatMap((idSet) => [...idSet])
   );
 
-  const recipesByServingTime = {};
-  recipeDocs.forEach((recipe) => {
-    const id = recipe._id.toString();
-    const isSupplement = recipe.category === 'Supplements';
-    const ownSlot = recipe.servingTime || 'Other';
-
-    // A not-yet-selected supplement only shows in the Supplements pseudo-
-    // slot, not cluttering its own real slot's browsable list; one that's
-    // already selected (e.g. AI-picked "Triphala Night Drink") still shows
-    // under its real slot too, flagged isSelected, so Total Budget reflects
-    // what was actually generated.
-    if (!isSupplement || selectedRecipeIdSet.has(id)) {
-      if (!recipesByServingTime[ownSlot]) recipesByServingTime[ownSlot] = [];
-      recipesByServingTime[ownSlot].push(recipe);
-    }
-
-    const isSideOrSalad = Array.isArray(recipe.tags) && recipe.tags.some((t) => t === 'side' || t === 'salad');
-    if (isSideOrSalad) {
-      SIDE_SALAD_ELIGIBLE_SLOTS.forEach((slot) => {
-        if (slot === ownSlot) return; // already added above, don't duplicate
-        if (!recipesByServingTime[slot]) recipesByServingTime[slot] = [];
-        recipesByServingTime[slot].push(recipe);
-      });
-    }
-
-    if (isSupplement) {
-      if (!recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT]) recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT] = [];
-      recipesByServingTime[SUPPLEMENTS_PSEUDO_SLOT].push(recipe);
-    }
+  const recipesByServingTime = buildRecipesByServingTimeMap(recipeDocs);
+  // UI-only: hide a not-yet-selected supplement from its own real slot's
+  // browsable list, so it doesn't clutter e.g. "Breakfast" - one that's
+  // already selected (e.g. AI-picked "Triphala Night Drink") still shows
+  // under its real slot too, flagged isSelected, so Total Budget reflects
+  // what was actually generated. This selection-awareness is a UI-only
+  // concern, kept out of buildRecipesByServingTimeMap so that function stays
+  // a pure function of recipeDocs alone.
+  Object.keys(recipesByServingTime).forEach((slot) => {
+    if (slot === SUPPLEMENTS_PSEUDO_SLOT) return;
+    recipesByServingTime[slot] = recipesByServingTime[slot].filter(
+      (r) => r.category !== 'Supplements' || selectedRecipeIdSet.has(r._id.toString())
+    );
   });
 
   const servingTimes = [...REQUIRED_SERVING_TIMES, SUPPLEMENTS_PSEUDO_SLOT].map((servingTime) => {
@@ -255,6 +275,7 @@ async function buildServingTimeOptions({ Recipe, dieticianId, ...rest }) {
 module.exports = {
   buildServingTimeOptions,
   buildServingTimeOptionsFromDocs,
+  buildRecipesByServingTimeMap,
   buildDayGroupsOptions,
   fetchRecipePoolForOptions,
   REQUIRED_SERVING_TIMES,

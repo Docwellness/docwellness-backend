@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const OpenAI = require('openai');
 const config = require('../config/environment');
 const { RECIPE_JSON_SCHEMA } = require('./recipeJsonSchema');
-const { DIET_PLAN_JSON_SCHEMA } = require('./dietPlanJsonSchema');
+const { DIET_PLAN_JSON_SCHEMA, REQUIRED_SERVING_TIMES } = require('./dietPlanJsonSchema');
 const { DISH_EXTRACTION_JSON_SCHEMA } = require('./dishExtractionJsonSchema');
 
 const openai = new OpenAI({
@@ -176,13 +176,23 @@ const buildPrompt = ({
   firstConsultation,
   calorieStrategy,
   macroStrategy,
-  recipes = [],
+  recipesByServingTime = {},
   weekNumbers = [1, 2, 3, 4],
+  correctiveNote = '',
 }) => {
   const bio = extractPatientBio(patient);
   const consultationSummary = summarizeConsultation(firstConsultation);
   const strategySummary = summarizeStrategy(calorieStrategy, macroStrategy);
-  const recipesJson = JSON.stringify(recipes);
+  // One JSON block per servingTime heading, each containing ONLY recipes
+  // eligible for that slot (own servingTime, plus side/salad cross-listed
+  // into Lunch/Dinner/Evening Snack - see dietPlanOptions.js's
+  // buildRecipesByServingTimeMap) - this makes a wrong-slot pick (e.g. a
+  // Dinner-only curry chosen for Breakfast) structurally harder, since the
+  // model is never even shown that recipe under the Breakfast heading, not
+  // just told not to via prose.
+  const recipesBySlotJson = REQUIRED_SERVING_TIMES.map(
+    (slot) => `${slot} (only these recipes are valid for a "${slot}" entry):\n${JSON.stringify(recipesByServingTime[slot] || [])}`
+  ).join('\n\n');
 
   const sortedWeeks = [...weekNumbers].sort((a, b) => a - b);
   const weekLabel = sortedWeeks.length === 1 ? `Week ${sortedWeeks[0]}` : `Weeks ${sortedWeeks.join(', ')}`;
@@ -230,24 +240,26 @@ ${consultationSummary}
 Strategy:
 ${strategySummary}
 
-Available recipes (JSON array - each has "tags": e.g. ["side"] or ["salad"] for accompaniments, and "servingSize" for its portion):
-${recipesJson}
+Available recipes, grouped by meal slot - this is the ONLY valid source list per slot. A recipe listed under one slot heading is NOT valid for any other slot unless it also appears under that other slot's heading (side/salad accompaniments intentionally appear under multiple headings - Lunch, Dinner, and Evening Snack - because they legitimately serve all three; that is the ONLY reason a recipe id would repeat across two slot lists). Each recipe has "tags" (e.g. ["side"] or ["salad"] for accompaniments) and "servingSize" for its portion:
+
+${recipesBySlotJson}
 
 Rules:
-- You MUST choose meals only from this recipes array.
+- You MUST choose meals only from the recipe lists above.
 - For every meal entry, you MUST use a valid recipe "id" from the list.
 - Day-group structure (this is how a real week is actually built - not a simplification you can skip): each week has exactly 4 day-groups - ${DAY_GROUPS.join(', ')}. Monday's meals are also eaten on Friday, Tuesday's on Saturday, Wednesday's on Sunday - Thursday is the only truly unique day. Every "dailyMeals" entry MUST carry a "dayGroup" of exactly one of these 4 values. NEVER generate entries for Friday, Saturday, or Sunday specifically - those days automatically reuse Monday/Tuesday/Wednesday's entries.
+- COMPLETENESS: every one of the 4 day-groups (${DAY_GROUPS.join(', ')}) must have AT LEAST one "dailyMeals" entry for EVERY one of the 7 servingTime slots (${REQUIRED_SERVING_TIMES.join(', ')}) - never omit a slot for any day-group.
 - Within a day-group, every entry is fixed (that's the whole point - Monday and Friday eat identically because they share one day-group's entries).
 - Across the 4 day-groups, the Lunch and Dinner MAIN dish (the sabji/curry itself, not its sides) must be DIFFERENT in each of the 4 groups - never reuse the same main dish recipeId for Lunch across two different day-groups, and likewise for Dinner. This is what gives the week its variety.
-- Morning Drink and any recipe with category "Supplements" (e.g. a multivitamin, whey protein) must use the exact SAME recipeId across all 4 day-groups - these never vary day to day.
+- Morning Drink must use the exact SAME recipeId across all 4 day-groups - it never varies day to day.
 - A meal slot is NOT limited to one recipe: you may output multiple "dailyMeals" entries that share the same "dayGroup" and "servingTime" when that's how the dish is actually eaten (see the Lunch/Dinner combo rule below).
-- Match servingTime: a recipe whose own "servingTime" is Breakfast may only be used for Breakfast, etc. - EXCEPT recipes tagged "side" or "salad" (their own servingTime is usually "Lunch" but they may be assigned to Lunch, Dinner, or Evening Snack, since a chapati/bhakri/rice/salad naturally accompanies any of those).
+- CRITICAL - candidate lists are pre-filtered per slot: for every "dailyMeals" entry, you MUST pick a "recipeId" that appears in that entry's own "servingTime" heading's list above. Do not reuse a recipeId from a different slot's list unless it also appears in this slot's own list (only side/salad accompaniments legitimately appear in more than one list - see above). If you cannot find a suitable recipe under a slot's heading, choose the closest fit from THAT SAME slot's list - never borrow from another slot's list.
 - Lunch/Dinner/Evening Snack combo rule: real Indian meals pair one main dish with several accompaniments at once - a full thali is typically sabji/curry + a bread (chapati/bhakri) + rice + dal/varan + salad, all "side" or "salad" tagged and all served alongside the main dish, not just one of them. When your chosen main dish for Lunch, Dinner, or Evening Snack is a component dish (sabji, curry, dal, bhurji, usal) rather than an already-complete one-pot meal (biryani, pulav, khichdi, idli, dosa, uttapa - these last three are already a full meal on their own with their own sambar/chutney, never add chapati/bhakri/rice/dal/salad alongside them), add AS MANY of the fitting "side"-tagged accompaniments (bread, rice, dal/varan) as make sense together as separate dailyMeals entries with the same dayGroup+servingTime, plus a "salad"-tagged recipe where it fits naturally - do not stop at just one side when a bread, rice, and dal/varan would all realistically appear on the same plate. Do not add sides to a main dish that's already a complete one-pot meal. Never output more than 5 entries for the same dayGroup+servingTime pair.
 - Create meal sets for exactly these weeks: ${sortedWeeks.join(', ')} - no others.
 - If generating more than one week, try to provide variety across them while staying close to the target calorieBudget.
-- Distribute calories realistically across meals: lighter for Morning Drink and Night Drink, higher for Lunch and Dinner - remember a Lunch/Dinner combo's total is the SUM of its main dish plus its side(s), so size the main dish accordingly rather than expecting one dish alone to hit the full meal's calorie target.
+- Distribute calories realistically across all 7 slots so their sum is close to the calorieBudget in the Strategy above: keep Morning Drink and Night Drink light (a small drink/light bite, not a full meal), Breakfast and Brunch moderate, and let Lunch and Dinner (COMBO totals - main dish plus every side you add, summed together) carry the largest share, with Evening Snack in between. Never leave a slot trivially small (e.g., a few calories) just to hit the total on paper - every slot must be something a person would genuinely eat at that time. Spread protein sources across multiple slots (not concentrated into a single meal) so the day's protein target is met gradually rather than in one large dose. When calorieStrategy indicates a deficit (weight loss), reduce portion sizes/servings proportionally rather than skipping meal slots or components entirely - a lighter version of a full day beats a day with missing slots.
 - Respect dietaryHabits and freeFrom flags according to the patient's profile and consultation notes.
-
+${correctiveNote ? `\nIMPORTANT - CORRECTIONS FROM YOUR PREVIOUS ATTEMPT (you MUST fix every one of these this time):\n${correctiveNote}\n` : ''}
 Output Requirements:
 - Respond ONLY with JSON in this exact structure (no comments, no extra text):
 {
@@ -263,16 +275,18 @@ const generateDietPlanWithAI = async ({
   firstConsultation,
   calorieStrategy,
   macroStrategy,
-  recipes = [],
+  recipesByServingTime = {},
   weekNumbers = [1, 2, 3, 4],
+  correctiveNote = '',
 }) => {
   const prompt = buildPrompt({
     patient,
     firstConsultation,
     calorieStrategy,
     macroStrategy,
-    recipes,
+    recipesByServingTime,
     weekNumbers,
+    correctiveNote,
   });
 
   const systemPrompt =
@@ -286,7 +300,7 @@ const generateDietPlanWithAI = async ({
     firstConsultationId: firstConsultation?._id?.toString(),
     calorieStrategy,
     macroStrategy,
-    recipeIds: recipes.map((r) => r.id),
+    recipeIds: Object.values(recipesByServingTime).flat().map((r) => r.id),
     weekNumbers,
   });
 

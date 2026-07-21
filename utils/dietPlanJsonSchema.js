@@ -32,7 +32,8 @@ const dailyMealSchema = {
     servingTime: { type: 'string', enum: REQUIRED_SERVING_TIMES },
     recipeId: {
       type: 'string',
-      description: 'Must be exactly one of the "id" values from the provided recipes array - never invented.',
+      description:
+        'Must be exactly one of the "id" values from the recipe list for THIS SAME entry\'s servingTime (see the per-slot recipe lists in the prompt) - never an id from a different slot\'s list, never invented.',
     },
   },
 };

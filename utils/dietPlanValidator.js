@@ -5,10 +5,17 @@
 // utils/dietaryConstraintValidator.js plays for individual recipes - the AI
 // proposes, this catches drift deterministically, the dietician reviews.
 
-const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('./dietPlanOptions');
+const { SIDE_SALAD_ELIGIBLE_SLOTS, REQUIRED_SERVING_TIMES } = require('./dietPlanOptions');
 const { DAY_GROUPS } = require('./dayGroups');
 
 const CALORIE_DEVIATION_TOLERANCE = 0.1; // ±10%, per the architecture's tolerance-based reconciliation
+// ±40% - a different regime from the soft tolerance above, not just a
+// stricter version of it: 4x the soft threshold so ordinary estimation
+// noise/portion variability never trips it, but a structurally broken
+// generation (missing slots, wrong recipes) always does - e.g. the incident
+// that motivated this: a plan totaling 151 kcal against a 1687 kcal budget,
+// a ~91% deviation. Used to BLOCK (finalize-time) rather than just warn.
+const SEVERE_CALORIE_DEVIATION_TOLERANCE = 0.4;
 
 // Mirrors the dietician app's trend-aware default-quantity logic
 // (patients_controller.dart's _defaultServingsForTrend/_isTrendScoped) -
@@ -45,6 +52,7 @@ function trendCalorieRatio(recipe, servingTime, weightTrend) {
 
 function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend = 'gain' }) {
   const warnings = [];
+  const severeIssues = [];
   const recipeById = new Map((recipePool || []).map((r) => [r.id, r]));
   const weeks = Array.isArray(parsedPlan?.weeks) ? parsedPlan.weeks : [];
   const weeksSummaryComputed = [];
@@ -64,9 +72,9 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
       const recipe = recipeById.get(meal?.recipeId);
 
       if (!recipe) {
-        warnings.push(
-          `Week ${week?.week}: ${meal?.servingTime || 'a meal'} references recipe "${meal?.recipeId}" which is not in the allowed recipe pool - please reselect it manually.`
-        );
+        const message = `Week ${week?.week}: ${meal?.servingTime || 'a meal'} references recipe "${meal?.recipeId}" which is not in the allowed recipe pool - please reselect it manually.`;
+        warnings.push(message);
+        severeIssues.push({ type: 'unknown_recipe', week: week?.week, servingTime: meal?.servingTime, recipeId: meal?.recipeId, message });
         continue;
       }
 
@@ -83,16 +91,23 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
         meal.servingTime !== recipe.servingTime &&
         !isCrossListedSlot
       ) {
-        warnings.push(
-          `Week ${week?.week}: "${recipe.name}" is a ${recipe.servingTime} recipe but was assigned to ${meal.servingTime}.`
-        );
+        const message = `Week ${week?.week}: "${recipe.name}" is a ${recipe.servingTime} recipe but was assigned to ${meal.servingTime}.`;
+        warnings.push(message);
+        severeIssues.push({
+          type: 'slot_mismatch',
+          week: week?.week,
+          recipeName: recipe.name,
+          recipeServingTime: recipe.servingTime,
+          assignedServingTime: meal.servingTime,
+          message,
+        });
       }
 
       const dayGroupTotals = totalsByDayGroup[meal?.dayGroup];
       if (!dayGroupTotals) {
-        warnings.push(
-          `Week ${week?.week}: ${meal?.servingTime || 'a meal'} has an invalid or missing dayGroup "${meal?.dayGroup}" - must be one of ${DAY_GROUPS.join(', ')}.`
-        );
+        const message = `Week ${week?.week}: ${meal?.servingTime || 'a meal'} has an invalid or missing dayGroup "${meal?.dayGroup}" - must be one of ${DAY_GROUPS.join(', ')}.`;
+        warnings.push(message);
+        severeIssues.push({ type: 'invalid_day_group', week: week?.week, servingTime: meal?.servingTime, dayGroup: meal?.dayGroup, message });
         continue;
       }
 
@@ -102,6 +117,23 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
       dayGroupTotals.totalCarbs += (recipe.carbs || 0) * ratio;
       dayGroupTotals.totalFats += (recipe.fats || 0) * ratio;
     }
+
+    // Every required slot must have at least one entry in every day-group -
+    // catches the "silently missing slots" failure mode (e.g. the AI drops
+    // most of Lunch/Dinner, collapsing the day's calorie total) that a
+    // per-meal loop alone can't see, since it only inspects entries that
+    // exist. Does not cap entries per slot - a legitimate 5-entry combo
+    // (main + bread + rice + dal + salad) still passes.
+    DAY_GROUPS.forEach((dayGroup) => {
+      REQUIRED_SERVING_TIMES.forEach((servingTime) => {
+        const hasEntry = dailyMeals.some((m) => m?.dayGroup === dayGroup && m?.servingTime === servingTime);
+        if (!hasEntry) {
+          const message = `Week ${week?.week}, ${dayGroup}: no meal entries found for required slot "${servingTime}".`;
+          warnings.push(message);
+          severeIssues.push({ type: 'missing_slot', week: week?.week, dayGroup, servingTime, message });
+        }
+      });
+    });
 
     // Weekly summary = sum across all 4 groups (a rough "everything this
     // week" aggregate) - kept for response-shape compatibility; the real
@@ -139,6 +171,21 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
             )}% from the target budget (${calorieBudget}).`
           );
         }
+        if (deviation > SEVERE_CALORIE_DEVIATION_TOLERANCE) {
+          severeIssues.push({
+            type: 'calorie_deviation_severe',
+            week: week?.week,
+            dayGroup,
+            actualCalories: Math.round(dayTotalCalories),
+            budgetCalories: calorieBudget,
+            deviationPercent: Math.round(deviation * 100),
+            message: `Week ${week?.week}, ${dayGroup}: total daily calories (${Math.round(
+              dayTotalCalories
+            )}) deviate ${Math.round(deviation * 100)}% from the target budget (${calorieBudget}) - exceeds the ${Math.round(
+              SEVERE_CALORIE_DEVIATION_TOLERANCE * 100
+            )}% severe threshold.`,
+          });
+        }
       });
     }
   }
@@ -146,8 +193,48 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
   return {
     valid: warnings.length === 0,
     warnings,
+    severeIssues,
+    hasSevereIssues: severeIssues.length > 0,
     weeksSummaryComputed,
   };
 }
 
-module.exports = { validateDietPlan, CALORIE_DEVIATION_TOLERANCE };
+// Turns the structured severeIssues from validateDietPlan into a short,
+// specific corrective note appended to the next generation attempt's
+// prompt (see openaiClient.js's correctiveNote param) - deduping repeated
+// slot_mismatch entries per recipe (the AI misplacing "Chicken Curry" 6
+// times becomes ONE bullet listing all 6 wrong slots) so the note stays
+// short and doesn't drown the model in repetition. Capped so a badly broken
+// plan can't blow up the next prompt's size.
+const MAX_CORRECTIVE_NOTE_LINES = 15;
+
+function formatSevereIssuesForPrompt(severeIssues) {
+  const bySlotMismatchRecipe = new Map();
+  const otherLines = [];
+
+  (severeIssues || []).forEach((issue) => {
+    if (issue.type === 'slot_mismatch') {
+      const key = issue.recipeName;
+      if (!bySlotMismatchRecipe.has(key)) {
+        bySlotMismatchRecipe.set(key, { recipeServingTime: issue.recipeServingTime, wrongSlots: new Set() });
+      }
+      bySlotMismatchRecipe.get(key).wrongSlots.add(issue.assignedServingTime);
+    } else {
+      otherLines.push(`- ${issue.message}`);
+    }
+  });
+
+  const slotMismatchLines = [...bySlotMismatchRecipe.entries()].map(
+    ([name, { recipeServingTime, wrongSlots }]) =>
+      `- "${name}" is a ${recipeServingTime} recipe - it was wrongly assigned to: ${[...wrongSlots].join(', ')}. Only use it for ${recipeServingTime}.`
+  );
+
+  return [...slotMismatchLines, ...otherLines].slice(0, MAX_CORRECTIVE_NOTE_LINES).join('\n');
+}
+
+module.exports = {
+  validateDietPlan,
+  formatSevereIssuesForPrompt,
+  CALORIE_DEVIATION_TOLERANCE,
+  SEVERE_CALORIE_DEVIATION_TOLERANCE,
+};
