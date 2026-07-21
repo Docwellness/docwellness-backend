@@ -6,11 +6,6 @@ const schemas = {
   // not the request body - password is handled entirely by Supabase and
   // never reaches this endpoint)
   register: Joi.object({
-    username: Joi.string().min(3).max(30).required().messages({
-      'string.min': 'Username must be at least 3 characters',
-      'string.max': 'Username cannot exceed 30 characters',
-      'any.required': 'Username is required',
-    }),
     profile: Joi.object({
       fullName: Joi.string().trim().required().messages({
         'any.required': 'Full name is required',

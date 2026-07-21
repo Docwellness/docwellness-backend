@@ -25,22 +25,18 @@ const { generateRecoveryOtp, generateSignupOtp } = require('../../utils/supabase
  *          (below) to link the profile.
  * @route   POST /api/patient/auth/signup-request
  * @access  Public
- * @body    { email, password, username }
+ * @body    { email, password }
  */
 exports.signupRequest = async (req, res, next) => {
   try {
-    const { email, password, username } = req.body || {};
-    if (!email || !password || !username) {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email, password, and username are required',
+        message: 'Email and password are required',
       });
     }
 
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({ success: false, message: 'Username is already taken' });
-    }
     const existingEmail = await User.findOne({ email: email.toLowerCase() });
     if (existingEmail) {
       return res.status(400).json({ success: false, message: 'User already exists with this email' });
@@ -76,11 +72,11 @@ exports.signupRequest = async (req, res, next) => {
  *          `supabase.auth.verifyOtp(type: signup)` succeeds client-side.
  * @route   POST /api/patient/auth/register
  * @access  Private (valid Supabase token required, no linked profile yet)
- * @body    { username, profile, healthProfile }
+ * @body    { profile, healthProfile }
  */
 exports.register = async (req, res, next) => {
   try {
-    const { username, profile, healthProfile } = req.body || {};
+    const { profile, healthProfile } = req.body || {};
     const { id: supabaseUserId, email } = req.supabaseUser;
 
     console.log('📝 Completing registration for:', email);
@@ -90,14 +86,6 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Registration already completed for this account',
-      });
-    }
-
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username is already taken',
       });
     }
 
@@ -120,7 +108,6 @@ exports.register = async (req, res, next) => {
 
     const user = await User.create({
       supabaseUserId,
-      username,
       email,
       role: 'patient',
       profile: {
@@ -152,7 +139,6 @@ exports.register = async (req, res, next) => {
       message: 'Registration successful! Welcome to DocWellness.',
       data: {
         _id: user._id,
-        username: user.username,
         email: user.email,
         role: user.role,
       },
@@ -227,7 +213,6 @@ exports.getMe = async (req, res, next) => {
       success: true,
       data: {
         _id: user._id,
-        username: user.username,
         email: user.email,
         role: user.role,
         profile: user.profile,
@@ -264,29 +249,6 @@ exports.logout = async (req, res, next) => {
 };
 
 /**
- * @desc    Check if username is available
- * @route   GET /api/patient/auth/check-username/:username
- * @access  Public
- */
-exports.checkUsername = async (req, res, next) => {
-  try {
-    const { username } = req.params;
-
-    const existingUser = await User.findOne({ username });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        username,
-        isAvailable: !existingUser,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * @desc    Check if email is available
  * @route   GET /api/patient/auth/check-email/:email
  * @access  Public
@@ -303,37 +265,6 @@ exports.checkEmail = async (req, res, next) => {
         email,
         isAvailable: !existingUser,
       },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Resolve a username to its email, so the app can sign in via
- *          Supabase (email-only) even when the user typed a username.
- *          Same information-disclosure profile as check-username (both
- *          confirm a username exists) - just also returns the email, since
- *          that's genuinely needed for username-based sign-in to work at
- *          all under Supabase.
- * @route   GET /api/patient/auth/resolve-username/:username
- * @access  Public
- */
-exports.resolveUsername = async (req, res, next) => {
-  try {
-    const { username } = req.params;
-
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with this username',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: { email: user.email },
     });
   } catch (error) {
     next(error);

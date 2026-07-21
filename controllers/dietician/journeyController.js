@@ -20,7 +20,7 @@ exports.getPatientJourneyImages = async (req, res, next) => {
 
     const images = await JourneyImage.find({ patientId })
       .sort({ createdAt: -1 })
-      .populate('uploadedBy', 'username fullName');
+      .populate('uploadedBy', 'fullName');
 
     res.status(200).json({
       success: true,
@@ -366,7 +366,7 @@ exports.getJourneyMilestones = async (req, res, next) => {
 
     const manualImages = await JourneyImage.find({ patientId })
       .sort({ createdAt: -1 })
-      .populate('uploadedBy', 'username fullName');
+      .populate('uploadedBy', 'fullName');
 
     res.status(200).json({
       success: true,

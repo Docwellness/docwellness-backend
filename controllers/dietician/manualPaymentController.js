@@ -16,7 +16,7 @@ exports.getManualPaymentProofs = async (req, res, next) => {
     };
 
     const proofs = await ManualPaymentProof.find(query)
-      .populate('patient', 'profile.fullName username email healthProfile.primaryGoal')
+      .populate('patient', 'profile.fullName email healthProfile.primaryGoal')
       .populate('request', 'startDateForDiet status')
       .sort({ createdAt: -1 });
 

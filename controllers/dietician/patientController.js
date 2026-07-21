@@ -59,7 +59,7 @@ exports.getPatientProfile = async (req, res, next) => {
 
     const patient = await User.findById(patientId)
       .select(
-        'role username email profile.fullName profile.gender profile.dateOfBirth profile.whatsappNumber profile.profileImage healthProfile.height healthProfile.weight healthProfile.bmi healthProfile.weightIndex healthProfile.primaryGoal healthProfile.targetWeight healthProfile.healthConcerns healthProfile.activityLevel isVerified isActive status'
+        'role email profile.fullName profile.gender profile.dateOfBirth profile.whatsappNumber profile.profileImage healthProfile.height healthProfile.weight healthProfile.bmi healthProfile.weightIndex healthProfile.primaryGoal healthProfile.targetWeight healthProfile.healthConcerns healthProfile.activityLevel isVerified isActive status'
       )
       .lean();
 
@@ -207,7 +207,6 @@ exports.getPatientProfile = async (req, res, next) => {
         id: patient._id,
         basic: {
           fullName: patient.profile?.fullName || null,
-          username: patient.username,
           email: patient.email,
           whatsappNumber: patient.profile?.whatsappNumber || null,
           gender: patient.profile?.gender || null,
@@ -305,9 +304,9 @@ exports.togglePatientActive = async (req, res, next) => {
  *          consultation, payments, chat/conversations, meal/water/progress
  *          logs, journey images, custom food requests, need-attention log,
  *          notifications), and their Supabase auth identity.
- *          Irreversible - requires `confirmUsername` in the body to exactly
- *          match the patient's username. The dietician app's UI already
- *          makes the dietician re-type the username before calling this,
+ *          Irreversible - requires `confirmEmail` in the body to exactly
+ *          match the patient's email. The dietician app's UI already
+ *          makes the dietician re-type the email before calling this,
  *          but that's a client-side guard only - re-verified here too,
  *          since a destructive/unrecoverable operation should never rely on
  *          client-side confirmation alone.
@@ -316,7 +315,7 @@ exports.togglePatientActive = async (req, res, next) => {
 exports.deletePatient = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    const { confirmUsername } = req.body || {};
+    const { confirmEmail } = req.body || {};
 
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
       return res.status(400).json({ success: false, message: 'Invalid patient id' });
@@ -327,10 +326,10 @@ exports.deletePatient = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
 
-    if (typeof confirmUsername !== 'string' || confirmUsername.trim() !== patient.username) {
+    if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== patient.email) {
       return res.status(400).json({
         success: false,
-        message: "Typed username does not match this patient's username - deletion cancelled.",
+        message: "Typed email does not match this patient's email - deletion cancelled.",
       });
     }
 

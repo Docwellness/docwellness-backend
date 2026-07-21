@@ -29,7 +29,7 @@ async function resetPatient() {
   }
 
   console.log('\n=== RESETTING PATIENT ===');
-  console.log('Patient:', patient.profile?.fullName || patient.username);
+  console.log('Patient:', patient.profile?.fullName || patient.email);
   console.log('ID:', patient._id.toString());
 
   // Delete all related records

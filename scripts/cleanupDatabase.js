@@ -33,7 +33,7 @@ const cleanup = async () => {
     console.log(`\nFound ${allUsers.length} total users:`);
 
     allUsers.forEach((u) => {
-      console.log(`  - ${u.email || u.username} (${u.role}) ID: ${u._id}`);
+      console.log(`  - ${u.email} (${u.role}) ID: ${u._id}`);
     });
 
     // Keep dieticians, remove all patients
@@ -48,14 +48,13 @@ const cleanup = async () => {
       await DietPlan.deleteMany({ patientId: patient._id });
       await MealLog.deleteMany({ patient: patient._id });
       await User.deleteOne({ _id: patient._id });
-      console.log(`  Deleted patient: ${patient.email || patient.username}`);
+      console.log(`  Deleted patient: ${patient.email}`);
     }
 
     // Create a fresh patient account
     const hashedPassword = await bcrypt.hash('patient123', 10);
     const newPatient = await User.create({
       email: 'patient@test.com',
-      username: 'testpatient',
       password: hashedPassword,
       role: 'patient',
       isVerified: true,
@@ -81,7 +80,7 @@ const cleanup = async () => {
     const remainingUsers = await User.find({});
     console.log(`\n📋 Remaining users (${remainingUsers.length}):`);
     remainingUsers.forEach((u) => {
-      console.log(`  - ${u.email || u.username} (${u.role})`);
+      console.log(`  - ${u.email} (${u.role})`);
     });
 
     console.log('\n✅ Database cleanup complete!');

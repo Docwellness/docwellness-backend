@@ -47,8 +47,8 @@ async function resetPatient() {
   console.log('Reset user status to fresh state');
 
   // Verify
-  const user = await User.findById(patientId).select('status username').lean();
-  console.log('Patient:', user.username);
+  const user = await User.findById(patientId).select('status email').lean();
+  console.log('Patient:', user.email);
   console.log('New status:', JSON.stringify(user.status, null, 2));
 
   await mongoose.disconnect();

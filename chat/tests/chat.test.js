@@ -19,7 +19,6 @@ const TEST_MONGODB_URI =
 // Mock user data
 const mockPatient = {
   _id: new mongoose.Types.ObjectId(),
-  username: 'testpatient',
   email: 'patient@test.com',
   role: 'patient',
   profile: { fullName: 'Test Patient' },
@@ -27,7 +26,6 @@ const mockPatient = {
 
 const mockDietician = {
   _id: new mongoose.Types.ObjectId(),
-  username: 'testdietician',
   email: 'dietician@test.com',
   role: 'dietician',
   profile: { fullName: 'Test Dietician' },

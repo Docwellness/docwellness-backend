@@ -43,7 +43,6 @@ async function main() {
     const hashedPassword = await bcrypt.hash('test-only-not-a-real-account', 10);
     const uniqueSuffix = Date.now();
     testPatient = await User.create({
-      username: `zz-diet-plan-verify-${uniqueSuffix}`,
       email: `zz-diet-plan-verification-${uniqueSuffix}@test.invalid`,
       password: hashedPassword,
       role: 'patient',

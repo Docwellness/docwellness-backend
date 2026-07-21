@@ -63,22 +63,10 @@ router.post('/auth/signup-request', authController.signupRequest);
 router.post('/auth/register', supabaseTokenOnly, validateRegister, authController.register);
 
 /**
- * @route   GET /api/patient/auth/check-username/:username
- * @desc    Check if username is available
- */
-router.get('/auth/check-username/:username', authController.checkUsername);
-
-/**
  * @route   GET /api/patient/auth/check-email/:email
  * @desc    Check if email is available
  */
 router.get('/auth/check-email/:email', authController.checkEmail);
-
-/**
- * @route   GET /api/patient/auth/resolve-username/:username
- * @desc    Resolve a username to its email for Supabase (email-only) sign-in
- */
-router.get('/auth/resolve-username/:username', authController.resolveUsername);
 
 /**
  * @route   POST /api/patient/auth/forgot-password

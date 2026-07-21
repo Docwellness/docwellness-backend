@@ -5,18 +5,18 @@
  * approach now that Supabase owns credentials.
  *
  * Usage:
- *   node scripts/createDieticianAccount.js <email> <password> <username> <fullName>
+ *   node scripts/createDieticianAccount.js <email> <password> <fullName>
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
 
 const run = async () => {
-  const [, , email, password, username, ...fullNameParts] = process.argv;
+  const [, , email, password, ...fullNameParts] = process.argv;
   const fullName = fullNameParts.join(' ');
 
-  if (!email || !password || !username || !fullName) {
+  if (!email || !password || !fullName) {
     console.error(
-      'Usage: node scripts/createDieticianAccount.js <email> <password> <username> <fullName>'
+      'Usage: node scripts/createDieticianAccount.js <email> <password> <fullName>'
     );
     process.exit(1);
   }
@@ -28,9 +28,9 @@ const run = async () => {
   const User = require('../models/User');
 
   try {
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    const existing = await User.findOne({ email });
     if (existing) {
-      console.error(`A user with this email or username already exists: ${existing._id}`);
+      console.error(`A user with this email already exists: ${existing._id}`);
       process.exit(1);
     }
 
@@ -52,7 +52,6 @@ const run = async () => {
       // needs placeholder values here.
       const user = await User.create({
         supabaseUserId: data.user.id,
-        username,
         email,
         role: 'dietician',
         profile: { fullName },
@@ -64,7 +63,6 @@ const run = async () => {
       console.log(`   Mongo User ID: ${user._id}`);
       console.log(`   Supabase User ID: ${data.user.id}`);
       console.log(`   Email: ${email}`);
-      console.log(`   Username: ${username}`);
     } catch (mongoErr) {
       // Roll back the Supabase identity so a failed run doesn't leave an
       // orphaned account that then blocks retrying with the same email.
