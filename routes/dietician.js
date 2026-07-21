@@ -138,6 +138,13 @@ router.put(
   patientController.togglePatientActive
 );
 
+// Permanently delete a patient and all their data (irreversible)
+router.delete(
+  '/patients/:patientId',
+  dieticianOnlyMiddleware,
+  patientController.deletePatient
+);
+
 // First consultation form APIs
 router.get(
   '/patients/:patientId/first-consultation',

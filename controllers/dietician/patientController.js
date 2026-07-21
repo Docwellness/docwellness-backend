@@ -5,8 +5,18 @@ const {
   DietPlanRequest,
   FirstConsultation,
   ManualPaymentProof,
+  Progress,
+  Chat,
+  Conversation,
+  Payment,
+  Notification,
 } = require('../../models');
+const CustomFoodRequest = require('../../models/CustomFoodRequest');
+const JourneyImage = require('../../models/JourneyImage');
+const NeedAttentionLog = require('../../models/NeedAttentionLog');
+const WaterLog = require('../../models/WaterLog');
 const { getMembershipTier } = require('../../utils/membershipTiers');
+const { getSupabaseAdmin } = require('../../utils/supabaseAuth');
 
 const formatDate = (value) => {
   if (!value) {
@@ -282,6 +292,78 @@ exports.togglePatientActive = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: { isActive: patient.isActive },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   DELETE /api/dietician/patients/:patientId
+ * @desc    Permanently delete a patient: their User document, every
+ *          collection referencing them (diet plans/requests, first
+ *          consultation, payments, chat/conversations, meal/water/progress
+ *          logs, journey images, custom food requests, need-attention log,
+ *          notifications), and their Supabase auth identity.
+ *          Irreversible - requires `confirmUsername` in the body to exactly
+ *          match the patient's username. The dietician app's UI already
+ *          makes the dietician re-type the username before calling this,
+ *          but that's a client-side guard only - re-verified here too,
+ *          since a destructive/unrecoverable operation should never rely on
+ *          client-side confirmation alone.
+ * @access  Private (Dietician)
+ */
+exports.deletePatient = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const { confirmUsername } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(400).json({ success: false, message: 'Invalid patient id' });
+    }
+
+    const patient = await User.findById(patientId);
+    if (!patient || patient.role !== 'patient') {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    if (typeof confirmUsername !== 'string' || confirmUsername.trim() !== patient.username) {
+      return res.status(400).json({
+        success: false,
+        message: "Typed username does not match this patient's username - deletion cancelled.",
+      });
+    }
+
+    await Promise.all([
+      DietPlan.deleteMany({ patientId }),
+      DietPlanRequest.deleteMany({ patient: patientId }),
+      FirstConsultation.deleteMany({ patient: patientId }),
+      ManualPaymentProof.deleteMany({ patient: patientId }),
+      Progress.deleteMany({ patientId }),
+      Payment.deleteMany({ patientId }),
+      Notification.deleteMany({ userId: patientId }),
+      Chat.deleteMany({ $or: [{ senderId: patientId }, { receiverId: patientId }] }),
+      Conversation.deleteMany({ 'participants.userId': patientId }),
+      CustomFoodRequest.deleteMany({ patientId }),
+      JourneyImage.deleteMany({ patientId }),
+      NeedAttentionLog.deleteMany({ patientId }),
+      WaterLog.deleteMany({ patientId }),
+    ]);
+
+    await User.findByIdAndDelete(patientId);
+
+    // Also remove the Supabase identity so no orphaned auth account remains
+    // (mirrors the patient's own self-delete flow in
+    // controllers/patient/profileController.js's deleteAccount).
+    if (patient.supabaseUserId) {
+      await getSupabaseAdmin().auth.admin.deleteUser(patient.supabaseUserId).catch((err) => {
+        console.error('Failed to delete Supabase user during patient deletion:', err.message);
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient deleted successfully',
     });
   } catch (error) {
     next(error);
