@@ -8,7 +8,7 @@ const { errorHandler } = require('../middlewares');
 const { chatRoutes } = require('../chat');
 
 // Import routes
-const { patientRoutes, dieticianRoutes } = require('../routes');
+const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
 
 function createApp() {
   const app = express();
@@ -36,6 +36,9 @@ function createApp() {
 
   // Dietician API Routes
   app.use('/api/dietician', dieticianRoutes);
+
+  // Internal/cron-triggered routes (shared-secret auth, not user JWT)
+  app.use('/api/internal', internalRoutes);
 
   // Health check route
   app.get('/health', (req, res) => {

@@ -48,6 +48,7 @@ const {
 } = require('../../utils/dietPlanOptions');
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
+const { buildWeekSchedule } = require('../../utils/weekSchedule');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -140,7 +141,16 @@ exports.listPatientsForDietician = async (req, res, next) => {
         // live, so they'd otherwise vanish from every tab (not "new" since
         // hasActivePlan is true, not "ongoing" since status isn't
         // Paid/PartiallyPaid, not "past" since nothing completed).
-        status: { $in: ['Paid', 'PartiallyPaid', 'PaymentSubmitted'] },
+        //
+        // status is intentionally unrestricted (any non-null value) rather
+        // than an explicit $in list: starting a renewal (see
+        // startRenewal()) resets status back to 'Unpaid'/'PaymentRequested'
+        // on the *same* request while hasActivePlan stays true (the prior
+        // cycle's plan is still live/loggable until the new one activates)
+        // - that combination doesn't match any status this list used to
+        // enumerate, and would otherwise make a renewing patient vanish
+        // from every tab the same way PaymentSubmitted once did above.
+        status: { $ne: null },
         hasActivePlan: true,
         completedAt: null,
       };
@@ -1018,7 +1028,30 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       });
     }
 
-    const parsedStartDate = startDate ? new Date(startDate) : undefined;
+    // Always resolved (defaults to now), unlike before, since weekSchedule
+    // needs an anchor date regardless of whether the dietician picked one.
+    const rawParsedStartDate = startDate ? new Date(startDate) : new Date();
+    const parsedStartDate = Number.isNaN(rawParsedStartDate.getTime()) ? new Date() : rawParsedStartDate;
+
+    // This endpoint doubles as "start a new renewal cycle" whenever it's
+    // called for a patient who already has plan history (no separate
+    // renewal-generation endpoint - see docs/cron-setup.md and the renewal
+    // flow in controllers/patient/dietPlanRequestController.js::startRenewal
+    // for how the request gets reset to Unpaid first). cycleNumber drives a
+    // *display-only* week offset (Week 5-8 for cycle 2, etc.) - the internal
+    // 1-4 week numbering, generation, and finalize logic below are
+    // completely unchanged for a renewal vs. a first-time plan.
+    const previousPlan = await DietPlan.findOne({ patientId, request: resolvedRequestId })
+      .sort({ cycleNumber: -1 })
+      .select('cycleNumber status')
+      .lean();
+    const cycleNumber = previousPlan ? (previousPlan.cycleNumber || 1) + 1 : 1;
+    if (previousPlan && previousPlan.status === 'Active') {
+      await DietPlan.updateMany(
+        { patientId, request: resolvedRequestId, status: 'Active' },
+        { $set: { status: 'Completed' } }
+      );
+    }
 
     const dietPlan = new DietPlan({
       patientId,
@@ -1028,9 +1061,9 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       calorieStrategy,
       macroStrategy,
       status: 'Draft',
-      ...(parsedStartDate && !Number.isNaN(parsedStartDate.getTime())
-        ? { startDate: parsedStartDate }
-        : {}),
+      startDate: parsedStartDate,
+      cycleNumber,
+      weekSchedule: buildWeekSchedule(parsedStartDate),
     });
 
     await dietPlan.save();
@@ -1079,6 +1112,8 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
         generatedPlan: dietPlan.generatedPlan,
         riskFlags: dietPlan.riskFlags,
         validationWarnings: dietPlan.validationWarnings,
+        cycleNumber: dietPlan.cycleNumber,
+        weekSchedule: dietPlan.weekSchedule,
       },
     });
   } catch (error) {
@@ -1151,11 +1186,21 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
       ? dietPlan.finalizedPlan.weeks.map((w) => w.week)
       : [];
 
+    // The week being superseded - week 2 for Golden's [3,4], week (N-1) for
+    // Platinum's single week N - is always sortedWeekNumbers[0] - 1 in both
+    // cases, so one lookup covers both tiers.
+    const priorWeekNumber = sortedWeekNumbers[0] - 1;
+    const currentWeekSchedule = Array.isArray(dietPlan.weekSchedule)
+      ? dietPlan.weekSchedule.find((w) => w.week === priorWeekNumber)
+      : null;
+
     const validation = validateRegenerateRequest({
       tier,
       weekNumbers: sortedWeekNumbers,
       existingWeekNumbers,
       finalizedWeekNumbers,
+      currentWeekSchedule,
+      now: new Date(),
     });
     if (!validation.ok) {
       return res.status(403).json({ success: false, message: validation.message });
@@ -1194,6 +1239,7 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
         generatedPlan: dietPlan.generatedPlan,
         riskFlags: dietPlan.riskFlags,
         validationWarnings: dietPlan.validationWarnings,
+        weekSchedule: dietPlan.weekSchedule,
       },
     });
   } catch (error) {
@@ -2129,6 +2175,11 @@ exports.activateDietPlan = async (req, res, next) => {
       const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       dietPlan.request.subscriptionStartDate = now;
       dietPlan.request.subscriptionExpiresAt = expiresAt;
+      // Fresh expiry window (first activation or a renewal) means any prior
+      // "expiring soon" reminder is stale - clear it so the renewal-reminder
+      // sweep (controllers/internal/renewalReminderController.js) can notify
+      // again for *this* cycle's expiry, 3 days out.
+      dietPlan.request.renewalReminderSentAt = null;
 
       await dietPlan.request.save();
     }

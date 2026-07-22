@@ -83,6 +83,16 @@ const dietPlanRequestSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Stamped by the renewal-reminder sweep (controllers/internal/
+    // renewalReminderController.js) once it creates the "expiring soon"
+    // notification for the *current* subscriptionExpiresAt, so the daily
+    // sweep doesn't re-notify every day during the 3-day window. Reset to
+    // null wherever subscriptionExpiresAt is overwritten with a new value
+    // (activateDietPlan) so a renewed cycle's reminder window starts fresh.
+    renewalReminderSentAt: {
+      type: Date,
+      default: null,
+    },
     currentWeight: {
       type: Number,
       default: null,

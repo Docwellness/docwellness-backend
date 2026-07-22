@@ -77,6 +77,27 @@ else
     warn "ecosystem.config.js not found in $PROD_DIR - skipping PM2 start."
 fi
 
+# --- Step 9: Membership-renewal reminder cron (prod only) ---
+# This is the ONLY trigger path that reaches real patients - vercel.json's
+# "crons" entry for the same route only ever runs against the Vercel-hosted
+# `dev` deployment (see docs/cron-setup.md), since prod runs on this VPS via
+# PM2, not Vercel. Requires CRON_SECRET to already be set in
+# $PROD_DIR/.env (add it there first if this is the first time).
+CRON_MARKER="docwellness-renewal-reminders"
+if [[ -f "$PROD_DIR/.env" ]] && grep -q '^CRON_SECRET=' "$PROD_DIR/.env"; then
+    CRON_SECRET_VALUE=$(grep '^CRON_SECRET=' "$PROD_DIR/.env" | head -1 | cut -d= -f2-)
+    CRON_LINE="0 3 * * * curl -fsS -X POST -H \"x-cron-secret: ${CRON_SECRET_VALUE}\" http://localhost:5000/api/internal/cron/renewal-reminders >> $PROD_LOG_DIR/renewal-reminders.log 2>&1 # ${CRON_MARKER}"
+    if ! crontab -l 2>/dev/null | grep -q "$CRON_MARKER"; then
+        log "Adding daily renewal-reminder cron entry (03:00 server time)..."
+        (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
+    else
+        log "Renewal-reminder cron entry already present - skipping."
+    fi
+else
+    warn "CRON_SECRET not found in $PROD_DIR/.env - skipping renewal-reminder crontab setup."
+    warn "Add CRON_SECRET=<a-random-secret> to $PROD_DIR/.env, then re-run this script (or add the crontab line manually - see docs/cron-setup.md)."
+fi
+
 echo ""
 log "========================================="
 log "  VPS Setup Complete!"
@@ -100,4 +121,6 @@ log "  3. Add VPS_HOST/VPS_USER/VPS_SSH_KEY as GitHub Actions secrets so"
 log "     deploy-prod.yml and deploy-dev-vps.yml can SSH in and run deploy.sh"
 log "  4. Set up Nginx reverse proxy + Cloudflare DNS once a domain exists"
 log "     (api.<domain> -> :5000, api-dev.<domain> -> :5001)"
+log "  5. See docs/cron-setup.md for the renewal-reminder cron - it only"
+log "     actually reaches production via this VPS's crontab, not Vercel"
 log ""

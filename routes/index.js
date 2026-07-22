@@ -6,8 +6,10 @@
 
 const patientRoutes = require('./patient');
 const dieticianRoutes = require('./dietician');
+const internalRoutes = require('./internal');
 
 module.exports = {
   patientRoutes,
   dieticianRoutes,
+  internalRoutes,
 };

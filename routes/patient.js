@@ -287,6 +287,16 @@ router.patch(
 );
 
 /**
+ * @route   POST /api/patient/diet-plan-requests/:id/renew
+ * @desc    Start a renewal cycle on an already-activated diet plan request
+ */
+router.post(
+  '/diet-plan-requests/:id/renew',
+  patientOnly,
+  dietPlanRequestController.startRenewal
+);
+
+/**
  * @route   GET /api/patient/diet/active
  * @desc    Get currently active diet plan with recipes and summaries
  */

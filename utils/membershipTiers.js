@@ -27,10 +27,36 @@ const TIER_INITIAL_WEEKS = {
   platinum: [1],
 };
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const ELIGIBILITY_WINDOW_DAYS = 2;
+
+// Not weight-log-dependent by design (product decision): the next week/pair
+// becomes eligible once the prior week is finalized AND it's within the
+// last ELIGIBILITY_WINDOW_DAYS days of the prior week's date range - both
+// required. Finalization still matters because "based on Week N's outcome"
+// requires the dietician to have actually reviewed/locked what happened;
+// the date window is what stops the dietician from front-loading the next
+// week the moment it's finalized, before enough of it has actually played
+// out. currentWeekSchedule is the {startDate, endDate} entry (from
+// DietPlan.weekSchedule) for the week being superseded - week 2's for
+// Golden's weeks-3&4, week (N-1)'s for Platinum's week N.
+function isWithinEligibilityWindow(currentWeekSchedule, now) {
+  if (!currentWeekSchedule || !currentWeekSchedule.endDate) return true;
+  const windowOpensAt = new Date(currentWeekSchedule.endDate).getTime() - ELIGIBILITY_WINDOW_DAYS * MS_PER_DAY;
+  return now.getTime() >= windowOpensAt;
+}
+
 // Validates a later regenerate-week request against the tier's allowed
 // cadence and the diet plan's current state (which weeks already exist in
 // generatedPlan). Returns { ok: true } or { ok: false, message }.
-function validateRegenerateRequest({ tier, weekNumbers, existingWeekNumbers, finalizedWeekNumbers }) {
+function validateRegenerateRequest({
+  tier,
+  weekNumbers,
+  existingWeekNumbers,
+  finalizedWeekNumbers,
+  currentWeekSchedule,
+  now = new Date(),
+}) {
   if (tier === 'silver' || !tier) {
     return { ok: false, message: 'This membership plan does not support week regeneration.' };
   }
@@ -54,6 +80,12 @@ function validateRegenerateRequest({ tier, weekNumbers, existingWeekNumbers, fin
     if (!finalized.has(2)) {
       return { ok: false, message: 'Week 2 must be finalized before weeks 3-4 can be generated.' };
     }
+    if (!isWithinEligibilityWindow(currentWeekSchedule, now)) {
+      return {
+        ok: false,
+        message: `Weeks 3-4 can only be generated in the last ${ELIGIBILITY_WINDOW_DAYS} days of Week 2.`,
+      };
+    }
     return { ok: true };
   }
 
@@ -71,6 +103,12 @@ function validateRegenerateRequest({ tier, weekNumbers, existingWeekNumbers, fin
     }
     if (!finalized.has(week - 1)) {
       return { ok: false, message: `Week ${week - 1} must be finalized before week ${week} can be generated.` };
+    }
+    if (!isWithinEligibilityWindow(currentWeekSchedule, now)) {
+      return {
+        ok: false,
+        message: `Week ${week} can only be generated in the last ${ELIGIBILITY_WINDOW_DAYS} days of Week ${week - 1}.`,
+      };
     }
     return { ok: true };
   }

@@ -19,7 +19,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['diet_plan', 'payment', 'chat', 'progress', 'system', 'consultation'],
+      enum: ['diet_plan', 'payment', 'chat', 'progress', 'system', 'consultation', 'membership_renewal'],
       default: 'system',
     },
     isRead: {
@@ -32,7 +32,7 @@ const notificationSchema = new mongoose.Schema(
     },
     referenceModel: {
       type: String,
-      enum: ['DietPlan', 'Payment', 'Chat', 'Progress', 'FirstConsultation'],
+      enum: ['DietPlan', 'Payment', 'Chat', 'Progress', 'FirstConsultation', 'DietPlanRequest'],
     },
   },
   {

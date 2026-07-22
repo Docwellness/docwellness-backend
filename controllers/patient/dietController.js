@@ -145,6 +145,29 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       }
     }
 
+    // Prefer weekSchedule's actual date ranges (the same source of truth
+    // the dietician app's tier-cadence gate uses - see
+    // utils/membershipTiers.js) over the activationDate-diff estimate below,
+    // so "which week is this" agrees everywhere instead of being computed
+    // two independent ways. Falls back to the diff-based computation for
+    // plans that predate weekSchedule being populated.
+    const weekScheduleEntries = Array.isArray(dietPlan.weekSchedule) ? dietPlan.weekSchedule : [];
+    if (currentWeek === null && weekScheduleEntries.length > 0) {
+      const refTime = normalizeDate(referenceDate).getTime();
+      const matchedEntry = weekScheduleEntries.find((entry) => {
+        const entryStart = normalizeDate(entry.startDate).getTime();
+        const entryEnd = normalizeDate(entry.endDate).getTime();
+        return refTime >= entryStart && refTime <= entryEnd;
+      });
+      if (matchedEntry) {
+        currentWeek = matchedEntry.week;
+      } else if (refTime < normalizeDate(weekScheduleEntries[0].startDate).getTime()) {
+        currentWeek = weekScheduleEntries[0].week;
+      } else {
+        currentWeek = weekScheduleEntries[weekScheduleEntries.length - 1].week;
+      }
+    }
+
     // Fallback: compute week from date difference
     if (currentWeek === null && startDate) {
       const startDay = normalizeDate(startDate);
@@ -163,6 +186,13 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 
     // Total weeks available in the plan
     const totalWeeks = weeks.length;
+
+    const cycleNumber = dietPlan.cycleNumber || 1;
+    const displayWeek = typeof currentWeek === 'number' ? (cycleNumber - 1) * 4 + currentWeek : null;
+    const currentWeekScheduleEntry =
+      typeof currentWeek === 'number'
+        ? weekScheduleEntries.find((entry) => Number(entry.week) === Number(currentWeek)) || null
+        : null;
 
     const allWeeksSummary = Array.isArray(dietPlan.weeksSummary) ? dietPlan.weeksSummary : [];
 
@@ -202,6 +232,13 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           activationDate: dietPlan.activationDate || null,
           currentWeek,
           totalWeeks,
+          // cycleNumber/displayWeek let the app show "Week 5" etc. for a
+          // renewed patient's second (or later) cycle, without changing
+          // currentWeek's own internal 1-4 meaning (see models/DietPlan.js).
+          cycleNumber,
+          displayWeek,
+          weekStartDate: currentWeekScheduleEntry?.startDate || null,
+          weekEndDate: currentWeekScheduleEntry?.endDate || null,
           dayGroup: todayDayGroup,
           weekSummary, // single object for the current week
           week: weekWithFixedMeals, // the current week’s dailyMeals with fixed recipeId

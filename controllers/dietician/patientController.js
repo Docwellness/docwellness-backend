@@ -163,7 +163,7 @@ exports.getPatientProfile = async (req, res, next) => {
     let dietPlanForSummary = null;
     if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
       dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
-        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy')
+        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
         .lean();
     }
     if (!dietPlanForSummary) {
@@ -172,7 +172,7 @@ exports.getPatientProfile = async (req, res, next) => {
         status: { $in: ['Finalized', 'Active'] },
       })
         .sort({ createdAt: -1 })
-        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy')
+        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
         .lean();
     }
 
@@ -232,11 +232,15 @@ exports.getPatientProfile = async (req, res, next) => {
           patientConsented: statusSnapshot.patientConsented === true,
           activeDietPlanId, // Updated to use the fallback logic
           // Status of the plan activeDietPlanId actually points at right
-          // now - lets the frontend tell a genuine first activation
-          // ('Finalized', needs Confirm & Activate) apart from a renewal
-          // payment where the referenced plan is already 'Active' (needs
-          // only a lightweight bill-settle, no plan changes).
+          // now - 'Finalized' means it needs Confirm & Activate,
+          // 'Active' means it's already live.
           activeDietPlanStatus: dietPlanForSummary?.status || null,
+          // Which renewal cycle dietPlanForSummary belongs to (1 = first
+          // plan ever built for this patient, incremented per renewal) -
+          // combines with weeklyDietPlans/generatedWeekNumbers' internal
+          // 1-4 week numbers as (cycleNumber-1)*4 + week to display "Week
+          // 5" etc. for a second cycle onward.
+          cycleNumber: dietPlanForSummary?.cycleNumber || 1,
           membershipPlan: latestRequest?.membershipPlan || null,
           // Normalized 'silver'|'golden'|'platinum'|null so the frontend
           // branches on a clean enum instead of re-parsing the raw string.
@@ -254,6 +258,12 @@ exports.getPatientProfile = async (req, res, next) => {
         },
         weeklyDietPlans,
         generatedWeekNumbers,
+        // Per-week date ranges for dietPlanForSummary's cycle (see
+        // utils/weekSchedule.js) - populated for all 4 internal weeks
+        // regardless of generation/finalize progress, since even a locked
+        // week needs a displayable date and the finalize-time gate
+        // (validateRegenerateRequest) needs a known end-of-week boundary.
+        weekSchedule: dietPlanForSummary?.weekSchedule || [],
         // Lets the dietician app re-open an already-generated/finalized
         // week's Create Diet Plan screen with the Calorie/Macro strategy
         // that was actually used pre-selected, instead of showing a blank

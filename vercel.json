@@ -4,5 +4,11 @@
       "maxDuration": 180
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "crons": [
+    {
+      "path": "/api/internal/cron/renewal-reminders",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

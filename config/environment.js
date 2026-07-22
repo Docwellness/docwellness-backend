@@ -37,4 +37,8 @@ module.exports = {
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB
   defaultDieticianId: process.env.DEFAULT_DIETICIAN_ID,
   sentryDsn: process.env.SENTRY_DSN,
+  // Shared secret for /api/internal/* cron-triggered routes (Vercel Cron on
+  // dev, a VPS crontab entry on prod - see routes/internal.js) instead of
+  // normal user JWT auth, since these aren't called by an authenticated user.
+  cronSecret: process.env.CRON_SECRET,
 };

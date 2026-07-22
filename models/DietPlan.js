@@ -58,6 +58,31 @@ const dietPlanSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DietPlanRequest',
     },
+    // Which renewal cycle this plan belongs to for this patient+request - 1
+    // for the first plan ever built, incremented each time a new DietPlan is
+    // created for a patient who already has one (see createAndGenerateDietPlan).
+    // Combined with the internal 1-4 week numbering (left untouched) to
+    // compute a display-only week number: (cycleNumber-1)*4 + week, so a
+    // second cycle shows as Week 5-8 without needing internal week numbers,
+    // gating logic, or finalize/generate code to change at all.
+    cycleNumber: {
+      type: Number,
+      default: 1,
+    },
+    // Per-week date range for this cycle, computed once at creation time
+    // (see utils/weekSchedule.js) from this plan's own startDate as the
+    // week-1 anchor, 7 days per week. Populated for all 4 weeks up front
+    // regardless of tier/generation progress, since a still-locked week
+    // (e.g. Platinum's week 2) still needs a displayable date range and a
+    // known end-of-week boundary for the finalize+2-day eligibility gate
+    // (see utils/membershipTiers.js::validateRegenerateRequest).
+    weekSchedule: [
+      {
+        week: { type: Number, required: true },
+        startDate: { type: Date, required: true },
+        endDate: { type: Date, required: true },
+      },
+    ],
     firstConsultation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'FirstConsultation',

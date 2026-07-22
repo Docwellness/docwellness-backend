@@ -220,6 +220,68 @@ exports.selectMembershipPlan = async (req, res, next) => {
 };
 
 /**
+ * @desc    Start a renewal cycle on an existing (already-activated) diet
+ *          plan request - resets its payment/status fields on the SAME
+ *          document so the patient can pick a plan again and the dietician
+ *          can build a fresh diet plan, without redoing the intake form or
+ *          first consultation (their data already exists).
+ *
+ *          Deliberately reuses this document rather than creating a new
+ *          DietPlanRequest: listPatientsForDietician queries one row per
+ *          request, not deduped per patient, so a second request would make
+ *          the patient appear twice on the dietician's dashboard. The
+ *          resulting Unpaid + hasActivePlan:true combination is handled by
+ *          the "ongoing" tab filter (see listPatientsForDietician).
+ *
+ *          membershipPlan/membershipAmount and subscriptionStartDate/
+ *          subscriptionExpiresAt are intentionally left untouched here - the
+ *          patient re-picks a plan next via selectMembershipPlan, and the
+ *          old cycle's real expiry stays visible/correct until the new
+ *          cycle's activateDietPlan overwrites it.
+ * @route   POST /api/patient/diet-plan-requests/:id/renew
+ * @access  Private (Patient)
+ */
+exports.startRenewal = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const request = await DietPlanRequest.findOne({ _id: id, patient: req.user._id });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Diet plan request not found',
+      });
+    }
+
+    if (!request.hasActivePlan) {
+      return res.status(400).json({
+        success: false,
+        message: 'This request has no active plan to renew yet - use the regular request flow instead.',
+      });
+    }
+
+    request.status = 'Unpaid';
+    request.paymentRequested = false;
+    request.paymentRequestedAt = null;
+    request.latestPaymentStatus = null;
+    request.latestPaymentProof = null;
+    request.collectedAmount = 0;
+    await request.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        requestId: request._id,
+        status: request.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Get the latest diet plan request status for the logged-in patient
  * @route   GET /api/patient/diet-plan-requests/status
  * @access  Private (Patient)
