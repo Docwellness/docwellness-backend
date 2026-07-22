@@ -48,7 +48,7 @@ const {
 } = require('../../utils/dietPlanOptions');
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
-const { buildWeekSchedule } = require('../../utils/weekSchedule');
+const { buildWeekSchedule, buildSequentialWeekEntries, mergeWeekSchedule } = require('../../utils/weekSchedule');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -1133,7 +1133,7 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
   try {
     const { patientId, dietPlanId } = req.params;
     const dieticianId = req.user._id;
-    const { weekNumbers, currentWeight, calorieStrategy, macroStrategy } = req.body;
+    const { weekNumbers, currentWeight, calorieStrategy, macroStrategy, startDate } = req.body;
 
     if (
       !mongoose.Types.ObjectId.isValid(patientId) ||
@@ -1211,6 +1211,19 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
     // historical breakdown even as this top-level field moves forward.
     dietPlan.calorieStrategy = calorieStrategy;
     dietPlan.macroStrategy = macroStrategy;
+
+    // Every week's date can be independently updated - whenever the
+    // dietician picks a date for this generation, sortedWeekNumbers just
+    // spans 7 days per week from there (a pair like Golden's [3,4] stays
+    // back-to-back with each other, but is no longer rigidly anchored to
+    // week 1's original date). Falls back to leaving weekSchedule untouched
+    // when no date is supplied (e.g. a plain content regenerate with no
+    // date change).
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    if (parsedStartDate && !Number.isNaN(parsedStartDate.getTime())) {
+      const newEntries = buildSequentialWeekEntries(sortedWeekNumbers, parsedStartDate);
+      dietPlan.weekSchedule = mergeWeekSchedule(dietPlan.weekSchedule, newEntries);
+    }
 
     const parsedWeight = typeof currentWeight === 'number' ? currentWeight : Number(currentWeight);
     if (typeof parsedWeight === 'number' && !Number.isNaN(parsedWeight) && parsedWeight > 0) {

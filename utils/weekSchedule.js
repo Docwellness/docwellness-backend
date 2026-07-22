@@ -16,4 +16,32 @@ function buildWeekSchedule(anchorStartDate) {
   });
 }
 
-module.exports = { buildWeekSchedule };
+// Builds date ranges for an arbitrary, specific set of week numbers (e.g.
+// Golden's [3, 4] pair, or a single Platinum week), sequential and 7 days
+// each starting at anchorStartDate - used when the dietician updates/picks
+// a date for a week (or week-pair) independently of the plan's original
+// week-1 anchor, so "every week's date can be updated, just keep it 7 days
+// from whichever day is selected" (product decision - dates are no longer
+// rigidly derived from week 1 once a week is (re)generated with its own
+// chosen date). weekNumbers is assumed pre-sorted ascending.
+function buildSequentialWeekEntries(weekNumbers, anchorStartDate) {
+  const anchor = new Date(anchorStartDate);
+  return weekNumbers.map((week, index) => {
+    const startDate = new Date(anchor.getTime() + index * 7 * MS_PER_DAY);
+    const endDate = new Date(anchor.getTime() + ((index + 1) * 7 - 1) * MS_PER_DAY);
+    return { week, startDate, endDate };
+  });
+}
+
+// Merges newEntries into an existing weekSchedule array, replacing any
+// entry whose week number matches and leaving all other weeks' entries
+// untouched. Returns a new array (doesn't mutate the input).
+function mergeWeekSchedule(existingSchedule, newEntries) {
+  const byWeek = new Map((existingSchedule || []).map((entry) => [entry.week, entry]));
+  for (const entry of newEntries) {
+    byWeek.set(entry.week, entry);
+  }
+  return Array.from(byWeek.values()).sort((a, b) => a.week - b.week);
+}
+
+module.exports = { buildWeekSchedule, buildSequentialWeekEntries, mergeWeekSchedule };
