@@ -25,7 +25,23 @@ const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
 const { authController } = require('../controllers/patient');
 
+const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
+
 const dieticianOnlyMiddleware = [authenticate, dieticianOnly];
+
+// Reject a malformed id param (e.g. the literal string "undefined") with a
+// clean 400 before it ever reaches a Mongoose query - see
+// validateObjectIdParam's doc comment for the production CastError this was
+// closing (was crashing PUT /patients/:patientId/first-consultation).
+router.param('id', validateObjectIdParam);
+router.param('patientId', validateObjectIdParam);
+router.param('dietPlanId', validateObjectIdParam);
+router.param('proofId', validateObjectIdParam);
+router.param('requestId', validateObjectIdParam);
+router.param('couponId', validateObjectIdParam);
+router.param('quoteId', validateObjectIdParam);
+router.param('videoId', validateObjectIdParam);
+router.param('imageId', validateObjectIdParam);
 
 /**
  * @route   GET /api/dietician/auth/me

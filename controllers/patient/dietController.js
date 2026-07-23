@@ -214,15 +214,38 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       // dayGroup (pre-migration plans) matches every group, so old plans
       // keep returning their full unfiltered set exactly as before.
       const todayDayGroup = resolveDayGroupForDate(referenceDate);
-      const weekWithFixedMeals = {
-        ...week,
-        dailyMeals: week.dailyMeals
+      const fixMeals = (dailyMeals) =>
+        (dailyMeals || [])
           .filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
           .map((meal) => ({
             ...meal,
             recipeId: meal.recipeId || '',
-          })),
+          }));
+
+      const weekWithFixedMeals = {
+        ...week,
+        dailyMeals: fixMeals(week.dailyMeals),
       };
+
+      // All weeks the plan actually has, day-group-filtered the same way as
+      // the single `week` field above - lets the app fetch once per Diet-tab
+      // visit and switch weeks client-side with no per-tap network round
+      // trip. The expensive part (loading finalizedPlan.weeks + resolving
+      // every recipe in the plan, above) already happens on every call
+      // regardless of which week was requested, so this is close to free.
+      const allWeeksData = weeks.map((w) => {
+        const weekNum = Number(w.week);
+        const scheduleEntry =
+          weekScheduleEntries.find((entry) => Number(entry.week) === weekNum) || null;
+        const summary = allWeeksSummary.find((s) => Number(s.week) === weekNum) || null;
+        return {
+          week: weekNum,
+          weekStartDate: scheduleEntry?.startDate || null,
+          weekEndDate: scheduleEntry?.endDate || null,
+          weekSummary: summary,
+          dailyMeals: fixMeals(w.dailyMeals),
+        };
+      });
 
       return res.status(200).json({
         success: true,
@@ -242,6 +265,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           dayGroup: todayDayGroup,
           weekSummary, // single object for the current week
           week: weekWithFixedMeals, // the current week’s dailyMeals with fixed recipeId
+          weeks: allWeeksData, // every week in the plan, for client-side caching
           recipes, // keep as-is (all recipes map)
         },
       });

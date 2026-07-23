@@ -36,9 +36,15 @@ const {
 
 // Middleware for file uploads
 const upload = require('../middlewares/upload');
+const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
 
 // Middleware to check if user is a patient
 const patientOnly = [authenticate, roleCheck('patient')];
+
+// Reject a malformed :id (e.g. the literal string "undefined") with a clean
+// 400 before it ever reaches a Mongoose query - see validateObjectIdParam's
+// doc comment for the production CastError this was closing.
+router.param('id', validateObjectIdParam);
 
 // ==========================================
 // Authentication Routes (Public)
