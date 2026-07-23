@@ -186,29 +186,81 @@ exports.listPatientsForDietician = async (req, res, next) => {
       };
     }
 
-    const query = DietPlanRequest.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .populate(
-        'patient',
-        [
-          'profile.fullName',
-          'profile.gender',
-          'profile.dateOfBirth',
-          'profile.imageUrl',
-          'healthProfile.weight',
-          'healthProfile.height',
-          'healthProfile.bmi',
-          'healthProfile.activityLevel',
-          'healthProfile.primaryGoal',
-          'isActive',
-          'status.firstConsultationId',
-          'status.patientConsented',
-        ].join(' ')
-      );
+    // One row per *patient*, not per request document. A patient can
+    // legitimately end up with more than one DietPlanRequest (a renewal
+    // reuses the same one, but nothing at the schema level enforces that -
+    // e.g. a retried/duplicate signup, or admin/test tooling creating a
+    // second one) - a plain find() showed one row per matching document,
+    // so any such patient appeared twice in this list. $group on `patient`
+    // (keeping each patient's most-recently-created matching request, since
+    // the collection is pre-sorted newest-first) collapses that down to
+    // one row per real patient before pagination is applied, so it can't
+    // reappear on another page either.
+    const dedupedPipeline = [
+      { $match: filter },
+      { $sort: { createdAt: -1 } },
+      { $group: { _id: '$patient', doc: { $first: '$$ROOT' } } },
+      { $replaceRoot: { newRoot: '$doc' } },
+      { $sort: { createdAt: -1 } },
+    ];
 
-    const [total, requests] = await Promise.all([DietPlanRequest.countDocuments(filter), query]);
+    const [countResult, requests] = await Promise.all([
+      DietPlanRequest.aggregate([...dedupedPipeline, { $count: 'total' }]),
+      DietPlanRequest.aggregate([
+        ...dedupedPipeline,
+        { $skip: skip },
+        { $limit: limitNum },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'patient',
+            foreignField: '_id',
+            as: 'patientDoc',
+          },
+        },
+        { $unwind: { path: '$patientDoc', preserveNullAndEmptyArrays: true } },
+        {
+          // Reshapes back into the same `request.patient.*` field layout
+          // the .populate().select() call below used to produce, so the
+          // mapping logic further down needs no changes.
+          $project: {
+            status: 1,
+            membershipPlan: 1,
+            plansCount: 1,
+            hasActivePlan: 1,
+            latestPaymentStatus: 1,
+            currentWeight: 1,
+            totalKgLost: 1,
+            bmiFrom: 1,
+            bmiTo: 1,
+            completedAt: 1,
+            createdAt: 1,
+            patient: {
+              _id: '$patientDoc._id',
+              profile: {
+                fullName: '$patientDoc.profile.fullName',
+                gender: '$patientDoc.profile.gender',
+                dateOfBirth: '$patientDoc.profile.dateOfBirth',
+                imageUrl: '$patientDoc.profile.imageUrl',
+              },
+              healthProfile: {
+                weight: '$patientDoc.healthProfile.weight',
+                height: '$patientDoc.healthProfile.height',
+                bmi: '$patientDoc.healthProfile.bmi',
+                activityLevel: '$patientDoc.healthProfile.activityLevel',
+                primaryGoal: '$patientDoc.healthProfile.primaryGoal',
+              },
+              isActive: '$patientDoc.isActive',
+              status: {
+                firstConsultationId: '$patientDoc.status.firstConsultationId',
+                patientConsented: '$patientDoc.status.patientConsented',
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+    const total = countResult[0]?.total ?? 0;
 
     const data = requests.map((request) => {
       const patient = request.patient || {};
