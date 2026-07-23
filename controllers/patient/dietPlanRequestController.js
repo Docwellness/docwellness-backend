@@ -1,5 +1,6 @@
 const { DietPlanRequest, User, ManualPaymentProof } = require('../../models');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
+const { parseFlexibleDate } = require('../../utils/dateUtils');
 
 /**
  * @desc    Create a diet plan request for the logged-in patient
@@ -58,7 +59,16 @@ exports.createDietPlanRequest = async (req, res, next) => {
     }
 
     if (dateOfBirth && dateOfBirth !== patient.profile.dateOfBirth) {
-      patient.profile.dateOfBirth = dateOfBirth;
+      // dateOfBirth flows into a Date-typed field (User.profile.dateOfBirth)
+      // - assigning the raw string directly crashed with a Mongoose
+      // CastError in production for values Date's own naive cast can't
+      // parse (e.g. "15-05-1994"). parseFlexibleDate accepts either the
+      // DD-MM-YYYY wire format used elsewhere in this API or a plain ISO
+      // string, and never throws.
+      const parsedDob = parseFlexibleDate(dateOfBirth);
+      if (parsedDob) {
+        patient.profile.dateOfBirth = parsedDob;
+      }
     }
 
     if (gender && gender !== patient.profile.gender) {

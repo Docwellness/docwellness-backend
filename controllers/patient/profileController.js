@@ -10,17 +10,7 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { verifyPassword, getSupabaseAdmin } = require('../../utils/supabaseAuth');
-const parseDateFromDDMMYYYY = (value) => {
-  if (!value || typeof value !== 'string') {
-    return null;
-  }
-  const [day, month, year] = value.split('-');
-  if (!(day && month && year)) {
-    return null;
-  }
-  const parsed = new Date(`${year}-${month}-${day}`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
+const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
 
 /**
  * @desc    Get patient profile

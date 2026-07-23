@@ -14,6 +14,7 @@ const { User } = require('../../models');
 const { sendWelcomeEmail, sendPasswordResetOtp, sendSignupOtp } = require('../../utils/emailService');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { generateRecoveryOtp, generateSignupOtp } = require('../../utils/supabaseAuth');
+const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
 
 /**
  * @desc    Start registration: creates the Supabase identity (unconfirmed)
@@ -95,16 +96,7 @@ exports.register = async (req, res, next) => {
     normalizeHealthProfileNumbers(normalizedHealthProfile);
     const safeProfile = profile && typeof profile === 'object' ? profile : {};
 
-    let dateOfBirth = null;
-    if (safeProfile?.dateOfBirth) {
-      const [day, month, year] = safeProfile.dateOfBirth.split('-');
-      if (day && month && year) {
-        const parsed = new Date(`${year}-${month}-${day}`);
-        if (!isNaN(parsed)) {
-          dateOfBirth = parsed;
-        }
-      }
-    }
+    const dateOfBirth = parseDateFromDDMMYYYY(safeProfile?.dateOfBirth);
 
     const user = await User.create({
       supabaseUserId,
