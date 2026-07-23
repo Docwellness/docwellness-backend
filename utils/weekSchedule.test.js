@@ -6,7 +6,12 @@
  */
 
 const assert = require('assert');
-const { buildWeekSchedule, buildSequentialWeekEntries, mergeWeekSchedule } = require('./weekSchedule');
+const {
+  buildWeekSchedule,
+  buildSequentialWeekEntries,
+  mergeWeekSchedule,
+  cascadeWeekScheduleFrom,
+} = require('./weekSchedule');
 
 const results = [];
 function test(name, fn) {
@@ -86,6 +91,33 @@ test('mergeWeekSchedule: result is sorted by week number even if existing entrie
   ];
   const merged = mergeWeekSchedule(outOfOrder, [{ week: 2, startDate: new Date('2026-01-08'), endDate: new Date('2026-01-14') }]);
   assert.deepStrictEqual(merged.map((e) => e.week), [1, 2, 3]);
+});
+
+test('cascadeWeekScheduleFrom: moving week 1 pushes weeks 2-4 to follow it', () => {
+  const original = buildWeekSchedule('2026-07-26');
+  const cascaded = cascadeWeekScheduleFrom(original, 1, new Date('2026-07-28T00:00:00.000Z'));
+  assert.strictEqual(cascaded.find((e) => e.week === 1).startDate.toISOString(), '2026-07-28T00:00:00.000Z');
+  assert.strictEqual(cascaded.find((e) => e.week === 2).startDate.toISOString(), '2026-08-04T00:00:00.000Z');
+  assert.strictEqual(cascaded.find((e) => e.week === 3).startDate.toISOString(), '2026-08-11T00:00:00.000Z');
+  assert.strictEqual(cascaded.find((e) => e.week === 4).startDate.toISOString(), '2026-08-18T00:00:00.000Z');
+});
+
+test('cascadeWeekScheduleFrom: moving week 2 leaves week 1 untouched, cascades 3-4', () => {
+  const original = buildWeekSchedule('2026-07-26');
+  const cascaded = cascadeWeekScheduleFrom(original, 2, new Date('2026-08-10T00:00:00.000Z'));
+  assert.strictEqual(cascaded.find((e) => e.week === 1).startDate.toISOString(), original[0].startDate.toISOString());
+  assert.strictEqual(cascaded.find((e) => e.week === 2).startDate.toISOString(), '2026-08-10T00:00:00.000Z');
+  assert.strictEqual(cascaded.find((e) => e.week === 3).startDate.toISOString(), '2026-08-17T00:00:00.000Z');
+  assert.strictEqual(cascaded.find((e) => e.week === 4).startDate.toISOString(), '2026-08-24T00:00:00.000Z');
+});
+
+test('cascadeWeekScheduleFrom: weeks stay contiguous (no gap/overlap) after cascading', () => {
+  const original = buildWeekSchedule('2026-07-26');
+  const cascaded = cascadeWeekScheduleFrom(original, 1, new Date('2026-07-28T00:00:00.000Z'));
+  for (let i = 0; i < 3; i++) {
+    const gapDays = (cascaded[i + 1].startDate - cascaded[i].endDate) / (24 * 60 * 60 * 1000);
+    assert.strictEqual(gapDays, 1);
+  }
 });
 
 const failed = results.filter((r) => !r.passed);

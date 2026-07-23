@@ -48,7 +48,7 @@ const {
 } = require('../../utils/dietPlanOptions');
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
-const { buildWeekSchedule, buildSequentialWeekEntries, mergeWeekSchedule } = require('../../utils/weekSchedule');
+const { buildWeekSchedule, cascadeWeekScheduleFrom } = require('../../utils/weekSchedule');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -121,14 +121,38 @@ exports.listPatientsForDietician = async (req, res, next) => {
     const limitNum = Math.min(Math.max(Number.isNaN(limitParsed) ? 10 : limitParsed, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
+    // "Ongoing" should mean the diet has actually started, not just that a
+    // plan was activated/paid for - a patient can be fully paid days before
+    // their week 1 begins (see weekSchedule), and until then there's
+    // nothing "ongoing" to review yet. Patients with an active plan whose
+    // week 1 hasn't started stay in "new" instead. Falls back to treating a
+    // plan as already-started if it predates weekSchedule (no week-1 entry
+    // to check), preserving old behavior for those.
+    let notStartedPatientIds = [];
+    if (normalizedTab === 'new' || normalizedTab === 'ongoing') {
+      const now = new Date();
+      const activePlans = await DietPlan.find({ dieticianId, status: 'Active' })
+        .select('patientId weekSchedule')
+        .lean();
+      notStartedPatientIds = activePlans
+        .filter((plan) => {
+          const week1 = (plan.weekSchedule || []).find((w) => w.week === 1);
+          return week1 && new Date(week1.startDate) > now;
+        })
+        .map((plan) => plan.patientId);
+    }
+
     const baseFilter = { dieticianId };
     let filter = { ...baseFilter };
 
     if (normalizedTab === 'new') {
       filter = {
         ...baseFilter,
-        hasActivePlan: false,
         completedAt: null,
+        $or: [
+          { hasActivePlan: false },
+          { hasActivePlan: true, patient: { $in: notStartedPatientIds } },
+        ],
       };
     } else if (normalizedTab === 'ongoing') {
       filter = {
@@ -153,6 +177,7 @@ exports.listPatientsForDietician = async (req, res, next) => {
         status: { $ne: null },
         hasActivePlan: true,
         completedAt: null,
+        patient: { $nin: notStartedPatientIds },
       };
     } else if (normalizedTab === 'past') {
       filter = {
@@ -1212,17 +1237,30 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
     dietPlan.calorieStrategy = calorieStrategy;
     dietPlan.macroStrategy = macroStrategy;
 
-    // Every week's date can be independently updated - whenever the
-    // dietician picks a date for this generation, sortedWeekNumbers just
-    // spans 7 days per week from there (a pair like Golden's [3,4] stays
-    // back-to-back with each other, but is no longer rigidly anchored to
-    // week 1's original date). Falls back to leaving weekSchedule untouched
-    // when no date is supplied (e.g. a plain content regenerate with no
-    // date change).
-    const parsedStartDate = startDate ? new Date(startDate) : null;
+    // Whenever the dietician picks a date for this generation, the week(s)
+    // being generated span 7 days per week from there, and every later week
+    // cascades to follow - keeps the whole plan's schedule contiguous
+    // instead of leaving a gap/overlap after the ones actually being
+    // regenerated (see cascadeWeekScheduleFrom's doc comment). Falls back
+    // to leaving weekSchedule untouched when no date is supplied (e.g. a
+    // plain content regenerate with no date change). A past date is
+    // silently floored to today rather than rejected outright - this
+    // endpoint also does AI content generation, weight logging, etc., so
+    // failing the whole request over a stale date field would be
+    // disproportionate (the dedicated updateWeekScheduleDate endpoint,
+    // which does nothing else, rejects outright instead).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let parsedStartDate = startDate ? new Date(startDate) : null;
+    if (parsedStartDate && !Number.isNaN(parsedStartDate.getTime()) && parsedStartDate < today) {
+      parsedStartDate = today;
+    }
     if (parsedStartDate && !Number.isNaN(parsedStartDate.getTime())) {
-      const newEntries = buildSequentialWeekEntries(sortedWeekNumbers, parsedStartDate);
-      dietPlan.weekSchedule = mergeWeekSchedule(dietPlan.weekSchedule, newEntries);
+      dietPlan.weekSchedule = cascadeWeekScheduleFrom(
+        dietPlan.weekSchedule,
+        sortedWeekNumbers[0],
+        parsedStartDate
+      );
     }
 
     const parsedWeight = typeof currentWeight === 'number' ? currentWeight : Number(currentWeight);
@@ -1254,6 +1292,67 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
         validationWarnings: dietPlan.validationWarnings,
         weekSchedule: dietPlan.weekSchedule,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Move a single week's date (and cascade every later week to follow
+ *          it, see cascadeWeekScheduleFrom) - a lightweight alternative to
+ *          generateWeekForExistingPlan for when the dietician only wants to
+ *          reschedule a week, not touch its content/strategy. Works for any
+ *          week regardless of whether it's been generated yet - weekSchedule
+ *          always has placeholder entries for all 4 weeks up front (see
+ *          createAndGenerateDietPlan). Preponing is allowed, but never to
+ *          before today - the dietician can't reschedule into the past.
+ * @route   PATCH /api/dietician/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/schedule
+ * @access  Private (Dietician)
+ */
+exports.updateWeekScheduleDate = async (req, res, next) => {
+  try {
+    const { patientId, dietPlanId, week } = req.params;
+    const dieticianId = req.user._id;
+    const { startDate } = req.body || {};
+
+    if (
+      !mongoose.Types.ObjectId.isValid(patientId) ||
+      !mongoose.Types.ObjectId.isValid(dietPlanId)
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid patient or diet plan id' });
+    }
+
+    const weekNumber = parseInt(week, 10);
+    if (!Number.isInteger(weekNumber) || weekNumber < 1 || weekNumber > 4) {
+      return res.status(400).json({ success: false, message: 'week must be an integer between 1 and 4' });
+    }
+
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    if (!parsedStartDate || Number.isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'startDate is required and must be a valid date' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsedStartDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: 'startDate cannot be earlier than today',
+      });
+    }
+
+    const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId });
+    if (!dietPlan) {
+      return res.status(404).json({ success: false, message: 'Diet plan not found for this patient' });
+    }
+
+    dietPlan.weekSchedule = cascadeWeekScheduleFrom(dietPlan.weekSchedule, weekNumber, parsedStartDate);
+    await dietPlan.save();
+
+    return res.status(200).json({
+      success: true,
+      data: { dietPlanId: dietPlan._id, weekSchedule: dietPlan.weekSchedule },
     });
   } catch (error) {
     next(error);

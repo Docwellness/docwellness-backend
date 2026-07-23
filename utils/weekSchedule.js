@@ -44,4 +44,29 @@ function mergeWeekSchedule(existingSchedule, newEntries) {
   return Array.from(byWeek.values()).sort((a, b) => a.week - b.week);
 }
 
-module.exports = { buildWeekSchedule, buildSequentialWeekEntries, mergeWeekSchedule };
+// Moves changedWeek to start at newStartDate (spanning 7 days), and cascades
+// every later week (changedWeek+1..N, whichever exist in existingSchedule)
+// to follow it back-to-back - so nudging one week's date can't leave a gap
+// or overlap with the weeks after it. Weeks *before* changedWeek are left
+// untouched (you can't reschedule the past). This is the fix for the
+// mergeWeekSchedule-only approach generateWeekForExistingPlan uses today,
+// which replaces just the week(s) being generated and leaves every later
+// week's date exactly where it was - fine for that endpoint's own narrower
+// purpose (picking a date while generating that week's content), but wrong
+// for a dedicated "move this week's date" action, where the whole point is
+// that everything downstream shifts with it.
+function cascadeWeekScheduleFrom(existingSchedule, changedWeek, newStartDate) {
+  const weeksToCascade = (existingSchedule || [])
+    .map((entry) => entry.week)
+    .filter((week) => week >= changedWeek)
+    .sort((a, b) => a - b);
+  const newEntries = buildSequentialWeekEntries(weeksToCascade, newStartDate);
+  return mergeWeekSchedule(existingSchedule, newEntries);
+}
+
+module.exports = {
+  buildWeekSchedule,
+  buildSequentialWeekEntries,
+  mergeWeekSchedule,
+  cascadeWeekScheduleFrom,
+};

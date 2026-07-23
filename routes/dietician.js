@@ -187,6 +187,12 @@ router.post(
   dietPlanController.generateWeekForExistingPlan
 );
 
+router.patch(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/schedule',
+  dieticianOnlyMiddleware,
+  dietPlanController.updateWeekScheduleDate
+);
+
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/details',
   dieticianOnlyMiddleware,
