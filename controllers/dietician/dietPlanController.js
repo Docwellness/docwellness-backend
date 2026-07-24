@@ -971,17 +971,13 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
       console.error('Failed to write GenerationLog entry:', logError.message);
     }
 
-    const debugRemoved = repairChangesMade.filter((c) => c.includes('removed')).length;
-    const debugFilled = repairChangesMade.filter((c) => c.includes('filled missing')).length;
-    const debugFailed = repairChangesMade.filter((c) => c.includes('could not backfill'));
-    const debugPoolSizes = REQUIRED_SERVING_TIMES.map((s) => `${s}=${(recipePoolByServingTime[s] || []).length}`).join(',');
     return {
       ok: false,
       status: 502,
       message: `AI diet-plan generation produced severe, unresolvable issues after ${attemptsUsed} attempt(s) (e.g. wrong-meal-slot assignments or calories far outside the target budget). No plan was saved - please try regenerating, or contact support if this persists. Details: ${validationResult.severeIssues
         .slice(0, 5)
         .map((i) => i.message)
-        .join(' | ')} [[DEBUG poolSizes=${debugPoolSizes} recipePoolTotal=${recipePool.length} removed=${debugRemoved} filled=${debugFilled} failed=${debugFailed.length}: ${debugFailed.slice(0, 6).join(' ~~ ')}]]`,
+        .join(' | ')}`,
     };
   }
 

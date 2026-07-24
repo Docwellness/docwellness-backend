@@ -221,6 +221,19 @@ const ALLERGY_CATEGORY_KEYWORDS = {
   sesame: ['sesame', 'til', 'tahini'],
 };
 
+// Near-universal base seasonings/ingredients present in almost every
+// savory recipe - free text like "I try to avoid foods high in sugar and
+// salt" must NEVER turn these into a hard ingredient-substring exclusion
+// keyword. A real incident: "salt" alone excluded every single Lunch and
+// Dinner recipe in a dietician's library (virtually all of them season
+// with salt), leaving diet-plan generation with zero valid candidates for
+// those slots - the free text was expressing a general moderation
+// preference, not "I am allergic to salt". A genuine low-salt/low-sugar/
+// low-oil need is what each recipe's own freeFrom.{salt,sugar,oil} flag is
+// for; this function is for allergens/hard avoidances (a specific
+// ingredient the patient cannot eat at all), not dietary moderation.
+const GENERIC_BASE_INGREDIENT_WORDS = new Set(['salt', 'sugar', 'oil', 'water', 'spice', 'pepper']);
+
 /**
  * Keyword-based allergen/foods-to-avoid scan: compares a recipe's ingredient
  * names against the patient's consultation-stated allergies/intolerances and
@@ -235,9 +248,27 @@ function findAllergenConflicts({ ingredients, allergyOptions = [], allergyOtherI
     const category = ALLERGY_CATEGORY_KEYWORDS[option.trim().toLowerCase()];
     return category ? [option, ...category] : [option];
   });
-  const keywords = [...expandedAllergyOptions, ...freeText.split(/[,.;\n]| and /i)]
+
+  // Free-text-derived keywords get tighter guardrails than an explicit
+  // allergyOptions pick, since they're the patient's own unstructured
+  // wording rather than a controlled category: skip anything that reads
+  // as a phrase/sentence fragment rather than a food/ingredient name (a
+  // long fragment like "foods that are high in sugar" produced false-
+  // positive matches via the reverse substring check below - virtually
+  // any short ingredient name is "contained in" a long enough sentence),
+  // and skip near-universal base seasonings (see
+  // GENERIC_BASE_INGREDIENT_WORDS above).
+  const freeTextKeywords = freeText
+    .split(/[,.;\n]| and /i)
     .map(normalizeAllergyKeyword)
-    .filter((keyword) => keyword.length > 2);
+    .filter(
+      (keyword) =>
+        keyword.length > 2 && keyword.split(/\s+/).length <= 3 && !GENERIC_BASE_INGREDIENT_WORDS.has(keyword)
+    );
+
+  const keywords = [...expandedAllergyOptions.map(normalizeAllergyKeyword), ...freeTextKeywords].filter(
+    (keyword) => keyword.length > 2
+  );
 
   if (keywords.length === 0) return [];
 
