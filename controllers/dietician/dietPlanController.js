@@ -977,7 +977,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
       message: `AI diet-plan generation produced severe, unresolvable issues after ${attemptsUsed} attempt(s) (e.g. wrong-meal-slot assignments or calories far outside the target budget). No plan was saved - please try regenerating, or contact support if this persists. Details: ${validationResult.severeIssues
         .slice(0, 5)
         .map((i) => i.message)
-        .join(' | ')}`,
+        .join(' | ')} [[DEBUG repairChangesMade=${repairChangesMade.length}: ${repairChangesMade.slice(0, 8).join(' ~~ ')}]]`,
     };
   }
 
