@@ -12,6 +12,7 @@ const {
 } = require('../../models');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
+const { parsePagination, buildPaginationMeta } = require('../../utils/pagination');
 const {
   buildFirstConsultationPayload,
   flattenPayload,
@@ -613,10 +614,18 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
       filter.status = status;
     }
 
-    const requests = await DietPlanRequest.find(filter).populate(
-      'patient',
-      'profile.fullName profile.profileImage healthProfile.primaryGoal'
-    );
+    // Pagination (AI_EXECUTION_PLAN.md Phase 5, P5-05) - this endpoint had
+    // no limit at all before (every request for the dietician, unbounded).
+    // Default limit is generous (100) to minimize behavior change for
+    // today's callers, which don't pass page/limit and expect "everything".
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 100, maxLimit: 200 });
+    const total = await DietPlanRequest.countDocuments(filter);
+
+    const requests = await DietPlanRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('patient', 'profile.fullName profile.profileImage healthProfile.primaryGoal');
 
     const data = requests.map((request) => {
       const patient = request.patient || {};
@@ -639,6 +648,7 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data,
+      pagination: buildPaginationMeta({ page, limit, total, resultCount: data.length }),
     });
   } catch (error) {
     next(error);

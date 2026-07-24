@@ -34,6 +34,15 @@ router.use(rateLimit);
 router.get('/conversations', chatController.getConversations);
 
 /**
+ * @route   GET /v1/chat/unread-count
+ * @desc    Total unread message count across all conversations
+ *          (AI_EXECUTION_PLAN.md Phase 5, P5-04). Registered before
+ *          '/conversations/:id/messages' etc. is irrelevant here since the
+ *          literal path never collides with a param route.
+ */
+router.get('/unread-count', chatController.getUnreadCount);
+
+/**
  * @route   POST /v1/conversations/direct
  * @desc    Create or get direct conversation
  * @body    participantId (optional for patients)

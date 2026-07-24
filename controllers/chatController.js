@@ -9,6 +9,7 @@ const fs = require('fs/promises');
 const { getChatIO } = require('../chat');
 const { ConversationV1, MessageV1 } = require('../chat/models');
 const Notification = require('../models/Notification');
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
 // Chat Controller Version: 2.3.0
 // Last Updated: 2026-01-22
@@ -129,6 +130,24 @@ exports.getConversations = async (req, res, next) => {
 
     // Sort by time descending
     data.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    // Pagination (AI_EXECUTION_PLAN.md Phase 5, P5-05) - applied in-memory
+    // after the legacy+v1 merge above rather than at the DB query level,
+    // since the two sources have to be combined and re-sorted first anyway.
+    // Only kicks in when page/limit is explicitly passed, so a caller that
+    // doesn't ask for it keeps getting the exact same unpaginated response
+    // as before (today's behavior - see "keep legacy endpoints working" /
+    // "do not break existing API responses abruptly").
+    if (req.query.page || req.query.limit) {
+      const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+      const total = data.length;
+      const paged = data.slice(skip, skip + limit);
+      return res.status(200).json({
+        success: true,
+        data: paged,
+        pagination: buildPaginationMeta({ page, limit, total, resultCount: paged.length }),
+      });
+    }
 
     res.status(200).json({ success: true, data });
   } catch (error) {

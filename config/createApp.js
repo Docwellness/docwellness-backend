@@ -10,6 +10,11 @@ const { errorHandler, requestLogger, sanitizeInput } = require('../middlewares')
 // v1 Chat Module
 const { chatRoutes } = require('../chat');
 
+// v1 Patient/Dietician routers (AI_EXECUTION_PLAN.md Phase 5, P5-01) - each
+// wraps the existing legacy router plus a couple of new v1-only endpoints,
+// see routes/v1/index.js.
+const { v1Patient, v1Dietician } = require('../routes/v1');
+
 // Import routes
 const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
 
@@ -79,6 +84,15 @@ function createApp() {
 
   // v1 Chat API Routes (WhatsApp-like messaging)
   app.use('/api/v1/chat', chatRoutes);
+
+  // v1 Patient/Dietician API Routes (AI_EXECUTION_PLAN.md Phase 5, P5-01) -
+  // every legacy endpoint below is also reachable under these prefixes,
+  // plus new v1-only dashboard/unread-count endpoints. Registered before
+  // the legacy mounts purely for readability (grouping all /api/v1/* mounts
+  // together) - Express matches by path prefix, not registration order
+  // across different prefixes, so this ordering has no behavioral effect.
+  app.use('/api/v1/patient', v1Patient);
+  app.use('/api/v1/dietician', v1Dietician);
 
   // Patient API Routes (Primary focus for Flutter frontend)
   app.use('/api/patient', patientRoutes);

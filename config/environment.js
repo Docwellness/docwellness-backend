@@ -81,4 +81,10 @@ module.exports = {
   // dev, a VPS crontab entry on prod - see routes/internal.js) instead of
   // normal user JWT auth, since these aren't called by an authenticated user.
   cronSecret: process.env.CRON_SECRET,
+  // Optional, per AI_EXECUTION_PLAN.md Phase 5 (P5-06/P5-07/P5-09) - unset
+  // by default so dev/this-sandbox keeps working with zero Redis dependency.
+  // See utils/redisClient.js: every caller goes through a wrapper that
+  // no-ops (cache miss, no adapter) when this is null, rather than each
+  // call site having to check config.redisUrl itself.
+  redisUrl: process.env.REDIS_URL || null,
 };

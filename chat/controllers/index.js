@@ -13,8 +13,9 @@ const {
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
-const { User } = require('../../models');
+const { User, Conversation } = require('../../models');
 const Notification = require('../../models/Notification');
+const { ConversationV1 } = require('../models');
 
 const { EVENTS } = ChatLogger;
 
@@ -600,6 +601,61 @@ exports.getAnalytics = async (req, res, next) => {
         activity,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /v1/chat/unread-count
+ * AI_EXECUTION_PLAN.md Phase 5, P5-04 - total unread message count across
+ * every conversation for the current user (patient or dietician), summed
+ * rather than counted per-conversation. V1 unreadCount is the source of
+ * truth for any conversation that exists there (mirrors the merge pattern
+ * already used in controllers/dietician/dashboardController.js and
+ * controllers/chatController.js's getConversations) - legacy-only
+ * conversations (not yet touched by the v1 system) fall back to their own
+ * unreadCount.
+ */
+exports.getUnreadCount = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    const [legacyConversations, v1Conversations] = await Promise.all([
+      Conversation.find({ 'participants.userId': userId }).lean(),
+      ConversationV1.find({ 'participants.userId': userId }).lean(),
+    ]);
+
+    const v1UnreadByOtherUser = {};
+    v1Conversations.forEach((conv) => {
+      const me = conv.participants.find((p) => String(p.userId) === String(userId));
+      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+      if (me && other) v1UnreadByOtherUser[String(other.userId)] = me.unreadCount || 0;
+    });
+
+    let unreadCount = 0;
+    const countedOtherUsers = new Set();
+
+    legacyConversations.forEach((conv) => {
+      const me = conv.participants.find((p) => String(p.userId) === String(userId));
+      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+      if (!me || !other) return;
+      const otherId = String(other.userId);
+      const unread = v1UnreadByOtherUser[otherId] !== undefined ? v1UnreadByOtherUser[otherId] : (me.unreadCount || 0);
+      unreadCount += unread;
+      countedOtherUsers.add(otherId);
+    });
+
+    v1Conversations.forEach((conv) => {
+      const me = conv.participants.find((p) => String(p.userId) === String(userId));
+      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+      if (!me || !other) return;
+      const otherId = String(other.userId);
+      if (countedOtherUsers.has(otherId)) return;
+      unreadCount += me.unreadCount || 0;
+    });
+
+    res.json({ success: true, data: { unreadCount } });
   } catch (error) {
     next(error);
   }

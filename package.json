@@ -27,6 +27,7 @@
   "type": "commonjs",
   "dependencies": {
     "@sentry/node": "^10.66.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@supabase/supabase-js": "^2.110.7",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
@@ -39,6 +40,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.6.0",
     "helmet": "^8.3.0",
+    "ioredis": "^5.11.1",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",

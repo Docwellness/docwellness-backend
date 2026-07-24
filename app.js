@@ -24,6 +24,43 @@ const io = new Server(server, {
   },
 });
 
+// Optional Socket.IO Redis adapter (AI_EXECUTION_PLAN.md Phase 5, P5-07) -
+// only attempted when REDIS_URL is configured; a single-process deployment
+// (today's setup) works fine without it, since io's default in-memory
+// adapter already broadcasts to every locally-connected socket. This only
+// matters once the backend runs as more than one process/instance, where
+// io.to(room).emit() needs to reach sockets connected to a *different*
+// process - the in-memory adapter can't do that on its own.
+if (config.redisUrl) {
+  try {
+    // eslint-disable-next-line global-require
+    const Redis = require('ioredis');
+    // eslint-disable-next-line global-require
+    const { createAdapter } = require('@socket.io/redis-adapter');
+    // maxRetriesPerRequest: null - required for a long-lived pub/sub client
+    // (ioredis' own documented recommendation for this exact case). The
+    // adapter issues SUBSCRIBE commands that don't resolve while
+    // disconnected; ioredis' default (fail after N retries) rejects that
+    // command's promise with nothing to catch it in @socket.io/redis-adapter,
+    // which surfaces as an unhandled rejection and kills the whole process
+    // (see app.js's own `unhandledRejection` handler below) - confirmed via
+    // a real reproduction against an unreachable Redis before this was set.
+    // null instead queues commands until reconnected, matching the
+    // reconnect-forever retryStrategy above instead of racing against it.
+    const pubClient = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
+    const subClient = pubClient.duplicate();
+    pubClient.on('error', (err) => console.error('[redis-adapter] pub error:', err.message));
+    subClient.on('error', (err) => console.error('[redis-adapter] sub error:', err.message));
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('[redis-adapter] Socket.IO Redis adapter attached');
+  } catch (err) {
+    // Never let a bad/unreachable Redis prevent the server from starting -
+    // falls back to the default in-memory adapter (single-process behavior,
+    // same as when REDIS_URL isn't set at all).
+    console.error('[redis-adapter] failed to attach, falling back to in-memory adapter:', err.message);
+  }
+}
+
 // Initialize chat socket handlers (original) - gated by
 // LEGACY_SOCKET_COMPAT (default true, i.e. opt-out) so legacy clients keep
 // working during migration, per AI_EXECUTION_PLAN.md Phase 4, P4-08. Both
