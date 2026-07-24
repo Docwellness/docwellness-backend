@@ -63,3 +63,4 @@ finalize-*.js
 # if it's the LAST matching rule for a given path).
 !.env.example
 !docs/SECURITY.md
+!RELEASE_CHECKLIST.md
