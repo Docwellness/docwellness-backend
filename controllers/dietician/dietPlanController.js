@@ -30,6 +30,7 @@ const {
   getConsultationAnswer,
 } = require('../../utils/dietaryConstraintValidator');
 const { validateDietPlan, formatSevereIssuesForPrompt, SEVERE_CALORIE_DEVIATION_TOLERANCE } = require('../../utils/dietPlanValidator');
+const { repairStructuralIssues, REPAIRABLE_SEVERE_ISSUE_TYPES } = require('../../utils/dietPlanRepair');
 const { computeFinalizeBlockingIssues } = require('../../utils/dietPlanFinalizeChecks');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { SAFETY_FIELD_IDS } = require('../../utils/consultationFormSeed');
@@ -883,6 +884,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   let validationResult = null;
   let correctiveNote = '';
   let attemptsUsed = 0;
+  let repairChangesMade = [];
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
     attemptsUsed = attempt;
@@ -910,6 +912,37 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
       weightTrend,
       restrictNonVegToDayGroups: isNonVegPatient,
     });
+
+    // Deterministic repair before spending another AI call: a model that
+    // broke the "only pick from this slot's list" rule once often breaks
+    // it again differently on retry rather than reliably self-correcting -
+    // see dietPlanRepair.js's header comment. Only attempted when every
+    // severe issue is a mechanically-fixable type (not e.g. a genuine
+    // calorie-budget miss, which needs the AI's own corrective retry).
+    if (
+      validationResult.hasSevereIssues &&
+      parsedGeneratedPlan &&
+      validationResult.severeIssues.every((issue) => REPAIRABLE_SEVERE_ISSUE_TYPES.has(issue.type))
+    ) {
+      const { repairedPlan, changesMade } = repairStructuralIssues({
+        parsedPlan: parsedGeneratedPlan,
+        recipePool,
+        recipePoolByServingTime,
+        restrictNonVegToDayGroups: isNonVegPatient,
+      });
+      const revalidation = validateDietPlan({
+        parsedPlan: repairedPlan,
+        recipePool,
+        calorieStrategy: dietPlan.calorieStrategy,
+        weightTrend,
+        restrictNonVegToDayGroups: isNonVegPatient,
+      });
+      if (!revalidation.hasSevereIssues) {
+        parsedGeneratedPlan = repairedPlan;
+        validationResult = revalidation;
+        repairChangesMade = changesMade;
+      }
+    }
 
     if (!validationResult.hasSevereIssues) break;
     if (attempt === MAX_GENERATION_ATTEMPTS) break;
@@ -944,6 +977,11 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   }
 
   const newValidationWarnings = validationResult.warnings;
+  if (repairChangesMade.length > 0) {
+    newValidationWarnings.push(
+      `${repairChangesMade.length} entry/entries were automatically corrected after generation (invalid slot placements removed/backfilled): ${repairChangesMade.join(' ')}`
+    );
+  }
   if (excludedForAllergens.length > 0) {
     newValidationWarnings.push(
       `${excludedForAllergens.length} recipe(s) were excluded from selection due to a potential allergen/foods-to-avoid conflict: ${excludedForAllergens
