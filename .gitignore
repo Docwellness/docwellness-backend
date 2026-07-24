@@ -57,3 +57,9 @@ fix-*.js
 finalize-*.js
 .vercel
 .env*
+
+# Re-asserted here since it must win over every .env*/*.md ignore pattern
+# above (gitignore evaluates rules in order - a negation only takes effect
+# if it's the LAST matching rule for a given path).
+!.env.example
+!docs/SECURITY.md
