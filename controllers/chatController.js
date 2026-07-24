@@ -452,16 +452,25 @@ exports.sendMessage = async (req, res, next) => {
       select: 'message senderId messageType',
     });
 
-    // Update conversation
-    conversation.lastMessage = messageType === 'image' ? '📷 Photo' : message;
-    conversation.lastMessageAt = new Date();
-    conversation.lastMessageSender = senderId;
-    conversation.participants.forEach((p) => {
-      if (p.userId.toString() !== senderId.toString()) {
-        p.unreadCount += 1;
-      }
-    });
-    await conversation.save();
+    // Update conversation atomically - the previous fetch-mutate-save
+    // pattern (read participants into memory, forEach + save()) lost
+    // concurrent increments under a race (two messages landing in the
+    // same conversation at once, e.g. an image + text sent back-to-back,
+    // both reading unreadCount:0 and both writing back 1) - see
+    // AI_EXECUTION_PLAN.md Phase 3, P3-04. arrayFilters targets every
+    // participant except the sender in one atomic operation.
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      {
+        $set: {
+          lastMessage: messageType === 'image' ? '📷 Photo' : message,
+          lastMessageAt: new Date(),
+          lastMessageSender: senderId,
+        },
+        $inc: { 'participants.$[other].unreadCount': 1 },
+      },
+      { arrayFilters: [{ 'other.userId': { $ne: senderId } }] }
+    );
 
     // Emit real-time message to receiver via Socket.IO
     try {
@@ -588,13 +597,15 @@ exports.markAsRead = async (req, res, next) => {
         { isRead: true }
       );
 
-      // Reset legacy unread count
-      conversation.participants.forEach((p) => {
-        if (p.userId.toString() === userId.toString()) {
-          p.unreadCount = 0;
-        }
-      });
-      await conversation.save();
+      // Reset legacy unread count atomically (see P3-04) - participants
+      // themselves aren't changing here, so the already-fetched
+      // `conversation.participants` below still reflects the current set
+      // of userIds correctly without re-fetching.
+      await Conversation.updateOne(
+        { _id: id },
+        { $set: { 'participants.$[me].unreadCount': 0 } },
+        { arrayFilters: [{ 'me.userId': userId }] }
+      );
 
       // Also reset V1 unread count — match by participant user IDs (not by legacy _id)
       const participantUserIds = conversation.participants.map((p) => p.userId);
@@ -874,16 +885,20 @@ exports.sendDoctorNote = async (req, res, next) => {
       },
     });
 
-    // Update conversation
-    conversation.lastMessage = `📝 Doctor's Note`;
-    conversation.lastMessageAt = new Date();
-    conversation.lastMessageSender = dieticianId;
-    conversation.participants.forEach((p) => {
-      if (p.userId.toString() !== dieticianId.toString()) {
-        p.unreadCount += 1;
-      }
-    });
-    await conversation.save();
+    // Update conversation atomically - see P3-04 / the identical comment
+    // in sendMessage above.
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      {
+        $set: {
+          lastMessage: `📝 Doctor's Note`,
+          lastMessageAt: new Date(),
+          lastMessageSender: dieticianId,
+        },
+        $inc: { 'participants.$[other].unreadCount': 1 },
+      },
+      { arrayFilters: [{ 'other.userId': { $ne: dieticianId } }] }
+    );
 
     // Emit real-time message via Socket.IO
     try {

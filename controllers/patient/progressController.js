@@ -116,7 +116,8 @@ exports.getProgress = async (req, res, next) => {
     const progress = await Progress.find(query)
       .sort({ date: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     const total = await Progress.countDocuments(query);
 
@@ -145,7 +146,7 @@ exports.getProgressById = async (req, res, next) => {
     const progress = await Progress.findOne({
       _id: req.params.id,
       patientId: req.user._id,
-    });
+    }).lean();
 
     if (!progress) {
       return res.status(404).json({
@@ -196,7 +197,9 @@ exports.getProgressStats = async (req, res, next) => {
     const progressEntries = await Progress.find({
       patientId: req.user._id,
       date: { $gte: startDate, $lte: endDate },
-    }).sort({ date: 1 });
+    })
+      .sort({ date: 1 })
+      .lean();
 
     if (progressEntries.length === 0) {
       return res.status(200).json({
@@ -422,7 +425,8 @@ exports.getGoalProgress = async (req, res, next) => {
     // Get progress entries
     const progressEntries = await Progress.find({ patientId: req.user._id })
       .sort({ date: -1 })
-      .limit(30);
+      .limit(30)
+      .lean();
 
     const latestProgress = progressEntries[0];
     const oldestProgress = progressEntries[progressEntries.length - 1];

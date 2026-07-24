@@ -218,7 +218,9 @@ exports.getTodayMealLogs = async (req, res, next) => {
     const mealLog = await MealLog.findOne({
       patientId,
       date: { $gte: startOfDay, $lte: endOfDay },
-    }).populate('meals.recipeId');
+    })
+      .populate('meals.recipeId')
+      .lean();
 
     const stats = await getTodayStatsInternal(patientId);
 
@@ -248,7 +250,9 @@ exports.getCalorieTrend = async (req, res, next) => {
     const mealLogs = await MealLog.find({
       patientId,
       date: { $gte: startDate },
-    }).sort({ date: 1 });
+    })
+      .sort({ date: 1 })
+      .lean();
 
     // Build a map of date → total calories
     const calorieMap = {};
@@ -306,7 +310,8 @@ exports.getAllMealLogs = async (req, res, next) => {
       .populate('meals.recipeId')
       .sort({ date: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     const total = await MealLog.countDocuments(filter);
 

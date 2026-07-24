@@ -178,4 +178,13 @@ const dietPlanSchema = new mongoose.Schema(
   }
 );
 
+// Had no indexes at all before this - {patientId, status:'Active'} is by
+// far the dominant query shape across both patient- and dietician-side
+// controllers (controllers/patient/dietController.js,
+// controllers/dietician/dietPlanController.js).
+dietPlanSchema.index({ patientId: 1, status: 1 });
+dietPlanSchema.index({ dieticianId: 1, status: 1 });
+// Covers the renewal-cycle lookup: findOne({patientId, request}).sort({cycleNumber:-1}).
+dietPlanSchema.index({ patientId: 1, request: 1, cycleNumber: -1 });
+
 module.exports = mongoose.model('DietPlan', dietPlanSchema);

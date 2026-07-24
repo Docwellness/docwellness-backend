@@ -789,9 +789,9 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     recipeFilter[`dietaryHabits.${eatingStyleFlag}`] = true;
   }
 
-  const candidateRecipes = await Recipe.find(recipeFilter).select(
-    'name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags category _id'
-  );
+  const candidateRecipes = await Recipe.find(recipeFilter)
+    .select('name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags category _id')
+    .lean();
 
   const allergyOptions = getAnswer(SAFETY_FIELD_IDS.ALLERGIES) || [];
   const allergyOtherInfo = getAnswer(SAFETY_FIELD_IDS.ALLERGIES_OTHER) || '';
@@ -1525,7 +1525,7 @@ exports.getDietPlanDetails = async (req, res, next) => {
       ? await Recipe.find(
         { _id: { $in: Array.from(recipeIds) } },
         { name: 1, nutrition: 1, servings: 1, image: 1, ingredients: 1 }
-      )
+      ).lean()
       : [];
 
     const recipeMap = {};

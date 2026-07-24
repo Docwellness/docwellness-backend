@@ -69,5 +69,15 @@ const chatSchema = new mongoose.Schema(
 
 chatSchema.index({ conversationId: 1, createdAt: -1 });
 chatSchema.index({ senderId: 1, receiverId: 1, createdAt: -1 });
+// Covers the repeated "mark messages as read" updateMany pattern
+// ({conversationId, receiverId, isRead:false} - see controllers/
+// chatController.js, sockets/chatSocket.js, socket/index.js) - the
+// existing {conversationId, createdAt} index only has conversationId as a
+// usable prefix for this filter shape.
+chatSchema.index({ conversationId: 1, receiverId: 1, isRead: 1 });
+// Covers receiver-scoped message-type queries without senderId in the
+// filter (e.g. getPatientDoctorNotes: {receiverId, messageType:'doctor_note'}),
+// which the senderId-first compound index above can't serve.
+chatSchema.index({ receiverId: 1, messageType: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Chat', chatSchema);

@@ -222,4 +222,12 @@ const recipeSchema = new mongoose.Schema(
   }
 );
 
+// Had no indexes at all before this - dieticianId scoping is present on
+// every query (multi-tenant: a dietician only ever sees their own
+// recipes), combined with servingTime (AI-generation recipe pool
+// building, dietPlanOptions.js) or category (browsing/filtering,
+// uploadRecipieController.js's listRecipes).
+recipeSchema.index({ dieticianId: 1, servingTime: 1 });
+recipeSchema.index({ dieticianId: 1, category: 1 });
+
 module.exports = mongoose.model('Recipe', recipeSchema);
