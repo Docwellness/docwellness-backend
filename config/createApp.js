@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const Sentry = require('@sentry/node');
+const config = require('./environment');
 const { errorHandler } = require('../middlewares');
 
 // v1 Chat Module
@@ -13,10 +14,24 @@ const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
 function createApp() {
   const app = express();
 
-  // CORS configuration - allow all origins (mobile app doesn't need CORS restrictions)
+  // CORS configuration. Native mobile apps (Dio/http don't send an Origin
+  // header the way browsers do), curl, Postman, and server-to-server calls
+  // are always allowed - CORS is a browser-enforced mechanism and doesn't
+  // apply to them regardless. For a browser-based consumer (e.g. a Flutter
+  // web build), only CLIENT_ORIGIN/DIETICIAN_ORIGIN are allowed once
+  // configured; until then this stays as permissive as the previous
+  // wildcard, so setting those env vars is what locks CORS down (see
+  // docs/SECURITY.md and .env.example) rather than a prerequisite for the
+  // app to keep working today.
+  const allowedOrigins = [config.clientOrigin, config.dieticianOrigin].filter(Boolean);
   app.use(
     cors({
-      origin: '*',
+      origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.length === 0) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       credentials: false,
     })
   );
