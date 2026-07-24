@@ -6,7 +6,7 @@
 // proposes, this catches drift deterministically, the dietician reviews.
 
 const { SIDE_SALAD_ELIGIBLE_SLOTS, REQUIRED_SERVING_TIMES } = require('./dietPlanOptions');
-const { DAY_GROUPS } = require('./dayGroups');
+const { DAY_GROUPS, NON_VEG_ALLOWED_DAY_GROUPS } = require('./dayGroups');
 
 const CALORIE_DEVIATION_TOLERANCE = 0.1; // ±10%, per the architecture's tolerance-based reconciliation
 // ±40% - a different regime from the soft tolerance above, not just a
@@ -50,7 +50,13 @@ function trendCalorieRatio(recipe, servingTime, weightTrend) {
   return target / baseQuantity;
 }
 
-function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend = 'gain' }) {
+function validateDietPlan({
+  parsedPlan,
+  recipePool,
+  calorieStrategy,
+  weightTrend = 'gain',
+  restrictNonVegToDayGroups = false,
+}) {
   const warnings = [];
   const severeIssues = [];
   const recipeById = new Map((recipePool || []).map((r) => [r.id, r]));
@@ -99,6 +105,28 @@ function validateDietPlan({ parsedPlan, recipePool, calorieStrategy, weightTrend
           recipeName: recipe.name,
           recipeServingTime: recipe.servingTime,
           assignedServingTime: meal.servingTime,
+          message,
+        });
+      }
+
+      // 'Non-Vegetarian' patients still eat vegetarian most of the week -
+      // see NON_VEG_ALLOWED_DAY_GROUPS's comment. The prompt already tells
+      // the model this, but the model can still slip a non-veg main into
+      // a should-be-vegetarian day-group - this catches that deterministically
+      // rather than trusting instruction-following alone.
+      if (
+        restrictNonVegToDayGroups &&
+        recipe.dietaryHabits?.nonVegetarian === true &&
+        meal?.dayGroup &&
+        !NON_VEG_ALLOWED_DAY_GROUPS.includes(meal.dayGroup)
+      ) {
+        const message = `Week ${week?.week}, ${meal.dayGroup}: "${recipe.name}" is non-vegetarian but ${meal.dayGroup} must stay vegetarian - non-veg is only allowed on ${NON_VEG_ALLOWED_DAY_GROUPS.join(' and ')}.`;
+        warnings.push(message);
+        severeIssues.push({
+          type: 'non_veg_on_vegetarian_day',
+          week: week?.week,
+          dayGroup: meal.dayGroup,
+          recipeName: recipe.name,
           message,
         });
       }

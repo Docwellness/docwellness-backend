@@ -7,6 +7,14 @@
 
 const DAY_GROUPS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 
+// For a "Non-Vegetarian" eating style specifically (see dietPlanController.js's
+// isNonVegPatient) - that doesn't mean every day is non-veg. Real-world
+// convention here is a mixed week: non-veg dishes are only used on the
+// Monday and Wednesday day-groups (i.e. Mon+Fri, Wed+Sun); the Tuesday and
+// Thursday day-groups (Tue+Sat, Thu) stay strictly vegetarian regardless of
+// the patient's stated eating style.
+const NON_VEG_ALLOWED_DAY_GROUPS = ['Monday', 'Wednesday'];
+
 // JS Date.getDay(): 0=Sunday, 1=Monday, ..., 6=Saturday.
 const WEEKDAY_TO_DAY_GROUP = {
   1: 'Monday',
@@ -29,4 +37,4 @@ function mealMatchesDayGroup(meal, dayGroup) {
   return !meal?.dayGroup || meal.dayGroup === dayGroup;
 }
 
-module.exports = { DAY_GROUPS, resolveDayGroupForDate, mealMatchesDayGroup };
+module.exports = { DAY_GROUPS, NON_VEG_ALLOWED_DAY_GROUPS, resolveDayGroupForDate, mealMatchesDayGroup };

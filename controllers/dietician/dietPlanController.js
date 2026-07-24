@@ -770,8 +770,21 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   const eatingStyleValue = getAnswer(SAFETY_FIELD_IDS.EATING_STYLE);
   const eatingStyleFlag = mapEatingStyleToDietFlag(eatingStyleValue ? [eatingStyleValue] : []);
 
+  // "Non-Vegetarian" doesn't mean every meal must be non-veg - real usage
+  // here is a mixed week (see dayGroups.js's NON_VEG_ALLOWED_DAY_GROUPS):
+  // non-veg dishes are only used on the Monday/Wednesday day-groups
+  // (Mon+Fri, Wed+Sun), Tuesday/Thursday (Tue+Sat, Thu) stay vegetarian.
+  // So unlike every other eating style, 'nonVegetarian' must NOT hard-filter
+  // the candidate pool down to only-nonVegetarian recipes - that would
+  // exclude every vegetarian recipe outright (and this kind of library
+  // typically has far more vegetarian recipes than non-veg ones across
+  // Morning Drink/Breakfast/Brunch/Evening Snack/Night Drink, which stay
+  // vegetarian for every patient regardless of eating style anyway). The
+  // full pool is kept instead, and the day-group split is enforced via the
+  // prompt + validateDietPlan's restrictNonVegToDayGroups check below.
+  const isNonVegPatient = eatingStyleFlag === 'nonVegetarian';
   const recipeFilter = { dieticianId };
-  if (eatingStyleFlag) {
+  if (eatingStyleFlag && !isNonVegPatient) {
     recipeFilter[`dietaryHabits.${eatingStyleFlag}`] = true;
   }
 
@@ -881,6 +894,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
       recipesByServingTime: recipePoolByServingTime,
       weekNumbers,
       correctiveNote,
+      restrictNonVegToDayGroups: isNonVegPatient,
     });
 
     try {
@@ -894,6 +908,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
       recipePool,
       calorieStrategy: dietPlan.calorieStrategy,
       weightTrend,
+      restrictNonVegToDayGroups: isNonVegPatient,
     });
 
     if (!validationResult.hasSevereIssues) break;

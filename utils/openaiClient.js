@@ -169,7 +169,7 @@ const summarizeStrategy = (calorieStrategy = {}, macroStrategy = {}) => {
   return `${calorieSummary}\n${macroSummary}`;
 };
 
-const { DAY_GROUPS } = require('./dayGroups');
+const { DAY_GROUPS, NON_VEG_ALLOWED_DAY_GROUPS } = require('./dayGroups');
 
 const buildPrompt = ({
   patient,
@@ -179,6 +179,7 @@ const buildPrompt = ({
   recipesByServingTime = {},
   weekNumbers = [1, 2, 3, 4],
   correctiveNote = '',
+  restrictNonVegToDayGroups = false,
 }) => {
   const bio = extractPatientBio(patient);
   const consultationSummary = summarizeConsultation(firstConsultation);
@@ -259,7 +260,7 @@ Rules:
 - If generating more than one week, try to provide variety across them while staying close to the target calorieBudget.
 - Distribute calories realistically across all 7 slots so their sum is close to the calorieBudget in the Strategy above: keep Morning Drink and Night Drink light (a small drink/light bite, not a full meal), Breakfast and Brunch moderate, and let Lunch and Dinner (COMBO totals - main dish plus every side you add, summed together) carry the largest share, with Evening Snack in between. Never leave a slot trivially small (e.g., a few calories) just to hit the total on paper - every slot must be something a person would genuinely eat at that time. Spread protein sources across multiple slots (not concentrated into a single meal) so the day's protein target is met gradually rather than in one large dose. When calorieStrategy indicates a deficit (weight loss), reduce portion sizes/servings proportionally rather than skipping meal slots or components entirely - a lighter version of a full day beats a day with missing slots.
 - Respect dietaryHabits and freeFrom flags according to the patient's profile and consultation notes.
-${correctiveNote ? `\nIMPORTANT - CORRECTIONS FROM YOUR PREVIOUS ATTEMPT (you MUST fix every one of these this time):\n${correctiveNote}\n` : ''}
+${restrictNonVegToDayGroups ? `- This patient's eating style is Non-Vegetarian, but that means a MIXED week, not a fully non-veg one: you may only pick a recipe with dietaryHabits.nonVegetarian === true for the ${NON_VEG_ALLOWED_DAY_GROUPS.join(' and ')} day-groups. Every other day-group (${DAY_GROUPS.filter((dg) => !NON_VEG_ALLOWED_DAY_GROUPS.includes(dg)).join(', ')}) MUST be entirely vegetarian - do not select any recipe with dietaryHabits.nonVegetarian === true for those day-groups, for any slot.\n` : ''}${correctiveNote ? `\nIMPORTANT - CORRECTIONS FROM YOUR PREVIOUS ATTEMPT (you MUST fix every one of these this time):\n${correctiveNote}\n` : ''}
 Output Requirements:
 - Respond ONLY with JSON in this exact structure (no comments, no extra text):
 {
@@ -278,6 +279,7 @@ const generateDietPlanWithAI = async ({
   recipesByServingTime = {},
   weekNumbers = [1, 2, 3, 4],
   correctiveNote = '',
+  restrictNonVegToDayGroups = false,
 }) => {
   const prompt = buildPrompt({
     patient,
@@ -287,6 +289,7 @@ const generateDietPlanWithAI = async ({
     recipesByServingTime,
     weekNumbers,
     correctiveNote,
+    restrictNonVegToDayGroups,
   });
 
   const systemPrompt =
