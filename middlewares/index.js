@@ -1,7 +1,10 @@
 const authMiddleware = require('./auth');
 const supabaseTokenOnly = require('./supabaseTokenOnly');
 const { roleCheck, patientOnly, dieticianOnly, adminOnly } = require('./roleCheck');
-const errorHandler = require('./errorHandler');
+const errorHandler = require('./error');
+const requestLogger = require('./requestLogger');
+const sanitizeInput = require('./sanitizeInput');
+const { authLimiter, messageLimiter, aiGenerationLimiter, uploadLimiter } = require('./rateLimiters');
 const {
   validate,
   schemas,
@@ -17,6 +20,12 @@ module.exports = {
   dieticianOnly,
   adminOnly,
   errorHandler,
+  requestLogger,
+  sanitizeInput,
+  authLimiter,
+  messageLimiter,
+  aiGenerationLimiter,
+  uploadLimiter,
   validate,
   schemas,
   validateRegister,

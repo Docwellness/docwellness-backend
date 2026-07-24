@@ -37,6 +37,7 @@ const {
 // Middleware for file uploads
 const upload = require('../middlewares/upload');
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
+const { authLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
 
 // Middleware to check if user is a patient
 const patientOnly = [authenticate, roleCheck('patient')];
@@ -57,7 +58,7 @@ router.param('id', validateObjectIdParam);
  *          directly against Supabase to get a session before calling
  *          /auth/register below.
  */
-router.post('/auth/signup-request', authController.signupRequest);
+router.post('/auth/signup-request', authLimiter, authController.signupRequest);
 
 /**
  * @route   POST /api/patient/auth/register
@@ -66,13 +67,13 @@ router.post('/auth/signup-request', authController.signupRequest);
  *          verifying the signup-request code), but no linked profile is
  *          expected to exist yet (that's what this creates).
  */
-router.post('/auth/register', supabaseTokenOnly, validateRegister, authController.register);
+router.post('/auth/register', authLimiter, supabaseTokenOnly, validateRegister, authController.register);
 
 /**
  * @route   GET /api/patient/auth/check-email/:email
  * @desc    Check if email is available
  */
-router.get('/auth/check-email/:email', authController.checkEmail);
+router.get('/auth/check-email/:email', authLimiter, authController.checkEmail);
 
 /**
  * @route   POST /api/patient/auth/forgot-password
@@ -81,7 +82,7 @@ router.get('/auth/check-email/:email', authController.checkEmail);
  *          the app then calls supabase.auth.verifyOtp(type: recovery)
  *          and supabase.auth.updateUser() directly, no backend involved.
  */
-router.post('/auth/forgot-password', authController.forgotPassword);
+router.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
 
 // Login, logout (sign-out), and the rest of the reset flow (verify code +
 // set new password) all happen client-side via the Supabase SDK directly -
@@ -126,6 +127,7 @@ router.put('/profile', patientOnly, validateUpdateProfile, profileController.upd
 router.post(
   '/profile/image',
   patientOnly,
+  uploadLimiter,
   upload.single('profileImage'),
   profileController.uploadProfileImage
 );
@@ -158,7 +160,7 @@ router.get('/meal-log/today-stats', patientOnly, dietController.getTodayMealLogS
 
 router.post('/meal-log', patientOnly, dietController.submitMealLog);
 
-router.post('/meal-log/add-note', patientOnly, upload.single('file'), dietController.addMealNote);
+router.post('/meal-log/add-note', patientOnly, uploadLimiter, upload.single('file'), dietController.addMealNote);
 
 // ==========================================
 // Tracking Data (Charts - calorie, weight, BMI trends)
@@ -176,6 +178,7 @@ router.get('/tracking-data', patientOnly, progressController.getTrackingData);
 router.post(
   '/progress',
   patientOnly,
+  uploadLimiter,
   upload.fields([
     { name: 'bodyImage', maxCount: 1 },
     { name: 'bodyImage2', maxCount: 1 },
@@ -222,6 +225,7 @@ router.put('/progress/:id', patientOnly, progressController.updateProgress);
 router.post(
   '/progress/:id/images',
   patientOnly,
+  uploadLimiter,
   upload.fields([
     { name: 'beforeImage', maxCount: 1 },
     { name: 'afterImage', maxCount: 1 },
@@ -321,6 +325,7 @@ router.get('/diet/groceries', patientOnly, dietController.getGroceriesForCurrent
 router.post(
   '/payments/manual-proof',
   patientOnly,
+  uploadLimiter,
   upload.single('proofImage'),
   validateManualPaymentProof,
   paymentController.submitManualPaymentProof
@@ -337,6 +342,7 @@ router.post(
 router.post(
   '/custom-food',
   patientOnly,
+  uploadLimiter,
   upload.single('imageUrl'), // field name used in Flutter FormData
   dietController.createCustomFoodRequest
 );
@@ -375,13 +381,13 @@ router.get('/chat/conversations/:conversationId/messages', patientOnly, chatCont
  * @route   POST /api/patient/chat/message
  * @desc    Send a message in conversation (patient auto-routes to default dietician)
  */
-router.post('/chat/message', patientOnly, upload.single('image'), chatController.sendMessage);
+router.post('/chat/message', patientOnly, messageLimiter, upload.single('image'), chatController.sendMessage);
 
 /**
  * @route   POST /api/patient/chat/upload-image
  * @desc    Upload a chat image to Cloudinary and return the URL
  */
-router.post('/chat/upload-image', patientOnly, upload.single('file'), chatController.uploadChatImage);
+router.post('/chat/upload-image', patientOnly, uploadLimiter, upload.single('file'), chatController.uploadChatImage);
 
 /**
  * @route   POST /api/patient/chat/conversations/:conversationId/read
@@ -407,7 +413,7 @@ router.post('/meal-logs', patientOnly, mealLogController.createMealLog);
 router.put('/meal-logs/:id/meal/:mealIndex', patientOnly, mealLogController.updateMealLog);
 router.delete('/meal-logs/:id/meal/:mealIndex', patientOnly, mealLogController.deleteMealLog);
 router.post('/meal-logs/:id/meal/:mealIndex/complete', patientOnly, mealLogController.completeMeal);
-router.post('/meal-notes', patientOnly, upload.single('image'), mealLogController.addMealNote);
+router.post('/meal-notes', patientOnly, uploadLimiter, upload.single('image'), mealLogController.addMealNote);
 
 // ==========================================
 // Water Intake Routes
@@ -440,6 +446,7 @@ router.get('/journey/milestones', patientOnly, journeyController.getJourneyMiles
 router.post(
   '/journey',
   patientOnly,
+  uploadLimiter,
   upload.fields([
     { name: 'beforeImage', maxCount: 1 },
     { name: 'afterImage', maxCount: 1 },

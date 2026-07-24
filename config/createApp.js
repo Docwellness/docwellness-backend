@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
 const Sentry = require('@sentry/node');
 const config = require('./environment');
-const { errorHandler } = require('../middlewares');
+const { errorHandler, requestLogger, sanitizeInput } = require('../middlewares');
 
 // v1 Chat Module
 const { chatRoutes } = require('../chat');
@@ -13,6 +15,30 @@ const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
 
 function createApp() {
   const app = express();
+
+  // Both deployment targets (Vercel serverless, and the VPS behind nginx -
+  // see .github/workflows/deploy-dev-vps.yml) sit behind exactly one
+  // reverse proxy hop. Without this, req.ip (and therefore every rate
+  // limiter's default per-IP bucket - see middlewares/rateLimiters.js)
+  // resolves to the proxy's own IP for every request, not the real
+  // client's - collapsing all traffic into a single shared bucket instead
+  // of limiting per-user. `1` = trust the X-Forwarded-For value set by
+  // that one hop, no further back.
+  app.set('trust proxy', 1);
+
+  // Security headers (helmet) and gzip/deflate compression - both purely
+  // additive, no behavior change for a well-formed request/response.
+  // contentSecurityPolicy is off: this is a pure JSON API consumed by
+  // native mobile apps, not a server-rendered site - a CSP header has no
+  // effect on API responses and helmet's default policy is meant for HTML
+  // pages, so leaving it enabled would just be dead configuration.
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(compression());
+
+  // Structured request logging with a per-request id (see
+  // middlewares/requestLogger.js) - registered early so every request gets
+  // logged/timed regardless of where it fails.
+  app.use(requestLogger);
 
   // CORS configuration. Native mobile apps (Dio/http don't send an Origin
   // header the way browsers do), curl, Postman, and server-to-server calls
@@ -39,6 +65,14 @@ function createApp() {
   // Body parser
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  // Strips any key starting with '$' or containing '.' from req.body/
+  // req.params (NoSQL injection prevention - a key like {"$gt": ""}
+  // reaching a Mongoose query unsanitized could bypass an intended
+  // filter). See middlewares/sanitizeInput.js for why this is NOT
+  // express-mongo-sanitize's own middleware() export used directly - it
+  // throws on every request under Express 5 (confirmed empirically).
+  app.use(sanitizeInput);
 
   // Serve static files (uploads)
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

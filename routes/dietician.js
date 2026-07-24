@@ -26,6 +26,7 @@ const notificationController = require('../controllers/notificationController');
 const { authController } = require('../controllers/patient');
 
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
+const { aiGenerationLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
 
 const dieticianOnlyMiddleware = [authenticate, dieticianOnly];
 
@@ -75,6 +76,7 @@ router.put('/profile', dieticianOnlyMiddleware, profileController.updateDoctorPr
 router.post(
   '/profile/image',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.single('profileImage'),
   profileController.uploadDoctorProfileImage
 );
@@ -171,6 +173,7 @@ router.get(
 router.put(
   '/patients/:patientId/first-consultation',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   uploadLabReport.single('file'),
   firstConsultationController.upsertFirstConsultation
 );
@@ -178,12 +181,14 @@ router.put(
 router.post(
   '/patients/:patientId/diet-plans/generate',
   dieticianOnlyMiddleware,
+  aiGenerationLimiter,
   dietPlanController.createAndGenerateDietPlan
 );
 
 router.post(
   '/patients/:patientId/diet-plans/:dietPlanId/generate-week',
   dieticianOnlyMiddleware,
+  aiGenerationLimiter,
   dietPlanController.generateWeekForExistingPlan
 );
 
@@ -273,6 +278,7 @@ router.patch(
 router.post(
   '/recipes/ai-generate-preview',
   dieticianOnlyMiddleware,
+  aiGenerationLimiter,
   uploadRecipieController.generateRecipeWithAI
 );
 
@@ -280,6 +286,7 @@ router.post(
 router.post(
   '/recipes/ai-update-from-edits',
   dieticianOnlyMiddleware,
+  aiGenerationLimiter,
   uploadRecipieController.updateRecipeFromEdits
 );
 
@@ -337,6 +344,7 @@ router.post('/recipes', dieticianOnlyMiddleware, uploadRecipieController.createR
 router.post(
   '/uploads/recipe-image',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.single('file'),
   uploadRecipieController.uploadRecipeImage
 );
@@ -345,6 +353,7 @@ router.post(
 router.post(
   '/uploads/ingredient-image',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.single('file'),
   uploadRecipieController.uploadIngredientImage
 );
@@ -397,6 +406,7 @@ router.get(
 router.post(
   '/chat/message',
   dieticianOnlyMiddleware,
+  messageLimiter,
   upload.single('image'),
   chatController.sendMessage
 );
@@ -404,6 +414,7 @@ router.post(
 router.post(
   '/chat/message/:receiverId',
   dieticianOnlyMiddleware,
+  messageLimiter,
   upload.single('image'),
   chatController.sendMessage
 );
@@ -454,6 +465,7 @@ router.get('/videos', dieticianOnlyMiddleware, videoController.getVideos);
 router.post(
   '/videos',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.fields([
     { name: 'bannerImage', maxCount: 1 },
     { name: 'videoFile', maxCount: 1 },
@@ -468,6 +480,7 @@ router.post(
 router.put(
   '/videos/:videoId',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.fields([
     { name: 'bannerImage', maxCount: 1 },
     { name: 'videoFile', maxCount: 1 },
@@ -522,6 +535,7 @@ router.get(
 router.post(
   '/patients/:patientId/journey',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.fields([
     { name: 'beforeImage', maxCount: 1 },
     { name: 'afterImage', maxCount: 1 },
@@ -536,6 +550,7 @@ router.post(
 router.put(
   '/patients/:patientId/journey/:imageId',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.fields([
     { name: 'beforeImage', maxCount: 1 },
     { name: 'afterImage', maxCount: 1 },
@@ -567,7 +582,7 @@ router.get('/quotes', dieticianOnlyMiddleware, quoteController.getQuotes);
  * @route   POST /api/dietician/quotes
  * @desc    Add a new quote (image uploaded to Cloudinary)
  */
-router.post('/quotes', dieticianOnlyMiddleware, upload.single('image'), quoteController.addQuote);
+router.post('/quotes', dieticianOnlyMiddleware, uploadLimiter, upload.single('image'), quoteController.addQuote);
 
 /**
  * @route   PUT /api/dietician/quotes/:quoteId
@@ -576,6 +591,7 @@ router.post('/quotes', dieticianOnlyMiddleware, upload.single('image'), quoteCon
 router.put(
   '/quotes/:quoteId',
   dieticianOnlyMiddleware,
+  uploadLimiter,
   upload.single('image'),
   quoteController.updateQuote
 );
