@@ -6,8 +6,10 @@ const config = require('./config/environment');
 const createApp = require('./config/createApp');
 const { initializeChatSocket } = require('./sockets');
 
-// v1 Chat Module
-const { initializeChatSocketV1 } = require('./chat');
+// v1 Chat Module (see socket/chat-socket.js - the canonical entrypoint per
+// AI_EXECUTION_PLAN.md Phase 4, P4-06 - which re-exports the actual
+// implementation in chat/socket/index.js)
+const { initializeChatSocketV1 } = require('./socket/chat-socket');
 
 const app = createApp();
 
@@ -22,8 +24,16 @@ const io = new Server(server, {
   },
 });
 
-// Initialize chat socket handlers (original)
-initializeChatSocket(io);
+// Initialize chat socket handlers (original) - gated by
+// LEGACY_SOCKET_COMPAT (default true, i.e. opt-out) so legacy clients keep
+// working during migration, per AI_EXECUTION_PLAN.md Phase 4, P4-08. Both
+// handlers register on the SAME io instance and now join the same
+// user:{id}/conv:{id} rooms (see P4-02), so a message routed through
+// either system reaches a socket regardless of which handler's connection
+// listener ran for it.
+if (config.legacySocketCompat) {
+  initializeChatSocket(io);
+}
 
 // Initialize v1 chat socket handlers (enhanced)
 initializeChatSocketV1(io);

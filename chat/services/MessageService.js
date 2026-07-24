@@ -217,7 +217,11 @@ class MessageService {
         });
       }
 
-      // Create message in old Chat collection
+      // Create message in old Chat collection - seq allocated atomically
+      // per-conversation, same as the direct legacy write paths (see
+      // AI_EXECUTION_PLAN.md Phase 4, P4-03), so a dual-written message
+      // isn't distinguishable from a directly-written one by this field.
+      const oldSeq = await Conversation.getNextSeq(oldConversation._id);
       await Chat.create({
         conversationId: oldConversation._id,
         senderId: new mongoose.Types.ObjectId(senderId),
@@ -226,6 +230,7 @@ class MessageService {
         messageType: type,
         attachment: attachment?.url || null,
         replyTo: replyTo?.messageId || null,
+        seq: oldSeq,
       });
 
       // Update old conversation

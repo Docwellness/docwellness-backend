@@ -177,8 +177,8 @@ class MealLogSyncService {
           };
 
           // Emit to both participants
-          ioInstance.to(actor_user_id.toString()).emit('msg.updated', msgData);
-          ioInstance.to(dieticianId.toString()).emit('msg.updated', msgData);
+          ioInstance.to(`user:${actor_user_id}`).emit('msg.updated', msgData);
+          ioInstance.to(`user:${dieticianId}`).emit('msg.updated', msgData);
 
           ChatLogger.info(EVENTS.MSG_UPDATED_FANOUT, {
             ...logContext,
@@ -241,13 +241,13 @@ class MealLogSyncService {
           };
 
           // Emit to dietician (using legacy event format)
-          ioInstance.to(dieticianId.toString()).emit('new_message', {
+          ioInstance.to(`user:${dieticianId}`).emit('new_message', {
             message: msgData,
             conversationId: convId.toString(),
           });
 
           // Also emit to patient for their chat view
-          ioInstance.to(actor_user_id.toString()).emit('new_message', {
+          ioInstance.to(`user:${actor_user_id}`).emit('new_message', {
             message: { ...msgData, isMe: true },
             conversationId: convId.toString(),
           });

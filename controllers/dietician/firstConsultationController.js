@@ -146,7 +146,7 @@ exports.upsertFirstConsultation = async (req, res, next) => {
         });
         const ioRef = getChatIO();
         if (ioRef) {
-          ioRef.to(patientId.toString()).emit('notification.new', {
+          ioRef.to(`user:${patientId}`).emit('notification.new', {
             id: notif._id,
             title: notif.title,
             message: notif.message,

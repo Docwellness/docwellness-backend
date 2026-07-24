@@ -1148,8 +1148,8 @@ exports.submitMealLog = async (req, res, next) => {
       await conversation.save();
 
       if (io) {
-        io.to(receiverId.toString()).emit('newMessage', mealChatMessage);
-        io.to(receiverId.toString()).emit('meal_log_update', {
+        io.to(`user:${receiverId}`).emit('newMessage', mealChatMessage);
+        io.to(`user:${receiverId}`).emit('meal_log_update', {
           patientId: senderId,
           logId: log._id,
           action: isFirstTime ? 'added' : 'updated',
@@ -1350,7 +1350,7 @@ exports.createCustomFoodRequest = async (req, res, next) => {
       if (io) {
         // Emit via V1 format so doctor app picks it up correctly
         if (v1Message) {
-          io.to(receiverId.toString()).emit('msg.new', {
+          io.to(`user:${receiverId}`).emit('msg.new', {
             message: {
               id: v1Message._id,
               conversationId: v1Message.conversationId,
@@ -1368,8 +1368,8 @@ exports.createCustomFoodRequest = async (req, res, next) => {
           });
         }
         // Also emit legacy events
-        io.to(receiverId.toString()).emit('newMessage', chatMessage);
-        io.to(receiverId.toString()).emit('custom_food_update', {
+        io.to(`user:${receiverId}`).emit('newMessage', chatMessage);
+        io.to(`user:${receiverId}`).emit('custom_food_update', {
           patientId: senderId,
           requestId: request._id,
           foodName,
@@ -1452,7 +1452,7 @@ exports.addMealNote = async (req, res, next) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(receiverId.toString()).emit('newMessage', mealNoteMessage);
+      io.to(`user:${receiverId}`).emit('newMessage', mealNoteMessage);
     }
 
     return res.status(201).json({

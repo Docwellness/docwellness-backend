@@ -153,6 +153,70 @@ exports.getMessages = async (req, res, next) => {
 };
 
 /**
+ * GET /v1/conversations/:id/messages/sync
+ * Reconnect sync (see AI_EXECUTION_PLAN.md Phase 4, P4-07) - a client that
+ * was offline/backgrounded calls this with the highest serverSeq it has
+ * cached locally to catch up on exactly what it missed, without re-fetching
+ * full history. Deliberately a separate, narrower endpoint from the general
+ * getMessages above (which also supports before_seq/backward pagination for
+ * scrolling into older history) - this one always returns ascending order
+ * from after_seq, matching the identical semantics the socket-based 'sync'
+ * event (chat/socket/index.js) already used for the same purpose, so a
+ * client can use either transport interchangeably.
+ */
+exports.syncMessages = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { after_seq, limit = 100 } = req.query;
+
+    const isParticipant = await ConversationService.isParticipant(id, req.user._id);
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a participant in this conversation',
+      });
+    }
+
+    const result = await MessageService.getMessages({
+      conversationId: id,
+      limit: parseInt(limit),
+      afterSeq: after_seq ? parseInt(after_seq) : null,
+    });
+
+    const messages = result.messages.map((msg) => ({
+      id: msg._id,
+      conversationId: msg.conversationId,
+      senderId: msg.senderId,
+      receiverId: msg.receiverId,
+      serverSeq: msg.serverSeq,
+      type: msg.type,
+      content: msg.content,
+      attachment: msg.attachment,
+      linkPreview: msg.linkPreview,
+      mealLogData: msg.mealLogData,
+      customFoodData: msg.customFoodData,
+      waterIntakeData: msg.waterIntakeData,
+      dietPlanData: msg.dietPlanData,
+      replyTo: msg.replyTo,
+      status: msg.status,
+      createdAt: msg.createdAt,
+      isMe: msg.senderId.toString() === req.user._id.toString(),
+    }));
+
+    res.json({
+      success: true,
+      data: messages,
+      pagination: {
+        hasMore: result.hasMore,
+        nextCursor: result.nextCursor,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * POST /v1/conversations/:id/messages
  * Send a message (REST fallback with idempotency support)
  */
@@ -235,7 +299,7 @@ exports.sendMessage = async (req, res, next) => {
     // Emit via Socket.IO if available
     const io = req.app.get('io');
     if (io && !result.dedup) {
-      io.to(receiverId.toString()).emit('msg.new', {
+      io.to(`user:${receiverId}`).emit('msg.new', {
         message: result.message,
         conversation_id: conversationId,
       });
@@ -270,7 +334,7 @@ exports.sendMessage = async (req, res, next) => {
         // Emit real-time notification to receiver
         const io = req.app.get('io');
         if (io) {
-          io.to(receiverId.toString()).emit('notification.new', {
+          io.to(`user:${receiverId}`).emit('notification.new', {
             id: notif._id,
             title: notif.title,
             message: notif.message,
@@ -345,7 +409,7 @@ exports.markRead = async (req, res, next) => {
     if (io) {
       const conversation = await ConversationService.getById(conversationId, req.user._id);
       if (conversation?.otherUser) {
-        io.to(conversation.otherUser.id.toString()).emit('conv.read', {
+        io.to(`user:${conversation.otherUser.id}`).emit('conv.read', {
           conversation_id: conversationId,
           reader_id: req.user._id,
           last_read_seq,
@@ -379,7 +443,7 @@ exports.markDelivered = async (req, res, next) => {
     // Notify sender via socket
     const io = req.app.get('io');
     if (io) {
-      io.to(message.senderId.toString()).emit('msg.status', {
+      io.to(`user:${message.senderId}`).emit('msg.status', {
         message_id: messageId,
         status: 'delivered',
         delivered_at: message.deliveredAt,

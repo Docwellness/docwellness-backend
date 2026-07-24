@@ -61,6 +61,17 @@ const chatSchema = new mongoose.Schema(
       ref: 'Chat',
       default: null,
     },
+    // Per-conversation sequence number, assigned via
+    // Conversation.getNextSeq() at creation time (see AI_EXECUTION_PLAN.md
+    // Phase 4, P4-03) - mirrors MessageV1.serverSeq in the v1 module.
+    // Optional (not `required`) since every message that existed before
+    // this field was added has none, and backfilling them is a separate,
+    // deliberate migration decision, not something to force here (see
+    // "do not break existing queries" / "do not drop existing fields").
+    seq: {
+      type: Number,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -68,6 +79,7 @@ const chatSchema = new mongoose.Schema(
 );
 
 chatSchema.index({ conversationId: 1, createdAt: -1 });
+chatSchema.index({ conversationId: 1, seq: 1 });
 chatSchema.index({ senderId: 1, receiverId: 1, createdAt: -1 });
 // Covers the repeated "mark messages as read" updateMany pattern
 // ({conversationId, receiverId, isRead:false} - see controllers/

@@ -436,7 +436,7 @@ exports.addMealNote = async (req, res, next) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(dieticianId.toString()).emit('new_message', chatMessage);
+      io.to(`user:${dieticianId}`).emit('new_message', chatMessage);
     }
 
     res.status(201).json({
@@ -483,8 +483,8 @@ async function sendMealUpdateToChat(req, patientId, data) {
 
   const io = req.app.get('io');
   if (io) {
-    io.to(dieticianId.toString()).emit('new_message', chatMessage);
-    io.to(dieticianId.toString()).emit('meal_log_update', {
+    io.to(`user:${dieticianId}`).emit('new_message', chatMessage);
+    io.to(`user:${dieticianId}`).emit('meal_log_update', {
       patientId: patientId.toString(),
       stats: data.todayStats,
     });

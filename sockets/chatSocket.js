@@ -58,8 +58,12 @@ const initializeChatSocket = (io) => {
       online: true,
     });
 
-    // Join user's personal room
-    socket.join(socket.user._id.toString());
+    // Join user's personal room - prefixed to match the v1 handler (see
+    // chat/socket/index.js) so a message routed through either system
+    // reaches the same room regardless of which handler's connection
+    // handler ran for this socket (see AI_EXECUTION_PLAN.md Phase 4,
+    // P4-02). Server-derived from the authenticated socket.user.
+    socket.join(`user:${socket.user._id}`);
 
     // Send message
     socket.on('send_message', async (data) => {
@@ -198,7 +202,9 @@ const initializeChatSocket = (io) => {
           });
         }
 
-        // Create message
+        // Create message - seq allocated atomically per-conversation (see
+        // AI_EXECUTION_PLAN.md Phase 4, P4-03)
+        const seq = await Conversation.getNextSeq(conversation._id);
         const chatMessage = await Chat.create({
           conversationId: conversation._id,
           senderId: senderId,
@@ -206,6 +212,7 @@ const initializeChatSocket = (io) => {
           message: messageType === 'image' ? 'Image' : message,
           messageType: messageType || 'text',
           attachment: attachment || null,
+          seq,
         });
 
         // Update conversation
@@ -220,7 +227,7 @@ const initializeChatSocket = (io) => {
         await conversation.save();
 
         // Emit to receiver
-        io.to(receiverId.toString()).emit('newMessage', chatMessage);
+        io.to(`user:${receiverId}`).emit('newMessage', chatMessage);
         callback({ success: true, data: chatMessage });
       } catch (error) {
         callback({ success: false, message: 'An error occurred while sending the message' });
@@ -257,7 +264,7 @@ const initializeChatSocket = (io) => {
         });
         await conversation.save();
 
-        io.to(userId.toString()).emit('conversationUpdated', conversation);
+        io.to(`user:${userId}`).emit('conversationUpdated', conversation);
         callback({ success: true });
       } catch (error) {
         callback({ success: false, message: 'An error occurred while marking messages as read' });

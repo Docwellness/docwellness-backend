@@ -99,7 +99,7 @@ exports.updateCustomFoodRequestStatus = async (req, res, next) => {
       const { getChatIO } = require('../../chat');
       const io = getChatIO();
       if (io) {
-        io.to(request.patientId.toString()).emit('custom_food_status', {
+        io.to(`user:${request.patientId}`).emit('custom_food_status', {
           requestId: id,
           foodName: request.foodName,
           status: chatStatus,

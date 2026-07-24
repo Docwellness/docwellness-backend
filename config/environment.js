@@ -36,6 +36,13 @@ module.exports = {
   // prerequisite for the app to keep working today.
   clientOrigin: process.env.CLIENT_ORIGIN,
   dieticianOrigin: process.env.DIETICIAN_ORIGIN,
+  // Whether app.js also initializes the legacy socket handler
+  // (sockets/chatSocket.js) alongside the v1 one (chat/socket/index.js -
+  // see AI_EXECUTION_PLAN.md Phase 4, P4-08). Defaults to true (both
+  // active, today's actual behavior) so this is opt-OUT, not opt-in - flip
+  // to 'false' only once every client is confirmed migrated to the v1
+  // socket events (msg.*, conv.*, chat.*, presence.*).
+  legacySocketCompat: process.env.LEGACY_SOCKET_COMPAT !== 'false',
   mongodbUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpire: process.env.JWT_EXPIRE || '7d',

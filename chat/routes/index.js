@@ -48,6 +48,14 @@ router.post('/conversations/direct', chatController.createDirectConversation);
 router.get('/conversations/:id/messages', chatController.getMessages);
 
 /**
+ * @route   GET /v1/conversations/:id/messages/sync
+ * @desc    Reconnect sync - catch up on messages after a given serverSeq
+ *          (see AI_EXECUTION_PLAN.md Phase 4, P4-07)
+ * @query   after_seq, limit
+ */
+router.get('/conversations/:id/messages/sync', chatController.syncMessages);
+
+/**
  * @route   POST /v1/conversations/:id/messages
  * @desc    Send message (REST fallback)
  * @header  Idempotency-Key (for dedup)

@@ -435,7 +435,9 @@ exports.sendMessage = async (req, res, next) => {
       });
     }
 
-    // Create message
+    // Create message - seq allocated atomically per-conversation (see
+    // AI_EXECUTION_PLAN.md Phase 4, P4-03)
+    const seq = await Conversation.getNextSeq(conversation._id);
     const chatMessage = await Chat.create({
       conversationId: conversation._id,
       senderId,
@@ -445,6 +447,7 @@ exports.sendMessage = async (req, res, next) => {
       attachment: attachmentUrl,
       replyTo: replyTo || null,
       metadata: metadata || null,
+      seq,
     });
 
     const populatedMessage = await Chat.findById(chatMessage._id).populate({
@@ -497,7 +500,7 @@ exports.sendMessage = async (req, res, next) => {
         // their personal room (on auth) and the conv room (when they open the
         // chat), so emitting to both delivers the same msg.new twice and the
         // client sees duplicates.
-        io.to(receiverId.toString()).emit('msg.new', { message: messagePayload });
+        io.to(`user:${receiverId}`).emit('msg.new', { message: messagePayload });
 
         console.log(`📤 Message broadcast to ${receiverId}`);
       }
@@ -531,7 +534,7 @@ exports.sendMessage = async (req, res, next) => {
       // Emit real-time notification to receiver
       const ioRef = getChatIO();
       if (ioRef) {
-        ioRef.to(receiverId.toString()).emit('notification.new', {
+        ioRef.to(`user:${receiverId}`).emit('notification.new', {
           id: notif._id,
           title: notif.title,
           message: notif.message,
@@ -873,7 +876,9 @@ exports.sendDoctorNote = async (req, res, next) => {
       });
     }
 
-    // Create chat message
+    // Create chat message - seq allocated atomically per-conversation (see
+    // AI_EXECUTION_PLAN.md Phase 4, P4-03)
+    const seq = await Conversation.getNextSeq(conversation._id);
     const chatMessage = await Chat.create({
       conversationId: conversation._id,
       senderId: dieticianId,
@@ -883,6 +888,7 @@ exports.sendDoctorNote = async (req, res, next) => {
       metadata: {
         noteDate: noteDate ? new Date(noteDate) : new Date(),
       },
+      seq,
     });
 
     // Update conversation atomically - see P3-04 / the identical comment
@@ -919,8 +925,11 @@ exports.sendDoctorNote = async (req, res, next) => {
           senderRole: 'dietician',
         };
 
-        io.to(patientId.toString()).emit('msg.new', { message: messagePayload });
-        io.to(`conv:${conversation._id.toString()}`).emit('msg.new', { message: messagePayload });
+        // Emit to receiver's personal room only - see sendMessage's identical
+        // note above: also emitting to the conv:<id> room delivers the same
+        // msg.new twice to a patient who has the chat screen open (they've
+        // joined both rooms), and the client sees duplicates (P4-09).
+        io.to(`user:${patientId}`).emit('msg.new', { message: messagePayload });
 
         console.log(`📝 Doctor note sent to patient ${patientId}`);
       }

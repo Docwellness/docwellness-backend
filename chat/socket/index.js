@@ -103,8 +103,11 @@ function initializeChatSocketV1(io) {
     // Mark user as online
     PresenceService.setOnline(userId, socket.id, socket.logContext);
 
-    // Join user's personal room
-    socket.join(userId);
+    // Join user's personal room - prefixed so it can never collide with a
+    // conversation room (conv:{id}) or any other room namespace added
+    // later (see AI_EXECUTION_PLAN.md Phase 4, P4-02). Server-derived from
+    // the authenticated socket.user, never from client-supplied data.
+    socket.join(`user:${userId}`);
 
     // Emit auth success to client
     socket.emit('ws.auth_ok', {
@@ -301,7 +304,7 @@ function initializeChatSocketV1(io) {
 
         // Fanout to receiver (if not dedup)
         if (!result.dedup) {
-          io.to(receiverId.toString()).emit('msg.new', {
+          io.to(`user:${receiverId}`).emit('msg.new', {
             message: {
               id: result.message._id,
               conversationId: result.message.conversationId,
@@ -361,7 +364,7 @@ function initializeChatSocketV1(io) {
             });
 
             // Emit real-time notification to receiver
-            io.to(receiverId.toString()).emit('notification.new', {
+            io.to(`user:${receiverId}`).emit('notification.new', {
               id: notif._id,
               title: notif.title,
               message: notif.message,
@@ -399,7 +402,7 @@ function initializeChatSocketV1(io) {
 
           if (message) {
             // Notify sender
-            io.to(message.senderId.toString()).emit('msg.status', {
+            io.to(`user:${message.senderId}`).emit('msg.status', {
               message_id,
               status: 'delivered',
               delivered_at: message.deliveredAt,
@@ -432,7 +435,7 @@ function initializeChatSocketV1(io) {
         // Notify other participant
         const conversation = await ConversationService.getById(conversation_id, userId);
         if (conversation?.otherUser) {
-          io.to(conversation.otherUser.id.toString()).emit('conv.read', {
+          io.to(`user:${conversation.otherUser.id}`).emit('conv.read', {
             conversation_id,
             reader_id: userId,
             last_read_seq,
@@ -465,7 +468,7 @@ function initializeChatSocketV1(io) {
 
       // Broadcast to conversation room or specific receiver
       if (receiver_id) {
-        io.to(receiver_id.toString()).emit('typing', {
+        io.to(`user:${receiver_id}`).emit('typing', {
           conversation_id,
           user_id: userId,
           typing: true,
@@ -488,7 +491,7 @@ function initializeChatSocketV1(io) {
       });
 
       if (receiver_id) {
-        io.to(receiver_id.toString()).emit('typing', {
+        io.to(`user:${receiver_id}`).emit('typing', {
           conversation_id,
           user_id: userId,
           typing: false,
