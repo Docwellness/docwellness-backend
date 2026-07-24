@@ -916,13 +916,20 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     // Deterministic repair before spending another AI call: a model that
     // broke the "only pick from this slot's list" rule once often breaks
     // it again differently on retry rather than reliably self-correcting -
-    // see dietPlanRepair.js's header comment. Only attempted when every
-    // severe issue is a mechanically-fixable type (not e.g. a genuine
-    // calorie-budget miss, which needs the AI's own corrective retry).
+    // see dietPlanRepair.js's header comment. Attempted whenever AT LEAST
+    // ONE severe issue is a mechanically-fixable type - repair only ever
+    // touches entries tied to those specific issues (drop + backfill),
+    // never anything else, so it's monotonically at least as structurally
+    // sound as the original; the repaired result is always adopted (not
+    // only when it comes out fully clean) so a plan that also has a
+    // genuine calorie-budget miss still gets its structural problems fixed
+    // now, leaving only the calorie issue for the AI's own corrective
+    // retry (or, on the final attempt, to save as a documented warning
+    // rather than rejecting an otherwise-sound plan outright).
     if (
       validationResult.hasSevereIssues &&
       parsedGeneratedPlan &&
-      validationResult.severeIssues.every((issue) => REPAIRABLE_SEVERE_ISSUE_TYPES.has(issue.type))
+      validationResult.severeIssues.some((issue) => REPAIRABLE_SEVERE_ISSUE_TYPES.has(issue.type))
     ) {
       const { repairedPlan, changesMade } = repairStructuralIssues({
         parsedPlan: parsedGeneratedPlan,
@@ -937,11 +944,9 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
         weightTrend,
         restrictNonVegToDayGroups: isNonVegPatient,
       });
-      if (!revalidation.hasSevereIssues) {
-        parsedGeneratedPlan = repairedPlan;
-        validationResult = revalidation;
-        repairChangesMade = changesMade;
-      }
+      parsedGeneratedPlan = repairedPlan;
+      validationResult = revalidation;
+      repairChangesMade = changesMade;
     }
 
     if (!validationResult.hasSevereIssues) break;
