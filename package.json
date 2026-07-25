@@ -46,7 +46,6 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
     "multer": "^2.0.2",
-    "nanoid": "^6.0.0",
     "openai": "^6.9.1",
     "pino-http": "^11.0.0",
     "razorpay": "^2.9.6",

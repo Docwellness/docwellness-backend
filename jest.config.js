@@ -6,8 +6,4 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: ['<rootDir>/tests/**/*.test.js'],
   testTimeout: 30000,
-  // nanoid v6 is pure ESM - see tests/helpers/nanoidMock.js.
-  moduleNameMapper: {
-    '^nanoid$': '<rootDir>/tests/helpers/nanoidMock.js',
-  },
 };
