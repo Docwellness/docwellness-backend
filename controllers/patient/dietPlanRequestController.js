@@ -291,6 +291,79 @@ exports.startRenewal = async (req, res, next) => {
   }
 };
 
+const REQUEST_DETAIL_SELECT =
+  'status paymentRequested paymentRequestedAt createdAt startDateForDiet primaryGoal latestPaymentProof subscriptionStartDate subscriptionExpiresAt fullName dateOfBirth gender weight height bmi weightIndex targetWeight activityLevel healthConcerns membershipPlan membershipAmount';
+
+/**
+ * Builds the "Order Summary" detail payload for one DietPlanRequest -
+ * shared by getRequestStatus (latest) and getRequestById (any specific
+ * order from the patient's "Your Orders" list), so both surfaces render
+ * identically.
+ */
+async function buildRequestDetail(request, patientId) {
+  let latestProof = null;
+  if (request?.latestPaymentProof) {
+    latestProof = await ManualPaymentProof.findById(request.latestPaymentProof)
+      .select('amountReceived amountPending totalAmount status')
+      .lean();
+  }
+
+  // Requests created before targetWeight/activityLevel/healthConcerns were
+  // added to this schema have those fields empty on the document itself -
+  // fall back to the patient's current healthProfile so Order Summary
+  // doesn't show a blank BMI card for older requests.
+  let targetWeight = request.targetWeight || null;
+  let activityLevel = request.activityLevel || null;
+  let healthConcerns = request.healthConcerns || [];
+  if (!targetWeight || !activityLevel || healthConcerns.length === 0) {
+    const patient = await User.findById(patientId).select('healthProfile');
+    const healthProfile = patient?.healthProfile || {};
+    targetWeight = targetWeight || healthProfile.targetWeight || null;
+    activityLevel = activityLevel || healthProfile.activityLevel || null;
+    healthConcerns = healthConcerns.length
+      ? healthConcerns
+      : healthProfile.healthConcerns || [];
+  }
+
+  return {
+    hasRequest: true,
+    requestId: request._id,
+    status: request.status,
+    // Only an Unpaid request can still be edited/resubmitted (see
+    // createDietPlanRequest's upsert-while-Unpaid logic) - surfaced here so
+    // both the Home button and the Orders list apply the exact same rule
+    // for whether "Update Plan Request" should show.
+    isEditable: request.status === 'Unpaid',
+    paymentRequested: request.paymentRequested || false,
+    paymentRequestedAt: request.paymentRequestedAt || null,
+    startDateForDiet: request.startDateForDiet,
+    primaryGoal: request.primaryGoal,
+    createdAt: request.createdAt,
+    paymentSummary: latestProof
+      ? {
+        amountReceived: latestProof.amountReceived ?? 0,
+        amountPending: latestProof.amountPending ?? 0,
+        totalAmount: latestProof.totalAmount ?? 0,
+        proofStatus: latestProof.status || null,
+      }
+      : null,
+    subscriptionStartDate: request.subscriptionStartDate || null,
+    subscriptionExpiresAt: request.subscriptionExpiresAt || null,
+    fullName: request.fullName || null,
+    dateOfBirth: request.dateOfBirth || null,
+    gender: request.gender || null,
+    weight: request.weight ?? null,
+    height: request.height ?? null,
+    bmi: request.bmi ?? null,
+    weightIndex: request.weightIndex ?? null,
+    targetWeight,
+    activityLevel,
+    healthConcerns,
+    membershipPlan: request.membershipPlan || null,
+    membershipAmount: request.membershipAmount ?? null,
+  };
+}
+
 /**
  * @desc    Get the latest diet plan request status for the logged-in patient
  * @route   GET /api/patient/diet-plan-requests/status
@@ -303,16 +376,7 @@ exports.getRequestStatus = async (req, res, next) => {
     // Find the most recent diet plan request for this patient
     const latestRequest = await DietPlanRequest.findOne({ patient: patientId })
       .sort({ createdAt: -1 })
-      .select(
-        'status paymentRequested paymentRequestedAt createdAt startDateForDiet primaryGoal latestPaymentProof subscriptionStartDate subscriptionExpiresAt fullName dateOfBirth gender weight height bmi weightIndex targetWeight activityLevel healthConcerns membershipPlan membershipAmount'
-      );
-
-    let latestProof = null;
-    if (latestRequest?.latestPaymentProof) {
-      latestProof = await ManualPaymentProof.findById(latestRequest.latestPaymentProof)
-        .select('amountReceived amountPending totalAmount status')
-        .lean();
-    }
+      .select(REQUEST_DETAIL_SELECT);
 
     if (!latestRequest) {
       return res.status(200).json({
@@ -325,57 +389,69 @@ exports.getRequestStatus = async (req, res, next) => {
       });
     }
 
-    // Requests created before targetWeight/activityLevel/healthConcerns were
-    // added to this schema have those fields empty on the document itself -
-    // fall back to the patient's current healthProfile so Order Summary
-    // doesn't show a blank BMI card for older requests.
-    let targetWeight = latestRequest.targetWeight || null;
-    let activityLevel = latestRequest.activityLevel || null;
-    let healthConcerns = latestRequest.healthConcerns || [];
-    if (!targetWeight || !activityLevel || healthConcerns.length === 0) {
-      const patient = await User.findById(patientId).select('healthProfile');
-      const healthProfile = patient?.healthProfile || {};
-      targetWeight = targetWeight || healthProfile.targetWeight || null;
-      activityLevel = activityLevel || healthProfile.activityLevel || null;
-      healthConcerns = healthConcerns.length
-        ? healthConcerns
-        : healthProfile.healthConcerns || [];
+    res.status(200).json({
+      success: true,
+      data: await buildRequestDetail(latestRequest, patientId),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    List every diet plan request ("order") the logged-in patient has
+ *          ever submitted, newest first - one row per renewal cycle - for
+ *          the profile screen's "Your Orders" list.
+ * @route   GET /api/patient/diet-plan-requests/all
+ * @access  Private (Patient)
+ */
+exports.listRequests = async (req, res, next) => {
+  try {
+    const requests = await DietPlanRequest.find({ patient: req.user._id })
+      .sort({ createdAt: -1 })
+      .select('status createdAt startDateForDiet membershipPlan membershipAmount')
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: requests.map((r) => ({
+        requestId: r._id,
+        status: r.status,
+        isEditable: r.status === 'Unpaid',
+        createdAt: r.createdAt,
+        startDateForDiet: r.startDateForDiet,
+        membershipPlan: r.membershipPlan || null,
+        membershipAmount: r.membershipAmount ?? null,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get one specific diet plan request's full "Order Summary" detail
+ *          (any past order, not just the latest) - for the Orders list.
+ * @route   GET /api/patient/diet-plan-requests/:id
+ * @access  Private (Patient)
+ */
+exports.getRequestById = async (req, res, next) => {
+  try {
+    const request = await DietPlanRequest.findOne({
+      _id: req.params.id,
+      patient: req.user._id,
+    }).select(REQUEST_DETAIL_SELECT);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Diet plan request not found',
+      });
     }
 
     res.status(200).json({
       success: true,
-      data: {
-        hasRequest: true,
-        requestId: latestRequest._id,
-        status: latestRequest.status,
-        paymentRequested: latestRequest.paymentRequested || false,
-        paymentRequestedAt: latestRequest.paymentRequestedAt || null,
-        startDateForDiet: latestRequest.startDateForDiet,
-        primaryGoal: latestRequest.primaryGoal,
-        createdAt: latestRequest.createdAt,
-        paymentSummary: latestProof
-          ? {
-            amountReceived: latestProof.amountReceived ?? 0,
-            amountPending: latestProof.amountPending ?? 0,
-            totalAmount: latestProof.totalAmount ?? 0,
-            proofStatus: latestProof.status || null,
-          }
-          : null,
-        subscriptionStartDate: latestRequest.subscriptionStartDate || null,
-        subscriptionExpiresAt: latestRequest.subscriptionExpiresAt || null,
-        fullName: latestRequest.fullName || null,
-        dateOfBirth: latestRequest.dateOfBirth || null,
-        gender: latestRequest.gender || null,
-        weight: latestRequest.weight ?? null,
-        height: latestRequest.height ?? null,
-        bmi: latestRequest.bmi ?? null,
-        weightIndex: latestRequest.weightIndex ?? null,
-        targetWeight,
-        activityLevel,
-        healthConcerns,
-        membershipPlan: latestRequest.membershipPlan || null,
-        membershipAmount: latestRequest.membershipAmount ?? null,
-      },
+      data: await buildRequestDetail(request, req.user._id),
     });
   } catch (error) {
     next(error);

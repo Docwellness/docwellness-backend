@@ -256,6 +256,20 @@ router.post('/diet-plan-requests', patientOnly, dietPlanRequestController.create
 router.get('/diet-plan-requests/status', patientOnly, dietPlanRequestController.getRequestStatus);
 
 /**
+ * @route   GET /api/patient/diet-plan-requests/all
+ * @desc    List every diet plan request ("order") the patient has ever
+ *          submitted, for the profile screen's "Your Orders" list. Must be
+ *          registered before the GET /:id route below.
+ */
+router.get('/diet-plan-requests/all', patientOnly, dietPlanRequestController.listRequests);
+
+/**
+ * @route   GET /api/patient/diet-plan-requests/:id
+ * @desc    Get one specific diet plan request's full Order Summary detail
+ */
+router.get('/diet-plan-requests/:id', patientOnly, dietPlanRequestController.getRequestById);
+
+/**
  * @route   GET /api/patient/consultation-form-template
  * @desc    Get the field definitions for the patient's assigned dietician's
  *          first-consultation questionnaire (labels/types/sections/etc,
