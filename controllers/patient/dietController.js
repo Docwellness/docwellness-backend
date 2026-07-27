@@ -359,21 +359,48 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
 
     const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
 
-    // Determine current week FIRST — then only fetch recipes for that week
-    const activationStart = parseDateOrNull(dietPlan.activationDate);
-    const requestStart = parseDateOrNull(dietPlan.request?.startDateForDiet);
-    const startDate = activationStart || requestStart;
-
+    // Determine current week FIRST — then only fetch recipes for that week.
+    // Prefer weekSchedule's actual date ranges (the same source of truth
+    // used everywhere else in this file - see getActiveDietPlan above) over
+    // the activationDate-diff estimate below, so the grocery list always
+    // agrees with which week the rest of the app thinks it is. Falling back
+    // to the diff-based computation only for plans that predate
+    // weekSchedule being populated avoids the two ever silently diverging
+    // (e.g. if activationDate is ever adjusted independently of the plan's
+    // real week-1 start).
     let currentWeek = null;
-    if (startDate) {
-      const startDay = normalizeDate(startDate);
-      const todayDay = normalizeDate(referenceDate);
-      const diffMs = todayDay.getTime() - startDay.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      let computedWeek = Math.floor(diffDays / 7) + 1;
-      if (computedWeek < 1) computedWeek = 1;
-      if (computedWeek > 4) computedWeek = 4;
-      currentWeek = computedWeek;
+    const weekScheduleEntries = Array.isArray(dietPlan.weekSchedule) ? dietPlan.weekSchedule : [];
+    if (weekScheduleEntries.length > 0) {
+      const refTime = normalizeDate(referenceDate).getTime();
+      const matchedEntry = weekScheduleEntries.find((entry) => {
+        const entryStart = normalizeDate(entry.startDate).getTime();
+        const entryEnd = normalizeDate(entry.endDate).getTime();
+        return refTime >= entryStart && refTime <= entryEnd;
+      });
+      if (matchedEntry) {
+        currentWeek = matchedEntry.week;
+      } else if (refTime < normalizeDate(weekScheduleEntries[0].startDate).getTime()) {
+        currentWeek = weekScheduleEntries[0].week;
+      } else {
+        currentWeek = weekScheduleEntries[weekScheduleEntries.length - 1].week;
+      }
+    }
+
+    if (currentWeek === null) {
+      const activationStart = parseDateOrNull(dietPlan.activationDate);
+      const requestStart = parseDateOrNull(dietPlan.request?.startDateForDiet);
+      const startDate = activationStart || requestStart;
+
+      if (startDate) {
+        const startDay = normalizeDate(startDate);
+        const todayDay = normalizeDate(referenceDate);
+        const diffMs = todayDay.getTime() - startDay.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        let computedWeek = Math.floor(diffDays / 7) + 1;
+        if (computedWeek < 1) computedWeek = 1;
+        if (computedWeek > 4) computedWeek = 4;
+        currentWeek = computedWeek;
+      }
     }
 
     const week =
