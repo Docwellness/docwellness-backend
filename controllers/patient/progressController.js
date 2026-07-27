@@ -560,7 +560,7 @@ exports.getTrackingData = async (req, res, next) => {
     const { DietPlan } = require('../../models');
     const activePlan = await DietPlan.findOne({ patientId, status: 'Active' })
       .sort({ createdAt: -1 })
-      .select('totalCalories weeksSummary activationDate')
+      .select('totalCalories weeksSummary activationDate weekSchedule')
       .lean();
 
     const plannedDailyCalories =
@@ -847,16 +847,40 @@ exports.getTrackingData = async (req, res, next) => {
     // ── Achievements (computed from real progress data) ──
     const achievements = [];
 
-    // Check weight loss achievement: lost > 2 kg in any 7-day window
-    const allProgressEntries = await Progress.find({
-      patientId,
-      weight: { $exists: true, $ne: null },
-    })
-      .sort({ date: 1 })
-      .select('date weight')
-      .lean();
+    // Weight-loss achievements only mean something once the diet plan has
+    // actually been running for a full week AND a weight was logged at/after
+    // that point - otherwise "Making progress" would fire off whatever
+    // weight happened to be on file before the plan even started (e.g. an
+    // old healthProfile value vs today's first log), which isn't real
+    // progress on THIS plan. Use weekSchedule's week-1 start (the same
+    // source dietController.js's weekStartDate/dietEnabled derive from) -
+    // not activationDate, which can predate the plan's real first week.
+    const dietStartDate = activePlan?.weekSchedule?.[0]?.startDate || activePlan?.activationDate || null;
+    const firstWeekComplete =
+      dietStartDate && new Date() - new Date(dietStartDate) >= 7 * 24 * 60 * 60 * 1000;
 
-    if (allProgressEntries.length >= 2) {
+    // Check weight loss achievement: lost > 2 kg in any 7-day window
+    const allProgressEntries = firstWeekComplete
+      ? await Progress.find({
+          patientId,
+          weight: { $exists: true, $ne: null },
+          date: { $gte: dietStartDate },
+        })
+          .sort({ date: 1 })
+          .select('date weight')
+          .lean()
+      : [];
+
+    // Also require an entry logged at/after the end of week 1 - a plan
+    // that's only a few days in shouldn't show "Making progress" just
+    // because two early logs happened to differ.
+    const weekOneEnd = dietStartDate
+      ? new Date(new Date(dietStartDate).getTime() + 7 * 24 * 60 * 60 * 1000)
+      : null;
+    const hasWeekOneLog =
+      weekOneEnd && allProgressEntries.some((p) => new Date(p.date) >= weekOneEnd);
+
+    if (hasWeekOneLog && allProgressEntries.length >= 2) {
       const firstW = allProgressEntries[0].weight;
       const lastW = allProgressEntries[allProgressEntries.length - 1].weight;
       const totalLoss = firstW - lastW;
