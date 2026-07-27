@@ -281,6 +281,18 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
  * single unit when the total barely clears a whole unit; below half a unit
  * there's nothing meaningful to show at all.
  */
+/**
+ * Formats a quantity+unit for the grocery list's uniform-unit display -
+ * "40g"/"7750ml" (no space, matches the existing base-unit style) for the
+ * two measured units, "5 piece"/"2 cup" (space, matches how the per-recipe
+ * breakdown already renders these - see addRecipeUsage) for every other
+ * unit, so the total and its own breakdown always read consistently.
+ */
+const formatUnitQuantity = (quantity, unit) => {
+  if (unit === 'g' || unit === 'ml') return `${quantity}${unit}`;
+  return `${quantity} ${unit}`;
+};
+
 const friendlyPieceCount = (totalBaseQuantity, gramsPerPiece) => {
   if (!gramsPerPiece) return null;
   const count = Math.round(totalBaseQuantity / gramsPerPiece);
@@ -478,11 +490,33 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
             isSupplement: false,
             _conversionIncomplete: false,
             _recipeUsage: {}, // recipeId -> accumulated entry, see below
+            // Every distinct unit this ingredient was actually recorded in
+            // across the week's recipes, plus a running total in that unit
+            // (only meaningful once _unitsSeen.size === 1) - see the
+            // uniform-unit display branch below. When every recipe agrees
+            // on the unit (e.g. every "Date" occurrence is in "piece"),
+            // the shopper wants "5 piece", not a gram-equivalent they'd
+            // have to convert back in their head - the base-unit total
+            // above is still computed regardless, for the genuinely-mixed-
+            // unit case (e.g. one recipe's "2 tbsp" and another's "1 cup"
+            // of the same ingredient, which has no single natural unit to
+            // report in).
+            _unitsSeen: new Set(),
+            _uniformUnitQuantity: 0,
           };
         }
         const item = groceryMap[key];
 
         if (typeof ingredient.quantity === 'number') {
+          if (ingredient.unit) {
+            item._unitsSeen.add(ingredient.unit);
+            item._uniformUnitQuantity += ingredient.quantity;
+          } else {
+            // No unit at all can never be "uniform" - force the mixed-unit
+            // fallback rather than silently summing unitless numbers.
+            item._unitsSeen.add(null);
+          }
+
           const conversions = registryEntry?.unitConversions || {};
           const factor = conversions[ingredient.unit];
           // Liquids (Water, Oil, Milk) are recorded in ml; everything else
@@ -520,22 +554,36 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
 
       const rounded = Math.round(item.totalQuantity * 10) / 10;
       let displayQuantity = item.displayQuantity;
+      const unitsSeen = item._unitsSeen || new Set();
       if (!item.isSupplement) {
-        const normalizedName = normalize(item.name || '');
-        const registryEntry = registry[normalizedName];
-        const pieceCount = registryEntry
-          ? friendlyPieceCount(item.totalQuantity, registryEntry.unitConversions?.piece)
-          : null;
-        const friendlyLabel = registryEntry?.friendlyUnitLabel;
-        displayQuantity =
-          pieceCount && friendlyLabel
-            ? `${rounded}${item.unit} (~${pieceCount} ${friendlyLabel})`
-            : `${rounded}${item.unit}`;
-        if (item._conversionIncomplete) {
-          displayQuantity += ' (approx)';
+        if (unitsSeen.size === 1 && !unitsSeen.has(null)) {
+          // Every recipe recorded this ingredient in the same unit - show
+          // the total directly in that unit (e.g. "5 piece", "2 cup")
+          // instead of a converted/hidden gram figure. Uses the raw
+          // same-unit sum, not a round-trip through the base-unit
+          // conversion factor, so this is exact, not approximated.
+          const [uniformUnit] = unitsSeen;
+          const uniformRounded = Math.round(item._uniformUnitQuantity * 10) / 10;
+          displayQuantity = formatUnitQuantity(uniformRounded, uniformUnit);
+        } else {
+          const normalizedName = normalize(item.name || '');
+          const registryEntry = registry[normalizedName];
+          const pieceCount = registryEntry
+            ? friendlyPieceCount(item.totalQuantity, registryEntry.unitConversions?.piece)
+            : null;
+          const friendlyLabel = registryEntry?.friendlyUnitLabel;
+          displayQuantity =
+            pieceCount && friendlyLabel
+              ? `${rounded}${item.unit} (~${pieceCount} ${friendlyLabel})`
+              : `${rounded}${item.unit}`;
+          if (item._conversionIncomplete) {
+            displayQuantity += ' (approx)';
+          }
         }
       }
       delete item._conversionIncomplete;
+      delete item._unitsSeen;
+      delete item._uniformUnitQuantity;
       return { ...item, totalQuantity: rounded, displayQuantity };
     });
 

@@ -12,6 +12,7 @@ const {
   enforceFiniteIngredientQuantities,
 } = require('../../utils/ingredientQuantityValidator');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
+const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValidator');
 const { TOP_CATEGORIES, resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
@@ -371,7 +372,22 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       freeFrom,
       ingredients: previewRecipe.ingredients,
     });
-    previewRecipe.warnings = [...quantityWarnings, ...ingredientWarnings, ...previewRecipe.warnings];
+
+    // Deterministic sanity check: does the claimed calorie total look
+    // plausible against a rough, category-based estimate from the
+    // ingredients themselves? Catches severe AI undercounts (see
+    // recipeNutritionValidator.js) without blocking generation.
+    const nutritionWarning = checkNutritionPlausibility({
+      ingredients: previewRecipe.ingredients,
+      claimedCalories: previewRecipe.nutrition?.calories,
+    });
+
+    previewRecipe.warnings = [
+      ...quantityWarnings,
+      ...ingredientWarnings,
+      ...(nutritionWarning ? [nutritionWarning] : []),
+      ...previewRecipe.warnings,
+    ];
 
     await logRecipeGeneration({
       dieticianId: req.user._id,
@@ -737,9 +753,19 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
       freeFrom,
       ingredients: finiteIngredients,
     });
+
+    // Deterministic sanity check (see generateRecipeWithAI above for full
+    // rationale): does the claimed calorie total look plausible against a
+    // rough, category-based estimate from the ingredients themselves?
+    const nutritionWarning = checkNutritionPlausibility({
+      ingredients: finiteIngredients,
+      claimedCalories: finalNutrition?.calories,
+    });
+
     const finalWarnings = [
       ...quantityWarnings,
       ...ingredientWarnings,
+      ...(nutritionWarning ? [nutritionWarning] : []),
       ...(Array.isArray(updatedRecipe.warnings) ? updatedRecipe.warnings : []),
     ];
 
