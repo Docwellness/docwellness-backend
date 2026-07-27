@@ -17,6 +17,15 @@ const CATEGORIES = [
 
 const INGREDIENT_UNITS = ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece'];
 
+// Units a dish-level `components` entry may use - a superset of
+// INGREDIENT_UNITS with natural whole-item/serving-vessel units so a
+// component never has to be force-converted into grams to be expressed
+// (e.g. "3 nos" of idli, "1 bowl" of sambar, "2 egg"). Keep in sync with
+// models/Recipe.js's `components` field (no schema-level enum there - this
+// JSON schema is the actual enforcement point since every recipe is
+// authored via generateRecipeWithAI).
+const COMPONENT_UNITS = ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece', 'nos', 'bowl', 'egg', 'slice'];
+
 const INGREDIENT_CATEGORIES = [
   'Protein Rich', 'Carbohydrate', 'Vegetable', 'Dairy', 'Spice', 'Oil/Fat',
   'Sweetener', 'Grain', 'Legume', 'Nut/Seed', 'Fruit', 'Herb',
@@ -46,12 +55,26 @@ const ingredientSchema = {
   },
 };
 
+// A single independently-adjustable component of one serving of the dish -
+// e.g. {label:'Idli', quantity:3, unit:'nos'}. See models/Recipe.js's
+// `components` field doc comment for the full rationale.
+const componentSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['label', 'quantity', 'unit'],
+  properties: {
+    label: { type: 'string', description: 'This component\'s own name as a patient would recognize it, e.g. "Idli", "Sambar", "Chutney" - for a single-component dish, just repeat the dish name (e.g. "Oats Porridge").' },
+    quantity: { type: 'number', minimum: 0.01 },
+    unit: { type: 'string', enum: COMPONENT_UNITS },
+  },
+};
+
 const RECIPE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
     'name', 'description', 'category', 'cuisine', 'preparationTime', 'cookingTime',
-    'ingredients', 'servingSize', 'nutrition', 'cookingSteps', 'warnings',
+    'ingredients', 'components', 'nutrition', 'cookingSteps', 'warnings',
   ],
   properties: {
     name: { type: 'string' },
@@ -61,15 +84,11 @@ const RECIPE_JSON_SCHEMA = {
     preparationTime: { type: 'number', description: 'Minutes.' },
     cookingTime: { type: 'number', description: 'Minutes.' },
     ingredients: { type: 'array', items: ingredientSchema },
-    servingSize: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['quantity', 'unit', 'servings'],
-      properties: {
-        quantity: { type: 'number' },
-        unit: { type: 'string', enum: ['g', 'ml'] },
-        servings: { type: 'number' },
-      },
+    components: {
+      type: 'array',
+      items: componentSchema,
+      minItems: 1,
+      description: 'Every independently-servable/countable part of ONE serving of this dish, each in its own natural real-world unit - not force-converted to grams. A simple dish (e.g. Oats Porridge) has exactly one entry.',
     },
     nutrition: {
       type: 'object',
@@ -91,6 +110,7 @@ const RECIPE_JSON_SCHEMA = {
 module.exports = {
   CATEGORIES,
   INGREDIENT_UNITS,
+  COMPONENT_UNITS,
   INGREDIENT_CATEGORIES,
   PRICE_LEVELS,
   RECIPE_JSON_SCHEMA,

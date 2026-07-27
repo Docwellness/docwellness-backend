@@ -56,7 +56,7 @@ const SIDE_SALAD_ELIGIBLE_SLOTS = new Set(['Lunch', 'Dinner', 'Evening Snack']);
  */
 async function fetchRecipePoolForOptions({ Recipe, dieticianId }) {
   return Recipe.find({ dieticianId })
-    .select('name servingTime nutrition supplementFacts image ingredients servingSize secondaryComponent tags category _id')
+    .select('name servingTime nutrition supplementFacts image ingredients servingSize secondaryComponent components tags category _id')
     .lean();
 }
 
@@ -75,6 +75,10 @@ async function fetchRecipePoolForOptions({ Recipe, dieticianId }) {
  *   with a secondaryComponent (e.g. "Banana with Roasted Chana and Seeds" -
  *   servingSize is the banana, secondaryComponent is the seeds mix-in, each
  *   independently adjustable - see cleanSelectedMeals' secondaryServings).
+ * @param selectedComponentServingsByServingTime  { [servingTime]: { [recipeId]: number[] } } -
+ *   generalizes the two params above to however many components a recipe
+ *   has (see models/Recipe.js's `components`) - index N is components[N]'s
+ *   selected quantity. See cleanSelectedMeals' componentServings.
  * @param nextWeekRecipeIds  Set<string> - optional, tags a recipe with
  *   `nextWeekTag` if it's already selected for the following week.
  */
@@ -119,6 +123,7 @@ function buildServingTimeOptionsFromDocs({
   selectedByServingTime = {},
   selectedServingsByServingTime = {},
   selectedSecondaryServingsByServingTime = {},
+  selectedComponentServingsByServingTime = {},
   nextWeekRecipeIds = new Set(),
   currentWeekNumber = null,
 }) {
@@ -161,6 +166,7 @@ function buildServingTimeOptionsFromDocs({
       const servingsLookupSlot = isSupplementsPseudoSlot ? recipe.servingTime || servingTime : servingTime;
       const selectedServingsForSlot = selectedServingsByServingTime[servingsLookupSlot] || {};
       const selectedSecondaryServingsForSlot = selectedSecondaryServingsByServingTime[servingsLookupSlot] || {};
+      const selectedComponentServingsForSlot = selectedComponentServingsByServingTime[servingsLookupSlot] || {};
       return {
         id,
         name: recipe.name || null,
@@ -168,6 +174,12 @@ function buildServingTimeOptionsFromDocs({
         nutrition: recipe.nutrition || null,
         supplementFacts: recipe.supplementFacts || null,
         secondaryComponent: recipe.secondaryComponent || null,
+        // See models/Recipe.js's `components` doc comment - the dietician
+        // app should prefer this over servingSize/secondaryComponent above
+        // once migrated; both are sent during the transition.
+        components: Array.isArray(recipe.components) && recipe.components.length > 0
+          ? recipe.components
+          : null,
         servingTime: recipe.servingTime || servingTime,
         servingSize: recipe.servingSize || null,
         // 'supplement' is synthesized here (not a real stored tag) from
@@ -183,6 +195,21 @@ function buildServingTimeOptionsFromDocs({
         secondaryServings: isSelected
           ? selectedSecondaryServingsForSlot[id] || recipe.secondaryComponent?.quantity || 1
           : recipe.secondaryComponent?.quantity || 1,
+        // Generalizes servings/secondaryServings above to every component
+        // (see models/Recipe.js's `components`) - index N is
+        // components[N]'s selected quantity. Unlike servings/
+        // secondaryServings (which default to a sentinel of 1 to mean "not
+        // explicitly set"), this is null unless the dietician actually
+        // persisted explicit per-component quantities for this meal - a
+        // real base quantity (e.g. "1 nos") is otherwise indistinguishable
+        // from the sentinel. The dietician app falls back to the
+        // servings/secondaryServings sentinel convention (components 0/1
+        // only) when this is null - see patients_controller.dart's
+        // _applyDraftOptionsForWeek.
+        componentServings:
+          isSelected && selectedComponentServingsForSlot[id]
+            ? selectedComponentServingsForSlot[id]
+            : null,
         nextWeekTag:
           currentWeekNumber !== null && currentWeekNumber < 4 && nextWeekRecipeIds.has(id)
             ? `Week ${currentWeekNumber + 1}`
@@ -232,6 +259,7 @@ function buildDayGroupsOptions({
     const selectedByServingTime = {};
     const selectedServingsByServingTime = {};
     const selectedSecondaryServingsByServingTime = {};
+    const selectedComponentServingsByServingTime = {};
     mealsForGroup.forEach((meal) => {
       if (meal?.servingTime && meal?.recipeId) {
         const recipeId = meal.recipeId.toString();
@@ -239,12 +267,16 @@ function buildDayGroupsOptions({
           selectedByServingTime[meal.servingTime] = new Set();
           selectedServingsByServingTime[meal.servingTime] = {};
           selectedSecondaryServingsByServingTime[meal.servingTime] = {};
+          selectedComponentServingsByServingTime[meal.servingTime] = {};
         }
         selectedByServingTime[meal.servingTime].add(recipeId);
         selectedServingsByServingTime[meal.servingTime][recipeId] =
           typeof meal.servings === 'number' && meal.servings > 0 ? meal.servings : 1;
         if (typeof meal.secondaryServings === 'number' && meal.secondaryServings > 0) {
           selectedSecondaryServingsByServingTime[meal.servingTime][recipeId] = meal.secondaryServings;
+        }
+        if (Array.isArray(meal.componentServings) && meal.componentServings.length > 0) {
+          selectedComponentServingsByServingTime[meal.servingTime][recipeId] = meal.componentServings;
         }
       }
     });
@@ -254,6 +286,7 @@ function buildDayGroupsOptions({
       selectedByServingTime,
       selectedServingsByServingTime,
       selectedSecondaryServingsByServingTime,
+      selectedComponentServingsByServingTime,
       nextWeekRecipeIds,
       currentWeekNumber,
     });

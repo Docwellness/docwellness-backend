@@ -16,6 +16,7 @@ const { TOP_CATEGORIES, resolveTopCategoryFilter } = require('../../utils/recipe
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
+const { COMPONENT_UNITS } = require('../../utils/recipeJsonSchema');
 const fs = require('fs');
 
 const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
@@ -318,6 +319,10 @@ exports.generateRecipeWithAI = async (req, res, next) => {
         unit: null,
         servings,
       },
+      ...(modelRecipe.secondaryComponent ? { secondaryComponent: modelRecipe.secondaryComponent } : {}),
+      components: Array.isArray(modelRecipe.components) && modelRecipe.components.length > 0
+        ? modelRecipe.components
+        : [{ label: modelRecipe.name || name, quantity: modelRecipe.servingSize?.quantity || null, unit: modelRecipe.servingSize?.unit || null }],
       nutrition: modelRecipe.nutrition || {
         calories: null,
         protein: null,
@@ -447,6 +452,27 @@ function sanitizeRecipeIngredients(ingredients) {
 }
 
 /**
+ * Sanitizes a raw `components` array (see models/Recipe.js's `components`
+ * field) the same way sanitizeRecipeIngredients does for ingredients - a
+ * bad/missing unit falls back to 'g' rather than failing Mongoose
+ * validation outright, since this is client-submitted data (createRecipe/
+ * updateRecipe accept it directly, unlike the AI-generation path which is
+ * already constrained by RECIPE_JSON_SCHEMA). Drops entries with no usable
+ * label/quantity instead of writing garbage.
+ */
+function sanitizeRecipeComponents(components) {
+  if (!Array.isArray(components)) return undefined;
+  const safe = components
+    .map((c) => ({
+      label: typeof c?.label === 'string' ? c.label.trim() : '',
+      quantity: parseQuantity(c?.quantity),
+      unit: COMPONENT_UNITS.includes(c?.unit) ? c.unit : 'g',
+    }))
+    .filter((c) => c.label && c.quantity > 0);
+  return safe.length > 0 ? safe : undefined;
+}
+
+/**
  * @desc    Create a new recipe
  * @route   POST /api/dietician/recipes
  * @access  Private (Dietician)
@@ -462,6 +488,8 @@ exports.createRecipe = async (req, res, next) => {
       dietaryHabits,
       freeFrom,
       servingSize,
+      secondaryComponent,
+      components,
       ingredients,
       cookingSteps,
       nutrition,
@@ -483,6 +511,7 @@ exports.createRecipe = async (req, res, next) => {
 
     const { ingredients: safeIngredients, warnings: quantityWarnings } =
       sanitizeRecipeIngredients(ingredients);
+    const safeComponents = sanitizeRecipeComponents(components);
 
     // Parse languages from comma-separated string or array
     let languages;
@@ -524,6 +553,8 @@ exports.createRecipe = async (req, res, next) => {
       dietaryHabits,
       freeFrom,
       servingSize,
+      secondaryComponent,
+      components: safeComponents,
       ingredients: ingredientsWithImages,
       instructions: cookingSteps,
       nutrition,
@@ -1047,6 +1078,7 @@ exports.updateRecipe = async (req, res, next) => {
     const body = req.body || {};
 
     const updates = {};
+    const unsets = {};
     for (const key of DIRECT_UPDATE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         updates[key] = body[key];
@@ -1059,13 +1091,38 @@ exports.updateRecipe = async (req, res, next) => {
       const { ingredients: safeIngredients } = sanitizeRecipeIngredients(body.ingredients);
       updates.ingredients = safeIngredients;
     }
+    if (Object.prototype.hasOwnProperty.call(body, 'components')) {
+      const safeComponents = sanitizeRecipeComponents(body.components);
+      if (safeComponents) {
+        updates.components = safeComponents;
+        // Keep the legacy servingSize/secondaryComponent mirrors in sync
+        // (see models/Recipe.js's doc comment) so consumers not yet reading
+        // `components` directly don't go stale after an edit.
+        updates.servingSize = {
+          quantity: safeComponents[0].quantity,
+          unit: safeComponents[0].unit,
+        };
+        if (safeComponents[1]) {
+          updates.secondaryComponent = {
+            label: safeComponents[1].label,
+            quantity: safeComponents[1].quantity,
+            unit: safeComponents[1].unit,
+          };
+        } else {
+          // $set can't reliably clear a field to "absent" - use $unset so a
+          // recipe edited down from 2 components to 1 doesn't keep a stale
+          // secondaryComponent mirror.
+          unsets.secondaryComponent = '';
+        }
+      }
+    }
     if (Object.prototype.hasOwnProperty.call(body, 'instructions')) {
       updates.instructions = body.instructions;
     } else if (Object.prototype.hasOwnProperty.call(body, 'cookingSteps')) {
       updates.instructions = body.cookingSteps;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && Object.keys(unsets).length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No updatable fields provided',
@@ -1074,7 +1131,10 @@ exports.updateRecipe = async (req, res, next) => {
 
     const recipe = await Recipe.findOneAndUpdate(
       { _id: id, dieticianId },
-      { $set: updates },
+      {
+        ...(Object.keys(updates).length > 0 ? { $set: updates } : {}),
+        ...(Object.keys(unsets).length > 0 ? { $unset: unsets } : {}),
+      },
       { new: true, runValidators: true }
     ).lean();
 

@@ -29,8 +29,27 @@ const SEVERE_CALORIE_DEVIATION_TOLERANCE = 0.4;
 // weight-loss combos.
 const TREND_SCOPED_SLOTS = new Set(['Lunch', 'Dinner', 'Evening Snack']);
 
+// Units a component uses when it's a discrete whole item counted like a
+// "piece" (an egg, an idli, a slice) rather than scooped/poured/weighed -
+// see models/Recipe.js's `components` doc comment for the full unit set.
+const COUNTABLE_COMPONENT_UNITS = new Set(['piece', 'nos', 'egg', 'slice']);
+
+// The recipe's first/primary component - components[0] if the recipe has
+// been migrated to the new shape (scripts/migrate-recipe-components.js),
+// else the legacy servingSize field. Only the primary component drives
+// this trend-ratio estimate (matches the pre-`components` behavior, which
+// only ever looked at servingSize) - it's a rough sizing heuristic for the
+// calorie-deviation warning, not an exact per-component computation like
+// weekNutritionSummary.js's computeMealRatio.
+function primaryComponent(recipe) {
+  if (Array.isArray(recipe?.components) && recipe.components.length > 0) {
+    return recipe.components[0];
+  }
+  return recipe?.servingSize || null;
+}
+
 function isPieceBased(recipe) {
-  return recipe?.servingSize?.unit === 'piece';
+  return COUNTABLE_COMPONENT_UNITS.has(primaryComponent(recipe)?.unit);
 }
 
 function isSalad(recipe) {
@@ -45,7 +64,7 @@ function trendCalorieRatio(recipe, servingTime, weightTrend) {
   const isLoss = weightTrend === 'loss';
   if (pieceBased) return isLoss ? 0.5 : 1;
 
-  const baseQuantity = recipe?.servingSize?.quantity > 0 ? recipe.servingSize.quantity : 1;
+  const baseQuantity = primaryComponent(recipe)?.quantity > 0 ? primaryComponent(recipe).quantity : 1;
   const target = isSalad(recipe) ? (isLoss ? 100 : 180) : isLoss ? 75 : 125;
   return target / baseQuantity;
 }

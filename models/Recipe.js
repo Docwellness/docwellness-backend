@@ -82,23 +82,46 @@ const recipeSchema = new mongoose.Schema(
     cookingTime: {
       type: Number, // in minutes
     },
+    // Legacy single-primary-quantity representation - superseded by
+    // `components` below, kept (and still populated, derived from
+    // components[0]) purely for backward read-compatibility with consumers
+    // not yet migrated (dietPlanOptions.js, dietPlanValidator.js,
+    // weekNutritionSummary.js, the dietician app). Do not add new writers
+    // of this field beyond that derivation - author new data via
+    // `components` instead.
     servingSize: {
       quantity: { type: Number, default: null },
       unit: { type: String, default: null },
     },
-    // For a handful of compound snacks (e.g. "Banana with Roasted Chana and
-    // Seeds") that combine a countable fruit with a scoopable mix-in -
-    // servingSize represents the primary component (the fruit, in pieces),
-    // this represents the second one (e.g. seeds/chikki, in tbsp/grams) -
-    // the dietician app renders a second independent +/- stepper for it
-    // when present. Absent (undefined) for every ordinary single-quantity
-    // recipe.
+    // Legacy second-quantity representation (see servingSize comment) -
+    // superseded by components[1]. Still derived/populated for the same
+    // backward-compatibility reason.
     secondaryComponent: {
       type: {
         label: { type: String },
         quantity: { type: Number },
         unit: { type: String },
       },
+      default: undefined,
+    },
+    // Real-world, independently-adjustable components of a single serving -
+    // e.g. Idli with Sambar and Chutney is [{label:'Idli',quantity:3,
+    // unit:'nos'}, {label:'Sambar',quantity:1,unit:'bowl'},
+    // {label:'Chutney',quantity:2,unit:'tbsp'}], and a plain Oats Porridge
+    // is just [{label:'Oats Porridge',quantity:250,unit:'g'}]. Replaces the
+    // old fixed primary+secondary shape above (which forced every dish
+    // into exactly 1-2 components, and the primary one into grams/ml only)
+    // with an arbitrary-length list so a dietician-facing quantity always
+    // matches how the dish is actually prescribed/eaten. See
+    // utils/recipeJsonSchema.js's COMPONENT_UNITS for the allowed unit set.
+    components: {
+      type: [
+        {
+          label: { type: String, required: true },
+          quantity: { type: Number, required: true },
+          unit: { type: String, required: true },
+        },
+      ],
       default: undefined,
     },
     ingredients: [

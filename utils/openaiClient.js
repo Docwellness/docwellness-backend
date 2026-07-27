@@ -241,7 +241,7 @@ ${consultationSummary}
 Strategy:
 ${strategySummary}
 
-Available recipes, grouped by meal slot - this is the ONLY valid source list per slot. A recipe listed under one slot heading is NOT valid for any other slot unless it also appears under that other slot's heading (side/salad accompaniments intentionally appear under multiple headings - Lunch, Dinner, and Evening Snack - because they legitimately serve all three; that is the ONLY reason a recipe id would repeat across two slot lists). Each recipe has "tags" (e.g. ["side"] or ["salad"] for accompaniments) and "servingSize" for its portion:
+Available recipes, grouped by meal slot - this is the ONLY valid source list per slot. A recipe listed under one slot heading is NOT valid for any other slot unless it also appears under that other slot's heading (side/salad accompaniments intentionally appear under multiple headings - Lunch, Dinner, and Evening Snack - because they legitimately serve all three; that is the ONLY reason a recipe id would repeat across two slot lists). Each recipe has "tags" (e.g. ["side"] or ["salad"] for accompaniments) and "components" describing its real portion - one or more {label, quantity, unit} entries in the dish's own natural units (e.g. Idli/Sambar/Chutney is 3 separate components in nos/bowl/tbsp; a simple dish like Oats Porridge is one component in g). You are not selecting these quantities yourself here (that happens later when the dietician reviews the plan) - "components" is just context for judging what a realistic single serving of this dish actually looks like:
 
 ${recipesBySlotJson}
 
@@ -472,11 +472,13 @@ RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
       "isScalable": boolean
     }
   ],
-  "servingSize": {
-    "quantity": number,
-    "unit": "g" | "ml",
-    "servings": number
-  },
+  "components": [
+    {
+      "label": "string - this component's own name as a patient would recognize it, e.g. \"Idli\", \"Sambar\", \"Chutney\" - for a single-component dish, just repeat the dish name (e.g. \"Oats Porridge\")",
+      "quantity": number,
+      "unit": "g" | "ml" | "cup" | "tbsp" | "tsp" | "piece" | "nos" | "bowl" | "egg" | "slice"
+    }
+  ],
   "nutrition": {
     "calories": number (per serving),
     "protein": number (grams per serving),
@@ -500,6 +502,12 @@ IMPORTANT RULES:
 - For smoothies/drinks, keep cooking steps simple (blend, mix, serve)
 - GROCERY SHOPPING RULE: Always name each ingredient as the RAW item a person would buy at a grocery store, not the processed or prepared form. Examples: write "Lemon" not "Lemon Juice", "Tomato" not "Tomato Puree", "Ginger" not "Ginger Paste", "Garlic" not "Garlic Paste", "Orange" not "Orange Juice". Adjust quantity and unit accordingly (e.g., Lemon 1 piece instead of Lemon Juice 2 tbsp). Only use processed/packaged forms when there is truly no whole raw equivalent (e.g., "Olive Oil", "Soy Sauce", "Coconut Milk" are fine as-is).
 
+COMPONENTS RULE (this is what the dietician and patient actually see and adjust - get it right): "components" describes ONE serving of the dish the way a dietician would actually prescribe it and a patient would actually count it, NOT a generic weight. Break the dish into its real, separately-servable/countable parts and give each its own natural unit - never force something countable or vessel-served into grams just because grams is available:
+  - A dish built around a countable item uses that item's own unit and a whole-number-friendly quantity: "Masala Omelette" -> [{"label":"Masala Omelette","quantity":2,"unit":"egg"}] (2 eggs), "Idli with Sambar and Chutney" -> [{"label":"Idli","quantity":3,"unit":"nos"},{"label":"Sambar","quantity":1,"unit":"bowl"},{"label":"Chutney","quantity":2,"unit":"tbsp"}], "Chapati" -> [{"label":"Chapati","quantity":2,"unit":"piece"}].
+  - A dish that's genuinely a single scoopable/pourable mass with no natural count uses "g" or "ml": "Oats Porridge" -> [{"label":"Oats Porridge","quantity":250,"unit":"g"}], "Buttermilk" -> [{"label":"Buttermilk","quantity":200,"unit":"ml"}].
+  - "nos" = a generic countable unit for items with no more specific unit of their own (idli, dumpling, cutlet); "bowl"/"cup"/"piece"/"slice"/"egg"/"tbsp"/"tsp" when they're the natural way that specific item is served/counted; "g"/"ml" only for genuinely unitless masses/liquids.
+  - List every component a patient would recognize as a distinct part of the plate (typically 1-3) - not every ingredient (a dal's tempering oil is an ingredient, not its own component). A simple single-part dish still gets exactly one components entry, repeating the dish name as its label.
+
 QUANTITY OVERRIDE RULE (highest priority - overrides "Include 5-15 ingredients" and all nutritional-balance guidance below): If the dietician's Custom Ingredients/Preferences or Custom Notes text states an explicit quantity and/or unit for a specific ingredient (e.g., "½ cup chickpeas", "1 cup quinoa", "1½ tbs mustard"), treat that stated amount as the PER-SERVING quantity for that ingredient - do not convert cup/tbsp/tsp to grams, do not round to a "typical" serving size, do not substitute a different amount for nutritional-balance reasons. Represent fractional amounts as decimals (½ → 0.5, 1½ → 1.5). Only ingredients NOT given an explicit quantity in the note should have their per-serving quantity determined by you, using the PORTION CALIBRATION below. If the note uses an informal measure with no schema-compatible unit (e.g., "handful of kale", "salt" with no amount), choose the closest reasonable quantity/unit yourself - this rule only binds you when the dietician gave an explicit numeric quantity+unit.
 
 NO ZERO/PLACEHOLDER QUANTITIES RULE: every ingredient's "quantity" MUST be a realistic positive number - NEVER 0, and never a placeholder. This applies even when an ingredient is mentioned with no amount at all (e.g. a note listing "Salt, turmeric, chilli" with nothing after them, or a bare ingredient name with no measure). In that case, infer a standard realistic quantity for that ingredient in this dish's context rather than writing 0 - for example: a pinch of salt ≈ 1g, turmeric ≈ ¼ tsp, a green chilli ≈ 1 piece, an unspecified onion in a chilla/sabzi ≈ 2 tbsp chopped. Every ingredient must be usable in a real shopping list and calorie calculation - a 0-quantity ingredient is never acceptable output.
@@ -515,8 +523,8 @@ Target calorie band for this ${servingTime} recipe, per serving: ${calorieBand[0
 
 Apply these rules in order:
 1. The calorie band above is a single-person, single-portion target for this Serving Time (e.g. one paratha, one bowl) - a natural, standard-sized portion of this dish, not a clinical prescription.
-2. Size ingredient quantities (for ingredients not covered by the QUANTITY OVERRIDE RULE) so ONE serving's total real nutrition falls within that band - then report the "nutrition" object as the actual computed total of those quantities (see NUTRITION ACCURACY RULE above), not the band figure itself.
-3. IMPORTANT: Every "quantity" you write for every ingredient, and every "servingSize"/"nutrition" value, must describe EXACTLY ONE SERVING - always, regardless of the Servings number given below. Do NOT multiply, scale, or otherwise adjust anything for the Servings count; ignore Servings entirely when writing quantities. Scaling the recipe up for multiple servings is handled separately by the system after your response, not by you.
+2. Size ingredient quantities (for ingredients not covered by the QUANTITY OVERRIDE RULE) so ONE serving's total real nutrition falls within that band - then report the "nutrition" object as the actual computed total of those quantities (see NUTRITION ACCURACY RULE above), not the band figure itself. Size "components" quantities to match - e.g. if 2 eggs' worth of ingredients lands the omelette in-band, "components" says quantity:2 unit:"egg".
+3. IMPORTANT: Every "quantity" you write for every ingredient, and every "components"/"nutrition" value, must describe EXACTLY ONE SERVING - always, regardless of the Servings number given below. Do NOT multiply, scale, or otherwise adjust anything for the Servings count; ignore Servings entirely when writing quantities. Scaling the recipe up for multiple servings is handled separately by the system after your response, not by you.
 - NO markdown, NO explanations, ONLY the JSON object`;
 
   let userPrompt;
@@ -698,7 +706,28 @@ TASK: Generate a complete, healthy ${name} recipe suitable for ${servingTime}.
     ing.isScalable ? { ...ing, quantity: ing.quantity * servings } : ing
   ));
 
-  const perServingSize = parsedRecipe.servingSize || { quantity: 200, unit: 'g' };
+  // components: the dish's real, independently-adjustable parts (see the
+  // COMPONENTS RULE in systemPrompt) - e.g. Idli/Sambar/Chutney each in
+  // their own natural unit, not one forced gram total. Falls back to a
+  // single generic 200g component only if the model somehow omitted
+  // components entirely (shouldn't happen under the strict schema, but
+  // this function is also reachable via update-mode re-generation).
+  const perServingComponents = Array.isArray(parsedRecipe.components) && parsedRecipe.components.length > 0
+    ? parsedRecipe.components
+    : [{ label: parsedRecipe.name || name, quantity: 200, unit: 'g' }];
+  const scaledComponents = perServingComponents.map((c) => ({
+    label: c.label || parsedRecipe.name || name,
+    quantity: (parseQuantity(c.quantity) || 1) * servings,
+    unit: c.unit || 'g',
+  }));
+
+  // servingSize/secondaryComponent: derived from components[0]/[1] purely
+  // for backward-compatibility with consumers not yet migrated to the full
+  // `components` array (dietPlanOptions.js, dietPlanValidator.js,
+  // weekNutritionSummary.js, the dietician app) - a 3rd+ component is only
+  // ever available via `components` itself. Remove once every consumer
+  // reads `components` directly.
+  const [primaryComponent, secondaryComponentSrc] = scaledComponents;
 
   return {
     name: parsedRecipe.name || name,
@@ -708,11 +737,21 @@ TASK: Generate a complete, healthy ${name} recipe suitable for ${servingTime}.
     preparationTime: parsedRecipe.preparationTime || 15,
     cookingTime: parsedRecipe.cookingTime || 20,
     ingredients: scaledIngredients,
+    components: scaledComponents,
     servingSize: {
-      quantity: (parseQuantity(perServingSize.quantity) || 200) * servings,
-      unit: perServingSize.unit || 'g',
+      quantity: primaryComponent.quantity,
+      unit: primaryComponent.unit,
       servings,
     },
+    ...(secondaryComponentSrc
+      ? {
+        secondaryComponent: {
+          label: secondaryComponentSrc.label,
+          quantity: secondaryComponentSrc.quantity,
+          unit: secondaryComponentSrc.unit,
+        },
+      }
+      : {}),
     nutrition: {
       calories: parsedRecipe.nutrition?.calories || 0,
       protein: parsedRecipe.nutrition?.protein || 0,

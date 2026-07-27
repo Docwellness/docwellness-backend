@@ -89,6 +89,17 @@ const cleanSelectedMeals = (rawSelectedMeals) =>
       ...(typeof meal.secondaryServings === 'number' && meal.secondaryServings > 0
         ? { secondaryServings: meal.secondaryServings }
         : {}),
+      // Generalizes servings/secondaryServings to however many components
+      // the recipe actually has (see models/Recipe.js's `components`) -
+      // index N here is recipe.components[N]'s selected quantity. Omitted
+      // for a recipe still only using the legacy 1-2 slot shape, or a meal
+      // whose selection hasn't been re-saved through the components-aware
+      // app yet - weekNutritionSummary.js falls back to servings/
+      // secondaryServings when this is absent.
+      ...(Array.isArray(meal.componentServings) &&
+        meal.componentServings.every((n) => typeof n === 'number' && n > 0)
+        ? { componentServings: meal.componentServings }
+        : {}),
     }));
 
 // 'Weight Loss'/'Fat Loss' -> smaller default portions; every other goal
@@ -800,7 +811,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   }
 
   const candidateRecipes = await Recipe.find(recipeFilter)
-    .select('name servingTime dietaryHabits freeFrom nutrition ingredients servingSize tags category _id')
+    .select('name servingTime dietaryHabits freeFrom nutrition ingredients servingSize components tags category _id')
     .lean();
 
   const allergyOptions = getAnswer(SAFETY_FIELD_IDS.ALLERGIES) || [];
@@ -845,7 +856,15 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     // so it can compose a main + sides combo for Lunch/Dinner, instead of
     // picking exactly one recipe per slot - see buildPrompt's combo rule.
     tags: r.tags || [],
-    servingSize: r.servingSize || null,
+    // The dish's real, independently-adjustable components (see
+    // models/Recipe.js's `components`) - e.g. Idli/Sambar/Chutney in
+    // nos/bowl/tbsp, not one forced gram total. Falls back to a
+    // synthesized single component from the legacy servingSize for a
+    // recipe not yet migrated (scripts/migrate-recipe-components.js), so
+    // this is never empty/null for a real recipe.
+    components: Array.isArray(r.components) && r.components.length > 0
+      ? r.components
+      : [{ label: r.name, quantity: r.servingSize?.quantity || 1, unit: r.servingSize?.unit || 'g' }],
   });
 
   // Flat pool: used by validateDietPlan's closed-world check and the
