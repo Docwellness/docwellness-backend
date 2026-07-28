@@ -1,4 +1,10 @@
 require('./config/instrument');
+// Some local Windows/VPN network setups hand Node's DNS resolver a server
+// it can't actually reach over UDP (even though the OS resolver succeeds
+// via a different path) - breaks mongodb+srv:// lookups specifically with
+// ECONNREFUSED on querySrv. Public resolvers as a fallback fix that without
+// touching the OS/network config; harmless everywhere else (incl. prod).
+require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 const http = require('http');
 const { Server } = require('socket.io');
 const connectDB = require('./config/database');
