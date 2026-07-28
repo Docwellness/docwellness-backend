@@ -471,121 +471,15 @@ exports.getGoalProgress = async (req, res, next) => {
 // GET /api/patient/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 // ============================================================
 
-// Helper: get local date string YYYY-MM-DD without timezone shift
-function localDateStr(date) {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-// Helper: format date as "6 Jul" style
-function formatShortDate(date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return `${date.getDate()} ${months[date.getMonth()]}`;
-}
-
-// Helper: sum meal calories from meals array
-function sumMealCalories(meals) {
-  if (!Array.isArray(meals)) return 0;
-  return meals.reduce((sum, meal) => sum + (meal.caloriesConsumed || 0), 0);
-}
-
-function addDays(date, n) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
-}
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-// Splits [rangeStart, rangeEnd] into buckets sized to keep the chart
-// readable regardless of how wide a range the patient picks - they choose
-// any start/end date (bounded by the plan's real start and today), not a
-// fixed week/month/year, so bucketing has to scale with whatever range that
-// turns out to be: a bar per day for a short range, growing to weekly then
-// monthly as the range widens.
-function buildDateBuckets(rangeStart, rangeEnd) {
-  const start = new Date(rangeStart);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(rangeEnd);
-  end.setHours(0, 0, 0, 0);
-  const totalDays = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY) + 1;
-
-  let granularity;
-  if (totalDays <= 14) granularity = 'daily';
-  else if (totalDays <= 84) granularity = 'weekly';
-  else granularity = 'monthly';
-
-  const buckets = [];
-
-  if (granularity === 'daily') {
-    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-      const bStart = new Date(d);
-      bStart.setHours(0, 0, 0, 0);
-      const bEnd = new Date(d);
-      bEnd.setHours(23, 59, 59, 999);
-      buckets.push({ start: bStart, end: bEnd, label: formatShortDate(bStart) });
-    }
-  } else if (granularity === 'weekly') {
-    let cur = new Date(start);
-    while (cur <= end) {
-      const bStart = new Date(cur);
-      bStart.setHours(0, 0, 0, 0);
-      const bEndRaw = addDays(cur, 6) > end ? new Date(end) : addDays(cur, 6);
-      const bEnd = new Date(bEndRaw);
-      bEnd.setHours(23, 59, 59, 999);
-      buckets.push({ start: bStart, end: bEnd, label: formatShortDate(bStart) });
-      cur = addDays(cur, 7);
-    }
-  } else {
-    const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const spansMultipleYears = start.getFullYear() !== end.getFullYear();
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-    while (cur <= end) {
-      const bStart = cur > start ? new Date(cur) : new Date(start);
-      bStart.setHours(0, 0, 0, 0);
-      const calendarMonthEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
-      const bEndRaw = calendarMonthEnd < end ? calendarMonthEnd : end;
-      const bEnd = new Date(bEndRaw);
-      bEnd.setHours(23, 59, 59, 999);
-      const label = spansMultipleYears
-        ? `${monthNames[cur.getMonth()]} '${String(cur.getFullYear()).slice(2)}`
-        : monthNames[cur.getMonth()];
-      buckets.push({ start: bStart, end: bEnd, label });
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-    }
-  }
-
-  return { buckets, granularity };
-}
+const {
+  localDateStr,
+  formatShortDate,
+  sumMealCalories,
+  addDays,
+  buildDateBuckets,
+  resolvePlanStartDate,
+  resolveRequestedRange,
+} = require('../../utils/trackingBuckets');
 
 exports.getTrackingData = async (req, res, next) => {
   try {
@@ -637,29 +531,14 @@ exports.getTrackingData = async (req, res, next) => {
     // over activationDate, which can predate the plan's real first week.
     // This is the earliest date this endpoint will ever show data for -
     // there's nothing meaningful to chart before it.
-    const resolvedPlanStart = activePlan?.weekSchedule?.[0]?.startDate
-      ? new Date(activePlan.weekSchedule[0].startDate)
-      : activePlan?.activationDate
-        ? new Date(activePlan.activationDate)
-        : null;
-    if (resolvedPlanStart) resolvedPlanStart.setHours(0, 0, 0, 0);
+    const resolvedPlanStart = resolvePlanStartDate(activePlan);
 
     // Requested range - each chart (Weight/BMI/Calorie) picks its own
     // start/end independently client-side. Defaults to [plan start, today]
     // (the patient's whole history so far) and is clamped so a stale/
     // tampered query can't ask for dates before the plan started or after
     // today - no data exists outside that window either way.
-    const earliestAllowed = resolvedPlanStart || today;
-    let startDate = req.query.startDate ? new Date(req.query.startDate) : earliestAllowed;
-    let endDate = req.query.endDate ? new Date(req.query.endDate) : today;
-    if (Number.isNaN(startDate.getTime())) startDate = earliestAllowed;
-    if (Number.isNaN(endDate.getTime())) endDate = today;
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(0, 0, 0, 0);
-    if (startDate < earliestAllowed) startDate = new Date(earliestAllowed);
-    if (endDate > today) endDate = new Date(today);
-    if (startDate > endDate) startDate = new Date(endDate);
-    endDate.setHours(23, 59, 59, 999);
+    const { startDate, endDate } = resolveRequestedRange(req.query, resolvedPlanStart, today);
 
     // Fetch meal logs
     const mealLogs = await MealLog.find({

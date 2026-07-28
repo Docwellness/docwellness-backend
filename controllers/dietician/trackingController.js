@@ -1,28 +1,33 @@
 const { MealLog, DietPlan, User, Recipe } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
-
-// Helper: get local date string YYYY-MM-DD without timezone shift
-function localDateStr(date) {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+const {
+  localDateStr,
+  formatShortDate,
+  sumMealCalories,
+  addDays,
+  buildDateBuckets,
+  resolvePlanStartDate,
+  resolveRequestedRange,
+} = require('../../utils/trackingBuckets');
 
 /**
- * GET /patients/:patientId/tracking-data?period=week|month|year
+ * GET /patients/:patientId/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  *
  * Returns:
  * - calorieData: aggregated calorie intake from meal logs
  * - weightTrend: auto-calculated weight trend from calorie data
  * - bmiTrend: auto-calculated BMI trend from weight data
+ *
+ * Mirrors controllers/patient/progressController.js's getTrackingData (same
+ * bucketing/range-clamping via utils/trackingBuckets) - this is the
+ * dietician's view of a specific patient's own history, so it must agree
+ * with what the patient app itself shows instead of drifting on its own
+ * week/month/year period logic.
  */
 exports.getPatientTrackingData = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    const period = req.query.period || 'week'; // week | month | year
 
     // 1. Fetch patient health data (initial weight, height, activity level)
     const patient = await User.findById(patientId).select('healthProfile').lean();
@@ -44,39 +49,20 @@ exports.getPatientTrackingData = async (req, res, next) => {
       status: 'Active',
     })
       .sort({ createdAt: -1 })
-      .select('totalCalories weeksSummary activationDate calorieStrategy')
+      .select('totalCalories weeksSummary activationDate weekSchedule calorieStrategy')
       .lean();
 
     const plannedDailyCalories =
       activePlan?.totalCalories || activePlan?.weeksSummary?.[0]?.totalCalories || 2000;
 
-    // 3. Calculate date range based on period
     const now = new Date();
-    let startDate, endDate;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (period === 'week') {
-      // Current week (Monday to Sunday)
-      const dayOfWeek = now.getDay();
-      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() + mondayOffset);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-    } else if (period === 'month') {
-      // Current month
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Current year
-      startDate = new Date(now.getFullYear(), 0, 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), 11, 31);
-      endDate.setHours(23, 59, 59, 999);
-    }
+    // 3. The plan's real start date, and the requested [startDate, endDate]
+    // range clamped to [plan start, today] - same rules the patient app's
+    // own tracking-data endpoint uses.
+    const resolvedPlanStart = resolvePlanStartDate(activePlan);
+    const { startDate, endDate } = resolveRequestedRange(req.query, resolvedPlanStart, today);
 
     // 4. Fetch meal logs in the date range
     const mealLogs = await MealLog.find({
@@ -103,224 +89,85 @@ exports.getPatientTrackingData = async (req, res, next) => {
     const bmr = 10 * currentWeight + 6.25 * height - 5 * 30 + 5; // approx for average age 30
     const tdee = bmr * activityMultiplier;
 
-    // 6. Build response based on period
-    let calorieData = [];
-    let weightTrend = [];
-    let bmiTrend = [];
+    // 6. Bucket the requested range - daily/weekly/monthly depending on how
+    // wide it is - and aggregate calorie intake per bucket.
+    const { buckets, granularity } = buildDateBuckets(startDate, endDate);
 
-    if (period === 'week') {
-      // Daily data for 7 days
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const calorieData = buckets.map((bucket) => {
+      const bucketLogs = mealLogs.filter((log) => {
+        const logDate = new Date(log.date);
+        return logDate >= bucket.start && logDate <= bucket.end;
+      });
+      const totalCalories = bucketLogs.reduce(
+        (sum, log) => sum + (log.totalCalories || sumMealCalories(log.meals)),
+        0
+      );
+      const daysWithLogs = bucketLogs.length;
+      const avgCalories = daysWithLogs > 0 ? totalCalories / daysWithLogs : 0;
+      return {
+        label: bucket.label,
+        dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
+        calories: Math.round(avgCalories),
+        totalCalories: Math.round(totalCalories),
+        plannedCalories: plannedDailyCalories,
+        daysLogged: daysWithLogs,
+      };
+    });
 
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + i);
-        const dayStr = localDateStr(day);
-
-        const dayLog = mealLogs.find((log) => {
-          const logDate = localDateStr(log.date);
-          return logDate === dayStr;
-        });
-
-        const totalCalories = dayLog ? dayLog.totalCalories || sumMealCalories(dayLog.meals) : 0;
-        const mealsLogged = dayLog ? dayLog.meals?.length || 0 : 0;
-
-        calorieData.push({
-          label: dayNames[i],
-          date: dayStr,
-          calories: Math.round(totalCalories),
-          plannedCalories: plannedDailyCalories,
-          mealsLogged,
-        });
-      }
-    } else if (period === 'month') {
-      // Weekly aggregated data for the month
-      const weeksInMonth = getWeeksInMonth(startDate);
-
-      for (let w = 0; w < weeksInMonth.length; w++) {
-        const weekStart = weeksInMonth[w].start;
-        const weekEnd = weeksInMonth[w].end;
-
-        const weekLogs = mealLogs.filter((log) => {
-          const logDate = new Date(log.date);
-          return logDate >= weekStart && logDate <= weekEnd;
-        });
-
-        const totalCalories = weekLogs.reduce((sum, log) => {
-          return sum + (log.totalCalories || sumMealCalories(log.meals));
-        }, 0);
-
-        const daysWithLogs = weekLogs.length;
-        const avgCalories = daysWithLogs > 0 ? totalCalories / daysWithLogs : 0;
-
-        calorieData.push({
-          label: `Week ${w + 1}`,
-          dateRange: `${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}`,
-          calories: Math.round(avgCalories),
-          totalCalories: Math.round(totalCalories),
-          plannedCalories: plannedDailyCalories,
-          daysLogged: daysWithLogs,
-        });
-      }
-    } else {
-      // Monthly aggregated data for the year
-      const monthNames = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-
-      for (let m = 0; m < 12; m++) {
-        const monthStart = new Date(now.getFullYear(), m, 1);
-        const monthEnd = new Date(now.getFullYear(), m + 1, 0, 23, 59, 59, 999);
-
-        const monthLogs = mealLogs.filter((log) => {
-          const logDate = new Date(log.date);
-          return logDate >= monthStart && logDate <= monthEnd;
-        });
-
-        const totalCalories = monthLogs.reduce((sum, log) => {
-          return sum + (log.totalCalories || sumMealCalories(log.meals));
-        }, 0);
-
-        const daysWithLogs = monthLogs.length;
-        const avgCalories = daysWithLogs > 0 ? totalCalories / daysWithLogs : 0;
-
-        calorieData.push({
-          label: monthNames[m],
-          calories: Math.round(avgCalories),
-          totalCalories: Math.round(totalCalories),
-          plannedCalories: plannedDailyCalories,
-          daysLogged: daysWithLogs,
-        });
-      }
-    }
-
-    // 7. Calculate weight trend (auto-calculated from calorie surplus/deficit)
-    // Weight changes: ~7700 calories = 1 kg
+    // 7. Calculate weight trend (auto-calculated from calorie surplus/
+    // deficit, ~7700 calories = 1 kg) - cumulative from the plan's real
+    // start (not just the visible range's start) so a bucket partway
+    // through the plan still reflects the real trajectory.
     const CALORIES_PER_KG = 7700;
-    let runningWeight = currentWeight;
-
-    // Get all meal logs from activation date to build cumulative weight
-    const activationDate = activePlan?.activationDate || startDate;
+    const cumulativeStart = resolvedPlanStart || startDate;
     const allLogs = await MealLog.find({
       patientId,
-      date: { $gte: activationDate, $lte: endDate },
+      date: { $gte: cumulativeStart, $lte: endDate },
     })
       .sort({ date: 1 })
       .select('date totalCalories meals')
       .lean();
 
-    // Build daily weight map from activation
     const dailyWeights = {};
     let cumulativeWeight = currentWeight;
-
-    // Calculate weight change day by day from activation
-    let currentDate = new Date(activationDate);
+    let currentDate = new Date(cumulativeStart);
     currentDate.setHours(0, 0, 0, 0);
 
     while (currentDate <= endDate) {
       const dateStr = localDateStr(currentDate);
-      const dayLog = allLogs.find((log) => {
-        return localDateStr(log.date) === dateStr;
-      });
-
+      const dayLog = allLogs.find((log) => localDateStr(log.date) === dateStr);
       if (dayLog) {
         const consumed = dayLog.totalCalories || sumMealCalories(dayLog.meals);
         const surplus = consumed - tdee;
         cumulativeWeight += surplus / CALORIES_PER_KG;
       }
-      // If no log, weight stays same (no eating recorded)
-
       dailyWeights[dateStr] = Math.round(cumulativeWeight * 10) / 10;
-
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate = addDays(currentDate, 1);
     }
 
-    // Extract weight trend points for the requested period
-    // Only include data up to today — future periods get weight=0
-    const todayStr = localDateStr(now);
-
-    if (period === 'week') {
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + i);
-        const dayStr = localDateStr(day);
-
-        if (dayStr > todayStr) {
-          // Future day — no data
-          weightTrend.push({ label: calorieData[i]?.label || '', date: dayStr, weight: 0 });
-        } else {
-          const weight = dailyWeights[dayStr] || currentWeight;
-          weightTrend.push({
-            label: calorieData[i]?.label || '',
-            date: dayStr,
-            weight: Math.round(weight * 10) / 10,
-          });
-        }
+    const weightTrend = buckets.map((bucket, index) => {
+      // Compare calendar days (not exact instants) against `today`, not
+      // `now` - see progressController.js's identical fix for why this
+      // matters for a bucket that legitimately starts today.
+      if (bucket.start > today) {
+        return { label: bucket.label, date: '', weight: 0 };
       }
-    } else if (period === 'month') {
-      const weeksInMonth = getWeeksInMonth(startDate);
-      for (let w = 0; w < weeksInMonth.length; w++) {
-        if (weeksInMonth[w].start > now) {
-          // Future week — no data
-          weightTrend.push({ label: `Week ${w + 1}`, date: '', weight: 0 });
-        } else {
-          // Use today's date if current week hasn't ended
-          const effectiveEnd = weeksInMonth[w].end > now ? now : weeksInMonth[w].end;
-          const weekEndStr = localDateStr(effectiveEnd);
-          const weight = dailyWeights[weekEndStr] || currentWeight;
-          weightTrend.push({
-            label: `Week ${w + 1}`,
-            date: weekEndStr,
-            weight: Math.round(weight * 10) / 10,
-          });
-        }
-      }
-    } else {
-      const monthNames = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      for (let m = 0; m < 12; m++) {
-        if (m > now.getMonth()) {
-          // Future month — no data
-          weightTrend.push({ label: monthNames[m], date: '', weight: 0 });
-        } else {
-          const effectiveEnd = m === now.getMonth() ? now : new Date(now.getFullYear(), m + 1, 0);
-          const endStr = localDateStr(effectiveEnd);
-          const weight = dailyWeights[endStr] || currentWeight;
-          weightTrend.push({
-            label: monthNames[m],
-            date: endStr,
-            weight: Math.round(weight * 10) / 10,
-          });
-        }
-      }
-    }
+      const effectiveEnd = bucket.end > now ? now : bucket.end;
+      const dayStr = localDateStr(effectiveEnd);
+      const weight = dailyWeights[dayStr] || currentWeight;
+      return {
+        label: bucket.label,
+        date: dayStr,
+        weight:
+          index === 0 && weight <= 0
+            ? Math.round(currentWeight * 10) / 10
+            : Math.round(weight * 10) / 10,
+      };
+    });
 
     // 8. Calculate BMI trend from weight trend (0 weight = no data = 0 bmi)
     const heightInMeters = height / 100;
-    bmiTrend = weightTrend.map((point) => ({
+    const bmiTrend = weightTrend.map((point) => ({
       label: point.label,
       date: point.date,
       bmi:
@@ -330,44 +177,24 @@ exports.getPatientTrackingData = async (req, res, next) => {
       weight: point.weight,
     }));
 
-    // 9. Date labels for x-axis
-    let startLabel, endLabel;
-    if (period === 'week') {
-      startLabel = formatShortDate(startDate);
-      endLabel = formatShortDate(endDate);
-    } else if (period === 'month') {
-      startLabel = formatShortDate(startDate);
-      endLabel = formatShortDate(endDate);
-    } else {
-      startLabel = 'Jan';
-      endLabel = 'Dec';
-    }
-
-    // 10. Calculate currentIndex (which bar represents "today")
-    let currentIndex = 0;
-    if (period === 'week') {
-      // Day of week: Mon=0 .. Sun=6
-      const dow = now.getDay(); // 0=Sun, 1=Mon .. 6=Sat
-      currentIndex = dow === 0 ? 6 : dow - 1;
-    } else if (period === 'month') {
-      // Which week of the month does today fall in?
-      const weeksInMonth = getWeeksInMonth(startDate);
-      for (let w = 0; w < weeksInMonth.length; w++) {
-        if (now >= weeksInMonth[w].start && now <= weeksInMonth[w].end) {
-          currentIndex = w;
-          break;
-        }
+    // 9. Which bucket "today" falls into, so the chart can highlight it -
+    // -1 (no highlight) when the picked range doesn't include today.
+    let currentIndex = -1;
+    for (let i = 0; i < buckets.length; i++) {
+      if (now >= buckets[i].start && now <= buckets[i].end) {
+        currentIndex = i;
+        break;
       }
-    } else {
-      // Current month index (0-11)
-      currentIndex = now.getMonth();
     }
 
     res.status(200).json({
       success: true,
       data: {
-        period,
-        dateRange: { start: startLabel, end: endLabel },
+        granularity,
+        planStartDate: resolvedPlanStart ? resolvedPlanStart.toISOString() : null,
+        dateRange: { start: formatShortDate(startDate), end: formatShortDate(endDate) },
+        startDate: localDateStr(startDate),
+        endDate: localDateStr(endDate),
         currentIndex,
         currentWeight: Math.round(currentWeight * 10) / 10,
         currentBmi: Math.round((currentWeight / (heightInMeters * heightInMeters)) * 10) / 10,
@@ -382,58 +209,6 @@ exports.getPatientTrackingData = async (req, res, next) => {
     next(error);
   }
 };
-
-// Helper: sum meal calories from meals array
-function sumMealCalories(meals) {
-  if (!Array.isArray(meals)) return 0;
-  return meals.reduce((sum, meal) => sum + (meal.caloriesConsumed || 0), 0);
-}
-
-// Helper: get weeks in a month as [{start, end}, ...]
-function getWeeksInMonth(monthStart) {
-  const weeks = [];
-  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-
-  let weekStart = new Date(monthStart);
-  while (weekStart <= monthEnd) {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    if (weekEnd > monthEnd) {
-      weekEnd.setTime(monthEnd.getTime());
-    }
-    weekEnd.setHours(23, 59, 59, 999);
-
-    weeks.push({
-      start: new Date(weekStart),
-      end: new Date(weekEnd),
-    });
-
-    weekStart = new Date(weekEnd);
-    weekStart.setDate(weekStart.getDate() + 1);
-    weekStart.setHours(0, 0, 0, 0);
-  }
-
-  return weeks;
-}
-
-// Helper: format date as "6 Jul" style
-function formatShortDate(date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return `${date.getDate()} ${months[date.getMonth()]}`;
-}
 
 // ============================================================
 // Dietician: get patient meal-log stats for a specific date
