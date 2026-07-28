@@ -731,17 +731,31 @@ exports.getTrackingData = async (req, res, next) => {
       currentDate = addDays(currentDate, 1);
     }
 
-    const weightTrend = buckets.map((bucket) => {
-      if (bucket.start > now) {
+    const weightTrend = buckets.map((bucket, index) => {
+      // Compare calendar days, not exact instants - bucket.start is already
+      // day-normalized (see buildDateBuckets), but `now` carries a
+      // time-of-day. Comparing it against `now` directly could misfire a
+      // bucket that starts "today" into the future branch depending on the
+      // time of day, which is exactly what made a freshly-started plan's
+      // very first (and only) reading come back zeroed out instead of
+      // showing the patient's actual current weight.
+      if (bucket.start > today) {
         return { label: bucket.label, date: '', weight: 0 };
       }
       const effectiveEnd = bucket.end > now ? now : bucket.end;
       const dayStr = localDateStr(effectiveEnd);
+      // The very first reading is never allowed to come back as an unlogged
+      // zero - if this is a fresh plan's first bucket and there's no
+      // cumulative-weight entry for it yet, it should read as the patient's
+      // actual current weight, not nothing.
       const weight = dailyWeights[dayStr] || currentWeight;
       return {
         label: bucket.label,
         date: dayStr,
-        weight: Math.round(weight * 10) / 10,
+        weight:
+          index === 0 && weight <= 0
+            ? Math.round(currentWeight * 10) / 10
+            : Math.round(weight * 10) / 10,
       };
     });
 
