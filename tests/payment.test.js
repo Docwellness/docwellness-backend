@@ -1,7 +1,7 @@
 /**
  * AI_EXECUTION_PLAN.md Phase 8, P8-01 - payment status transition. Real
- * payment collection goes through Razorpay/manual proof + Cloudinary
- * upload (external services, not practical or desirable to hit in an
+ * payment collection goes through manual proof + Cloudinary upload
+ * (external services, not practical or desirable to hit in an
  * integration test) - this exercises the confirm-renewal-payment
  * transition directly against a pre-seeded ManualPaymentProof document
  * (no file upload needed for that specific endpoint), which is where the

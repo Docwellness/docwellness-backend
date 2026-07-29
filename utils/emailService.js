@@ -1,13 +1,11 @@
 // EMAIL USAGE SUMMARY:
 // Email is used in the following controllers and functions:
-// - controllers/patient/paymentController.js: sendPaymentConfirmation
 // - controllers/patient/authController.js: sendEmail, sendWelcomeEmail
 //
 // This file defines utility functions for sending emails, including:
 // - sendEmail: Generic email sender
 // - sendWelcomeEmail: Sends a welcome email to new users
 // - sendDietPlanNotification: Notifies users about diet plan updates
-// - sendPaymentConfirmation: Confirms payment to users
 
 const { Resend } = require('resend');
 const config = require('../config/environment');
@@ -162,40 +160,10 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
   });
 };
 
-// Send payment confirmation
-const sendPaymentConfirmation = async (user, payment, dietPlan) => {
-  const subject = 'Payment Confirmation - DocWellness';
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #4CAF50;">Payment Successful!</h1>
-      <p>Hi ${user.profile?.fullName || 'there'},</p>
-      <p>Your payment has been successfully processed.</p>
-      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="margin-top: 0;">Payment Details</h3>
-        <p><strong>Amount:</strong> ₹${payment.amount}</p>
-        <p><strong>Diet Plan:</strong> ${dietPlan.name}</p>
-        <p><strong>Payment ID:</strong> ${payment.razorpayPaymentId}</p>
-        <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-      </div>
-      <p>Your diet plan is now active. Get started on your wellness journey!</p>
-      <a href="${config.frontendUrl}/diet-plans/${dietPlan._id}" style="display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">View Diet Plan</a>
-      <p style="margin-top: 30px; color: #666;">Best regards,<br>The DocWellness Team</p>
-    </div>
-  `;
-
-  return sendEmail({
-    to: user.email,
-    subject,
-    text: `Payment of ₹${payment.amount} confirmed for ${dietPlan.name}`,
-    html,
-  });
-};
-
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetOtp,
   sendSignupOtp,
   sendDietPlanNotification,
-  sendPaymentConfirmation,
 };

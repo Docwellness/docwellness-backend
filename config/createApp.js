@@ -158,12 +158,7 @@ function createApp() {
             delete: 'DELETE /api/patient/progress/:id',
           },
           payments: {
-            createOrder: 'POST /api/patient/payments/create-order',
-            verify: 'POST /api/patient/payments/verify',
-            history: 'GET /api/patient/payments',
-            getById: 'GET /api/patient/payments/:id',
-            receipt: 'GET /api/patient/payments/:id/receipt',
-            refund: 'POST /api/patient/payments/:id/refund',
+            submitManualProof: 'POST /api/patient/payments/manual-proof',
           },
         },
       },

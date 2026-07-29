@@ -14,7 +14,6 @@ code or configuration by itself.
 | `SUPABASE_SERVICE_ROLE_KEY` | backend `.env` | full Supabase DB access - server-side only |
 | `SUPABASE_PUBLISHABLE_KEY` / anon key | Flutter apps (dart-define) | client-safe by design - only allows what RLS policies permit |
 | `CLOUDINARY_API_SECRET` | backend `.env` | image upload signing |
-| `RAZORPAY_KEY_SECRET` | backend `.env` | payment verification |
 | `RESEND_API_KEY` | backend `.env` | transactional email sending |
 | `OPENAI_API_KEY` | backend `.env` | AI-assisted recipe/translation/diet-plan generation |
 | `PEXELS_API_KEY` | backend `.env` | stock ingredient images |
@@ -26,7 +25,7 @@ Dart-define values (Sentry DSN, PostHog key, Supabase anon key) are
 intentionally public/client-embeddable and end up baked into the compiled
 app binary either way - they are safe to commit in a `scripts/run-dev.ps1`
 style helper script. Real secrets (JWT signing keys, DB passwords, the
-Supabase *service role* key, Cloudinary/Razorpay/Resend/OpenAI/Pexels
+Supabase *service role* key, Cloudinary/Resend/OpenAI/Pexels
 secrets) must never appear in a Flutter `--dart-define` or be committed
 anywhere, in either repo.
 
@@ -50,8 +49,6 @@ than hardcoding it inline.
    - **MongoDB URI / password** - rotate the database user's password in
      the MongoDB Atlas (or self-hosted) dashboard, update `MONGODB_URI`.
    - **Cloudinary** - regenerate the API secret in the Cloudinary console.
-   - **Razorpay** - regenerate the key secret in the Razorpay dashboard;
-     coordinate with payments if live traffic exists.
    - **Resend** - revoke and reissue the API key in the Resend dashboard.
    - **OpenAI** - revoke and reissue the API key in the OpenAI platform
      dashboard.
