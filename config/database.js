@@ -47,7 +47,15 @@ async function connectWithRetry(uri, { attempts = 3, delayMs = 800 } = {}) {
   let triedFallbackDns = false;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      return await mongoose.connect(uri);
+      // The MongoDB driver defaults to maxPoolSize: 100 per connection when
+      // unset - fine for a single long-running process, but ruinous once
+      // multiple things connect to the same free-tier M0 cluster (500
+      // connections total): a handful of concurrent Vercel serverless
+      // instances, each opening their own pool, can exhaust the entire
+      // cluster limit on their own. Capped low here since this app - even
+      // the persistent VPS/Coolify process - never legitimately needs many
+      // concurrent in-flight queries at this scale.
+      return await mongoose.connect(uri, { maxPoolSize: 10 });
     } catch (error) {
       lastError = error;
       const isDnsSrvHiccup = error.code === 'ECONNREFUSED' && error.syscall === 'querySrv';
