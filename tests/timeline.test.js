@@ -31,12 +31,18 @@ async function seedPatientWithGoal(dietician) {
     healthProfile: { bmi: 22, weightIndex: 0, weight: 74, targetWeight: '64' },
   });
   const { DietPlan } = require('../models');
+  const startDate = new Date('2026-07-01T00:00:00.000Z');
+  const endDate = new Date('2026-07-28T00:00:00.000Z');
   const plan = await DietPlan.create({
     patientId: patient._id,
     dieticianId: dietician._id,
     status: 'Active',
-    startDate: new Date('2026-07-01T00:00:00.000Z'),
-    endDate: new Date('2026-07-28T00:00:00.000Z'),
+    startDate,
+    endDate,
+    // weekSchedule (not the top-level startDate/endDate) is what
+    // seedGoalTimeline actually resolves dates from - see
+    // utils/trackingBuckets.js's resolvePlanStartDate/EndDate.
+    weekSchedule: [{ week: 1, startDate, endDate }],
   });
   const goal = await seedGoalTimeline(plan);
   return { patient, goal };

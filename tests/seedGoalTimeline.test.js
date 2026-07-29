@@ -20,12 +20,17 @@ afterAll(async () => {
 });
 
 async function makeActivePlan(patient, dietician, { startDate, endDate }) {
+  // weekSchedule (not the top-level startDate/endDate fields, which
+  // activateDietPlan never actually populates) is what seedGoalTimeline
+  // resolves dates from - matches real data exactly instead of relying on
+  // resolvePlanStartDate/EndDate's fallback branches.
   return DietPlan.create({
     patientId: patient._id,
     dieticianId: dietician._id,
     status: 'Active',
     startDate,
     endDate,
+    weekSchedule: [{ week: 1, startDate, endDate }],
   });
 }
 
@@ -157,12 +162,15 @@ describe('seedGoalTimeline', () => {
       fullName: 'Test Patient',
       currentWeight: 80,
     });
+    const startDate = new Date('2026-07-01T00:00:00.000Z');
+    const endDate = new Date('2026-07-28T00:00:00.000Z');
     const plan = await DietPlan.create({
       patientId: patient._id,
       dieticianId: dietician._id,
       status: 'Active',
-      startDate: new Date('2026-07-01T00:00:00.000Z'),
-      endDate: new Date('2026-07-28T00:00:00.000Z'),
+      startDate,
+      endDate,
+      weekSchedule: [{ week: 1, startDate, endDate }],
       request: request._id,
     });
     await plan.populate('request');

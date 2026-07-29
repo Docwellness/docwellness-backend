@@ -132,6 +132,7 @@ function resolvePlanStartDate(dietPlan) {
   return resolved;
 }
 
+
 // Resolves + clamps the requested [startDate, endDate] query params against
 // [earliestAllowed (plan start, or today if no plan), today] - shared
 // clamping rules so both endpoints reject the same out-of-range requests

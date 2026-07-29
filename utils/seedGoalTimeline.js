@@ -13,6 +13,34 @@ function toDateOnly(d) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+// The plan's real start/end dates - prefers weekSchedule's week-1
+// start/last-week end over the top-level startDate/endDate fields, which
+// activateDietPlan never actually populates (confirmed live: every real
+// activated plan has endDate === undefined; weekSchedule is the only place
+// a plan's true dates are set). Deliberately UTC-based (not
+// utils/trackingBuckets.js's resolvePlanStartDate, which truncates to
+// LOCAL midnight for its own chart-bucketing use case) so these line up
+// exactly with toDateOnly() and the rest of this file's UTC day boundaries
+// - mixing the two conventions silently shifted seeded dates by a day in
+// any non-UTC server timezone.
+function resolvePlanStartDate(dietPlan) {
+  const schedule = dietPlan?.weekSchedule;
+  const raw =
+    schedule && schedule.length > 0
+      ? schedule[0].startDate
+      : dietPlan?.activationDate || dietPlan?.startDate || null;
+  return raw ? toDateOnly(new Date(raw)) : null;
+}
+
+function resolvePlanEndDate(dietPlan) {
+  const schedule = dietPlan?.weekSchedule;
+  const raw =
+    schedule && schedule.length > 0
+      ? schedule[schedule.length - 1].endDate
+      : dietPlan?.endDate || null;
+  return raw ? toDateOnly(new Date(raw)) : null;
+}
+
 function formatDayLabel(date) {
   return date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', timeZone: 'UTC' });
 }
@@ -120,7 +148,17 @@ async function seedMilestonesForRange(goal, rangeStart, rangeEnd, { includeEndGo
  * stuck at the first cycle's 4-week window.
  */
 async function seedGoalTimeline(dietPlan) {
-  const { patientId, dieticianId, _id: dietPlanId, startDate, endDate } = dietPlan;
+  const { patientId, dieticianId, _id: dietPlanId } = dietPlan;
+  // weekSchedule is the only place a plan's real start/end dates are
+  // reliably populated - activateDietPlan never sets the top-level
+  // startDate/endDate fields themselves (confirmed against real data).
+  const startDate = resolvePlanStartDate(dietPlan);
+  const endDate = resolvePlanEndDate(dietPlan);
+  if (!startDate || !endDate) {
+    // No weekSchedule yet (plan finalized but never went through the
+    // week-schedule-generating step) - nothing to seed a timeline from.
+    return null;
+  }
 
   const existingGoal = await Goal.findOne({ patientId, status: 'active' });
 
