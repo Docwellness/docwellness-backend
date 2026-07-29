@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 
 let usernameIndexCleanupAttempted = false;
 
@@ -31,6 +32,57 @@ async function dropStaleUsernameIndex(connection) {
   }
 }
 
+// A `mongodb+srv://` URI needs a DNS SRV lookup before the driver can even
+// open a socket - seen intermittently failing with `querySrv ECONNREFUSED`
+// on a freshly-spawned process (Node's bundled c-ares resolver occasionally
+// drops the very first DNS query a cold process issues, particularly on
+// Windows - confirmed the domain itself resolves fine via the OS's own
+// `nslookup` in the same moment a Node process's own querySrv call fails).
+// Retried a few times with a short backoff rather than treated as fatal -
+// this is exactly the kind of transient blip a production process
+// restarting after a network hiccup could also hit, not just a
+// dev-environment quirk.
+async function connectWithRetry(uri, { attempts = 3, delayMs = 800 } = {}) {
+  let lastError;
+  let triedFallbackDns = false;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await mongoose.connect(uri);
+    } catch (error) {
+      lastError = error;
+      const isDnsSrvHiccup = error.code === 'ECONNREFUSED' && error.syscall === 'querySrv';
+      if (!isDnsSrvHiccup) throw error;
+
+      // Some environments have multiple/virtual network adapters (VPN,
+      // Docker, etc.) whose DNS servers Node's resolver picks up
+      // inconsistently per-process, even when the OS's own resolver (and
+      // other already-running Node processes) succeed - confirmed exactly
+      // this on a machine where the API server connected fine but a
+      // separately-launched worker process's SRV lookup failed 3 attempts
+      // in a row against its own default resolver. Falling back to known-
+      // public DNS servers for the SRV lookup specifically resolves that
+      // class of issue without touching the OS/network configuration.
+      if (!triedFallbackDns) {
+        triedFallbackDns = true;
+        console.error(
+          'connectDB: SRV DNS lookup failed on the default resolver, falling back to public DNS (8.8.8.8/1.1.1.1):',
+          error.message
+        );
+        dns.setServers(['8.8.8.8', '1.1.1.1']);
+        continue; // retry immediately with the new resolver, don't burn an attempt on backoff
+      }
+
+      if (attempt === attempts) throw error;
+      console.error(
+        `connectDB: attempt ${attempt}/${attempts} hit a transient SRV DNS lookup failure, retrying:`,
+        error.message
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Database connection configuration.
  *
@@ -43,7 +95,7 @@ const connectDB = async () => {
     return mongoose.connection;
   }
 
-  const conn = await mongoose.connect(process.env.MONGODB_URI);
+  const conn = await connectWithRetry(process.env.MONGODB_URI);
   console.log(`MongoDB Connected: ${conn.connection.host}`);
   await dropStaleUsernameIndex(conn.connection);
   return conn.connection;
