@@ -14,6 +14,7 @@ const waterController = require('./waterController');
 const journeyController = require('./journeyController');
 const couponController = require('./couponController');
 const firstConsultationController = require('./firstConsultationController');
+const timelineController = require('./timelineController');
 
 module.exports = {
   authController,
@@ -27,4 +28,5 @@ module.exports = {
   journeyController,
   couponController,
   firstConsultationController,
+  timelineController,
 };

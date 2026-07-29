@@ -6,7 +6,6 @@ const MealLog = require('./MealLog');
 const Progress = require('./Progress');
 const Chat = require('./Chat');
 const Conversation = require('./Conversation');
-const Payment = require('./Payment');
 const Notification = require('./Notification');
 const ManualPaymentProof = require('./ManualPaymentProof');
 const DietPlanRequest = require('./DietPlanRequest');
@@ -16,6 +15,11 @@ const Quote = require('./Quote');
 const Coupon = require('./Coupon');
 const ConsultationFormTemplate = require('./ConsultationFormTemplate');
 const GenerationLog = require('./GenerationLog');
+const Goal = require('./Goal');
+const Milestone = require('./Milestone');
+const MilestoneTask = require('./MilestoneTask');
+const CheckIn = require('./CheckIn');
+const Nudge = require('./Nudge');
 
 module.exports = {
   User,
@@ -26,7 +30,6 @@ module.exports = {
   Progress,
   Chat,
   Conversation,
-  Payment,
   Notification,
   ManualPaymentProof,
   DietPlanRequest,
@@ -36,4 +39,9 @@ module.exports = {
   Coupon,
   ConsultationFormTemplate,
   GenerationLog,
+  Goal,
+  Milestone,
+  MilestoneTask,
+  CheckIn,
+  Nudge,
 };

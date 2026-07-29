@@ -5,7 +5,7 @@ require('dotenv').config();
 // silently failing because JWT_SECRET is undefined and jwt.sign() throws).
 // Limited to the variables genuinely required for ANY request to work at
 // all (DB access, JWT signing, Supabase-backed auth verification) - not
-// every optional integration (Cloudinary/Razorpay/Resend/OpenAI/Pexels/
+// every optional integration (Cloudinary/Resend/OpenAI/Pexels/
 // Sentry all degrade that specific feature gracefully or are read with a
 // safe default above, so they're deliberately excluded here rather than
 // blocking startup over a feature nobody's using yet in this environment).
@@ -50,10 +50,6 @@ module.exports = {
     url: process.env.SUPABASE_URL,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET,
-  },
   email: {
     resendApiKey: process.env.RESEND_API_KEY,
     // Resend's shared sandbox sender until docwellness.fit is verified in
@@ -87,4 +83,12 @@ module.exports = {
   // no-ops (cache miss, no adapter) when this is null, rather than each
   // call site having to check config.redisUrl itself.
   redisUrl: process.env.REDIS_URL || null,
+  // Optional FCM push (Goal Journey Timeline nudges). Unset by default -
+  // utils/push.js no-ops entirely when this is null, same "optional
+  // integration degrades gracefully" convention as redisUrl above. Value is
+  // the full Firebase service-account JSON, base64-encoded - never a
+  // committed file.
+  fcm: {
+    serviceAccountBase64: process.env.FCM_SERVICE_ACCOUNT_BASE64 || null,
+  },
 };

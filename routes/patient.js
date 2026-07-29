@@ -29,6 +29,7 @@ const {
   waterController,
   journeyController,
   firstConsultationController,
+  timelineController,
 } = require('../controllers/patient');
 const {
   consultationFormController,
@@ -46,6 +47,7 @@ const patientOnly = [authenticate, roleCheck('patient')];
 // 400 before it ever reaches a Mongoose query - see validateObjectIdParam's
 // doc comment for the production CastError this was closing.
 router.param('id', validateObjectIdParam);
+router.param('taskId', validateObjectIdParam);
 
 // ==========================================
 // Authentication Routes (Public)
@@ -473,6 +475,47 @@ router.post(
  * @desc    Get all manually uploaded journey images for the patient
  */
 router.get('/journey', patientOnly, journeyController.getJourneyImages);
+
+// ==========================================
+// Device Token (push notifications)
+// ==========================================
+const deviceTokenController = require('../controllers/deviceTokenController');
+
+/**
+ * @route   POST /api/patient/device-token
+ * @desc    Register/refresh this device's FCM token for push notifications
+ */
+router.post('/device-token', patientOnly, deviceTokenController.registerDeviceToken);
+
+// ==========================================
+// Goal Journey Timeline Routes
+// ==========================================
+// Distinct from the photo-based Journey routes above - this is a
+// task/adherence timeline toward a weight goal, not before/after images.
+
+/**
+ * @route   GET /api/patient/timeline?from=-14&to=30
+ * @desc    Full goal + stats + windowed milestone/task list
+ */
+router.get('/timeline', patientOnly, timelineController.getTimeline);
+
+/**
+ * @route   GET /api/patient/timeline/summary
+ * @desc    Header stats only (light poll after a check-in)
+ */
+router.get('/timeline/summary', patientOnly, timelineController.getTimelineSummary);
+
+/**
+ * @route   POST /api/patient/check-ins
+ * @desc    Mark a task done for today
+ */
+router.post('/check-ins', patientOnly, timelineController.createCheckIn);
+
+/**
+ * @route   DELETE /api/patient/check-ins/today/:taskId
+ * @desc    Uncheck a task for today
+ */
+router.delete('/check-ins/today/:taskId', patientOnly, timelineController.deleteTodayCheckIn);
 
 // ==========================================
 // Videos Routes (visible videos from dietician)

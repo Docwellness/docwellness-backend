@@ -12,6 +12,7 @@ const {
 } = require('../../models');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
+const { seedGoalTimeline } = require('../../utils/seedGoalTimeline');
 const { parsePagination, buildPaginationMeta } = require('../../utils/pagination');
 const {
   buildFirstConsultationPayload,
@@ -2439,6 +2440,14 @@ exports.activateDietPlan = async (req, res, next) => {
     dietPlan.isPaid = true;
     dietPlan.activationDate = dietPlan.activationDate || new Date();
     await dietPlan.save();
+
+    // Goal Journey Timeline seeding (fire-and-forget - must never fail or
+    // delay activation). See utils/seedGoalTimeline.js for the create-vs-
+    // extend logic (first activation creates the goal; a later renewal
+    // extends its existing timeline instead of re-seeding).
+    seedGoalTimeline(dietPlan).catch((err) => {
+      console.error('[activateDietPlan] goal timeline seeding failed:', err.message);
+    });
 
     // Compute subscription expiry for user status
     const subscriptionExpiresAt = dietPlan.request?.subscriptionExpiresAt || null;

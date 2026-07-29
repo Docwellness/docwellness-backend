@@ -184,7 +184,19 @@ const userSchema = new mongoose.Schema(
 
     // For tracking
     lastLogin: Date,
-    deviceToken: String, // For push notifications
+    deviceToken: String, // Deprecated/unused legacy field - see deviceTokens below
+    // Multi-device FCM tokens (a user may be logged in on more than one
+    // device) - see utils/push.js and controllers/deviceTokenController.js.
+    deviceTokens: {
+      type: [
+        {
+          token: { type: String, required: true },
+          platform: { type: String, enum: ['android', 'ios'], required: true },
+          updatedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

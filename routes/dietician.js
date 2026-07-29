@@ -20,6 +20,7 @@ const {
   profileController,
   couponController,
   consultationFormController,
+  timelineController,
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
@@ -689,5 +690,60 @@ router.put(
  * @desc    Mark a single notification as read
  */
 router.put('/notifications/:id/read', dieticianOnlyMiddleware, notificationController.markAsRead);
+
+// ==========================================
+// Device Token (push notifications)
+// ==========================================
+const deviceTokenController = require('../controllers/deviceTokenController');
+
+/**
+ * @route   POST /api/dietician/device-token
+ * @desc    Register/refresh this device's FCM token for push notifications
+ */
+router.post('/device-token', dieticianOnlyMiddleware, deviceTokenController.registerDeviceToken);
+
+// ==========================================
+// Goal Journey Timeline Routes
+// ==========================================
+// Distinct from the photo-based Journey routes elsewhere - this is a
+// task/adherence timeline toward a patient's weight goal.
+
+/**
+ * @route   GET /api/dietician/patients/:patientId/timeline?from=-30&to=30
+ * @desc    Adherence-heat line for a specific patient (verifies assignment)
+ */
+router.get(
+  '/patients/:patientId/timeline',
+  dieticianOnlyMiddleware,
+  timelineController.getPatientTimeline
+);
+
+/**
+ * @route   GET /api/dietician/patients/:patientId/days/:date/logs
+ * @desc    What the patient actually logged that day (meals + weight)
+ */
+router.get(
+  '/patients/:patientId/days/:date/logs',
+  dieticianOnlyMiddleware,
+  timelineController.getDayLogs
+);
+
+/**
+ * @route   POST /api/dietician/nudges
+ * @desc    Send an encouragement message to a patient
+ */
+router.post('/nudges', dieticianOnlyMiddleware, timelineController.createNudge);
+
+/**
+ * @route   POST /api/dietician/milestones
+ * @desc    Add a custom milestone (with optional tasks) to a patient's goal
+ */
+router.post('/milestones', dieticianOnlyMiddleware, timelineController.createMilestone);
+
+/**
+ * @route   PUT /api/dietician/milestones/:id
+ * @desc    Edit an existing milestone's targets/tasks
+ */
+router.put('/milestones/:id', dieticianOnlyMiddleware, timelineController.updateMilestone);
 
 module.exports = router;
