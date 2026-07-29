@@ -1,0 +1,14 @@
+node_modules
+uploads
+logs
+*.log
+.env
+.env.*
+.git
+.github
+.vercel
+coverage
+.nyc_output
+tests
+*.md
+*.txt
