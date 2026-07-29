@@ -85,6 +85,44 @@ describe('GET /api/patient/timeline', () => {
   });
 });
 
+describe('GET /api/patient/timeline/days/:date/logs', () => {
+  test("returns this patient's own logged meals and weight for the date", async () => {
+    const dietician = await createDietician();
+    const { patient } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const { MealLog, Progress } = require('../models');
+    const date = new Date('2026-07-28T00:00:00.000Z');
+    await MealLog.create({
+      patientId: patient._id,
+      date,
+      meals: [{ mealType: 'Breakfast', servingTime: 'Breakfast', caloriesConsumed: 350 }],
+    });
+    await Progress.create({ patientId: patient._id, date, weight: 73 });
+
+    const res = await request(app)
+      .get('/api/patient/timeline/days/2026-07-28/logs')
+      .set('Authorization', 'Bearer patient-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.meals).toHaveLength(1);
+    expect(res.body.data.meals[0].mealType).toBe('Breakfast');
+    expect(res.body.data.progress).toHaveLength(1);
+    expect(res.body.data.progress[0].weight).toBe(73);
+  });
+
+  test('400s on an invalid date', async () => {
+    const patient = await createPatient();
+    registerTestToken('patient-token', patient._id);
+
+    const res = await request(app)
+      .get('/api/patient/timeline/days/not-a-date/logs')
+      .set('Authorization', 'Bearer patient-token');
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('POST /api/patient/check-ins + DELETE /check-ins/today/:taskId', () => {
   test('checks in a task, reflects done:true afterward, then uncheck reverts it', async () => {
     const dietician = await createDietician();

@@ -3,7 +3,7 @@ const asyncHandler = require('../../utils/async-handler');
 const ApiError = require('../../utils/api-error');
 const { sendSuccess } = require('../../utils/api-response');
 const { computeGoalStats } = require('../../utils/goalAdherence');
-const { buildTimelinePayload, shapeGoal } = require('../../utils/timelinePayload');
+const { buildTimelinePayload, shapeGoal, getDayLogs } = require('../../utils/timelinePayload');
 const { getChatIO } = require('../../chat');
 
 /**
@@ -28,6 +28,19 @@ exports.getTimeline = asyncHandler(async (req, res) => {
 exports.getTimelineSummary = asyncHandler(async (req, res) => {
   const { goal, stats } = await computeGoalStats(req.user._id);
   return sendSuccess(res, { data: { goal: goal ? shapeGoal(goal) : null, stats } });
+});
+
+/**
+ * @route   GET /api/patient/timeline/days/:date/logs
+ * @desc    What this patient actually logged that day (meals + weight) -
+ *          shown behind a milestone node on their own timeline
+ * @access  Patient only
+ */
+exports.getMyDayLogs = asyncHandler(async (req, res) => {
+  const { date } = req.params;
+  const logs = await getDayLogs(req.user._id, date);
+  if (!logs) throw ApiError.badRequest('Invalid date');
+  return sendSuccess(res, { data: logs });
 });
 
 /**

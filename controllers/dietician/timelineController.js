@@ -1,17 +1,8 @@
-const {
-  Goal,
-  Milestone,
-  MilestoneTask,
-  Nudge,
-  Notification,
-  MealLog,
-  Progress,
-  User,
-} = require('../../models');
+const { Goal, Milestone, MilestoneTask, Nudge, Notification, User } = require('../../models');
 const asyncHandler = require('../../utils/async-handler');
 const ApiError = require('../../utils/api-error');
 const { sendSuccess } = require('../../utils/api-response');
-const { buildTimelinePayload } = require('../../utils/timelinePayload');
+const { buildTimelinePayload, getDayLogs } = require('../../utils/timelinePayload');
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
 
@@ -54,24 +45,10 @@ exports.getDayLogs = asyncHandler(async (req, res) => {
   const { patientId, date } = req.params;
   await assertAssignedGoal(patientId, req.user._id);
 
-  const day = new Date(date);
-  if (Number.isNaN(day.getTime())) throw ApiError.badRequest('Invalid date');
-  const dayStart = new Date(day);
-  dayStart.setUTCHours(0, 0, 0, 0);
-  const dayEnd = new Date(day);
-  dayEnd.setUTCHours(23, 59, 59, 999);
+  const logs = await getDayLogs(patientId, date);
+  if (!logs) throw ApiError.badRequest('Invalid date');
 
-  const [mealLog, progressEntries] = await Promise.all([
-    MealLog.findOne({ patientId, date: { $gte: dayStart, $lte: dayEnd } }).lean(),
-    Progress.find({ patientId, date: { $gte: dayStart, $lte: dayEnd } }).lean(),
-  ]);
-
-  return sendSuccess(res, {
-    data: {
-      meals: mealLog?.meals || [],
-      progress: progressEntries,
-    },
-  });
+  return sendSuccess(res, { data: logs });
 });
 
 /**

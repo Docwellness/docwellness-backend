@@ -506,6 +506,12 @@ router.get('/timeline', patientOnly, timelineController.getTimeline);
 router.get('/timeline/summary', patientOnly, timelineController.getTimelineSummary);
 
 /**
+ * @route   GET /api/patient/timeline/days/:date/logs
+ * @desc    What this patient actually logged that day
+ */
+router.get('/timeline/days/:date/logs', patientOnly, timelineController.getMyDayLogs);
+
+/**
  * @route   POST /api/patient/check-ins
  * @desc    Mark a task done for today
  */

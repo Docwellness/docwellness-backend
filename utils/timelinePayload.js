@@ -3,7 +3,7 @@
 // controllers/dietician/timelineController.js (a specific patient's
 // timeline), so the two never silently diverge in shape.
 
-const { Milestone, MilestoneTask, CheckIn } = require('../models');
+const { Milestone, MilestoneTask, CheckIn, MealLog, Progress } = require('../models');
 const {
   computeGoalStats,
   computeAdherenceForMilestones,
@@ -94,4 +94,29 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   return { goal: shapeGoal(goal), stats, milestones: shapedMilestones };
 }
 
-module.exports = { buildTimelinePayload, shapeGoal, parseRangeParam };
+/**
+ * What a patient actually logged on a given day (meals + weight/measurements)
+ * - reads existing MealLog/Progress, no new storage. Shared by both the
+ * patient's own "what did I log" view and the dietician's day-logs sheet.
+ */
+async function getDayLogs(patientId, dateStr) {
+  const day = new Date(dateStr);
+  if (Number.isNaN(day.getTime())) return null;
+
+  const dayStart = new Date(day);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(day);
+  dayEnd.setUTCHours(23, 59, 59, 999);
+
+  const [mealLog, progressEntries] = await Promise.all([
+    MealLog.findOne({ patientId, date: { $gte: dayStart, $lte: dayEnd } }).lean(),
+    Progress.find({ patientId, date: { $gte: dayStart, $lte: dayEnd } }).lean(),
+  ]);
+
+  return {
+    meals: mealLog?.meals || [],
+    progress: progressEntries,
+  };
+}
+
+module.exports = { buildTimelinePayload, shapeGoal, parseRangeParam, getDayLogs };
