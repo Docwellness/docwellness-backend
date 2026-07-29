@@ -3,11 +3,12 @@
 // controllers/dietician/timelineController.js (a specific patient's
 // timeline), so the two never silently diverge in shape.
 
-const { Milestone, MilestoneTask, CheckIn, MealLog, Progress } = require('../models');
+const { Milestone, MilestoneTask, MealLog, Progress } = require('../models');
 const {
   computeGoalStats,
   computeAdherenceForMilestones,
   computeMilestoneStatus,
+  computeTaskDoneMap,
 } = require('./goalAdherence');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -57,23 +58,25 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     .lean();
 
   const milestoneIds = milestones.map((m) => m._id);
-  const [adherenceMap, tasks, checkIns] = await Promise.all([
-    computeAdherenceForMilestones(milestoneIds),
+  const [adherenceMap, tasks, taskDoneMap] = await Promise.all([
+    computeAdherenceForMilestones(patientId, milestoneIds, milestones),
     MilestoneTask.find({ milestoneId: { $in: milestoneIds } }).sort({ sortOrder: 1 }).lean(),
-    CheckIn.find({ milestoneId: { $in: milestoneIds } }).select('taskId').lean(),
+    computeTaskDoneMap(patientId, milestones),
   ]);
 
-  const doneTaskIds = new Set(checkIns.map((c) => c.taskId.toString()));
   const tasksByMilestone = new Map();
   for (const t of tasks) {
     const key = t.milestoneId.toString();
     if (!tasksByMilestone.has(key)) tasksByMilestone.set(key, []);
+    const info = taskDoneMap.get(t._id.toString()) || { done: false, linked: false, loggedNote: null };
     tasksByMilestone.get(key).push({
       id: t._id,
       title: t.title,
       metric: t.metric,
       icon: t.icon,
-      done: doneTaskIds.has(t._id.toString()),
+      linked: info.linked,
+      done: info.done,
+      loggedNote: info.loggedNote,
     });
   }
 

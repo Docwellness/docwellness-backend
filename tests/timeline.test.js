@@ -80,8 +80,39 @@ describe('GET /api/patient/timeline', () => {
     expect(res.body.data.goal.targetValue).toBe(64);
     expect(res.body.data.milestones.length).toBeGreaterThan(0);
     const daily = res.body.data.milestones.find((m) => m.type === 'daily');
-    expect(daily.tasks.length).toBe(4);
+    expect(daily.tasks.length).toBe(8);
     expect(daily.tasks[0]).toHaveProperty('done');
+    expect(daily.tasks[0]).toHaveProperty('linked');
+  });
+
+  test('marks a meal-linked task done from a real MealLog entry, not a check-in', async () => {
+    const dietician = await createDietician();
+    const { patient } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const { MealLog } = require('../models');
+    const date = new Date('2026-07-05T00:00:00.000Z');
+    await MealLog.create({
+      patientId: patient._id,
+      date,
+      meals: [{ mealType: 'Breakfast', servingTime: 'Breakfast', caloriesConsumed: 320 }],
+    });
+
+    const res = await request(app)
+      .get('/api/patient/timeline?from=-30&to=30')
+      .set('Authorization', 'Bearer patient-token');
+
+    const daily = res.body.data.milestones.find(
+      (m) => m.type === 'daily' && m.date.startsWith('2026-07-05')
+    );
+    const breakfastTask = daily.tasks.find((t) => t.title === 'Breakfast');
+    expect(breakfastTask.linked).toBe(true);
+    expect(breakfastTask.done).toBe(true);
+    expect(breakfastTask.loggedNote).toBe('320 kcal');
+
+    const supplementsTask = daily.tasks.find((t) => t.title === 'Supplements');
+    expect(supplementsTask.linked).toBe(false);
+    expect(supplementsTask.done).toBe(false);
   });
 });
 
@@ -134,7 +165,10 @@ describe('POST /api/patient/check-ins + DELETE /check-ins/today/:taskId', () => 
       type: 'daily',
       date: { $lte: new Date() },
     }).sort({ date: -1 });
-    const task = await MilestoneTask.findOne({ milestoneId: todayMilestone._id });
+    // Supplements is the only daily task still manually checked off - every
+    // other one is meal-linked (see MEAL_LINKED_TASK_TITLES) and rejects a
+    // manual check-in outright.
+    const task = await MilestoneTask.findOne({ milestoneId: todayMilestone._id, title: 'Supplements' });
 
     const checkInRes = await request(app)
       .post('/api/patient/check-ins')
@@ -157,6 +191,26 @@ describe('POST /api/patient/check-ins + DELETE /check-ins/today/:taskId', () => 
       .set('Authorization', 'Bearer patient-token');
     expect(deleteRes.status).toBe(200);
     expect(await CheckIn.countDocuments({ taskId: task._id })).toBe(0);
+  });
+
+  test('400s trying to manually check in a meal-linked task', async () => {
+    const dietician = await createDietician();
+    const { patient, goal } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const todayMilestone = await Milestone.findOne({
+      goalId: goal._id,
+      type: 'daily',
+      date: { $lte: new Date() },
+    }).sort({ date: -1 });
+    const linkedTask = await MilestoneTask.findOne({ milestoneId: todayMilestone._id, title: 'Breakfast' });
+
+    const res = await request(app)
+      .post('/api/patient/check-ins')
+      .set('Authorization', 'Bearer patient-token')
+      .send({ taskId: linkedTask._id.toString(), milestoneId: todayMilestone._id.toString() });
+
+    expect(res.status).toBe(400);
   });
 
   test("403s when trying to check in on another patient's task", async () => {

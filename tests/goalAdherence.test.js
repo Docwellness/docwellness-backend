@@ -116,7 +116,7 @@ describe('computeAdherenceForMilestones', () => {
     await checkIn(patient._id, tasks[0], milestone._id, '2026-07-10');
     await checkIn(patient._id, tasks[1], milestone._id, '2026-07-10');
 
-    const map = await goalAdherence.computeAdherenceForMilestones([milestone._id]);
+    const map = await goalAdherence.computeAdherenceForMilestones(patient._id, [milestone._id]);
     const entry = map.get(milestone._id.toString());
 
     expect(entry.tasksTotal).toBe(4);
@@ -135,7 +135,7 @@ describe('computeAdherenceForMilestones', () => {
       sortOrder: 900,
     });
 
-    const map = await goalAdherence.computeAdherenceForMilestones([milestone._id]);
+    const map = await goalAdherence.computeAdherenceForMilestones(patient._id, [milestone._id]);
     const entry = map.get(milestone._id.toString());
 
     expect(entry.tasksTotal).toBe(0);

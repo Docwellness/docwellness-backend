@@ -2,12 +2,33 @@ const { Goal, Milestone, MilestoneTask, User, Progress } = require('../models');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// One task per MealLog serving-time (see models/MealLog.js's mealType enum -
+// buildTimelinePayload matches a task's title against a patient's actual
+// logged meals for that day by this exact string), plus Supplements, which
+// has no dedicated log model and stays manually checked off via CheckIn.
 const DEFAULT_DAILY_TASKS = [
-  { title: 'Log all 3 meals', metric: '3 meals', icon: 'restaurant', sortOrder: 1 },
-  { title: 'Drink water', metric: '8 glasses', icon: 'water_drop', sortOrder: 2 },
-  { title: 'Walk', metric: '30 min', icon: 'walk', sortOrder: 3 },
-  { title: 'Sleep by 11 pm', metric: '7+ hrs', icon: 'sleep', sortOrder: 4 },
+  { title: 'Morning Drink', metric: '', icon: 'morning_drink', sortOrder: 1 },
+  { title: 'Breakfast', metric: '', icon: 'breakfast', sortOrder: 2 },
+  { title: 'Brunch', metric: '', icon: 'brunch', sortOrder: 3 },
+  { title: 'Lunch', metric: '', icon: 'lunch', sortOrder: 4 },
+  { title: 'Evening Snack', metric: '', icon: 'evening_snack', sortOrder: 5 },
+  { title: 'Dinner', metric: '', icon: 'dinner', sortOrder: 6 },
+  { title: 'Night Drink', metric: '', icon: 'night_drink', sortOrder: 7 },
+  { title: 'Supplements', metric: '', icon: 'supplements', sortOrder: 8 },
 ];
+
+// Titles that match a models/MealLog.js mealType exactly - buildTimelinePayload
+// uses this set to know which tasks are log-linked (auto-done from real
+// logs) vs manually checked off (Supplements).
+const MEAL_LINKED_TASK_TITLES = new Set([
+  'Morning Drink',
+  'Breakfast',
+  'Brunch',
+  'Lunch',
+  'Evening Snack',
+  'Dinner',
+  'Night Drink',
+]);
 
 function toDateOnly(d) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -215,4 +236,9 @@ async function seedGoalTimeline(dietPlan) {
   return goal;
 }
 
-module.exports = { seedGoalTimeline, seedMilestonesForRange, DEFAULT_DAILY_TASKS };
+module.exports = {
+  seedGoalTimeline,
+  seedMilestonesForRange,
+  DEFAULT_DAILY_TASKS,
+  MEAL_LINKED_TASK_TITLES,
+};

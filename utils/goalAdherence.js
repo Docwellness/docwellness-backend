@@ -11,7 +11,8 @@
 // "streak", to keep it unambiguous next to those two.
 
 const { MS_PER_DAY } = require('./trackingBuckets');
-const { Milestone, MilestoneTask, CheckIn, Goal, Progress } = require('../models');
+const { Milestone, MilestoneTask, CheckIn, Goal, Progress, MealLog } = require('../models');
+const { MEAL_LINKED_TASK_TITLES } = require('./seedGoalTimeline');
 
 const ADHERENCE_COMPLETE_THRESHOLD = 0.6;
 
@@ -26,21 +27,85 @@ function startOfTodayUTC() {
 }
 
 /**
- * Batches task + check-in lookups for a set of milestones into one query
- * each (not one per milestone), returning
+ * Single source of truth for "is this task done" - a meal-linked task (see
+ * MEAL_LINKED_TASK_TITLES, seedGoalTimeline.js) is done when the patient's
+ * real MealLog for that milestone's day has a matching mealType entry, not
+ * from a separate manual check-in that could silently drift from the real
+ * log; every other task (Supplements) is done via the existing CheckIn
+ * flow. Used by both computeAdherenceForMilestones (aggregate stats) and
+ * timelinePayload.js (per-task shaping for the API response), so adherence/
+ * streak and what the client displays as "done" can never disagree.
+ *
+ * `milestones` just needs `_id` and `date` on each entry (lean docs are
+ * fine even without `type` selected - only daily milestones ever have
+ * MilestoneTask docs at all, so no type filter is needed here).
+ * Returns Map<taskId string, { done, linked, loggedNote }>.
+ */
+async function computeTaskDoneMap(patientId, milestones) {
+  const result = new Map();
+  if (!milestones || milestones.length === 0) return result;
+
+  const milestoneIds = milestones.map((m) => m._id);
+  const tasks = await MilestoneTask.find({ milestoneId: { $in: milestoneIds } })
+    .select('milestoneId title')
+    .lean();
+  if (tasks.length === 0) return result;
+
+  const taskIds = tasks.map((t) => t._id);
+  const checkIns = await CheckIn.find({ taskId: { $in: taskIds } }).select('taskId').lean();
+  const checkedInIds = new Set(checkIns.map((c) => c.taskId.toString()));
+
+  const dates = milestones.map((m) => new Date(m.date)).sort((a, b) => a - b);
+  const mealLogs = await MealLog.find({
+    patientId,
+    date: { $gte: dates[0], $lte: dates[dates.length - 1] },
+  }).lean();
+
+  const mealsByDateKey = new Map();
+  for (const log of mealLogs) {
+    const key = dateKeyUTC(log.date);
+    if (!mealsByDateKey.has(key)) mealsByDateKey.set(key, new Map());
+    const byType = mealsByDateKey.get(key);
+    for (const meal of log.meals || []) byType.set(meal.mealType, meal);
+  }
+
+  const milestoneById = new Map(milestones.map((m) => [m._id.toString(), m]));
+  for (const t of tasks) {
+    const milestone = milestoneById.get(t.milestoneId.toString());
+    const linked = MEAL_LINKED_TASK_TITLES.has(t.title);
+    const dateKey = milestone ? dateKeyUTC(milestone.date) : null;
+    const loggedMeal = linked && dateKey ? mealsByDateKey.get(dateKey)?.get(t.title) : null;
+    result.set(t._id.toString(), {
+      done: linked ? Boolean(loggedMeal) : checkedInIds.has(t._id.toString()),
+      linked,
+      loggedNote: loggedMeal ? (loggedMeal.caloriesConsumed ? `${loggedMeal.caloriesConsumed} kcal` : 'Logged') : null,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Batches task + done-state lookups for a set of milestones into one pass
+ * (not one per milestone), returning
  * Map<milestoneId string, { tasksTotal, tasksDone, adherence }>.
  * adherence is 0 for a milestone with no tasks at all (weekly/monthly/
  * end_goal nodes don't get default tasks - see seedGoalTimeline.js) rather
- * than NaN/undefined.
+ * than NaN/undefined. `milestonesHint`, if given (each needs `_id`+`date`),
+ * skips the internal Milestone.find lookup for callers that already have
+ * the docs loaded.
  */
-async function computeAdherenceForMilestones(milestoneIds) {
+async function computeAdherenceForMilestones(patientId, milestoneIds, milestonesHint) {
   const result = new Map();
   if (!milestoneIds || milestoneIds.length === 0) return result;
+
+  const milestones =
+    milestonesHint || (await Milestone.find({ _id: { $in: milestoneIds } }).select('date').lean());
+  const taskDoneMap = await computeTaskDoneMap(patientId, milestones);
 
   const tasks = await MilestoneTask.find({ milestoneId: { $in: milestoneIds } })
     .select('milestoneId')
     .lean();
-
   const tasksByMilestone = new Map();
   for (const t of tasks) {
     const key = t.milestoneId.toString();
@@ -48,24 +113,11 @@ async function computeAdherenceForMilestones(milestoneIds) {
     tasksByMilestone.get(key).push(t._id.toString());
   }
 
-  const taskIds = tasks.map((t) => t._id);
-  const checkIns = taskIds.length
-    ? await CheckIn.find({ taskId: { $in: taskIds } }).select('taskId milestoneId').lean()
-    : [];
-
-  const doneTaskIdsByMilestone = new Map();
-  for (const c of checkIns) {
-    const key = c.milestoneId.toString();
-    if (!doneTaskIdsByMilestone.has(key)) doneTaskIdsByMilestone.set(key, new Set());
-    doneTaskIdsByMilestone.get(key).add(c.taskId.toString());
-  }
-
   for (const milestoneId of milestoneIds) {
     const key = milestoneId.toString();
     const taskIdsForM = tasksByMilestone.get(key) || [];
-    const doneSet = doneTaskIdsByMilestone.get(key) || new Set();
     const tasksTotal = taskIdsForM.length;
-    const tasksDone = taskIdsForM.filter((id) => doneSet.has(id)).length;
+    const tasksDone = taskIdsForM.filter((id) => taskDoneMap.get(id)?.done).length;
     const adherence = tasksTotal === 0 ? 0 : tasksDone / tasksTotal;
     result.set(key, { tasksTotal, tasksDone, adherence });
   }
@@ -114,7 +166,11 @@ async function computeGoalStreak(patientId, today = startOfTodayUTC()) {
 
   if (dailyMilestones.length === 0) return 0;
 
-  const adherenceMap = await computeAdherenceForMilestones(dailyMilestones.map((m) => m._id));
+  const adherenceMap = await computeAdherenceForMilestones(
+    patientId,
+    dailyMilestones.map((m) => m._id),
+    dailyMilestones
+  );
 
   let startIndex = 0;
   const mostRecent = dailyMilestones[0];
@@ -210,12 +266,20 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
     predictedEndDate(goal),
   ]);
 
-  const weekAdherence = await computeAdherenceForMilestones(weekMilestones.map((m) => m._id));
+  const weekAdherence = await computeAdherenceForMilestones(
+    patientId,
+    weekMilestones.map((m) => m._id),
+    weekMilestones
+  );
   const weekDone = weekMilestones.filter(
     (m) => (weekAdherence.get(m._id.toString())?.adherence ?? 0) >= ADHERENCE_COMPLETE_THRESHOLD
   ).length;
 
-  const last30Adherence = await computeAdherenceForMilestones(last30Milestones.map((m) => m._id));
+  const last30Adherence = await computeAdherenceForMilestones(
+    patientId,
+    last30Milestones.map((m) => m._id),
+    last30Milestones
+  );
   const adherenceValues = last30Milestones.map(
     (m) => last30Adherence.get(m._id.toString())?.adherence ?? 0
   );
@@ -226,6 +290,17 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
         100;
 
   const daysToGo = Math.max(0, Math.round((goal.endDate.getTime() - today.getTime()) / MS_PER_DAY));
+  // Days elapsed since the goal started, clamped to the goal's own total
+  // span so a client showing "X completed / Y remaining" never sums to more
+  // than the actual goal length (e.g. querying the day the goal starts).
+  const totalDays = Math.max(
+    1,
+    Math.round((goal.endDate.getTime() - goal.startDate.getTime()) / MS_PER_DAY)
+  );
+  const daysElapsed = Math.min(
+    totalDays,
+    Math.max(0, Math.round((today.getTime() - goal.startDate.getTime()) / MS_PER_DAY))
+  );
   const onPace = predicted ? predicted <= goal.endDate : null;
 
   return {
@@ -236,6 +311,7 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
       weekTotal: weekMilestones.length,
       adherence30d,
       daysToGo,
+      daysElapsed,
       predictedEndDate: predicted,
       onPace,
     },
@@ -244,6 +320,7 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
 
 module.exports = {
   ADHERENCE_COMPLETE_THRESHOLD,
+  computeTaskDoneMap,
   computeAdherenceForMilestones,
   computeMilestoneStatus,
   computeGoalStreak,

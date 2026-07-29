@@ -4,6 +4,7 @@ const ApiError = require('../../utils/api-error');
 const { sendSuccess } = require('../../utils/api-response');
 const { computeGoalStats } = require('../../utils/goalAdherence');
 const { buildTimelinePayload, shapeGoal, getDayLogs } = require('../../utils/timelinePayload');
+const { MEAL_LINKED_TASK_TITLES } = require('../../utils/seedGoalTimeline');
 const { getChatIO } = require('../../chat');
 
 /**
@@ -62,9 +63,19 @@ exports.createCheckIn = asyncHandler(async (req, res) => {
 
   // Ownership check: the milestone's goal must belong to this patient -
   // otherwise any authenticated patient could check off another patient's
-  // task by guessing/enumerating ids.
+  // task by guessing/enumerating ids. Checked before the meal-linked guard
+  // below so a wrong-patient request always 403s, regardless of task type.
   const goal = await Goal.findOne({ _id: milestone.goalId, patientId: req.user._id });
   if (!goal) throw ApiError.forbidden('Not your milestone');
+
+  // Meal-linked tasks (Morning Drink...Night Drink) are done automatically
+  // from the patient's real MealLog entries (see utils/goalAdherence.js's
+  // computeTaskDoneMap) - a manual check-in here would be a state that can
+  // never actually be read back as "done", so reject it outright rather
+  // than silently no-op.
+  if (MEAL_LINKED_TASK_TITLES.has(task.title)) {
+    throw ApiError.badRequest('This task is logged automatically from your meal log');
+  }
 
   const todayKey = new Date().toISOString().slice(0, 10);
 

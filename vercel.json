@@ -9,6 +9,10 @@
     {
       "path": "/api/internal/cron/renewal-reminders",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/cron/goal-nudges",
+      "schedule": "30 3 * * *"
     }
   ]
 }

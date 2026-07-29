@@ -54,6 +54,14 @@ const goalSchema = new mongoose.Schema(
       enum: ['active', 'paused', 'completed', 'abandoned'],
       default: 'active',
     },
+    // Stamped once the goal-missed nudge sweep (see
+    // controllers/internal/goalNudgeController.js) has notified this patient
+    // that their goal's endDate passed without reaching targetValue - stops
+    // the daily cron from re-notifying the same miss every day.
+    nudgeSentAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

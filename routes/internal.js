@@ -11,6 +11,7 @@ const router = express.Router();
 
 const config = require('../config/environment');
 const { runRenewalReminderSweep } = require('../controllers/internal/renewalReminderController');
+const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeController');
 
 function requireCronSecret(req, res, next) {
   // Two trigger sources need to authenticate here: Vercel Cron (dev), which
@@ -36,6 +37,20 @@ function requireCronSecret(req, res, next) {
 router.post('/cron/renewal-reminders', requireCronSecret, async (req, res, next) => {
   try {
     const result = await runRenewalReminderSweep();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/internal/cron/goal-nudges
+ * @desc    Daily sweep: nudge patients whose goal endDate passed without
+ *          reaching their target to continue their diet journey and rebook.
+ */
+router.post('/cron/goal-nudges', requireCronSecret, async (req, res, next) => {
+  try {
+    const result = await runGoalNudgeSweep();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
