@@ -80,7 +80,7 @@ describe('GET /api/patient/timeline', () => {
     expect(res.body.data.goal.targetValue).toBe(64);
     expect(res.body.data.milestones.length).toBeGreaterThan(0);
     const daily = res.body.data.milestones.find((m) => m.type === 'daily');
-    expect(daily.tasks.length).toBe(8);
+    expect(daily.tasks.length).toBe(11);
     expect(daily.tasks[0]).toHaveProperty('done');
     expect(daily.tasks[0]).toHaveProperty('linked');
   });
@@ -113,6 +113,60 @@ describe('GET /api/patient/timeline', () => {
     const supplementsTask = daily.tasks.find((t) => t.title === 'Supplements');
     expect(supplementsTask.linked).toBe(false);
     expect(supplementsTask.done).toBe(false);
+  });
+
+  test('Water Intake task carries a progress fraction from real WaterLog data', async () => {
+    const dietician = await createDietician();
+    const { patient } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const { WaterLog } = require('../models');
+    await WaterLog.create({
+      patientId: patient._id,
+      date: '2026-07-05',
+      goal: 2500,
+      totalAmount: 1250,
+      entries: [{ amount: 1250, time: '10:00' }],
+    });
+
+    const res = await request(app)
+      .get('/api/patient/timeline?from=-30&to=30')
+      .set('Authorization', 'Bearer patient-token');
+
+    const daily = res.body.data.milestones.find(
+      (m) => m.type === 'daily' && m.date.startsWith('2026-07-05')
+    );
+    const waterTask = daily.tasks.find((t) => t.title === 'Water Intake');
+    expect(waterTask.linked).toBe(true);
+    expect(waterTask.done).toBe(false);
+    expect(waterTask.progress).toBeCloseTo(0.5);
+    expect(waterTask.loggedNote).toBe('1.3/2.5 L');
+  });
+
+  test('Water Intake is done once the total reaches the goal', async () => {
+    const dietician = await createDietician();
+    const { patient } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const { WaterLog } = require('../models');
+    await WaterLog.create({
+      patientId: patient._id,
+      date: '2026-07-05',
+      goal: 2500,
+      totalAmount: 2600,
+      entries: [{ amount: 2600, time: '18:00' }],
+    });
+
+    const res = await request(app)
+      .get('/api/patient/timeline?from=-30&to=30')
+      .set('Authorization', 'Bearer patient-token');
+
+    const daily = res.body.data.milestones.find(
+      (m) => m.type === 'daily' && m.date.startsWith('2026-07-05')
+    );
+    const waterTask = daily.tasks.find((t) => t.title === 'Water Intake');
+    expect(waterTask.done).toBe(true);
+    expect(waterTask.progress).toBe(1);
   });
 });
 
@@ -209,6 +263,29 @@ describe('POST /api/patient/check-ins + DELETE /check-ins/today/:taskId', () => 
       .post('/api/patient/check-ins')
       .set('Authorization', 'Bearer patient-token')
       .send({ taskId: linkedTask._id.toString(), milestoneId: todayMilestone._id.toString() });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('400s trying to manually check in Water Intake', async () => {
+    const dietician = await createDietician();
+    const { patient, goal } = await seedPatientWithGoal(dietician);
+    registerTestToken('patient-token', patient._id);
+
+    const todayMilestone = await Milestone.findOne({
+      goalId: goal._id,
+      type: 'daily',
+      date: { $lte: new Date() },
+    }).sort({ date: -1 });
+    const waterTask = await MilestoneTask.findOne({
+      milestoneId: todayMilestone._id,
+      title: 'Water Intake',
+    });
+
+    const res = await request(app)
+      .post('/api/patient/check-ins')
+      .set('Authorization', 'Bearer patient-token')
+      .send({ taskId: waterTask._id.toString(), milestoneId: todayMilestone._id.toString() });
 
     expect(res.status).toBe(400);
   });

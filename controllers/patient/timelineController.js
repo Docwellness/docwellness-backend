@@ -4,7 +4,7 @@ const ApiError = require('../../utils/api-error');
 const { sendSuccess } = require('../../utils/api-response');
 const { computeGoalStats } = require('../../utils/goalAdherence');
 const { buildTimelinePayload, shapeGoal, getDayLogs } = require('../../utils/timelinePayload');
-const { MEAL_LINKED_TASK_TITLES } = require('../../utils/seedGoalTimeline');
+const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE } = require('../../utils/seedGoalTimeline');
 const { getChatIO } = require('../../chat');
 
 /**
@@ -68,13 +68,14 @@ exports.createCheckIn = asyncHandler(async (req, res) => {
   const goal = await Goal.findOne({ _id: milestone.goalId, patientId: req.user._id });
   if (!goal) throw ApiError.forbidden('Not your milestone');
 
-  // Meal-linked tasks (Morning Drink...Night Drink) are done automatically
-  // from the patient's real MealLog entries (see utils/goalAdherence.js's
-  // computeTaskDoneMap) - a manual check-in here would be a state that can
-  // never actually be read back as "done", so reject it outright rather
-  // than silently no-op.
-  if (MEAL_LINKED_TASK_TITLES.has(task.title)) {
-    throw ApiError.badRequest('This task is logged automatically from your meal log');
+  // Meal-linked tasks (Morning Drink...Night Drink) and Water Intake are
+  // done automatically from the patient's real MealLog/WaterLog entries
+  // (see utils/goalAdherence.js's computeTaskDoneMap) - a manual check-in
+  // here would be a state that can never actually be read back as "done",
+  // so reject it outright rather than silently no-op. Supplements has no
+  // log source and stays manually checked off.
+  if (MEAL_LINKED_TASK_TITLES.has(task.title) || task.title === WATER_TASK_TITLE) {
+    throw ApiError.badRequest('This task is logged automatically');
   }
 
   const todayKey = new Date().toISOString().slice(0, 10);

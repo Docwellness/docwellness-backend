@@ -11,8 +11,8 @@
 // "streak", to keep it unambiguous next to those two.
 
 const { MS_PER_DAY } = require('./trackingBuckets');
-const { Milestone, MilestoneTask, CheckIn, Goal, Progress, MealLog } = require('../models');
-const { MEAL_LINKED_TASK_TITLES } = require('./seedGoalTimeline');
+const { Milestone, MilestoneTask, CheckIn, Goal, Progress, MealLog, WaterLog } = require('../models');
+const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE } = require('./seedGoalTimeline');
 
 const ADHERENCE_COMPLETE_THRESHOLD = 0.6;
 
@@ -29,17 +29,19 @@ function startOfTodayUTC() {
 /**
  * Single source of truth for "is this task done" - a meal-linked task (see
  * MEAL_LINKED_TASK_TITLES, seedGoalTimeline.js) is done when the patient's
- * real MealLog for that milestone's day has a matching mealType entry, not
- * from a separate manual check-in that could silently drift from the real
- * log; every other task (Supplements) is done via the existing CheckIn
- * flow. Used by both computeAdherenceForMilestones (aggregate stats) and
+ * real MealLog for that milestone's day has a matching mealType entry; the
+ * Water Intake task (WATER_TASK_TITLE) is done when that day's WaterLog
+ * total reaches its goal, with a 0..1 progress fraction alongside it since
+ * water isn't a discrete yes/no like a meal being logged; every other task
+ * (Supplements, Walk, Sleep) is done via the existing CheckIn flow. Used by
+ * both computeAdherenceForMilestones (aggregate stats) and
  * timelinePayload.js (per-task shaping for the API response), so adherence/
  * streak and what the client displays as "done" can never disagree.
  *
  * `milestones` just needs `_id` and `date` on each entry (lean docs are
  * fine even without `type` selected - only daily milestones ever have
  * MilestoneTask docs at all, so no type filter is needed here).
- * Returns Map<taskId string, { done, linked, loggedNote }>.
+ * Returns Map<taskId string, { done, linked, loggedNote, progress }>.
  */
 async function computeTaskDoneMap(patientId, milestones) {
   const result = new Map();
@@ -56,10 +58,16 @@ async function computeTaskDoneMap(patientId, milestones) {
   const checkedInIds = new Set(checkIns.map((c) => c.taskId.toString()));
 
   const dates = milestones.map((m) => new Date(m.date)).sort((a, b) => a - b);
-  const mealLogs = await MealLog.find({
-    patientId,
-    date: { $gte: dates[0], $lte: dates[dates.length - 1] },
-  }).lean();
+  const [mealLogs, waterLogs] = await Promise.all([
+    MealLog.find({
+      patientId,
+      date: { $gte: dates[0], $lte: dates[dates.length - 1] },
+    }).lean(),
+    WaterLog.find({
+      patientId,
+      date: { $gte: dateKeyUTC(dates[0]), $lte: dateKeyUTC(dates[dates.length - 1]) },
+    }).lean(),
+  ]);
 
   const mealsByDateKey = new Map();
   for (const log of mealLogs) {
@@ -68,17 +76,47 @@ async function computeTaskDoneMap(patientId, milestones) {
     const byType = mealsByDateKey.get(key);
     for (const meal of log.meals || []) byType.set(meal.mealType, meal);
   }
+  const waterByDateKey = new Map(waterLogs.map((w) => [w.date, w]));
 
   const milestoneById = new Map(milestones.map((m) => [m._id.toString(), m]));
   for (const t of tasks) {
     const milestone = milestoneById.get(t.milestoneId.toString());
-    const linked = MEAL_LINKED_TASK_TITLES.has(t.title);
     const dateKey = milestone ? dateKeyUTC(milestone.date) : null;
-    const loggedMeal = linked && dateKey ? mealsByDateKey.get(dateKey)?.get(t.title) : null;
+
+    if (MEAL_LINKED_TASK_TITLES.has(t.title)) {
+      const loggedMeal = dateKey ? mealsByDateKey.get(dateKey)?.get(t.title) : null;
+      result.set(t._id.toString(), {
+        done: Boolean(loggedMeal),
+        linked: true,
+        loggedNote: loggedMeal
+          ? loggedMeal.caloriesConsumed
+            ? `${loggedMeal.caloriesConsumed} kcal`
+            : 'Logged'
+          : null,
+        progress: null,
+      });
+      continue;
+    }
+
+    if (t.title === WATER_TASK_TITLE) {
+      const waterLog = dateKey ? waterByDateKey.get(dateKey) : null;
+      const total = waterLog?.totalAmount ?? 0;
+      const goal = waterLog?.goal ?? 2500;
+      const progress = goal > 0 ? Math.min(1, total / goal) : 0;
+      result.set(t._id.toString(), {
+        done: total >= goal,
+        linked: true,
+        loggedNote: `${(total / 1000).toFixed(1)}/${(goal / 1000).toFixed(1)} L`,
+        progress,
+      });
+      continue;
+    }
+
     result.set(t._id.toString(), {
-      done: linked ? Boolean(loggedMeal) : checkedInIds.has(t._id.toString()),
-      linked,
-      loggedNote: loggedMeal ? (loggedMeal.caloriesConsumed ? `${loggedMeal.caloriesConsumed} kcal` : 'Logged') : null,
+      done: checkedInIds.has(t._id.toString()),
+      linked: false,
+      loggedNote: null,
+      progress: null,
     });
   }
 

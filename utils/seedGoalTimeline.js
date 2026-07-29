@@ -3,9 +3,14 @@ const { Goal, Milestone, MilestoneTask, User, Progress } = require('../models');
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // One task per MealLog serving-time (see models/MealLog.js's mealType enum -
-// buildTimelinePayload matches a task's title against a patient's actual
-// logged meals for that day by this exact string), plus Supplements, which
+// computeTaskDoneMap matches a task's title against a patient's actual
+// logged meals for that day by this exact string) plus Supplements, which
 // has no dedicated log model and stays manually checked off via CheckIn.
+// Client apps roll these 8 up into a single "Log Meal" x/8 progress row
+// rather than showing 8 separate checklist rows (see MEAL_GROUP_TASK_TITLES).
+// Water Intake is similarly progress-based, backed by WaterLog instead of a
+// manual checkbox (see WATER_TASK_TITLE). Walk and Sleep stay simple,
+// individually-displayed manual check-ins.
 const DEFAULT_DAILY_TASKS = [
   { title: 'Morning Drink', metric: '', icon: 'morning_drink', sortOrder: 1 },
   { title: 'Breakfast', metric: '', icon: 'breakfast', sortOrder: 2 },
@@ -15,11 +20,14 @@ const DEFAULT_DAILY_TASKS = [
   { title: 'Dinner', metric: '', icon: 'dinner', sortOrder: 6 },
   { title: 'Night Drink', metric: '', icon: 'night_drink', sortOrder: 7 },
   { title: 'Supplements', metric: '', icon: 'supplements', sortOrder: 8 },
+  { title: 'Water Intake', metric: '2.5 L goal', icon: 'water_drop', sortOrder: 9 },
+  { title: 'Walk', metric: '30 min', icon: 'walk', sortOrder: 10 },
+  { title: 'Sleep by 11 pm', metric: '7+ hrs', icon: 'sleep', sortOrder: 11 },
 ];
 
-// Titles that match a models/MealLog.js mealType exactly - buildTimelinePayload
-// uses this set to know which tasks are log-linked (auto-done from real
-// logs) vs manually checked off (Supplements).
+// Titles that match a models/MealLog.js mealType exactly - computeTaskDoneMap
+// uses this set to know which tasks are meal-log-linked (auto-done from a
+// real MealLog entry).
 const MEAL_LINKED_TASK_TITLES = new Set([
   'Morning Drink',
   'Breakfast',
@@ -29,6 +37,14 @@ const MEAL_LINKED_TASK_TITLES = new Set([
   'Dinner',
   'Night Drink',
 ]);
+
+// The 8 tasks a client rolls up into one "Log Meal" progress row (the 7
+// real serving-times plus Supplements, which has no log source of its own
+// but still counts toward the same completion).
+const MEAL_GROUP_TASK_TITLES = new Set([...MEAL_LINKED_TASK_TITLES, 'Supplements']);
+
+// Progress-based (not a manual checkbox) task, backed by WaterLog.
+const WATER_TASK_TITLE = 'Water Intake';
 
 function toDateOnly(d) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -241,4 +257,6 @@ module.exports = {
   seedMilestonesForRange,
   DEFAULT_DAILY_TASKS,
   MEAL_LINKED_TASK_TITLES,
+  MEAL_GROUP_TASK_TITLES,
+  WATER_TASK_TITLE,
 };

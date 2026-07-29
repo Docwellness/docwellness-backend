@@ -20,6 +20,7 @@ const Milestone = require('./Milestone');
 const MilestoneTask = require('./MilestoneTask');
 const CheckIn = require('./CheckIn');
 const Nudge = require('./Nudge');
+const WaterLog = require('./WaterLog');
 
 module.exports = {
   User,
@@ -44,4 +45,5 @@ module.exports = {
   MilestoneTask,
   CheckIn,
   Nudge,
+  WaterLog,
 };

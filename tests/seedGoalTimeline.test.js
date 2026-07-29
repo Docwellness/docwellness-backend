@@ -68,7 +68,7 @@ describe('seedGoalTimeline', () => {
     expect(monthly).toHaveLength(0);
 
     const tasksForFirstDay = await MilestoneTask.find({ milestoneId: daily[0]._id });
-    expect(tasksForFirstDay).toHaveLength(8);
+    expect(tasksForFirstDay).toHaveLength(11);
     expect(tasksForFirstDay.map((t) => t.title)).toEqual(
       expect.arrayContaining([
         'Morning Drink',
@@ -79,6 +79,9 @@ describe('seedGoalTimeline', () => {
         'Dinner',
         'Night Drink',
         'Supplements',
+        'Water Intake',
+        'Walk',
+        'Sleep by 11 pm',
       ])
     );
   });

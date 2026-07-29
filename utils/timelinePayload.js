@@ -68,7 +68,12 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   for (const t of tasks) {
     const key = t.milestoneId.toString();
     if (!tasksByMilestone.has(key)) tasksByMilestone.set(key, []);
-    const info = taskDoneMap.get(t._id.toString()) || { done: false, linked: false, loggedNote: null };
+    const info = taskDoneMap.get(t._id.toString()) || {
+      done: false,
+      linked: false,
+      loggedNote: null,
+      progress: null,
+    };
     tasksByMilestone.get(key).push({
       id: t._id,
       title: t.title,
@@ -77,6 +82,7 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       linked: info.linked,
       done: info.done,
       loggedNote: info.loggedNote,
+      progress: info.progress,
     });
   }
 
