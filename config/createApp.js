@@ -21,9 +21,9 @@ const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
 function createApp() {
   const app = express();
 
-  // Both deployment targets (Vercel serverless, and the VPS behind nginx -
-  // see .github/workflows/deploy-dev-vps.yml) sit behind exactly one
-  // reverse proxy hop. Without this, req.ip (and therefore every rate
+  // Both deployment targets (Vercel serverless for dev, and the Oracle
+  // Cloud VPS behind Coolify's Traefik proxy for prod) sit behind exactly
+  // one reverse proxy hop. Without this, req.ip (and therefore every rate
   // limiter's default per-IP bucket - see middlewares/rateLimiters.js)
   // resolves to the proxy's own IP for every request, not the real
   // client's - collapsing all traffic into a single shared bucket instead
