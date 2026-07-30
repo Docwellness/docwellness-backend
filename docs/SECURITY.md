@@ -46,8 +46,15 @@ than hardcoding it inline.
      backend's env config. This immediately invalidates every existing
      session/token; every logged-in user is signed out and must log in
      again. Coordinate before rotating in production.
-   - **MongoDB URI / password** - rotate the database user's password in
-     the MongoDB Atlas (or self-hosted) dashboard, update `MONGODB_URI`.
+   - **MongoDB URI / password** - dev still runs against MongoDB Atlas
+     (rotate the database user's password in the Atlas dashboard). Prod
+     runs against the dedicated self-hosted instance described in
+     `docs/db-migration-oracle.md` - rotate by SSHing into that VM and
+     changing the app user's password via `mongosh`
+     (`db.updateUser("appuser", { pwd: passwordPrompt() })` against the
+     `docwellness` database). Either way, update the corresponding
+     `MONGODB_URI` (Vercel project env for dev, the Coolify resource's
+     environment variables for prod) immediately after.
    - **Cloudinary** - regenerate the API secret in the Cloudinary console.
    - **Resend** - revoke and reissue the API key in the Resend dashboard.
    - **OpenAI** - revoke and reissue the API key in the OpenAI platform

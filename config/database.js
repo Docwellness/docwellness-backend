@@ -1,7 +1,31 @@
 const mongoose = require('mongoose');
 const dns = require('dns');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 let usernameIndexCleanupAttempted = false;
+let cachedTlsCAFile;
+
+// Prod connects over TLS to the self-hosted instance's private CA (see
+// docs/db-migration-oracle.md); dev's Atlas mongodb+srv:// URI already
+// negotiates TLS on its own and needs no custom CA, so this stays unset
+// there and connectWithRetry falls back to plain options - same
+// "optional integration degrades gracefully" convention as utils/push.js's
+// FCM_SERVICE_ACCOUNT_BASE64. Written to a tmp file once per process and
+// reused, rather than decoded fresh on every retry attempt.
+function resolveTlsCAFile() {
+  if (cachedTlsCAFile !== undefined) return cachedTlsCAFile;
+  const base64 = process.env.MONGODB_TLS_CA_BASE64;
+  if (!base64) {
+    cachedTlsCAFile = null;
+    return cachedTlsCAFile;
+  }
+  const caPath = path.join(os.tmpdir(), 'mongodb-ca.pem');
+  fs.writeFileSync(caPath, Buffer.from(base64, 'base64'));
+  cachedTlsCAFile = caPath;
+  return cachedTlsCAFile;
+}
 
 // Self-healing cleanup for a stale unique index left over from the
 // `username` field's removal (models/User.js no longer defines it at all -
@@ -49,13 +73,20 @@ async function connectWithRetry(uri, { attempts = 3, delayMs = 800 } = {}) {
     try {
       // The MongoDB driver defaults to maxPoolSize: 100 per connection when
       // unset - fine for a single long-running process, but ruinous once
-      // multiple things connect to the same free-tier M0 cluster (500
-      // connections total): a handful of concurrent Vercel serverless
-      // instances, each opening their own pool, can exhaust the entire
-      // cluster limit on their own. Capped low here since this app - even
-      // the persistent VPS/Coolify process - never legitimately needs many
-      // concurrent in-flight queries at this scale.
-      return await mongoose.connect(uri, { maxPoolSize: 10 });
+      // multiple things connect to the same cluster. Dev (Vercel) still
+      // points at the Atlas M0 free tier (500 connections total), where a
+      // handful of concurrent serverless instances - each opening their own
+      // pool - can exhaust the entire cluster limit on their own. Prod runs
+      // against a dedicated self-hosted instance (see
+      // docs/db-migration-oracle.md) with no such external cap, but 10 stays
+      // the default here regardless since this app - even the persistent
+      // VPS/Coolify process - never legitimately needs many concurrent
+      // in-flight queries at this scale.
+      const tlsCAFile = resolveTlsCAFile();
+      const connectOptions = tlsCAFile
+        ? { maxPoolSize: 10, tls: true, tlsCAFile }
+        : { maxPoolSize: 10 };
+      return await mongoose.connect(uri, connectOptions);
     } catch (error) {
       lastError = error;
       const isDnsSrvHiccup = error.code === 'ECONNREFUSED' && error.syscall === 'querySrv';
