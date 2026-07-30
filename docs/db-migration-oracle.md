@@ -18,16 +18,38 @@ a straightforward dump/restore/switch, not a live/dual-write migration.
   Ampere instances, so this leaves headroom), Ubuntu 22.04/24.04 LTS.
   Keep it separate from the existing app VPS - dedicated resources, blast
   radius isolated from the app.
-- In the VM's subnet Security List / Network Security Group: allow inbound
-  TCP `27017` **only** from the existing prod app VPS's public IP, plus
-  (temporarily) your own IP for setup. Do not open it to `0.0.0.0/0`.
-- Restrict SSH (`22`) the same way.
-- Mirror the same allowlist in the VM's own `ufw` as defense-in-depth:
+- **If the app VPS is in the same VCN/subnet** (true for this setup - both
+  on `docwellness-vcn-subnet`), give the new VM **no public IP at all** and
+  rely entirely on private-subnet routing. This is strictly better than a
+  public IP + allowlist: 27017/22 are then only reachable from inside the
+  VCN, never the internet, regardless of any firewall misconfiguration.
+  A temporary ephemeral public IP is still useful transiently during
+  initial setup (installing packages, first SSH login) - just scope its
+  Security List rule to your own current IP only, and remove both the rule
+  and the public IP once setup is done. Ongoing SSH access afterward goes
+  through the app VPS as a jump host (`ssh -A` agent forwarding, or copy
+  the Mongo VM's key onto the app VPS).
+- In the subnet's Security List: allow inbound TCP `27017` and `22` from
+  the subnet's own CIDR (`10.0.0.0/24` here) - this covers the app VPS
+  reaching the DB and any same-subnet host doing maintenance SSH.
+- **Oracle's base images ship their own default `iptables` rules**,
+  independent of both the OCI Security List and `ufw` (which may not even
+  be installed - these are minimized images). This default ruleset
+  explicitly `ACCEPT`s new connections only on port `22` and **rejects
+  everything else** (`reject-with icmp-host-prohibited`), including
+  traffic the Security List already allows. This is easy to miss because
+  same-host loopback tests (e.g. `mongosh --host <own-private-ip>` run
+  from the box itself) route over `lo` and bypass this chain entirely,
+  masking the problem until a *different* host tries to connect and gets
+  `EHOSTUNREACH`/"No route to host". Fix by inserting an `ACCEPT` rule
+  *before* the final `REJECT` (check line numbers first,
+  `iptables -L INPUT --line-numbers -n`):
+  ```bash
+  sudo iptables -I INPUT <line-before-reject> -p tcp --dport 27017 -m state --state NEW -j ACCEPT
+  sudo netfilter-persistent save   # persist across reboots; install via apt if `which netfilter-persistent` is empty
   ```
-  ufw allow from <app-vps-ip> to any port 27017 proto tcp
-  ufw allow from <your-ip> to any port 22 proto tcp
-  ufw enable
-  ```
+  Do this on **every** instance that needs to accept non-SSH inbound
+  traffic - it's not specific to the Mongo VM.
 
 ## 2. Install and harden MongoDB
 
@@ -103,11 +125,26 @@ options whenever it's unset.
 
 Atlas's automatic backups go away once self-hosted - replace them:
 
-- Daily `mongodump` cron on the new VM, compressed, shipped off-box (e.g.
-  Oracle Object Storage's Always-Free 20 GB tier via `oci os object put`,
-  or another off-box destination). Never leave the only backup copy on the
-  same disk as the live data.
-- Retention: e.g. 7 daily + 4 weekly.
+- Daily `mongodump` cron on the new VM (must include `tls=true&tlsCAFile=...`
+  in its URI once step 2a is done, and use the VM's real private IP, not
+  `127.0.0.1` - the server cert's SAN doesn't cover loopback), compressed,
+  shipped off-box. Never leave the only backup copy on the same disk as the
+  live data.
+- **Shipping off-box, without a public IP or NAT Gateway on the VM**: don't
+  reach for the OCI CLI + instance principal auth here - it needs the IAM/
+  Auth service (`auth.<region>.oraclecloud.com`), which requires a Service
+  Gateway scoped to **"All `<region>` Services"**, and OCI won't let that
+  coexist with an Internet Gateway route in the same route table (a
+  conflict this shared subnet's table hits immediately, since the app VPS
+  needs that Internet Gateway route). Simpler and sufficient for this use
+  case: a **Pre-Authenticated Request (PAR)** on the bucket (type "Object
+  Prefix", permission "Permit object writes"), and a plain `curl -X PUT`
+  in the backup script - this only ever touches Object Storage, which a
+  narrowly-scoped Service Gateway (just "OCI Object Storage") already
+  covers without any conflict. The PAR's URL is itself a bearer credential
+  (anyone with it can write matching objects) - handle it like a secret.
+- Retention: e.g. 7 daily locally (`find ... -mtime +7 -delete`) plus
+  however long Object Storage retains uploaded objects.
 - **Actually test a restore** before relying on this in an incident.
 
 ## 4. Migrate the data and cut prod over
@@ -123,7 +160,25 @@ Atlas's automatic backups go away once self-hosted - replace them:
      `mongodb://appuser:<password>@<new-vm-host>:27017/docwellness?tls=true&authSource=docwellness`
    - Also set `MONGODB_TLS_CA_BASE64` there (see step 2a) - without it,
      `config/database.js` won't pass `tlsCAFile` and the connection will
-     fail TLS verification.
+     fail TLS verification. Mark both vars **available at runtime** (not
+     just buildtime) - new Coolify env vars don't default to runtime
+     availability the way pre-existing ones behave, and a runtime-only
+     miss here silently makes the app try a bare TLS connection with no
+     custom CA, failing with a confusing "self-signed certificate in
+     certificate chain" error that looks like a cert problem but isn't.
+   - When pasting a long base64 value (e.g. the CA cert) into Coolify's
+     UI, don't select/copy it out of an SSH terminal - line-wrapping makes
+     it easy to silently truncate. Write it to a local file first
+     (`scp` it down, or decode+re-encode locally) and copy from a text
+     editor instead; verify the length matches (`base64 -w0 file | wc -c`)
+     if anything seems off.
+   - **The code that reads these env vars has to actually be deployed** -
+     Coolify builds from whatever commit is at the tip of the branch it's
+     configured to track (`main` here), not from this repo's local working
+     tree. Uncommitted local edits to `config/database.js` (or anything
+     else) do nothing until committed *and* pushed to that branch - check
+     `git status`/the commit SHA in Coolify's build log against `git log`
+     if a deploy doesn't seem to pick up a recent code change.
    - Restart the Coolify resource.
 5. Confirm the switch via the existing `MongoDB Connected: <host>` log line
    (`config/database.js:107`) in the Coolify logs - it should now print the
