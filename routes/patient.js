@@ -536,6 +536,25 @@ const { getActiveQuotesForPatient } = require('../controllers/dietician/quoteCon
 router.get('/quotes', patientOnly, getActiveQuotesForPatient);
 
 // ==========================================
+// Social Media Routes (dietician's YouTube/Instagram, About Doctor page)
+// ==========================================
+const { getActiveSocialPostsForPatient } = require('../controllers/dietician/socialMediaController');
+router.get('/social-media', patientOnly, getActiveSocialPostsForPatient);
+
+// ==========================================
+// Article Routes (dietician's nutrition/wellness articles)
+// ==========================================
+const { getActiveArticlesForPatient } = require('../controllers/dietician/articleController');
+router.get('/articles', patientOnly, getActiveArticlesForPatient);
+
+// ==========================================
+// Review Routes (patient reviews of their assigned dietician)
+// ==========================================
+const { getReviewsForPatient, addReview } = require('../controllers/dietician/reviewController');
+router.get('/reviews', patientOnly, getReviewsForPatient);
+router.post('/reviews', patientOnly, addReview);
+
+// ==========================================
 // Coupon Routes
 // ==========================================
 

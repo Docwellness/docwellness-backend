@@ -21,6 +21,9 @@ const {
   couponController,
   consultationFormController,
   timelineController,
+  socialMediaController,
+  articleController,
+  reviewController,
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
@@ -43,6 +46,7 @@ router.param('requestId', validateObjectIdParam);
 router.param('couponId', validateObjectIdParam);
 router.param('quoteId', validateObjectIdParam);
 router.param('videoId', validateObjectIdParam);
+router.param('imageId', validateObjectIdParam);
 router.param('imageId', validateObjectIdParam);
 
 /**
@@ -80,6 +84,28 @@ router.post(
   uploadLimiter,
   upload.single('profileImage'),
   profileController.uploadDoctorProfileImage
+);
+
+/**
+ * @route   POST /api/dietician/profile/gallery
+ * @desc    Add a photo to the About Doctor gallery carousel
+ */
+router.post(
+  '/profile/gallery',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('image'),
+  profileController.addGalleryImage
+);
+
+/**
+ * @route   DELETE /api/dietician/profile/gallery/:imageId
+ * @desc    Remove a photo from the About Doctor gallery carousel
+ */
+router.delete(
+  '/profile/gallery/:imageId',
+  dieticianOnlyMiddleware,
+  profileController.deleteGalleryImage
 );
 
 /**
@@ -602,6 +628,68 @@ router.put(
  * @desc    Delete a specific quote
  */
 router.delete('/quotes/:quoteId', dieticianOnlyMiddleware, quoteController.deleteQuote);
+
+// ==========================================
+// Social Media Routes (About Doctor - YouTube/Instagram)
+// ==========================================
+
+router.get('/social-media', dieticianOnlyMiddleware, socialMediaController.getSocialPosts);
+
+router.post(
+  '/social-media',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('image'),
+  socialMediaController.addSocialPost
+);
+
+router.put('/social-media/reorder', dieticianOnlyMiddleware, socialMediaController.reorderSocialPosts);
+
+router.put(
+  '/social-media/:id',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('image'),
+  socialMediaController.updateSocialPost
+);
+
+router.delete('/social-media/:id', dieticianOnlyMiddleware, socialMediaController.deleteSocialPost);
+
+// ==========================================
+// Article Routes (About Doctor - nutrition/wellness articles)
+// ==========================================
+
+router.get('/articles', dieticianOnlyMiddleware, articleController.getArticles);
+
+router.post(
+  '/articles',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('image'),
+  articleController.addArticle
+);
+
+router.put('/articles/reorder', dieticianOnlyMiddleware, articleController.reorderArticles);
+
+router.put(
+  '/articles/:id',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('image'),
+  articleController.updateArticle
+);
+
+router.delete('/articles/:id', dieticianOnlyMiddleware, articleController.deleteArticle);
+
+// ==========================================
+// Review Routes (About Doctor - patient reviews, dietician-sorted)
+// ==========================================
+
+router.get('/reviews', dieticianOnlyMiddleware, reviewController.getReviews);
+
+router.put('/reviews/reorder', dieticianOnlyMiddleware, reviewController.reorderReviews);
+
+router.delete('/reviews/:id', dieticianOnlyMiddleware, reviewController.deleteReview);
 
 // ==========================================
 // Coupon Routes

@@ -13,6 +13,9 @@ const profileController = require('./profileController');
 const couponController = require('./couponController');
 const consultationFormController = require('./consultationFormController');
 const timelineController = require('./timelineController');
+const socialMediaController = require('./socialMediaController');
+const articleController = require('./articleController');
+const reviewController = require('./reviewController');
 
 module.exports = {
   manualPaymentController,
@@ -30,4 +33,7 @@ module.exports = {
   couponController,
   consultationFormController,
   timelineController,
+  socialMediaController,
+  articleController,
+  reviewController,
 };

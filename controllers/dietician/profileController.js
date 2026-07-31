@@ -34,6 +34,10 @@ exports.getDoctorProfile = async (req, res, next) => {
         experience: user.dieticianProfile?.experience || 0,
         qualification: user.dieticianProfile?.qualification || '',
         bio: user.dieticianProfile?.bio || '',
+        galleryImages: (user.dieticianProfile?.galleryImages || []).map((g) => ({
+          id: g._id,
+          url: g.url,
+        })),
       },
     });
   } catch (error) {
@@ -84,6 +88,10 @@ exports.updateDoctorProfile = async (req, res, next) => {
         experience: user.dieticianProfile?.experience || 0,
         qualification: user.dieticianProfile?.qualification || '',
         bio: user.dieticianProfile?.bio || '',
+        galleryImages: (user.dieticianProfile?.galleryImages || []).map((g) => ({
+          id: g._id,
+          url: g.url,
+        })),
       },
     });
   } catch (error) {
@@ -164,8 +172,81 @@ exports.getAssignedDoctorProfile = async (req, res, next) => {
         experience: doctor.dieticianProfile?.experience || 0,
         qualification: doctor.dieticianProfile?.qualification || '',
         bio: doctor.dieticianProfile?.bio || '',
+        galleryImages: (doctor.dieticianProfile?.galleryImages || []).map((g) => ({
+          id: g._id,
+          url: g.url,
+        })),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Add a photo to the dietician's About Doctor gallery carousel
+ * @route   POST /api/dietician/profile/gallery
+ * @access  Private (Dietician)
+ */
+exports.addGalleryImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please upload an image file' });
+    }
+
+    const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+      folder: cloudinaryUserFolder(req.user._id, 'gallery'),
+      transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+    });
+    await fs.unlink(req.file.path).catch(() => {});
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $push: {
+          'dieticianProfile.galleryImages': {
+            url: uploadResult.secure_url,
+            cloudinaryPublicId: uploadResult.public_id,
+          },
+        },
+      },
+      { new: true }
+    ).select('dieticianProfile.galleryImages');
+
+    res.status(201).json({
+      success: true,
+      message: 'Gallery photo added',
+      data: (user.dieticianProfile?.galleryImages || []).map((g) => ({ id: g._id, url: g.url })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Remove a photo from the dietician's About Doctor gallery carousel
+ * @route   DELETE /api/dietician/profile/gallery/:imageId
+ * @access  Private (Dietician)
+ */
+exports.deleteGalleryImage = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('dieticianProfile.galleryImages');
+    const image = user?.dieticianProfile?.galleryImages?.id(req.params.imageId);
+
+    if (!image) {
+      return res.status(404).json({ success: false, message: 'Gallery photo not found' });
+    }
+
+    if (image.cloudinaryPublicId) {
+      await cloudinary.uploader.destroy(image.cloudinaryPublicId).catch(() => {});
+    }
+
+    await User.updateOne(
+      { _id: req.user._id },
+      { $pull: { 'dieticianProfile.galleryImages': { _id: req.params.imageId } } }
+    );
+
+    res.status(200).json({ success: true, message: 'Gallery photo removed' });
   } catch (error) {
     next(error);
   }

@@ -180,6 +180,12 @@ const userSchema = new mongoose.Schema(
       qualification: { type: String },
       bio: { type: String },
       isApproved: { type: Boolean, default: false },
+      // Photos shown in the auto-scrolling carousel at the top of the
+      // patient app's About Doctor page (see doctor_detail_view.dart).
+      galleryImages: {
+        type: [{ url: String, cloudinaryPublicId: String }],
+        default: [],
+      },
     },
 
     // For tracking
