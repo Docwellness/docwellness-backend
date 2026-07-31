@@ -2,6 +2,84 @@ const Quote = require('../../models/Quote');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const fs = require('fs');
+const { Notification, User, DietPlan } = require('../../models');
+const config = require('../../config/environment');
+const { getChatIO } = require('../../chat');
+const { sendPushToTokens } = require('../../utils/push');
+
+/**
+ * Notifies every patient who can currently see this dietician's quotes (same
+ * assignment rule as getActiveQuotesForPatient below: DietPlan.dieticianId,
+ * falling back to patients with no DietPlan at all when this is the default
+ * dietician) that a new quote is live. In-app Notification + socket push are
+ * awaited so a failure here surfaces to the caller's own catch; the real FCM
+ * send is fire-and-forget like every other push in this codebase - it must
+ * never fail or delay the caller.
+ */
+async function notifyPatientsOfQuote(dieticianId, quote) {
+  const assignedPatientIds = await DietPlan.find({ dieticianId }).distinct('patientId');
+  const patientIds = [...assignedPatientIds];
+
+  if (config.defaultDieticianId && String(dieticianId) === String(config.defaultDieticianId)) {
+    const anyAssignedPatientIds = await DietPlan.distinct('patientId');
+    const unassignedPatientIds = await User.find({
+      role: 'patient',
+      _id: { $nin: anyAssignedPatientIds },
+    }).distinct('_id');
+    patientIds.push(...unassignedPatientIds);
+  }
+
+  if (patientIds.length === 0) return;
+
+  const title = 'New quote from your dietician';
+  const message = quote.text || "Tap to see today's quote";
+
+  const notifications = await Notification.insertMany(
+    patientIds.map((patientId) => ({
+      userId: patientId,
+      title,
+      message,
+      type: 'quote',
+      referenceId: quote._id,
+      referenceModel: 'Quote',
+    }))
+  );
+
+  const ioRef = getChatIO();
+  if (ioRef) {
+    notifications.forEach((notif) => {
+      ioRef.to(`user:${notif.userId}`).emit('notification.new', {
+        id: notif._id,
+        title: notif.title,
+        message: notif.message,
+        type: notif.type,
+        referenceId: notif.referenceId?.toString(),
+        createdAt: notif.createdAt,
+      });
+    });
+  }
+
+  const patients = await User.find({ _id: { $in: patientIds } }).select('deviceTokens').lean();
+  const tokenToUserId = new Map();
+  const tokens = [];
+  patients.forEach((patient) => {
+    (patient.deviceTokens || []).forEach((t) => {
+      tokens.push(t.token);
+      tokenToUserId.set(t.token, patient._id);
+    });
+  });
+
+  sendPushToTokens(
+    tokens,
+    { title, body: message, data: { deepLink: 'docwellness://quotes' } },
+    (deadToken) => {
+      const userId = tokenToUserId.get(deadToken);
+      if (userId) {
+        User.updateOne({ _id: userId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
+      }
+    }
+  ).catch((err) => console.error('[notifyPatientsOfQuote] push failed (non-fatal):', err.message));
+}
 
 /**
  * @desc    Add a new quote (image uploaded to Cloudinary)
@@ -33,6 +111,12 @@ exports.addQuote = async (req, res) => {
       text: text || '',
       isActive: isActive === true || isActive === 'true',
     });
+
+    if (quote.isActive) {
+      notifyPatientsOfQuote(dieticianId, quote).catch((err) =>
+        console.error('notifyPatientsOfQuote error:', err)
+      );
+    }
 
     return res.status(201).json({
       success: true,
@@ -78,6 +162,7 @@ exports.updateQuote = async (req, res) => {
     if (!quote) {
       return res.status(404).json({ success: false, message: 'Quote not found' });
     }
+    const wasActive = quote.isActive;
 
     // If new image uploaded, replace in Cloudinary
     if (req.file) {
@@ -106,6 +191,12 @@ exports.updateQuote = async (req, res) => {
     }
 
     await quote.save();
+
+    if (!wasActive && quote.isActive) {
+      notifyPatientsOfQuote(dieticianId, quote).catch((err) =>
+        console.error('notifyPatientsOfQuote error:', err)
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -157,8 +248,6 @@ exports.deleteQuote = async (req, res) => {
  */
 exports.getActiveQuotesForPatient = async (req, res) => {
   try {
-    const DietPlan = require('../../models/DietPlan');
-    const config = require('../../config/environment');
     const patientId = req.user._id;
 
     // Find the dietician assigned to this patient via DietPlan, fallback to default dietician

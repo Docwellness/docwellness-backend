@@ -221,8 +221,11 @@ const parseDateOrNull = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+// UTC-based - see the matching normalizeDate in controllers/patient/dietController.js
+// for why: local getters made this drift by the server's UTC offset whenever
+// it wasn't 0, causing already-logged days to read back as 0 consumed.
 const normalizeDate = (dateObj) =>
-  new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
 
 exports.getPatientMealLogStats = async (req, res, next) => {
   try {

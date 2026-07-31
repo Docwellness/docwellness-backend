@@ -19,8 +19,15 @@ const parseDateOrNull = (value) => {
   return parsed;
 };
 
+// UTC-based, not local-timezone-based: dates travel between client/server as
+// plain "yyyy-MM-dd" strings, which JS always parses as UTC midnight. Using
+// local getters here (as this used to) made the stripped-down date drift by
+// the server's UTC offset whenever it wasn't exactly 0 - e.g. under CEST
+// (UTC+2), normalizing "2026-07-31" produced 2026-07-30T22:00:00.000Z instead
+// of the 2026-07-31T00:00:00.000Z actually stored on MealLog, so a day that
+// was fully logged still read back as 0 consumed calories.
 const normalizeDate = (dateObj) =>
-  new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
 
 // The plan's real week-1 start date - prefers weekSchedule (the same anchor
 // used to build weekStartDate/weekEndDate everywhere else, and what the

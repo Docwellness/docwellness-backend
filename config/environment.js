@@ -61,6 +61,9 @@ module.exports = {
     // come from a real person rather than a no-reply address.
     fromAddressPersonal: process.env.RESEND_FROM_EMAIL_PERSONAL || process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
   },
+  // Used for links inside emails (e.g. "Go to Dashboard") - the marketing/
+  // web app's own origin, not this API's.
+  frontendUrl: process.env.FRONTEND_URL || 'https://docwellness.fit',
   openai: {
     apiKey: process.env.OPENAI_API_KEY,
     // Pinned explicit snapshots (not bare aliases) so behavior can't silently
