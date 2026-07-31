@@ -265,30 +265,36 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
     if (week) {
       // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
       // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) instead
-      // of one flat meal set applying to all 7 days - filter down to just
-      // the group referenceDate actually falls into. A meal with no
-      // dayGroup (pre-migration plans) matches every group, so old plans
-      // keep returning their full unfiltered set exactly as before.
+      // of one flat meal set applying to all 7 days. This endpoint used to
+      // filter dailyMeals down to just the group referenceDate falls into,
+      // which meant the Diet Plan screen had to re-hit this endpoint on
+      // every single day tap (not just every week tap) to pick up the other
+      // 3 groups - a full-screen loading flash per tap. Instead, return
+      // every group's meals together (each meal already carries its own
+      // dayGroup - see mealMatchesDayGroup) and let the app pick the right
+      // one for whichever day is selected, entirely client-side. A meal
+      // with no dayGroup (pre-migration plans) has no group to filter by
+      // anyway, so this is also just a strict superset of the old response
+      // for those plans.
       const todayDayGroup = resolveDayGroupForDate(referenceDate);
       const fixMeals = (dailyMeals) =>
-        (dailyMeals || [])
-          .filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
-          .map((meal) => ({
-            ...meal,
-            recipeId: meal.recipeId || '',
-          }));
+        (dailyMeals || []).map((meal) => ({
+          ...meal,
+          recipeId: meal.recipeId || '',
+        }));
 
       const weekWithFixedMeals = {
         ...week,
         dailyMeals: fixMeals(week.dailyMeals),
       };
 
-      // All weeks the plan actually has, day-group-filtered the same way as
-      // the single `week` field above - lets the app fetch once per Diet-tab
-      // visit and switch weeks client-side with no per-tap network round
-      // trip. The expensive part (loading finalizedPlan.weeks + resolving
-      // every recipe in the plan, above) already happens on every call
-      // regardless of which week was requested, so this is close to free.
+      // All weeks the plan actually has, carrying every day-group the same
+      // way as the single `week` field above - lets the app fetch once per
+      // Diet-tab visit and switch weeks *and* days client-side with no
+      // per-tap network round trip. The expensive part (loading
+      // finalizedPlan.weeks + resolving every recipe in the plan, above)
+      // already happens on every call regardless of which week was
+      // requested, so this is close to free.
       const allWeeksData = weeks.map((w) => {
         const weekNum = Number(w.week);
         const scheduleEntry =
