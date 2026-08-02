@@ -5,6 +5,7 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { normalize } = require('../../utils/ingredientLibrary');
+const { resolvePlannedDailyCalories } = require('../../utils/weekNutritionSummary');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -128,7 +129,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name servingTime nutrition image ingredients servingSize instructions language translations tags category supplementFacts')
+        .select('name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts')
         .lean()
       : [];
 
@@ -186,6 +187,18 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             unit: ingredient.unit || null,
             image: ingredient.image || null,
             isScalable: typeof ingredient.isScalable === 'boolean' ? ingredient.isScalable : true,
+          }))
+          : [],
+        // Independently-adjustable parts of a compound dish (e.g. Idli:
+        // 3 nos, Sambar: 1 bowl, Chutney: 2 tbsp - see models/Recipe.js) -
+        // the dietician app already shows these; previously missing here so
+        // the patient app had no choice but to flatten a multi-part meal
+        // down to just its first component's quantity/unit.
+        components: Array.isArray(recipe.components)
+          ? recipe.components.map((component) => ({
+            label: component.label || null,
+            quantity: typeof component.quantity === 'number' ? component.quantity : null,
+            unit: component.unit || null,
           }))
           : [],
         instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
@@ -859,17 +872,24 @@ exports.getTodayMealLogStats = async (req, res, next) => {
       return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
     });
 
-    // weekSummary (see finalizeWeekPlan's normalizedSummary/DietPlan.weeksSummary
-    // schema) is the authoritative daily target - it's the dietician's actual
-    // weighted 7-day average, already correctly scaled by each meal's assigned
-    // servings ratio. The plannedMeals sum below is a fallback for weeks
-    // without one, an unscaled (servings=1x) approximation. Field names here
-    // must match the schema (totalCalories/proteinGrams/carbGrams/fatGrams/
-    // fiberGrams) - they previously read dailyCalories/dailyProtein/dailyCarbs/
-    // dailyFat, which don't exist on the schema, so this always silently fell
-    // through to the fallback sum even when a correct weekSummary existed.
-    const totalPlannedCalories =
-      weekSummary?.totalCalories ?? plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
+    // The dietician's own calorie target (calorieStrategy.calorieBudget)
+    // takes priority over weekSummary.totalCalories - see
+    // resolvePlannedDailyCalories. weekSummary (finalizeWeekPlan's
+    // normalizedSummary/DietPlan.weeksSummary schema) is itself the
+    // authoritative daily target when no budget is set - the dietician's
+    // actual weighted 7-day average, already correctly scaled by each meal's
+    // assigned servings ratio. The plannedMeals sum below is a fallback for
+    // weeks without either, an unscaled (servings=1x) approximation. Field
+    // names here must match the schema (totalCalories/proteinGrams/
+    // carbGrams/fatGrams/fiberGrams) - they previously read dailyCalories/
+    // dailyProtein/dailyCarbs/dailyFat, which don't exist on the schema, so
+    // this always silently fell through to the fallback sum even when a
+    // correct weekSummary existed.
+    const totalPlannedCalories = resolvePlannedDailyCalories(
+      dietPlan,
+      weekSummary,
+      plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0)
+    );
     // Recomputed live per logged meal (see liveCaloriesConsumed above)
     // instead of trusting MealLog.totalCalories, a snapshot frozen at
     // whatever the recipe's calorie count was at the moment each meal was

@@ -10,6 +10,7 @@ const {
   resolvePlanStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
+const { resolvePlannedDailyCalories } = require('../../utils/weekNutritionSummary');
 
 /**
  * GET /patients/:patientId/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
@@ -416,15 +417,23 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
     });
 
-    // weekSummary (see finalizeWeekPlan's normalizedSummary/DietPlan.weeksSummary
-    // schema) is the authoritative daily target - the dietician's actual
-    // weighted 7-day average. Field names here must match the schema
+    // The dietician's own calorie target (calorieStrategy.calorieBudget)
+    // takes priority over weekSummary.totalCalories - see
+    // resolvePlannedDailyCalories. weekSummary (finalizeWeekPlan's
+    // normalizedSummary/DietPlan.weeksSummary schema) is itself the
+    // authoritative daily target when no budget is set - the dietician's
+    // actual weighted 7-day average. Field names here must match the schema
     // (totalCalories/proteinGrams/carbGrams/fatGrams/fiberGrams) - they
     // previously read dailyCalories/dailyProtein/dailyCarbs/dailyFat, which
     // don't exist on the schema, so this always silently fell through to the
     // plannedMeals fallback sum even when a correct weekSummary existed.
-    const totalPlannedCalories =
-      weekSummary?.totalCalories ?? plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
+    // Kept identical to the patient-facing getTodayMealLogStats so this
+    // dietician-facing view never disagrees with what the patient sees.
+    const totalPlannedCalories = resolvePlannedDailyCalories(
+      dietPlan,
+      weekSummary,
+      plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0)
+    );
     // Recomputed live per logged meal (see liveCaloriesConsumed above)
     // instead of trusting MealLog.totalCalories, a snapshot frozen at
     // whatever the recipe's calorie count was at the moment each meal was
