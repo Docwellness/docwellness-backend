@@ -4,6 +4,7 @@ const config = require('../config/environment');
 const { RECIPE_JSON_SCHEMA } = require('./recipeJsonSchema');
 const { DIET_PLAN_JSON_SCHEMA, REQUIRED_SERVING_TIMES } = require('./dietPlanJsonSchema');
 const { DISH_EXTRACTION_JSON_SCHEMA } = require('./dishExtractionJsonSchema');
+const { EXERCISE_JSON_SCHEMA } = require('./exerciseJsonSchema');
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -40,6 +41,12 @@ const computeDietPlanSeed = ({
     recipeIds: [...(recipeIds || [])].sort(),
     weekNumbers: [...(weekNumbers || [1, 2, 3, 4])].sort(),
   });
+  return parseInt(crypto.createHash('sha256').update(key).digest('hex').slice(0, 8), 16);
+};
+
+// Same rationale as computeRecipeSeed above, applied to exercise generation.
+const computeExerciseSeed = ({ name, category }) => {
+  const key = JSON.stringify({ name, category: category || '' });
   return parseInt(crypto.createHash('sha256').update(key).digest('hex').slice(0, 8), 16);
 };
 
@@ -930,9 +937,133 @@ For each dish you do extract:
   return Array.isArray(parsed.dishes) ? parsed.dishes : [];
 };
 
+/**
+ * Generate an exercise catalog entry (category, MET, description,
+ * instructions, equipment, difficulty, target muscles) from just a name and
+ * an optional category hint - the exercise equivalent of
+ * generateRecipeWithAI, scoped down since there's no ingredient list/
+ * dietary-constraint machinery to carry over. videoUrl is deliberately never
+ * part of this - see uploadExerciseController.js's generateExercisePreview
+ * doc comment for why.
+ */
+const generateExerciseWithAI = async ({ name, category }) => {
+  if (!name || !name.trim()) {
+    throw new Error('name is required');
+  }
+
+  const systemPrompt = `You are an expert exercise physiologist and certified personal trainer AI.
+
+Given an exercise name, return accurate, literature-grounded exercise data.
+
+RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
+{
+  "name": "string - exercise name",
+  "category": "Cardio" | "Strength" | "Flexibility" | "Sports" | "Other",
+  "met": number (1-20, the real metabolic equivalent of task for this exact exercise at a moderate/typical intensity),
+  "description": "string - brief 1-2 sentence description of the exercise and what it targets",
+  "instructions": ["string - step 1", "string - step 2", ...],
+  "equipment": ["string - equipment item", ...],
+  "difficultyLevel": "Beginner" | "Intermediate" | "Advanced",
+  "targetMuscleGroups": ["string - muscle group", ...]
+}
+
+IMPORTANT RULES:
+- met MUST be a real, literature-grounded MET value for this specific exercise, not a rough guess. Reference points: walking (3.0-4.3 depending on pace), running (8-12.8 depending on pace), cycling moderate (7.5-8.5), swimming laps (6-10), yoga/stretching (2.3-3.0), weight training moderate (3.5-5.0), weight training vigorous (6.0), jumping rope (11-12.3), HIIT (8-10), bodyweight circuit (6-8), push-ups/sit-ups/planks (3.8-8.0 depending on pace).
+- Include 3-8 clear, actionable form-cue instructions
+- equipment is an empty array for bodyweight-only exercises
+- Categorize accurately: Cardio (elevates heart rate sustained), Strength (resistance/muscle-building), Flexibility (stretching/mobility), Sports (sport-specific drills), Other (anything else)
+- targetMuscleGroups should list 1-4 primary muscle groups, e.g. ["Quadriceps", "Glutes"]`;
+
+  const userPrompt = `Exercise Name: ${name}${category ? `\nCategory hint (dietician-selected, may be overridden if clearly wrong): ${category}` : ''}`;
+
+  const seed = computeExerciseSeed({ name, category });
+  const jsonSchemaConfig = {
+    name: 'exercise_generation',
+    schema: EXERCISE_JSON_SCHEMA,
+    strict: true,
+  };
+
+  let parsedExercise;
+  let lastError;
+  let refused = false;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.responses.create({
+        model: config.openai.recipeModel,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0,
+        text: { format: { type: 'json_schema', ...jsonSchemaConfig } },
+      });
+
+      const part = response?.output?.[0]?.content?.[0];
+      if (part?.type === 'refusal') {
+        console.error(`generateExerciseWithAI responses.create attempt ${attempt} refused:`, part.refusal);
+        lastError = new Error(`Model refused: ${part.refusal}`);
+        refused = true;
+        break;
+      }
+      const raw = typeof part === 'string' ? part : part?.text || response?.output_text || '';
+      parsedExercise = parseJsonFromModelOutput(raw);
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`generateExerciseWithAI responses.create attempt ${attempt} failed:`, error.message);
+    }
+  }
+
+  if (!parsedExercise) {
+    try {
+      const fallback = await openai.chat.completions.create({
+        model: config.openai.recipeModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0,
+        seed,
+        response_format: { type: 'json_schema', json_schema: jsonSchemaConfig },
+      });
+
+      const message = fallback?.choices?.[0]?.message;
+      if (message?.refusal) {
+        console.error('generateExerciseWithAI chat fallback refused:', message.refusal);
+        lastError = new Error(`Model refused: ${message.refusal}`);
+      } else {
+        parsedExercise = parseJsonFromModelOutput(message?.content || '');
+      }
+    } catch (fallbackError) {
+      lastError = fallbackError;
+      console.error('generateExerciseWithAI chat fallback failed:', fallbackError.message);
+    }
+  }
+
+  if (refused && !parsedExercise) {
+    throw new Error(`AI declined to generate this exercise: ${lastError?.message || 'policy refusal'}`);
+  }
+  if (!parsedExercise) {
+    throw new Error(`AI generation failed: ${lastError?.message || 'Unknown error'}`);
+  }
+
+  return {
+    name: parsedExercise.name || name,
+    category: parsedExercise.category || category || 'Other',
+    met: typeof parsedExercise.met === 'number' ? parsedExercise.met : 3.5,
+    description: parsedExercise.description || '',
+    instructions: Array.isArray(parsedExercise.instructions) ? parsedExercise.instructions : [],
+    equipment: Array.isArray(parsedExercise.equipment) ? parsedExercise.equipment : [],
+    difficultyLevel: parsedExercise.difficultyLevel || 'Beginner',
+    targetMuscleGroups: Array.isArray(parsedExercise.targetMuscleGroups) ? parsedExercise.targetMuscleGroups : [],
+  };
+};
+
 module.exports = {
   generateDietPlanWithAI,
   generateRecipeWithAI,
+  generateExerciseWithAI,
   extractDishesFromDocument,
   generateTranslations,
 };

@@ -33,9 +33,24 @@ const exerciseSchema = new mongoose.Schema(
       min: 1,
       max: 20,
     },
+    // Short blurb + step-by-step cues, mirrors Recipe.js's description/
+    // instructions split - description is the catalog-tile summary,
+    // instructions are the how-to-perform steps.
+    description: {
+      type: String,
+      default: '',
+    },
     instructions: {
       type: [String],
       default: [],
+    },
+    // A demo/tutorial link the dietician pastes in (e.g. YouTube) - not
+    // AI-generated (see uploadExerciseController.js's generateExercisePreview
+    // doc comment for why: an AI can't verify a real video exists at a URL,
+    // unlike met/description which are just text it's authoring itself).
+    videoUrl: {
+      type: String,
+      default: '',
     },
     equipment: {
       type: [String],

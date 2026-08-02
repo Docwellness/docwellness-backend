@@ -276,6 +276,10 @@ router.post(
 router.get('/exercises', dieticianOnlyMiddleware, uploadExerciseController.listExercises);
 router.post('/exercises', dieticianOnlyMiddleware, uploadExerciseController.createExercise);
 
+// AI-draft an exercise's catalog fields from just a name - dietician reviews/
+// edits before saving via the create route above.
+router.post('/exercises/ai-generate-preview', dieticianOnlyMiddleware, uploadExerciseController.generateExercisePreview);
+
 // Get/update a single exercise
 router.get('/exercises/:id', dieticianOnlyMiddleware, uploadExerciseController.getExerciseById);
 router.put('/exercises/:id', dieticianOnlyMiddleware, uploadExerciseController.updateExercise);

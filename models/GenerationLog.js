@@ -9,7 +9,7 @@ const generationLogSchema = new mongoose.Schema(
   {
     kind: {
       type: String,
-      enum: ['recipe', 'dietPlan'],
+      enum: ['recipe', 'dietPlan', 'exercise'],
       required: true,
     },
     dieticianId: {

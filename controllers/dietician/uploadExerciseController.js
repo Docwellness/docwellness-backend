@@ -1,13 +1,30 @@
-// Exercise catalog CRUD - a deliberately scoped-down mirror of
-// uploadRecipieController.js. No AI-generation step: a dietician manually
-// enters an exercise's name/category/MET value/instructions, unlike
-// Recipe's AI-drafted-then-edited flow (there's no "hit a calorie target"
-// pressure for exercises the way there is for recipe nutrition).
+// Exercise catalog CRUD - a scoped-down mirror of uploadRecipieController.js.
+// AI-generation now covers category/met/description/instructions/equipment/
+// difficulty/targetMuscleGroups from just a name (generateExercisePreview
+// below), the same "draft then dietician reviews/edits" flow recipes use.
+// videoUrl is the one field that stays manual - a demo/tutorial link the
+// dietician pastes in - since the AI can't verify a real video exists at a
+// URL it invents, unlike the text fields it's authoring itself.
 
 const Exercise = require('../../models/Exercise');
+const GenerationLog = require('../../models/GenerationLog');
+const config = require('../../config/environment');
+const { generateExerciseWithAI } = require('../../utils/openaiClient');
+const { calcCaloriesBurned, DEFAULT_FALLBACK_WEIGHT_KG } = require('../../utils/exerciseHelpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const crypto = require('crypto');
 const fs = require('fs');
+
+// A fixed reference session length so the AI-preview's displayed calorie
+// figure is comparable across exercises - the real per-log calorie burn
+// always uses the patient's actual weight and the duration they logged (see
+// controllers/patient/exerciseController.js's submitExerciseLog), this is
+// purely a "what does this look like for a typical adult" preview number.
+const REFERENCE_DURATION_MINUTES = 30;
+
+const hashExerciseInput = ({ name, category }) =>
+  crypto.createHash('sha256').update(JSON.stringify({ name, category: category || '' })).digest('hex');
 
 /**
  * @route   POST /api/dietician/exercises/upload-image
@@ -43,6 +60,87 @@ exports.uploadExerciseImage = async (req, res, next) => {
 };
 
 /**
+ * @desc    Generate an exercise catalog entry preview using AI - category,
+ *          met, description, instructions, equipment, difficulty, and target
+ *          muscle groups from just a name (+ optional category hint).
+ *          Mirrors uploadRecipieController.js's generateRecipeWithAI preview
+ *          endpoint: the dietician reviews/edits the draft before saving via
+ *          createExercise, nothing is persisted here.
+ * @route   POST /api/dietician/exercises/ai-generate-preview
+ * @access  Private (Dietician)
+ * @body    { name, category? }
+ */
+exports.generateExercisePreview = async (req, res, next) => {
+  try {
+    const { name, category } = req.body || {};
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'name is required',
+      });
+    }
+
+    const inputHash = hashExerciseInput({ name, category });
+    const generationStartedAt = Date.now();
+    let generated;
+    try {
+      generated = await generateExerciseWithAI({ name, category });
+    } catch (aiError) {
+      console.error('AI error in generateExercisePreview:', aiError);
+      try {
+        await GenerationLog.create({
+          kind: 'exercise',
+          dieticianId: req.user._id,
+          model: config.openai.recipeModel,
+          inputHash,
+          latencyMs: Date.now() - generationStartedAt,
+          succeeded: false,
+        });
+      } catch (logError) {
+        console.error('Failed to write GenerationLog entry:', logError.message);
+      }
+      return res.status(502).json({
+        success: false,
+        message: 'AI service error. Please try again later.',
+      });
+    }
+
+    // Reference-only figure for a typical adult at a fixed session length -
+    // never persisted, never trusted for an actual logged completion (see
+    // REFERENCE_DURATION_MINUTES's own comment above).
+    const referenceCaloriesBurned = calcCaloriesBurned({
+      met: generated.met,
+      weightKg: DEFAULT_FALLBACK_WEIGHT_KG,
+      durationMinutes: REFERENCE_DURATION_MINUTES,
+    });
+
+    try {
+      await GenerationLog.create({
+        kind: 'exercise',
+        dieticianId: req.user._id,
+        model: config.openai.recipeModel,
+        inputHash,
+        latencyMs: Date.now() - generationStartedAt,
+        succeeded: true,
+      });
+    } catch (logError) {
+      console.error('Failed to write GenerationLog entry:', logError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...generated,
+        referenceCaloriesBurned,
+        referenceDurationMinutes: REFERENCE_DURATION_MINUTES,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @route   POST /api/dietician/exercises
  * @access  Private (Dietician)
  */
@@ -53,11 +151,13 @@ exports.createExercise = async (req, res, next) => {
       name,
       category,
       met,
+      description,
       instructions,
       equipment,
       difficultyLevel,
       targetMuscleGroups,
       image,
+      videoUrl,
       tags,
     } = req.body || {};
 
@@ -73,11 +173,13 @@ exports.createExercise = async (req, res, next) => {
       name,
       category,
       met,
+      description,
       instructions,
       equipment,
       difficultyLevel,
       targetMuscleGroups,
       image,
+      videoUrl,
       tags,
     });
 
@@ -159,11 +261,13 @@ const DIRECT_UPDATE_FIELDS = [
   'name',
   'category',
   'met',
+  'description',
   'instructions',
   'equipment',
   'difficultyLevel',
   'targetMuscleGroups',
   'image',
+  'videoUrl',
   'tags',
 ];
 
