@@ -24,6 +24,9 @@ const WaterLog = require('./WaterLog');
 const SocialMediaPost = require('./SocialMediaPost');
 const Article = require('./Article');
 const Review = require('./Review');
+const Exercise = require('./Exercise');
+const ExercisePlan = require('./ExercisePlan');
+const ExerciseLog = require('./ExerciseLog');
 
 module.exports = {
   User,
@@ -52,4 +55,7 @@ module.exports = {
   SocialMediaPost,
   Article,
   Review,
+  Exercise,
+  ExercisePlan,
+  ExerciseLog,
 };

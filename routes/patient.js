@@ -30,6 +30,7 @@ const {
   journeyController,
   firstConsultationController,
   timelineController,
+  exerciseController,
 } = require('../controllers/patient');
 const {
   consultationFormController,
@@ -438,6 +439,14 @@ router.post('/water/log', patientOnly, waterController.logWater);
 router.get('/water/today', patientOnly, waterController.getToday);
 router.get('/water/history', patientOnly, waterController.getHistory);
 router.put('/water/goal', patientOnly, waterController.updateGoal);
+
+// ==========================================
+// Exercise Plan (patient-facing)
+// ==========================================
+
+router.get('/exercise/active', patientOnly, exerciseController.getActiveExercisePlanForPatient);
+router.get('/exercise-log/today-stats', patientOnly, exerciseController.getTodayExerciseStats);
+router.post('/exercise-log', patientOnly, exerciseController.submitExerciseLog);
 
 // ==========================================
 // Journey Routes

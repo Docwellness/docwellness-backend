@@ -24,6 +24,8 @@ const {
   socialMediaController,
   articleController,
   reviewController,
+  uploadExerciseController,
+  exercisePlanController,
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
@@ -266,6 +268,46 @@ router.post(
   dietPlanController.activateDietPlan
 );
 
+// ==========================================
+// Exercise Plan (catalog + assignment)
+// ==========================================
+
+// List/create exercises in the dietician's own catalog
+router.get('/exercises', dieticianOnlyMiddleware, uploadExerciseController.listExercises);
+router.post('/exercises', dieticianOnlyMiddleware, uploadExerciseController.createExercise);
+
+// Get/update a single exercise
+router.get('/exercises/:id', dieticianOnlyMiddleware, uploadExerciseController.getExerciseById);
+router.put('/exercises/:id', dieticianOnlyMiddleware, uploadExerciseController.updateExercise);
+
+// Upload an exercise's image
+router.post(
+  '/uploads/exercise-image',
+  dieticianOnlyMiddleware,
+  uploadLimiter,
+  upload.single('file'),
+  uploadExerciseController.uploadExerciseImage
+);
+
+// Create/update (upsert) a patient's evergreen exercise plan
+router.post(
+  '/patients/:patientId/exercise-plans',
+  dieticianOnlyMiddleware,
+  exercisePlanController.upsertExercisePlan
+);
+
+router.get(
+  '/patients/:patientId/exercise-plans/:exercisePlanId/details',
+  dieticianOnlyMiddleware,
+  exercisePlanController.getExercisePlanDetails
+);
+
+router.post(
+  '/patients/:patientId/exercise-plans/:exercisePlanId/activate',
+  dieticianOnlyMiddleware,
+  exercisePlanController.activateExercisePlan
+);
+
 // Patient tracking data (calorie intake, weight trend, BMI) for charts
 router.get(
   '/patients/:patientId/tracking-data',
@@ -285,6 +327,13 @@ router.get(
   '/patients/:patientId/water/today',
   dieticianOnlyMiddleware,
   trackingController.getPatientWaterIntake
+);
+
+// Patient exercise stats for Client Logged Data screen
+router.get(
+  '/patients/:patientId/exercise-log/today-stats',
+  dieticianOnlyMiddleware,
+  trackingController.getPatientExerciseStats
 );
 
 // Get custom food requests for dietician

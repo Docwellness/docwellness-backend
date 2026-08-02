@@ -15,6 +15,7 @@ const journeyController = require('./journeyController');
 const couponController = require('./couponController');
 const firstConsultationController = require('./firstConsultationController');
 const timelineController = require('./timelineController');
+const exerciseController = require('./exerciseController');
 
 module.exports = {
   authController,
@@ -29,4 +30,5 @@ module.exports = {
   couponController,
   firstConsultationController,
   timelineController,
+  exerciseController,
 };

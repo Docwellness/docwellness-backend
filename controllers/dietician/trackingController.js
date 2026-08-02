@@ -1,4 +1,4 @@
-const { MealLog, DietPlan, User, Recipe } = require('../../models');
+const { MealLog, DietPlan, User, Recipe, ExercisePlan, ExerciseLog } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const {
@@ -516,6 +516,58 @@ exports.getPatientWaterIntake = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: waterLog || { date: today, totalAmount: 0, goal: 2500, entries: [] },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================
+// Dietician: get patient exercise stats for a specific date -
+// mirrors controllers/patient/exerciseController.js's
+// getTodayExerciseStats, scoped by :patientId param instead of the
+// logged-in user, for the Client Logged Data screen. Full logged-exercise
+// list/history view is a later phase (see the Exercise Plan feature plan's
+// Phase 3) - this returns just the summary numbers the Progress card needs.
+// GET /api/dietician/patients/:patientId/exercise-log/today-stats?date=YYYY-MM-DD
+// ============================================================
+exports.getPatientExerciseStats = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const queryDate = req.query.date;
+    const today = queryDate ? new Date(queryDate) : new Date();
+    const todayDayGroup = resolveDayGroupForDate(today);
+
+    const plan = await ExercisePlan.findOne({ patientId, status: 'Active' }).lean();
+    const todaysPlanned = (plan?.dailyExercises || []).filter(
+      (entry) => entry.dayGroup === todayDayGroup
+    );
+
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingLog = await ExerciseLog.findOne({
+      patientId,
+      date: { $gte: startOfDay, $lte: endOfDay },
+    }).lean();
+    const loggedExercises = existingLog?.exercises || [];
+
+    const totalCaloriesBurned = Math.round(
+      loggedExercises.reduce((sum, e) => sum + (e.caloriesBurned || 0), 0)
+    );
+    const completedCount = todaysPlanned.filter((entry) =>
+      loggedExercises.some((e) => e.exerciseId?.toString() === entry.exerciseId?.toString())
+    ).length;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalCaloriesBurned,
+        completedCount,
+        totalExercises: todaysPlanned.length,
+      },
     });
   } catch (error) {
     next(error);

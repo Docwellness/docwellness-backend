@@ -16,6 +16,8 @@ const timelineController = require('./timelineController');
 const socialMediaController = require('./socialMediaController');
 const articleController = require('./articleController');
 const reviewController = require('./reviewController');
+const uploadExerciseController = require('./uploadExerciseController');
+const exercisePlanController = require('./exercisePlanController');
 
 module.exports = {
   manualPaymentController,
@@ -36,4 +38,6 @@ module.exports = {
   socialMediaController,
   articleController,
   reviewController,
+  uploadExerciseController,
+  exercisePlanController,
 };
