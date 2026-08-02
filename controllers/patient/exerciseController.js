@@ -95,6 +95,7 @@ exports.getTodayExerciseStats = async (req, res, next) => {
         description: entry.exerciseId?.description || null,
         videoUrl: entry.exerciseId?.videoUrl || null,
         instructions: entry.exerciseId?.instructions || [],
+        translations: entry.exerciseId?.translations || {},
         durationMinutes: entry.durationMinutes,
         sets: entry.sets,
         reps: entry.reps,

@@ -946,7 +946,7 @@ For each dish you do extract:
  * part of this - see uploadExerciseController.js's generateExercisePreview
  * doc comment for why.
  */
-const generateExerciseWithAI = async ({ name, category }) => {
+const generateExerciseWithAI = async ({ name, category, languages }) => {
   if (!name || !name.trim()) {
     throw new Error('name is required');
   }
@@ -1048,7 +1048,7 @@ IMPORTANT RULES:
     throw new Error(`AI generation failed: ${lastError?.message || 'Unknown error'}`);
   }
 
-  return {
+  const finalExercise = {
     name: parsedExercise.name || name,
     category: parsedExercise.category || category || 'Other',
     met: typeof parsedExercise.met === 'number' ? parsedExercise.met : 3.5,
@@ -1058,12 +1058,72 @@ IMPORTANT RULES:
     difficultyLevel: parsedExercise.difficultyLevel || 'Beginner',
     targetMuscleGroups: Array.isArray(parsedExercise.targetMuscleGroups) ? parsedExercise.targetMuscleGroups : [],
   };
+
+  const translationLanguages = (languages || ['English']).filter((l) => l !== 'English');
+  finalExercise.translations = await generateExerciseTranslations(finalExercise, translationLanguages);
+
+  return finalExercise;
+};
+
+/**
+ * Translates an exercise's name/description/instructions into each of
+ * `languages` - a scoped-down sibling of generateTranslations above (which
+ * is shaped around Recipe's ingredients/cookingSteps/warnings fields).
+ * Returns {} if languages is empty (English-only, the common case).
+ */
+const generateExerciseTranslations = async (exercise, languages) => {
+  const translations = {};
+  if (!languages || languages.length === 0) return translations;
+
+  for (const lang of languages) {
+    try {
+      const translationPrompt = `Translate the following exercise content to ${lang}. Return ONLY valid JSON.
+
+Exercise Name: ${exercise.name || ''}
+Description: ${exercise.description || ''}
+Instructions: ${JSON.stringify(exercise.instructions || [])}
+
+Return this exact JSON structure:
+{
+  "name": "translated exercise name in ${lang}",
+  "description": "translated description in ${lang}",
+  "instructions": ["translated step 1", "translated step 2", ...]
+}
+
+IMPORTANT: Translate naturally into ${lang} script. NO markdown, ONLY JSON.`;
+
+      const response = await openai.responses.create({
+        model: config.openai.translationModel,
+        input: [{ role: 'user', content: translationPrompt }],
+        temperature: 0.3,
+        text: {},
+      });
+
+      const part = response?.output?.[0]?.content?.[0];
+      const raw = typeof part === 'string' ? part : part?.text || response?.output_text || '';
+      const parsed = parseJsonFromModelOutput(raw);
+
+      if (parsed) {
+        translations[lang] = {
+          name: parsed.name || exercise.name,
+          description: parsed.description || exercise.description || '',
+          instructions: Array.isArray(parsed.instructions) ? parsed.instructions : [],
+        };
+      }
+    } catch (err) {
+      console.error(`Exercise translation to ${lang} failed:`, err.message);
+      // Skip this language if translation fails - never blocks generation.
+    }
+  }
+
+  return translations;
 };
 
 module.exports = {
   generateDietPlanWithAI,
   generateRecipeWithAI,
   generateExerciseWithAI,
+  generateExerciseTranslations,
   extractDishesFromDocument,
   generateTranslations,
 };

@@ -73,6 +73,20 @@ const exerciseSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Mirrors Recipe.js's language/translations split - name/description/
+    // instructions get AI-translated at creation time (see
+    // generateExerciseTranslations in utils/openaiClient.js), so a patient
+    // viewing in their preferred language (see RecipeLanguageService, shared
+    // app-wide rather than exercise-specific) sees exercise content in it
+    // too, not just recipes.
+    language: {
+      type: [String],
+      default: ['English'],
+    },
+    translations: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,

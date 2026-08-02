@@ -17,8 +17,10 @@ function validateDailyExercises(dailyExercises) {
     if (!mongoose.Types.ObjectId.isValid(entry?.exerciseId)) {
       return 'Each entry needs a valid exerciseId';
     }
-    if (typeof entry?.durationMinutes !== 'number' || entry.durationMinutes <= 0) {
-      return 'Each entry needs a positive durationMinutes';
+    // durationMinutes is optional (see ExercisePlan.js's own comment) - only
+    // validated when actually provided, same as sets/reps below.
+    if (entry?.durationMinutes != null && (typeof entry.durationMinutes !== 'number' || entry.durationMinutes <= 0)) {
+      return 'durationMinutes must be a positive number when provided';
     }
     if (!DAY_GROUPS.includes(entry?.dayGroup)) {
       return `Each entry needs a dayGroup from: ${DAY_GROUPS.join(', ')}`;

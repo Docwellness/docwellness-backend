@@ -68,11 +68,13 @@ exports.uploadExerciseImage = async (req, res, next) => {
  *          createExercise, nothing is persisted here.
  * @route   POST /api/dietician/exercises/ai-generate-preview
  * @access  Private (Dietician)
- * @body    { name, category? }
+ * @body    { name, category?, language? } - language is a comma-separated
+ *          string, e.g. "English,Hindi,Marathi", same convention as the
+ *          recipe generation endpoint.
  */
 exports.generateExercisePreview = async (req, res, next) => {
   try {
-    const { name, category } = req.body || {};
+    const { name, category, language } = req.body || {};
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -80,11 +82,15 @@ exports.generateExercisePreview = async (req, res, next) => {
       });
     }
 
+    const languages = language
+      ? language.split(',').map((l) => l.trim()).filter(Boolean)
+      : ['English'];
+
     const inputHash = hashExerciseInput({ name, category });
     const generationStartedAt = Date.now();
     let generated;
     try {
-      generated = await generateExerciseWithAI({ name, category });
+      generated = await generateExerciseWithAI({ name, category, languages });
     } catch (aiError) {
       console.error('AI error in generateExercisePreview:', aiError);
       try {
@@ -131,6 +137,7 @@ exports.generateExercisePreview = async (req, res, next) => {
       success: true,
       data: {
         ...generated,
+        language: languages,
         referenceCaloriesBurned,
         referenceDurationMinutes: REFERENCE_DURATION_MINUTES,
       },
@@ -159,6 +166,8 @@ exports.createExercise = async (req, res, next) => {
       image,
       videoUrl,
       tags,
+      language,
+      translations,
     } = req.body || {};
 
     if (!name || typeof met !== 'number') {
@@ -181,6 +190,8 @@ exports.createExercise = async (req, res, next) => {
       image,
       videoUrl,
       tags,
+      language,
+      translations,
     });
 
     return res.status(201).json({
@@ -269,6 +280,8 @@ const DIRECT_UPDATE_FIELDS = [
   'image',
   'videoUrl',
   'tags',
+  'language',
+  'translations',
 ];
 
 /**
