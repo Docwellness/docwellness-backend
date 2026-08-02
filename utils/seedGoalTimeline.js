@@ -113,18 +113,30 @@ async function seedMilestonesForRange(goal, rangeStart, rangeEnd, { includeEndGo
 
   // Weekly milestones every 7 days from the goal's own start (not the
   // range start), so week boundaries stay stable across renewal-triggered
-  // range extensions instead of resetting per cycle.
+  // range extensions instead of resetting per cycle. Dated on each week's
+  // LAST day (goalStart + 6, +13, +20, ...), not its first - a weekly
+  // checkpoint must sort after all 7 of that week's daily milestones in the
+  // client's timeline (see utils/timelinePayload.js's
+  // .sort({ date: 1, sortOrder: 1 }) - a weekly doc sharing its date with
+  // that week's 7th daily doc sorts right after it there, since daily's
+  // sortOrder is a small day-index vs weekly's flat 900). Previously dated
+  // on the week's FIRST day, so "Week 1" sorted in right after just the
+  // first daily milestone instead of at the end of the week.
   const goalStart = toDateOnly(goal.startDate);
   const weeklyDocs = [];
-  for (let d = new Date(goalStart); d <= end; d = new Date(d.getTime() + 7 * MS_PER_DAY)) {
-    if (d < start) continue;
-    const weekNum = Math.floor((d - goalStart) / MS_PER_DAY / 7) + 1;
+  for (
+    let weekEnd = new Date(goalStart.getTime() + 6 * MS_PER_DAY);
+    weekEnd <= end;
+    weekEnd = new Date(weekEnd.getTime() + 7 * MS_PER_DAY)
+  ) {
+    if (weekEnd < start) continue;
+    const weekNum = Math.floor((weekEnd - goalStart) / MS_PER_DAY / 7) + 1;
     weeklyDocs.push({
       goalId: goal._id,
       type: 'weekly',
       title: `Week ${weekNum}`,
       subtitle: 'Weekly checkpoint',
-      date: d,
+      date: weekEnd,
       sortOrder: 900,
     });
   }
