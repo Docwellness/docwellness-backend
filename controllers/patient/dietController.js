@@ -5,7 +5,6 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { normalize } = require('../../utils/ingredientLibrary');
-const { resolvePlannedDailyCalories } = require('../../utils/weekNutritionSummary');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -732,8 +731,6 @@ exports.getTodayMealLogStats = async (req, res, next) => {
     const currentWeek = resolveCurrentWeek(dietPlan, today);
 
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
-    const weekSummary =
-      dietPlan.weeksSummary?.find((s) => Number(s.week) === Number(currentWeek)) || null;
 
     // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
     // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) bundled
@@ -872,24 +869,15 @@ exports.getTodayMealLogStats = async (req, res, next) => {
       return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
     });
 
-    // The dietician's own calorie target (calorieStrategy.calorieBudget)
-    // takes priority over weekSummary.totalCalories - see
-    // resolvePlannedDailyCalories. weekSummary (finalizeWeekPlan's
-    // normalizedSummary/DietPlan.weeksSummary schema) is itself the
-    // authoritative daily target when no budget is set - the dietician's
-    // actual weighted 7-day average, already correctly scaled by each meal's
-    // assigned servings ratio. The plannedMeals sum below is a fallback for
-    // weeks without either, an unscaled (servings=1x) approximation. Field
-    // names here must match the schema (totalCalories/proteinGrams/
-    // carbGrams/fatGrams/fiberGrams) - they previously read dailyCalories/
-    // dailyProtein/dailyCarbs/dailyFat, which don't exist on the schema, so
-    // this always silently fell through to the fallback sum even when a
-    // correct weekSummary existed.
-    const totalPlannedCalories = resolvePlannedDailyCalories(
-      dietPlan,
-      weekSummary,
-      plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0)
-    );
+    // The real sum of *today's own* assigned meals (plannedMeals is already
+    // scoped to todaysDailyMeals, this day-group only) - not
+    // weekSummary.totalCalories, which is a day-group-weighted 7-day
+    // *average* across all 4 day-groups (see computeWeekSummary), so it
+    // never actually equals any single day's real total and drifted from
+    // what the dietician's own "Selected Calories" shows for that specific
+    // day. Patients need today's real planned total, not a cross-day
+    // average.
+    const totalPlannedCalories = plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
     // Recomputed live per logged meal (see liveCaloriesConsumed above)
     // instead of trusting MealLog.totalCalories, a snapshot frozen at
     // whatever the recipe's calorie count was at the moment each meal was
@@ -937,11 +925,13 @@ exports.getTodayMealLogStats = async (req, res, next) => {
       }, 0)),
     };
 
+    // Same reasoning as totalPlannedCalories above - today's own meals, not
+    // weekSummary's cross-day-group weighted average.
     const macroPlanned = {
-      protein: Math.round(weekSummary?.proteinGrams ?? plannedMeals.reduce((sum, m) => sum + m.protein, 0)),
-      carbs: Math.round(weekSummary?.carbGrams ?? plannedMeals.reduce((sum, m) => sum + m.carbs, 0)),
-      fats: Math.round(weekSummary?.fatGrams ?? plannedMeals.reduce((sum, m) => sum + m.fats, 0)),
-      fiber: Math.round(weekSummary?.fiberGrams ?? plannedMeals.reduce((sum, m) => sum + m.fiber, 0)),
+      protein: Math.round(plannedMeals.reduce((sum, m) => sum + m.protein, 0)),
+      carbs: Math.round(plannedMeals.reduce((sum, m) => sum + m.carbs, 0)),
+      fats: Math.round(plannedMeals.reduce((sum, m) => sum + m.fats, 0)),
+      fiber: Math.round(plannedMeals.reduce((sum, m) => sum + m.fiber, 0)),
     };
 
     const resolvedPlanStartDate = resolvePlanStartDate(dietPlan);

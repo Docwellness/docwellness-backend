@@ -125,25 +125,4 @@ function computeWeekSummary(meals, recipeDocs) {
   };
 }
 
-// The dietician's chosen daily calorie target (DietPlan.calorieStrategy.
-// calorieBudget, picked when starting the plan - see select_diet_sheet.dart's
-// "Required Calories") takes priority over weekSummary.totalCalories - a
-// value that's always recomputed from the selected recipes' own nutrition
-// data and can legitimately drift a little from the dietician's round target
-// (e.g. budget 1560 vs. recipes summing to 1550). Patients must see one
-// stable, dietician-authoritative number for "calories planned today"
-// instead of whichever the recipe math happens to land on. Falls back to
-// weekSummary.totalCalories, then the raw plannedMeals sum, for plans with
-// no calorieBudget set (predating calorie strategies, or a custom/manual
-// plan). Shared by both the patient-facing and dietician-facing "today
-// stats" endpoints so the two apps can never show different numbers for the
-// same plan/day.
-function resolvePlannedDailyCalories(dietPlan, weekSummary, plannedMealsFallback) {
-  const dieticianBudget = dietPlan?.calorieStrategy?.calorieBudget;
-  if (typeof dieticianBudget === 'number' && dieticianBudget > 0) {
-    return dieticianBudget;
-  }
-  return weekSummary?.totalCalories ?? plannedMealsFallback;
-}
-
-module.exports = { computeWeekSummary, resolvePlannedDailyCalories };
+module.exports = { computeWeekSummary };
