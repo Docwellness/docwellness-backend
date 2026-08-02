@@ -74,7 +74,22 @@ async function computeTaskDoneMap(patientId, milestones) {
     const key = dateKeyUTC(log.date);
     if (!mealsByDateKey.has(key)) mealsByDateKey.set(key, new Map());
     const byType = mealsByDateKey.get(key);
-    for (const meal of log.meals || []) byType.set(meal.mealType, meal);
+    for (const meal of log.meals || []) {
+      // A single serving-time slot can hold more than one logged recipe
+      // (see dietController.js's submitMealLog, which overwrites-or-appends
+      // per (servingTime, recipeId) pair - e.g. Breakfast: Idli + Boiled
+      // Egg, each logged separately). Aggregating instead of the previous
+      // last-write-wins Map.set() - that silently discarded every earlier
+      // entry's calories for the same mealType, undercounting a slot's
+      // real "X kcal" loggedNote (and the day summary's total kcal logged)
+      // whenever more than one recipe was logged under it.
+      const existing = byType.get(meal.mealType);
+      if (existing) {
+        existing.caloriesConsumed = (existing.caloriesConsumed || 0) + (meal.caloriesConsumed || 0);
+      } else {
+        byType.set(meal.mealType, { ...meal });
+      }
+    }
   }
   const waterByDateKey = new Map(waterLogs.map((w) => [w.date, w]));
 
