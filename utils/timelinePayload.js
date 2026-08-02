@@ -86,8 +86,36 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     });
   }
 
+  // A 'weekly' milestone has no MilestoneTask docs of its own (only 'daily'
+  // milestones get default tasks - see seedGoalTimeline.js), so
+  // adherenceMap always holds tasksTotal: 0 for it, which made
+  // computeMilestoneStatus fall back to its "no tasks -> completed" case -
+  // every past week's checkpoint showed a checkmark unconditionally,
+  // whether or not the patient actually completed that week's daily tasks.
+  // Build a real adherence for a weekly milestone instead, aggregated from
+  // the 7 'daily' milestones spanning that week (weekEnd-6..weekEnd, since
+  // seedGoalTimeline now dates a weekly milestone on the week's LAST day -
+  // same window convention as computeGoalStats' own 7-day rollup above).
+  const dailyMilestones = milestones.filter((m) => m.type === 'daily');
+  function weeklyAdherenceEntry(weeklyMilestone) {
+    const weekEnd = new Date(weeklyMilestone.date);
+    const weekStart = new Date(weekEnd.getTime() - 6 * MS_PER_DAY);
+    const daysInWeek = dailyMilestones.filter((d) => d.date >= weekStart && d.date <= weekEnd);
+    if (daysInWeek.length === 0) return adherenceMap.get(weeklyMilestone._id.toString());
+
+    let tasksTotal = 0;
+    let tasksDone = 0;
+    for (const day of daysInWeek) {
+      const entry = adherenceMap.get(day._id.toString());
+      tasksTotal += entry?.tasksTotal ?? 0;
+      tasksDone += entry?.tasksDone ?? 0;
+    }
+    return { tasksTotal, tasksDone, adherence: tasksTotal === 0 ? 0 : tasksDone / tasksTotal };
+  }
+
   const shapedMilestones = milestones.map((m) => {
-    const adherenceEntry = adherenceMap.get(m._id.toString());
+    const adherenceEntry =
+      m.type === 'weekly' ? weeklyAdherenceEntry(m) : adherenceMap.get(m._id.toString());
     return {
       id: m._id,
       type: m.type,
