@@ -501,7 +501,17 @@ async function getTodayStatsInternal(patientId) {
   });
 
   const totalCalories = todayLog?.totalCalories || 0;
-  const mealsLogged = todayLog?.meals?.length || 0;
+  // Distinct serving-time slots logged (Morning Drink...Night Drink, 7
+  // total), not the raw entry count - a single slot can hold more than one
+  // logged meal.recipeId (see dietController.js's submitMealLog, which
+  // overwrites-or-appends per (servingTime, recipeId) pair so multiple
+  // recipes assigned to the same slot, e.g. Breakfast: Idli + Boiled Egg,
+  // both get tracked). Counting raw entries let "Today's Meals" climb past
+  // 7 (up to ~15+) whenever a patient logged more than one recipe per slot,
+  // when the intent is "how many of today's 7 sessions have you logged
+  // anything for".
+  const loggedServingTimes = new Set((todayLog?.meals || []).map((m) => m.servingTime));
+  const mealsLogged = loggedServingTimes.size;
 
   const activePlan = await DietPlan.findOne({
     patientId,
