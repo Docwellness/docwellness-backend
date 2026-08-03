@@ -5,6 +5,10 @@
  *   node scripts/backfill-weekly-milestone-dates.js
  */
 
+// Same DNS fix as seed-home-workout-exercises.js - the default system
+// resolver on this machine doesn't handle mongodb+srv://'s SRV/TXT lookups.
+require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 const config = require('../config/environment');
