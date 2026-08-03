@@ -513,142 +513,17 @@ const addRecipeUsage = (item, recipe, ingredient) => {
 };
 
 /**
- * @route   GET /api/patient/diet/groceries
- * @desc    Get grocery list for the current active week
+ * Aggregates one week's dailyMeals into the grocery-item shape the app
+ * renders (name/unit/totalQuantity/displayQuantity/category/recipesUsedIn),
+ * merging by canonical ingredient name via the shared registry. Extracted
+ * so getGroceriesForCurrentWeek can call this once per ready week - see that
+ * function's own doc comment for why it now aggregates every week, not just
+ * the current one, in a single response.
  */
-exports.getGroceriesForCurrentWeek = async (req, res, next) => {
-  try {
-    const { date } = req.query || {};
-    let referenceDate = new Date();
+const buildGroceryItemsForWeek = (week, recipes, registry) => {
+  const groceryMap = {};
 
-    if (date) {
-      const parsedReference = new Date(date);
-      if (!Number.isNaN(parsedReference.getTime())) {
-        referenceDate = parsedReference;
-      }
-    }
-
-    const dietPlan = await DietPlan.findOne({
-      patientId: req.user._id,
-      status: 'Active',
-    })
-      .populate('request', 'startDateForDiet')
-      .lean();
-
-    if (!dietPlan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Active diet plan not found',
-      });
-    }
-
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
-
-    // Determine current week FIRST — then only fetch recipes for that week.
-    // Prefer weekSchedule's actual date ranges (the same source of truth
-    // used everywhere else in this file - see getActiveDietPlan above) over
-    // the activationDate-diff estimate below, so the grocery list always
-    // agrees with which week the rest of the app thinks it is. Falling back
-    // to the diff-based computation only for plans that predate
-    // weekSchedule being populated avoids the two ever silently diverging
-    // (e.g. if activationDate is ever adjusted independently of the plan's
-    // real week-1 start).
-    let currentWeek = null;
-    const weekScheduleEntries = Array.isArray(dietPlan.weekSchedule) ? dietPlan.weekSchedule : [];
-    if (weekScheduleEntries.length > 0) {
-      const refTime = normalizeDate(referenceDate).getTime();
-      const matchedEntry = weekScheduleEntries.find((entry) => {
-        const entryStart = normalizeDate(entry.startDate).getTime();
-        const entryEnd = normalizeDate(entry.endDate).getTime();
-        return refTime >= entryStart && refTime <= entryEnd;
-      });
-      if (matchedEntry) {
-        currentWeek = matchedEntry.week;
-      } else if (refTime < normalizeDate(weekScheduleEntries[0].startDate).getTime()) {
-        currentWeek = weekScheduleEntries[0].week;
-      } else {
-        currentWeek = weekScheduleEntries[weekScheduleEntries.length - 1].week;
-      }
-    }
-
-    if (currentWeek === null) {
-      const activationStart = parseDateOrNull(dietPlan.activationDate);
-      const requestStart = parseDateOrNull(dietPlan.request?.startDateForDiet);
-      const startDate = activationStart || requestStart;
-
-      if (startDate) {
-        const startDay = normalizeDate(startDate);
-        const todayDay = normalizeDate(referenceDate);
-        const diffMs = todayDay.getTime() - startDay.getTime();
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        let computedWeek = Math.floor(diffDays / 7) + 1;
-        if (computedWeek < 1) computedWeek = 1;
-        if (computedWeek > 4) computedWeek = 4;
-        currentWeek = computedWeek;
-      }
-    }
-
-    const week =
-      typeof currentWeek === 'number'
-        ? weeks.find((w) => Number(w.week) === Number(currentWeek)) || null
-        : null;
-
-    if (!week) {
-      return res.status(200).json({
-        success: true,
-        data: { week: currentWeek, items: [] },
-      });
-    }
-
-    // Collect recipe IDs only from the current week — previous/future weeks excluded
-    const recipeIds = new Set();
-    (week.dailyMeals || []).forEach((meal) => {
-      if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
-    });
-
-    const recipeDocs = recipeIds.size
-      ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name servingTime image ingredients category')
-        .lean()
-      : [];
-
-    const recipes = {};
-    recipeDocs.forEach((recipe) => {
-      const id = recipe._id.toString();
-      recipes[id] = {
-        id,
-        name: recipe.name || null,
-        servingTime: recipe.servingTime || null,
-        image: recipe.image || null,
-        isSupplement: recipe.category === 'Supplements',
-        ingredients: Array.isArray(recipe.ingredients)
-          ? recipe.ingredients.map((ingredient) => ({
-            name: ingredient.name || null,
-            quantity: typeof ingredient.quantity === 'number' ? ingredient.quantity : null,
-            unit: ingredient.unit || null,
-            category: ingredient.category || null,
-            priceLevel: ingredient.priceLevel || null,
-            image: ingredient.image || null,
-          }))
-          : [],
-      };
-    });
-
-    // Canonical ingredient registry (see models/Ingredient.js,
-    // scripts/migrate-canonical-ingredients.js) - loaded once, keyed by
-    // normalizedName, so aggregation below is a fast in-memory lookup
-    // instead of a per-ingredient query. Recipe ingredient names were
-    // already rewritten to their canonical spelling by that migration, so
-    // this is an exact lookup, not fuzzy matching.
-    const registryDocs = await Ingredient.find({ dieticianId: dietPlan.dieticianId }).lean();
-    const registry = {};
-    registryDocs.forEach((doc) => {
-      registry[doc.normalizedName] = doc;
-    });
-
-    const groceryMap = {};
-
-    (week.dailyMeals || []).forEach((meal) => {
+  (week.dailyMeals || []).forEach((meal) => {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
 
@@ -799,12 +674,121 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
       return { ...item, totalQuantity: rounded, displayQuantity };
     });
 
+  return items;
+};
+
+/**
+ * @route   GET /api/patient/diet/groceries
+ * @desc    Grocery list for every week the dietician has actually finalized
+ *          (finalizedPlan.weeks - a locked/not-yet-generated future week has
+ *          no entry there and is simply omitted, same "is this week ready"
+ *          check the endpoint always used internally, now surfaced as the
+ *          set of weeks returned instead of silently returning an empty
+ *          list for whichever single week `date` fell into). Returns every
+ *          ready week's items in ONE response so the app can prefetch all
+ *          of them on first load and switch weeks client-side with zero
+ *          repeat calls (see GroceryController.switchWeek) - the same
+ *          all-weeks-in-one-response pattern getActiveDietPlanForPatient
+ *          already uses for the diet plan itself.
+ */
+exports.getGroceriesForCurrentWeek = async (req, res, next) => {
+  try {
+    const { date } = req.query || {};
+    let referenceDate = new Date();
+    if (date) {
+      const parsedReference = new Date(date);
+      if (!Number.isNaN(parsedReference.getTime())) {
+        referenceDate = parsedReference;
+      }
+    }
+
+    const dietPlan = await DietPlan.findOne({
+      patientId: req.user._id,
+      status: 'Active',
+    })
+      .populate('request', 'startDateForDiet')
+      .lean();
+
+    if (!dietPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active diet plan not found',
+      });
+    }
+
+    // currentWeek is just a hint for which week the app should default its
+    // selector to - readiness itself is decided per-week below by which
+    // weeks are actually present in finalizedPlan.weeks.
+    const currentWeek = resolveCurrentWeek(dietPlan, referenceDate);
+
+    const readyWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    if (readyWeeks.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { currentWeek, weeks: [] },
+      });
+    }
+
+    // Recipe/registry resolution done once across every ready week's
+    // recipes combined (not once per week) - the same economy of scale
+    // getActiveDietPlanForPatient's all-weeks response already relies on.
+    const recipeIds = new Set();
+    readyWeeks.forEach((week) => {
+      (week.dailyMeals || []).forEach((meal) => {
+        if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+      });
+    });
+
+    const recipeDocs = recipeIds.size
+      ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
+        .select('name servingTime image ingredients category')
+        .lean()
+      : [];
+
+    const recipes = {};
+    recipeDocs.forEach((recipe) => {
+      const id = recipe._id.toString();
+      recipes[id] = {
+        id,
+        name: recipe.name || null,
+        servingTime: recipe.servingTime || null,
+        image: recipe.image || null,
+        isSupplement: recipe.category === 'Supplements',
+        ingredients: Array.isArray(recipe.ingredients)
+          ? recipe.ingredients.map((ingredient) => ({
+            name: ingredient.name || null,
+            quantity: typeof ingredient.quantity === 'number' ? ingredient.quantity : null,
+            unit: ingredient.unit || null,
+            category: ingredient.category || null,
+            priceLevel: ingredient.priceLevel || null,
+            image: ingredient.image || null,
+          }))
+          : [],
+      };
+    });
+
+    // Canonical ingredient registry (see models/Ingredient.js,
+    // scripts/migrate-canonical-ingredients.js) - loaded once, keyed by
+    // normalizedName, so aggregation below is a fast in-memory lookup
+    // instead of a per-ingredient query. Recipe ingredient names were
+    // already rewritten to their canonical spelling by that migration, so
+    // this is an exact lookup, not fuzzy matching.
+    const registryDocs = await Ingredient.find({ dieticianId: dietPlan.dieticianId }).lean();
+    const registry = {};
+    registryDocs.forEach((doc) => {
+      registry[doc.normalizedName] = doc;
+    });
+
+    const weeksData = readyWeeks
+      .map((week) => ({
+        week: Number(week.week),
+        items: buildGroceryItemsForWeek(week, recipes, registry),
+      }))
+      .sort((a, b) => a.week - b.week);
+
     return res.status(200).json({
       success: true,
-      data: {
-        week: currentWeek,
-        items,
-      },
+      data: { currentWeek, weeks: weeksData },
     });
   } catch (error) {
     next(error);

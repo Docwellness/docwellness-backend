@@ -337,7 +337,7 @@ router.get('/diet/week-completion', patientOnly, dietController.getWeekCompletio
 
 /**
  * @route   GET /api/patient/diet/groceries
- * @desc    Get grocery list for the current week
+ * @desc    Get grocery lists for every finalized/ready week, in one call
  */
 router.get('/diet/groceries', patientOnly, dietController.getGroceriesForCurrentWeek);
 
