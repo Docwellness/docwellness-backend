@@ -29,6 +29,28 @@ function calcCaloriesBurned({ met, weightKg, durationMinutes }) {
   return Math.round(met * weightKg * (durationMinutes / 60));
 }
 
+/**
+ * A session's duration in minutes, estimated when the patient leaves the
+ * log-time duration field blank. Priority: the dietician's own plan figure
+ * (durationMinutes on the ExercisePlan entry) is authored per-set once sets
+ * is also assigned - see ExercisePlan.js's own comment - so it's multiplied
+ * by sets; with no sets it's already a flat total (e.g. "10 min jump
+ * rope"). Falls back to the exercise catalog's AI-estimated secondsPerRep
+ * (see models/Exercise.js) times reps/sets only when the plan gives no
+ * duration at all. Returns null when there's genuinely nothing to estimate
+ * from - callers should still require a manual duration in that case.
+ */
+function estimateDurationMinutes({ planDurationMinutes, sets, reps, secondsPerRep }) {
+  if (typeof planDurationMinutes === 'number' && planDurationMinutes > 0) {
+    return typeof sets === 'number' && sets > 0 ? planDurationMinutes * sets : planDurationMinutes;
+  }
+  if (typeof secondsPerRep === 'number' && secondsPerRep > 0 && typeof reps === 'number' && reps > 0) {
+    const setsMultiplier = typeof sets === 'number' && sets > 0 ? sets : 1;
+    return (secondsPerRep * reps * setsMultiplier) / 60;
+  }
+  return null;
+}
+
 // Average adult weight (kg) - last-resort fallback only, when a patient has
 // neither a logged Progress entry nor a healthProfile.weight on file. Flags
 // loudly via the caller's own handling rather than silently producing a
@@ -60,4 +82,4 @@ async function resolvePatientWeightKg(patientId) {
   return null;
 }
 
-module.exports = { calcCaloriesBurned, resolvePatientWeightKg, DEFAULT_FALLBACK_WEIGHT_KG };
+module.exports = { calcCaloriesBurned, estimateDurationMinutes, resolvePatientWeightKg, DEFAULT_FALLBACK_WEIGHT_KG };

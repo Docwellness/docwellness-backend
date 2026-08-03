@@ -6,7 +6,12 @@
 const mongoose = require('mongoose');
 const { ExercisePlan, ExerciseLog, Exercise } = require('../../models');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
-const { calcCaloriesBurned, resolvePatientWeightKg, DEFAULT_FALLBACK_WEIGHT_KG } = require('../../utils/exerciseHelpers');
+const {
+  calcCaloriesBurned,
+  estimateDurationMinutes,
+  resolvePatientWeightKg,
+  DEFAULT_FALLBACK_WEIGHT_KG,
+} = require('../../utils/exerciseHelpers');
 
 const getStartOfDay = (d = new Date()) => {
   const start = new Date(d);
@@ -131,6 +136,12 @@ exports.getTodayExerciseStats = async (req, res, next) => {
  *          there's no time-slot concept here). caloriesBurned is always
  *          computed server-side (met * weightKg * durationHours) - any
  *          client-sent calorie figure is ignored outright.
+ *
+ *          durationMinutes is optional from the client (see
+ *          exercise_view.dart - the patient can leave it blank): when
+ *          absent, it's estimated from the patient's active plan entry
+ *          and/or the exercise catalog's secondsPerRep via
+ *          estimateDurationMinutes - see that function's own doc comment.
  * @access  Private (Patient)
  */
 exports.submitExerciseLog = async (req, res, next) => {
@@ -157,27 +168,67 @@ exports.submitExerciseLog = async (req, res, next) => {
       });
     }
     for (const item of exercises) {
-      if (
-        !mongoose.Types.ObjectId.isValid(item.exerciseId) ||
-        typeof item.durationMinutes !== 'number' ||
-        item.durationMinutes <= 0
-      ) {
+      if (!mongoose.Types.ObjectId.isValid(item.exerciseId)) {
         return res.status(400).json({
           success: false,
-          message: 'Each exercise needs a valid exerciseId and a positive durationMinutes',
+          message: 'Each exercise needs a valid exerciseId',
+        });
+      }
+      if (item.durationMinutes != null && (typeof item.durationMinutes !== 'number' || item.durationMinutes <= 0)) {
+        return res.status(400).json({
+          success: false,
+          message: 'durationMinutes must be a positive number when provided',
         });
       }
     }
 
     const exerciseIds = [...new Set(exercises.map((e) => e.exerciseId))];
-    const exerciseDocs = await Exercise.find({ _id: { $in: exerciseIds } }).select('met').lean();
-    const metById = new Map(exerciseDocs.map((e) => [e._id.toString(), e.met]));
+    const exerciseDocs = await Exercise.find({ _id: { $in: exerciseIds } }).select('met secondsPerRep').lean();
+    const exerciseById = new Map(exerciseDocs.map((e) => [e._id.toString(), e]));
+
+    const activePlan = await ExercisePlan.findOne({ patientId, status: 'Active' }).select('dailyExercises').lean();
+    const planEntryByExerciseId = new Map(
+      (activePlan?.dailyExercises || []).map((e) => [e.exerciseId.toString(), e])
+    );
 
     let weightKg = await resolvePatientWeightKg(patientId);
     let usedFallbackWeight = false;
     if (weightKg == null) {
       weightKg = DEFAULT_FALLBACK_WEIGHT_KG;
       usedFallbackWeight = true;
+    }
+
+    // Resolve each item's real durationMinutes (client-sent, or estimated)
+    // up front so a single unresolvable item fails the whole request before
+    // any DB write, same as the exerciseId/durationMinutes validation above.
+    const resolvedExercises = [];
+    for (const item of exercises) {
+      const planEntry = planEntryByExerciseId.get(item.exerciseId);
+      const sets = item.sets ?? planEntry?.sets ?? null;
+      const reps = item.reps ?? planEntry?.reps ?? null;
+
+      let durationMinutes = typeof item.durationMinutes === 'number' && item.durationMinutes > 0
+        ? item.durationMinutes
+        : null;
+
+      if (durationMinutes == null) {
+        const exerciseDoc = exerciseById.get(item.exerciseId);
+        const estimated = estimateDurationMinutes({
+          planDurationMinutes: planEntry?.durationMinutes ?? null,
+          sets,
+          reps,
+          secondsPerRep: exerciseDoc?.secondsPerRep ?? null,
+        });
+        if (estimated == null) {
+          return res.status(400).json({
+            success: false,
+            message: 'Enter how many minutes you did this exercise for',
+          });
+        }
+        durationMinutes = Math.max(1, Math.round(estimated));
+      }
+
+      resolvedExercises.push({ ...item, durationMinutes, sets, reps });
     }
 
     let log = await ExerciseLog.findOne({
@@ -188,8 +239,8 @@ exports.submitExerciseLog = async (req, res, next) => {
       log = new ExerciseLog({ patientId, date: targetDate, exercises: [] });
     }
 
-    exercises.forEach((item) => {
-      const met = metById.get(item.exerciseId);
+    resolvedExercises.forEach((item) => {
+      const met = exerciseById.get(item.exerciseId)?.met;
       const caloriesBurned = calcCaloriesBurned({
         met,
         weightKg,

@@ -960,6 +960,7 @@ RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
   "name": "string - exercise name",
   "category": "Cardio" | "Strength" | "Flexibility" | "Sports" | "Other",
   "met": number (1-20, the real metabolic equivalent of task for this exact exercise at a moderate/typical intensity),
+  "secondsPerRep": number (1-60, average seconds a normal healthy adult takes to complete one rep at a controlled pace),
   "description": "string - brief 1-2 sentence description of the exercise and what it targets",
   "instructions": ["string - step 1", "string - step 2", ...],
   "equipment": ["string - equipment item", ...],
@@ -969,6 +970,7 @@ RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
 
 IMPORTANT RULES:
 - met MUST be a real, literature-grounded MET value for this specific exercise, not a rough guess. Reference points: walking (3.0-4.3 depending on pace), running (8-12.8 depending on pace), cycling moderate (7.5-8.5), swimming laps (6-10), yoga/stretching (2.3-3.0), weight training moderate (3.5-5.0), weight training vigorous (6.0), jumping rope (11-12.3), HIIT (8-10), bodyweight circuit (6-8), push-ups/sit-ups/planks (3.8-8.0 depending on pace).
+- secondsPerRep is the average time to perform ONE rep at a controlled pace. Reference points: push-ups/squats/lunges/sit-ups (~3s), jumping jacks/high knees (~1-2s), burpees (~4-5s), bicep curls/shoulder press (~3-4s), deadlifts (~4s). For exercises with no natural "rep" (e.g. brisk walking, plank hold, running), estimate the time for one small repeatable unit instead (e.g. a plank counted in 10-second holds -> secondsPerRep ~10).
 - Include 3-8 clear, actionable form-cue instructions
 - equipment is an empty array for bodyweight-only exercises
 - Categorize accurately: Cardio (elevates heart rate sustained), Strength (resistance/muscle-building), Flexibility (stretching/mobility), Sports (sport-specific drills), Other (anything else)
@@ -1052,6 +1054,7 @@ IMPORTANT RULES:
     name: parsedExercise.name || name,
     category: parsedExercise.category || category || 'Other',
     met: typeof parsedExercise.met === 'number' ? parsedExercise.met : 3.5,
+    secondsPerRep: typeof parsedExercise.secondsPerRep === 'number' ? parsedExercise.secondsPerRep : 3,
     description: parsedExercise.description || '',
     instructions: Array.isArray(parsedExercise.instructions) ? parsedExercise.instructions : [],
     equipment: Array.isArray(parsedExercise.equipment) ? parsedExercise.equipment : [],

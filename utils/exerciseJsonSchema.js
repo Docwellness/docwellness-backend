@@ -18,7 +18,7 @@ const EXERCISE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'name', 'category', 'met', 'description', 'instructions',
+    'name', 'category', 'met', 'secondsPerRep', 'description', 'instructions',
     'equipment', 'difficultyLevel', 'targetMuscleGroups',
   ],
   properties: {
@@ -30,6 +30,13 @@ const EXERCISE_JSON_SCHEMA = {
     // guess (e.g. brisk walking ~3.5, running 8km/h ~8.3, yoga ~2.5, weight
     // training moderate ~5.0, jumping rope ~11.0, swimming laps ~7.0).
     met: { type: 'number', minimum: 1, maximum: 20 },
+    // Average seconds a normal adult takes to complete one rep at a
+    // controlled pace - see models/Exercise.js's own comment for the
+    // duration-estimate fallback this feeds (utils/exerciseHelpers.js's
+    // estimateDurationMinutes). For duration-based exercises with no
+    // natural "rep" (e.g. brisk walking, plank hold), give a reasonable
+    // per-unit estimate anyway (e.g. per 10-second hold).
+    secondsPerRep: { type: 'number', minimum: 1, maximum: 60 },
     description: { type: 'string', description: 'Brief 1-2 sentence description of the exercise and what it targets.' },
     instructions: {
       type: 'array',

@@ -44,11 +44,15 @@ const exercisePlanSchema = new mongoose.Schema(
             required: true,
           },
           // Optional - a suggested/target duration that pre-fills the
-          // patient's log dialog. Not required: some exercises are better
-          // prescribed by sets/reps alone (e.g. "3x15 push-ups"), and the
-          // patient's own actual duration (always required at log time -
-          // see submitExerciseLog) is what actually drives caloriesBurned,
-          // not this planned figure.
+          // patient's log dialog. When `sets` is also set on this entry,
+          // this is the duration PER SET (total = durationMinutes * sets) -
+          // when `sets` is null, it's already a flat total (e.g. "10 min
+          // jump rope"). The patient's own actual duration at log time
+          // takes priority when given; when the patient leaves it blank,
+          // this figure (or, failing that, the exercise catalog's
+          // secondsPerRep - see utils/exerciseHelpers.js's
+          // estimateDurationMinutes) is what estimates caloriesBurned - see
+          // submitExerciseLog.
           durationMinutes: {
             type: Number,
             default: null,
