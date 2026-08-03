@@ -357,6 +357,110 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 };
 
 /**
+ * @route   GET /api/patient/diet/week-completion?week=N
+ * @desc    Whether every planned meal in diet-plan week N has actually been
+ *          logged, per day and in aggregate - lets the app collapse a
+ *          fully-logged week's day-strip down to a single "Week N" chip
+ *          (see diet_view.dart). "Complete" means every servingTime slot
+ *          planned for that date (via the same day-group resolution
+ *          getActiveDietPlanForPatient itself uses) has a matching MealLog
+ *          entry - not just "calories reached", since over/under-eating one
+ *          slot shouldn't mask a completely unlogged one, and a day with no
+ *          planned meals at all never counts as "complete" (nothing to
+ *          verify against).
+ * @access  Private (Patient)
+ */
+exports.getWeekCompletion = async (req, res, next) => {
+  try {
+    const { week: requestedWeek } = req.query || {};
+    const weekNum = parseInt(requestedWeek, 10);
+    if (!weekNum || weekNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid week query param is required',
+      });
+    }
+
+    const dietPlan = await DietPlan.findOne({
+      patientId: req.user._id,
+      status: 'Active',
+    }).lean();
+    if (!dietPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active diet plan not found',
+      });
+    }
+
+    const weekScheduleEntries = Array.isArray(dietPlan.weekSchedule) ? dietPlan.weekSchedule : [];
+    const scheduleEntry = weekScheduleEntries.find((e) => Number(e.week) === weekNum);
+    const weekStartRaw = scheduleEntry ? parseDateOrNull(scheduleEntry.startDate) : null;
+    if (!weekStartRaw) {
+      return res.status(404).json({
+        success: false,
+        message: `No schedule found for week ${weekNum}`,
+      });
+    }
+    const weekStart = normalizeDate(weekStartRaw);
+
+    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weekData = weeks.find((w) => Number(w.week) === weekNum);
+    const dailyMeals = weekData?.dailyMeals || [];
+
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setUTCDate(d.getUTCDate() + i);
+      return d;
+    });
+
+    const mealLogs = await MealLog.find({
+      patientId: req.user._id,
+      date: { $gte: dates[0], $lte: dates[6] },
+    })
+      .select('date meals.servingTime')
+      .lean();
+
+    const loggedByDateKey = new Map();
+    for (const log of mealLogs) {
+      const key = normalizeDate(new Date(log.date)).toISOString().slice(0, 10);
+      const set = loggedByDateKey.get(key) || new Set();
+      for (const m of log.meals || []) {
+        if (m.servingTime) set.add(m.servingTime);
+      }
+      loggedByDateKey.set(key, set);
+    }
+
+    const days = dates.map((date) => {
+      const dayGroup = resolveDayGroupForDate(date);
+      const plannedSlots = new Set(
+        dailyMeals
+          .filter((m) => mealMatchesDayGroup(m, dayGroup) && m.servingTime)
+          .map((m) => m.servingTime)
+      );
+      const key = date.toISOString().slice(0, 10);
+      const loggedSlots = loggedByDateKey.get(key) || new Set();
+      const complete = plannedSlots.size > 0 && [...plannedSlots].every((slot) => loggedSlots.has(slot));
+      return {
+        date: key,
+        dayGroup,
+        plannedSlots: plannedSlots.size,
+        loggedSlots: loggedSlots.size,
+        complete,
+      };
+    });
+
+    const complete = days.length > 0 && days.every((d) => d.complete);
+
+    return res.status(200).json({
+      success: true,
+      data: { week: weekNum, complete, days },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Rounds a friendly "~N unit" count for display - e.g. 330g of onion at
  * ~110g/piece becomes "~3". Never shows "~0" or "~1" as a false-precision
  * single unit when the total barely clears a whole unit; below half a unit

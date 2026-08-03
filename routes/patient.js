@@ -330,6 +330,12 @@ router.post(
 router.get('/diet/active', patientOnly, dietController.getActiveDietPlanForPatient);
 
 /**
+ * @route   GET /api/patient/diet/week-completion?week=N
+ * @desc    Real per-day/week meal-logging completion for diet-plan week N
+ */
+router.get('/diet/week-completion', patientOnly, dietController.getWeekCompletion);
+
+/**
  * @route   GET /api/patient/diet/groceries
  * @desc    Get grocery list for the current week
  */
