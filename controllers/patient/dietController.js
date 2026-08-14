@@ -5,6 +5,7 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { normalize } = require('../../utils/ingredientLibrary');
+const { componentRatiosByLabel } = require('../../utils/weekNutritionSummary');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -527,7 +528,23 @@ const buildGroceryItemsForWeek = (week, recipes, registry) => {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
 
-      recipe.ingredients.forEach((ingredient) => {
+      // Scales each ingredient by whichever recipe component it matches
+      // (by name, same convention as the dietician app's own Edit Portions
+      // -> Ingredients sync) - without this, a portion the dietician
+      // adjusted for this specific patient's meal (e.g. Brown Bread bumped
+      // to 2 slices via the component stepper) was silently ignored here,
+      // and the grocery list always showed the recipe's raw default
+      // ingredient quantity/unit instead. Unmatched ingredients (no
+      // same-named component) fall through at ratio 1, unscaled - same as
+      // before this fix.
+      const componentRatios = componentRatiosByLabel(meal, recipe);
+
+      recipe.ingredients.forEach((rawIngredient) => {
+        const ratioKey = (rawIngredient.name || '').trim().toLowerCase();
+        const ratio = componentRatios[ratioKey] ?? 1;
+        const ingredient = typeof rawIngredient.quantity === 'number' && ratio !== 1
+          ? { ...rawIngredient, quantity: rawIngredient.quantity * ratio }
+          : rawIngredient;
         // Supplements' ingredients (e.g. "Multivitamin Tablet") are a
         // self-referential, self-contained namespace - not part of the
         // canonical registry and never merged with food ingredients, just

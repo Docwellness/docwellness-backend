@@ -128,9 +128,17 @@ const recipeSchema = new mongoose.Schema(
       {
         name: { type: String, required: true },
         quantity: { type: Number, required: true },
+        // Matches utils/recipeJsonSchema.js's COMPONENT_UNITS exactly - an
+        // ingredient's unit is synced from its matching component (see
+        // scripts/sync-recipe-ingredients-with-components.js and
+        // dietController.js's buildGroceryItemsForWeek), so it needs to
+        // accept every unit a component can have, not a narrower set. Was
+        // previously missing 'nos'/'bowl'/'egg'/'slice', which made that
+        // sync fail outright for any ingredient whose matching component
+        // used one of them.
         unit: {
           type: String,
-          enum: ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece'],
+          enum: ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece', 'nos', 'bowl', 'egg', 'slice'],
           default: 'g',
         },
         category: {

@@ -125,4 +125,39 @@ function computeWeekSummary(meals, recipeDocs) {
   };
 }
 
-module.exports = { computeWeekSummary };
+/**
+ * Per-component ratios keyed by the component's label (lowercased/trimmed),
+ * for scaling an individual ingredient's grocery-list quantity by whichever
+ * component it corresponds to - unlike computeMealRatio's single averaged
+ * ratio (meant for whole-recipe nutrition scaling), each ingredient should
+ * scale by its OWN matching component's servings, not the recipe-wide
+ * average (e.g. a recipe where only the bread was bumped to 2 slices
+ * shouldn't inflate the peanut butter's grocery quantity too). Same
+ * label<->ingredient-name matching convention as the dietician app's
+ * RecipePreview._syncedIngredients (recipe_model.dart) uses for its own
+ * "Edit Portions" -> Ingredients tab sync.
+ */
+function componentRatiosByLabel(meal, recipe) {
+  const components = componentsForRecipe(recipe);
+  const componentServings = Array.isArray(meal.componentServings) ? meal.componentServings : null;
+  const ratios = {};
+  components.forEach((component, index) => {
+    const baseQty = component.quantity > 0 ? component.quantity : 1;
+    let selectedQty;
+    if (componentServings && typeof componentServings[index] === 'number' && componentServings[index] > 0) {
+      selectedQty = componentServings[index];
+    } else if (index === 0 && typeof meal.servings === 'number') {
+      selectedQty = meal.servings;
+    } else if (index === 1 && typeof meal.secondaryServings === 'number' && meal.secondaryServings !== null) {
+      selectedQty = meal.secondaryServings;
+    } else {
+      selectedQty = baseQty;
+    }
+    if (component.label) {
+      ratios[component.label.trim().toLowerCase()] = selectedQty / baseQty;
+    }
+  });
+  return ratios;
+}
+
+module.exports = { computeWeekSummary, componentRatiosByLabel };
