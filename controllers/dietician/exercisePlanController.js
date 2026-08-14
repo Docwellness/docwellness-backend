@@ -86,6 +86,38 @@ exports.upsertExercisePlan = async (req, res, next) => {
 };
 
 /**
+ * @route   GET /api/dietician/patients/:patientId/exercise-plans/current
+ * @desc    Fetches the patient's one evergreen plan directly by patientId -
+ *          same lookup upsertExercisePlan itself uses - so the app never
+ *          needs to remember a plan's _id just to display what's already
+ *          assigned. Returns { data: null } (not a 404) when nothing has
+ *          been created yet, since that's a normal state, not an error.
+ * @access  Private (Dietician)
+ */
+exports.getCurrentExercisePlan = async (req, res, next) => {
+  try {
+    const dieticianId = req.user._id;
+    const { patientId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(400).json({ success: false, message: 'Invalid patient id' });
+    }
+
+    const plan = await ExercisePlan.findOne({
+      patientId,
+      dieticianId,
+      status: { $ne: 'Completed' },
+    })
+      .populate('dailyExercises.exerciseId')
+      .lean();
+
+    return res.status(200).json({ success: true, data: plan || null });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @route   GET /api/dietician/patients/:patientId/exercise-plans/:exercisePlanId/details
  * @access  Private (Dietician)
  */

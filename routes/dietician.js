@@ -311,6 +311,12 @@ router.post(
 );
 
 router.get(
+  '/patients/:patientId/exercise-plans/current',
+  dieticianOnlyMiddleware,
+  exercisePlanController.getCurrentExercisePlan
+);
+
+router.get(
   '/patients/:patientId/exercise-plans/:exercisePlanId/details',
   dieticianOnlyMiddleware,
   exercisePlanController.getExercisePlanDetails
