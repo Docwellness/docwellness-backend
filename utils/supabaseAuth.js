@@ -98,6 +98,110 @@ async function generateSignupOtp(email, password) {
   return data.properties.email_otp;
 }
 
+/**
+ * Signs in with email/password and returns the resulting Supabase session
+ * (access token, refresh token, expiry) - the server-side equivalent of the
+ * client calling supabase.auth.signInWithPassword() directly. Unlike
+ * verifyPassword above (which discards the session, used only as a yes/no
+ * confirmation), this is the real login path: the caller needs the tokens.
+ * Throws with the raw Supabase error message on failure (invalid
+ * credentials, etc.) - callers should surface a generic message rather than
+ * this raw one, to avoid distinguishing "wrong email" from "wrong password".
+ */
+async function signInWithPassword(email, password) {
+  const { data, error } = await getSupabaseAdmin().auth.signInWithPassword({ email, password });
+  if (error || !data?.session) {
+    const err = new Error(error?.message || 'Invalid email or password');
+    err.code = 'invalid_credentials';
+    throw err;
+  }
+  return data.session;
+}
+
+/**
+ * Verifies a signup OTP code (see generateSignupOtp above - the code this
+ * verifies against) and returns the resulting session. Server-side
+ * equivalent of the client calling supabase.auth.verifyOtp(type: 'signup')
+ * directly - the register endpoint downstream doesn't care how the caller
+ * obtained a valid Supabase access token, so nothing else about the signup
+ * flow changes.
+ */
+async function verifySignupOtp(email, code) {
+  const { data, error } = await getSupabaseAdmin().auth.verifyOtp({
+    email,
+    token: code,
+    type: 'signup',
+  });
+  if (error || !data?.session) {
+    const err = new Error(error?.message || 'Invalid or expired code');
+    err.code = 'invalid_otp';
+    throw err;
+  }
+  return data.session;
+}
+
+/**
+ * Verifies a password-recovery OTP (see generateRecoveryOtp above) and, if
+ * valid, sets the account's new password directly via the admin API -
+ * combining what used to be three separate client-side Supabase calls
+ * (verifyOtp -> updateUser -> signOut) into one server call. No session is
+ * returned or needed: the client sends the user back to the login screen
+ * afterward either way, so there's nothing to hand back but success/failure.
+ */
+async function resetPasswordWithOtp(email, code, newPassword) {
+  const { data, error } = await getSupabaseAdmin().auth.verifyOtp({
+    email,
+    token: code,
+    type: 'recovery',
+  });
+  if (error || !data?.user) {
+    const err = new Error(error?.message || 'Invalid or expired code');
+    err.code = 'invalid_otp';
+    throw err;
+  }
+
+  const { error: updateError } = await getSupabaseAdmin().auth.admin.updateUserById(data.user.id, {
+    password: newPassword,
+  });
+  if (updateError) {
+    throw new Error(updateError.message || 'Could not reset password');
+  }
+}
+
+/**
+ * Exchanges a refresh token for a new session - server-side equivalent of
+ * the client's supabase.auth.refreshSession(), now that the app no longer
+ * runs the Supabase SDK's own background auto-refresh timer (see
+ * lib/utils/functions/dio_function.dart's ApiService.request() on the
+ * Flutter side, which calls this proactively before an expiring request).
+ */
+async function refreshSession(refreshToken) {
+  const { data, error } = await getSupabaseAdmin().auth.refreshSession({
+    refresh_token: refreshToken,
+  });
+  if (error || !data?.session) {
+    const err = new Error(error?.message || 'Session expired, please log in again');
+    err.code = 'invalid_refresh_token';
+    throw err;
+  }
+  return data.session;
+}
+
+/**
+ * Revokes a session via the admin API - 'global' actually invalidates the
+ * caller's own token (real logout, replacing the old client-side
+ * supabase.auth.signOut()); 'others' revokes every *other* session tied to
+ * the same account while leaving the caller's own current session intact
+ * (the change-password "sign out everywhere else" step, replacing
+ * supabase.auth.signOut(scope: SignOutScope.others)).
+ */
+async function signOutSession(accessToken, scope) {
+  const { error } = await getSupabaseAdmin().auth.admin.signOut(accessToken, scope);
+  if (error) {
+    console.error(`signOutSession (scope=${scope}) failed:`, error.message);
+  }
+}
+
 module.exports = {
   getSupabaseAdmin,
   verifySupabaseToken,
@@ -105,4 +209,9 @@ module.exports = {
   verifyPassword,
   generateRecoveryOtp,
   generateSignupOtp,
+  signInWithPassword,
+  verifySignupOtp,
+  resetPasswordWithOtp,
+  refreshSession,
+  signOutSession,
 };

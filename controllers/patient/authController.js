@@ -1,20 +1,46 @@
 /**
  * Patient Authentication Controller
  *
- * Sign in, sign out, and password reset happen entirely client-side via
- * Supabase. Sign-up needs two backend touchpoints because this project
- * requires email confirmation (so a plain client-side signUp() returns no
- * session): signupRequest creates the Supabase identity and emails a code
- * via Resend, then - once the app verifies that code directly against
- * Supabase and gets a session - register links the resulting identity to a
- * new Mongo profile.
+ * The app never talks to Supabase directly - every auth operation (login,
+ * signup OTP verification, password reset/change, session refresh, logout)
+ * goes through this controller, which holds the only Supabase credentials
+ * (the service-role key, via utils/supabaseAuth.js's admin client). This
+ * keeps the Flutter build free of any Supabase URL/key, the same way it
+ * never embeds Mongo/Cloudinary/OpenAI credentials either.
+ *
+ * Sign-up needs two backend touchpoints because this project requires email
+ * confirmation (so a plain signUp() returns no session): signupRequest
+ * creates the Supabase identity and emails a code via Resend, then - once
+ * verifySignupOtpEndpoint confirms that code and returns a session -
+ * register links the resulting identity to a new Mongo profile.
  */
 
 const { User } = require('../../models');
 const { sendWelcomeEmail, sendPasswordResetOtp, sendSignupOtp } = require('../../utils/emailService');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
-const { generateRecoveryOtp, generateSignupOtp } = require('../../utils/supabaseAuth');
+const {
+  generateRecoveryOtp,
+  generateSignupOtp,
+  signInWithPassword,
+  verifySignupOtp,
+  resetPasswordWithOtp,
+  refreshSession,
+  signOutSession,
+  verifyPassword,
+  getSupabaseAdmin,
+} = require('../../utils/supabaseAuth');
 const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
+
+const sessionResponse = (session) => ({
+  accessToken: session.access_token,
+  refreshToken: session.refresh_token,
+  expiresAt: session.expires_at,
+});
+
+const bearerTokenFrom = (req) => {
+  const header = req.headers.authorization || '';
+  return header.startsWith('Bearer') ? header.split(' ')[1] : null;
+};
 
 /**
  * @desc    Start registration: creates the Supabase identity (unconfirmed)
@@ -62,6 +88,66 @@ exports.signupRequest = async (req, res, next) => {
     });
   } catch (error) {
     console.log('Signup request error:', error.message);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Step 2 of signup: verifies the emailed code (see signupRequest
+ *          above) and returns a Supabase session. The app then calls
+ *          /auth/register (below) with the returned accessToken to link a
+ *          Mongo profile - this is the server-side replacement for what
+ *          used to be a direct client call to
+ *          supabase.auth.verifyOtp(type: 'signup').
+ * @route   POST /api/patient/auth/verify-signup-otp
+ * @access  Public
+ * @body    { email, code }
+ */
+exports.verifySignupOtpEndpoint = async (req, res, next) => {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ success: false, message: 'Email and code are required' });
+    }
+
+    let session;
+    try {
+      session = await verifySignupOtp(email, code);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code. Please try again.' });
+    }
+
+    res.status(200).json({ success: true, data: sessionResponse(session) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Log in with email/password - server-side replacement for the
+ *          client calling supabase.auth.signInWithPassword() directly.
+ * @route   POST /api/patient/auth/login
+ * @access  Public
+ * @body    { email, password }
+ */
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+
+    let session;
+    try {
+      session = await signInWithPassword(email.trim(), password);
+    } catch (err) {
+      // Generic message regardless of whether the email or password was
+      // wrong - same reasoning as forgotPassword's generic response below.
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    res.status(200).json({ success: true, data: sessionResponse(session) });
+  } catch (error) {
     next(error);
   }
 };
@@ -184,6 +270,70 @@ exports.forgotPassword = async (req, res, next) => {
 };
 
 /**
+ * @desc    Completes the password-reset flow: verifies the code emailed by
+ *          forgotPassword above and sets the new password directly, in one
+ *          call - replaces what used to be three separate client-side
+ *          Supabase calls (verifyOtp -> updateUser -> signOut). No session
+ *          is returned; the app sends the patient back to the login screen.
+ * @route   POST /api/patient/auth/reset-password
+ * @access  Public
+ * @body    { email, code, newPassword }
+ */
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, code, newPassword } = req.body || {};
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, code, and new password are required',
+      });
+    }
+
+    try {
+      await resetPasswordWithOtp(email, code, newPassword);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code. Please try again.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset. Please sign in with your new password.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Exchanges a refresh token for a new session - server-side
+ *          replacement for the client's own supabase.auth.refreshSession(),
+ *          called proactively by the app before an access token expires
+ *          (see docwellness-user's ApiService.request()).
+ * @route   POST /api/patient/auth/refresh
+ * @access  Public
+ * @body    { refreshToken }
+ */
+exports.refresh = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, message: 'refreshToken is required' });
+    }
+
+    let session;
+    try {
+      session = await refreshSession(refreshToken);
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Session expired, please log in again' });
+    }
+
+    res.status(200).json({ success: true, data: sessionResponse(session) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Get current logged in patient
  * @route   GET /api/patient/auth/me
  * @access  Private (Patient)
@@ -221,15 +371,64 @@ exports.getMe = async (req, res, next) => {
 };
 
 /**
- * @desc    Logout patient. Kept as a best-effort no-op for backward
- *          compatibility with clients that still call it - actual sign-out
- *          happens client-side via supabase.auth.signOut(), which is what
- *          actually invalidates the session.
+ * @desc    Changes the current patient's password: reauthenticates with
+ *          their current password (same confirmation step the old
+ *          client-side flow required before calling updateUser), sets the
+ *          new one via the admin API, then signs out every other session on
+ *          the account (scope: 'others') while leaving this one intact -
+ *          replaces the old client-side signInWithPassword -> updateUser ->
+ *          signOut(scope: others) sequence.
+ * @route   POST /api/patient/auth/change-password
+ * @access  Private (Patient)
+ * @body    { currentPassword, newPassword }
+ */
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+    }
+
+    const isMatch = await verifyPassword(req.user.email, currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(req.user.supabaseUserId, {
+      password: newPassword,
+    });
+    if (error) {
+      return next(new Error(error.message || 'Could not update password'));
+    }
+
+    const callerToken = bearerTokenFrom(req);
+    if (callerToken) {
+      await signOutSession(callerToken, 'others');
+    }
+
+    res.status(200).json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Logout patient - revokes the Supabase session behind the
+ *          caller's own access token (scope: 'global'), the server-side
+ *          replacement for the old client-side supabase.auth.signOut(),
+ *          which is what actually invalidated the session before.
  * @route   POST /api/patient/auth/logout
  * @access  Private (Patient)
  */
 exports.logout = async (req, res, next) => {
   try {
+    const callerToken = bearerTokenFrom(req);
+    if (callerToken) {
+      await signOutSession(callerToken, 'global');
+    }
     console.log('Patient logged out:', req.user._id);
     res.status(200).json({
       success: true,

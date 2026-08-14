@@ -64,6 +64,21 @@ router.param('taskId', validateObjectIdParam);
 router.post('/auth/signup-request', authLimiter, authController.signupRequest);
 
 /**
+ * @route   POST /api/patient/auth/verify-signup-otp
+ * @desc    Verifies the signup-request code and returns a Supabase session -
+ *          server-side replacement for the client calling
+ *          supabase.auth.verifyOtp(type: 'signup') directly.
+ */
+router.post('/auth/verify-signup-otp', authLimiter, authController.verifySignupOtpEndpoint);
+
+/**
+ * @route   POST /api/patient/auth/login
+ * @desc    Log in with email/password - server-side replacement for the
+ *          client calling supabase.auth.signInWithPassword() directly.
+ */
+router.post('/auth/login', authLimiter, authController.login);
+
+/**
  * @route   POST /api/patient/auth/register
  * @desc    Complete registration - links a verified Supabase identity to a
  *          new Mongo profile. Requires a valid Supabase access token (from
@@ -81,15 +96,25 @@ router.get('/auth/check-email/:email', authLimiter, authController.checkEmail);
 /**
  * @route   POST /api/patient/auth/forgot-password
  * @desc    Request a password reset code (delivered via Resend, not
- *          Supabase's own email templates). See §"Recovery via OTP" -
- *          the app then calls supabase.auth.verifyOtp(type: recovery)
- *          and supabase.auth.updateUser() directly, no backend involved.
+ *          Supabase's own email templates). The app then calls
+ *          /auth/reset-password below with the code.
  */
 router.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
 
-// Login, logout (sign-out), and the rest of the reset flow (verify code +
-// set new password) all happen client-side via the Supabase SDK directly -
-// no backend endpoints needed for those.
+/**
+ * @route   POST /api/patient/auth/reset-password
+ * @desc    Verifies the forgot-password code and sets the new password in
+ *          one call - server-side replacement for the client's own
+ *          verifyOtp -> updateUser -> signOut sequence.
+ */
+router.post('/auth/reset-password', authLimiter, authController.resetPassword);
+
+/**
+ * @route   POST /api/patient/auth/refresh
+ * @desc    Exchanges a refresh token for a new session - server-side
+ *          replacement for the client's own supabase.auth.refreshSession().
+ */
+router.post('/auth/refresh', authLimiter, authController.refresh);
 
 // ==========================================
 // Authentication Routes (Protected)
@@ -102,8 +127,15 @@ router.post('/auth/forgot-password', authLimiter, authController.forgotPassword)
 router.get('/auth/me', patientOnly, authController.getMe);
 
 /**
+ * @route   POST /api/patient/auth/change-password
+ * @desc    Reauthenticates with the current password, sets a new one, and
+ *          signs out every other session on the account.
+ */
+router.post('/auth/change-password', patientOnly, authController.changePassword);
+
+/**
  * @route   POST /api/patient/auth/logout
- * @desc    Logout patient (best-effort no-op, kept for backward compat)
+ * @desc    Logout patient - revokes the caller's Supabase session.
  */
 router.post('/auth/logout', patientOnly, authController.logout);
 
