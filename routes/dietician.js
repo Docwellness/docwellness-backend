@@ -32,7 +32,7 @@ const notificationController = require('../controllers/notificationController');
 const { authController } = require('../controllers/patient');
 
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
-const { aiGenerationLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
+const { authLimiter, aiGenerationLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
 
 const dieticianOnlyMiddleware = [authenticate, dieticianOnly];
 
@@ -59,6 +59,16 @@ router.param('imageId', validateObjectIdParam);
  *          dieticianOnlyMiddleware wrapper does that).
  */
 router.get('/auth/me', dieticianOnlyMiddleware, authController.getMe);
+
+// Forgot/reset password - reuses the same role-agnostic Supabase-OTP flow
+// as the patient app (see controllers/patient/authController.js's
+// forgotPassword/resetPassword - neither looks at role, just email), rather
+// than duplicating the logic here. DocDesk still logs in via a direct
+// client-side Supabase call (see docwellness-dietician's AuthController),
+// but password reset needs the backend's service-role key to generate the
+// recovery OTP and email it via Resend, so it goes through here instead.
+router.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
+router.post('/auth/reset-password', authLimiter, authController.resetPassword);
 
 // ==========================================
 // Doctor Profile Routes

@@ -148,6 +148,7 @@ async function verifySignupOtp(email, code) {
     type: 'signup',
   });
   if (error || !data?.session) {
+    console.error('verifySignupOtp failed:', error?.message, error?.status, error?.code);
     const err = new Error(error?.message || 'Invalid or expired code');
     err.code = 'invalid_otp';
     throw err;
