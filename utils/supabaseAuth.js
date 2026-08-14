@@ -2,6 +2,21 @@ const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/environment');
 const { User } = require('../models');
 
+// @supabase/supabase-js's admin API (auth.admin.*) pulls in realtime-js,
+// which expects a native `WebSocket` global - only present in Node 22+.
+// Prod runs Node 20 (see Dockerfile: node:20-slim), where this throws
+// "Node.js detected but native WebSocket not found" the first time any
+// auth.admin.* method is called (createUser, updateUserById,
+// generateLink, signOut - i.e. signup, password reset/change, and account
+// deletion all go through this). Non-admin methods (signInWithPassword,
+// verifyOtp, refreshSession) never hit this path, which is why it stayed
+// undiscovered until the first real admin-API call against this
+// container. `ws` is already a real dependency (see package.json), not a
+// bare devDependency-only polyfill.
+if (typeof WebSocket === 'undefined') {
+  global.WebSocket = require('ws');
+}
+
 // Constructed lazily (not at module load) for the same reason as the Resend
 // client: this file is required by middlewares/auth.js and both Socket.IO
 // gateways unconditionally, so a missing env var shouldn't crash app

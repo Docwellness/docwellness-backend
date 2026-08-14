@@ -9,6 +9,15 @@
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
+// Reuses the app's own connectDB (not a raw mongoose.connect()) - prod's
+// self-hosted Mongo instance requires a custom TLS CA (see
+// config/database.js's resolveTlsCAFile / docs/db-migration-oracle.md), and
+// only connectDB knows how to pass that. A raw mongoose.connect() call
+// here previously connected fine against dev's Atlas cluster (which
+// negotiates TLS on its own) but hung/failed with "self-signed certificate
+// in certificate chain" against prod, since MONGODB_TLS_CA_BASE64 being set
+// as an env var does nothing unless something actually reads it.
+const connectDB = require('../config/database');
 
 const run = async () => {
   const [, , email, password, ...fullNameParts] = process.argv;
@@ -21,7 +30,7 @@ const run = async () => {
     process.exit(1);
   }
 
-  await mongoose.connect(process.env.MONGODB_URI);
+  await connectDB();
   console.log('MongoDB connected');
 
   const { getSupabaseAdmin } = require('../utils/supabaseAuth');
