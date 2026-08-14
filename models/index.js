@@ -27,6 +27,9 @@ const Review = require('./Review');
 const Exercise = require('./Exercise');
 const ExercisePlan = require('./ExercisePlan');
 const ExerciseLog = require('./ExerciseLog');
+const CustomFoodRequest = require('./CustomFoodRequest');
+const JourneyImage = require('./JourneyImage');
+const NeedAttentionLog = require('./NeedAttentionLog');
 
 module.exports = {
   User,
@@ -58,4 +61,7 @@ module.exports = {
   Exercise,
   ExercisePlan,
   ExerciseLog,
+  CustomFoodRequest,
+  JourneyImage,
+  NeedAttentionLog,
 };

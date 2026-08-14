@@ -140,4 +140,15 @@ const connectDB = async () => {
   return conn.connection;
 };
 
+// Exposed alongside the default export so one-off scripts that need a
+// second/manual mongoose connection (e.g. scripts/migrate-dev-catalog-to-prod.js,
+// which holds a dev connection open on the default mongoose connection
+// while also needing a separate prod connection via mongoose.createConnection)
+// can build correct TLS options for that connection too, instead of each
+// duplicating this resolution logic (or worse, silently omitting it - see
+// that script's own history for what a raw mongoose.connect()/createConnection()
+// against prod does without this: a misleading "self-signed certificate in
+// certificate chain" error).
+connectDB.resolveTlsCAFile = resolveTlsCAFile;
+
 module.exports = connectDB;
