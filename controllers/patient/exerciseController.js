@@ -13,17 +13,19 @@ const {
   DEFAULT_FALLBACK_WEIGHT_KG,
 } = require('../../utils/exerciseHelpers');
 
-const getStartOfDay = (d = new Date()) => {
-  const start = new Date(d);
-  start.setHours(0, 0, 0, 0);
-  return start;
-};
+// UTC-based, not local-timezone-based - same fix, same reasoning as
+// dietController.js's normalizeDate: dates travel between client/server as
+// plain "yyyy-MM-dd" strings, which JS always parses as UTC midnight, so
+// local getters here (as this used to use, via setHours) drift the
+// stripped-down date by the server's UTC offset whenever it isn't exactly
+// 0 - e.g. a day fully logged under CEST could read back as belonging to
+// the wrong calendar day.
+const normalizeDate = (dateObj) =>
+  new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
 
-const getEndOfDay = (d = new Date()) => {
-  const end = new Date(d);
-  end.setHours(23, 59, 59, 999);
-  return end;
-};
+const getStartOfDay = (d = new Date()) => normalizeDate(d);
+
+const getEndOfDay = (d = new Date()) => new Date(normalizeDate(d).getTime() + 24 * 60 * 60 * 1000 - 1);
 
 /**
  * @route   GET /api/patient/exercise/active
@@ -149,15 +151,22 @@ exports.submitExerciseLog = async (req, res, next) => {
     const patientId = req.user._id;
     const { date, exercises } = req.body || {};
 
-    const targetDate = date ? new Date(date) : new Date();
-    if (Number.isNaN(targetDate.getTime())) {
+    const rawDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(rawDate.getTime())) {
       return res.status(400).json({ success: false, message: 'Invalid date' });
     }
-    const today = getStartOfDay();
-    if (getStartOfDay(targetDate) < today) {
+    const targetDate = normalizeDate(rawDate);
+    const today = normalizeDate(new Date());
+    // Reject only a future date - a patient logs exercise they *did*, which
+    // can only ever be today or an earlier day (mirrors dietController.js's
+    // submitMealLog day-strip logging). This used to reject the opposite
+    // direction (blocking every past-day submission with "Cannot modify
+    // past exercise logs" while allowing future ones), which is exactly
+    // backwards from the intended rule.
+    if (targetDate > today) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot modify past exercise logs',
+        message: 'Cannot log exercise for a future date',
       });
     }
 

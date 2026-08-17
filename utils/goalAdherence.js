@@ -179,10 +179,26 @@ async function computeAdherenceForMilestones(patientId, milestoneIds, milestones
 }
 
 /**
- * 'completed' | 'missed' | 'active' | 'upcoming'. A milestone with no tasks
- * at all (a weekly/monthly/end_goal node the dietician hasn't customized)
- * can't be judged by adherence, so past ones default to 'completed' rather
- * than always showing as 'missed' for having nothing to check off.
+ * 'completed' | 'partial' | 'missed' | 'active' | 'upcoming'. A milestone
+ * with no tasks at all (a weekly/monthly/end_goal node the dietician
+ * hasn't customized) can't be judged by adherence, so past ones default to
+ * 'completed' rather than always showing as 'missed' for having nothing to
+ * check off.
+ *
+ * Deliberately all-or-nothing-or-something rather than the
+ * ADHERENCE_COMPLETE_THRESHOLD ratio this used to use (>= 0.6 -> completed,
+ * else missed): the timeline's dots are meant to read at a glance as "did
+ * you do everything", "did you do nothing", or "you did some of it" - a
+ * 60%-done day and a 100%-done day both showing the identical green check
+ * looked indistinguishable from a day that was actually fully closed out,
+ * and a 25%-done day looked identical to a day with literally nothing
+ * logged. tasksDone===tasksTotal and tasksDone===0 are equivalent whether
+ * counted at this function's raw per-task granularity or the client's
+ * conceptual grouping (see docwellness-user's TaskGroups - Log Meal's 7
+ * serving-time tasks collapse into one "Log Meal" group there), since
+ * "every task done" and "no task done" mean the same thing under either
+ * counting scheme - only the exact boundary within 'partial' would ever
+ * differ, and 'partial' doesn't distinguish degrees anyway.
  */
 function computeMilestoneStatus(milestone, adherenceEntry, today = startOfTodayUTC()) {
   const milestoneDate = new Date(milestone.date);
@@ -194,8 +210,10 @@ function computeMilestoneStatus(milestone, adherenceEntry, today = startOfTodayU
 
   const tasksTotal = adherenceEntry?.tasksTotal ?? 0;
   if (tasksTotal === 0) return 'completed';
-  const adherence = adherenceEntry?.adherence ?? 0;
-  return adherence >= ADHERENCE_COMPLETE_THRESHOLD ? 'completed' : 'missed';
+  const tasksDone = adherenceEntry?.tasksDone ?? 0;
+  if (tasksDone <= 0) return 'missed';
+  if (tasksDone >= tasksTotal) return 'completed';
+  return 'partial';
 }
 
 /**

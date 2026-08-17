@@ -83,20 +83,39 @@ describe('computeMilestoneStatus', () => {
     );
   });
 
-  test('past milestone with adherence >= 0.6 is completed', () => {
+  test('past milestone with every task done is completed', () => {
     const today = utcDate('2026-07-15');
     const milestone = { date: utcDate('2026-07-10') };
     expect(
-      goalAdherence.computeMilestoneStatus(milestone, { tasksTotal: 4, adherence: 0.75 }, today)
+      goalAdherence.computeMilestoneStatus(milestone, { tasksTotal: 4, tasksDone: 4, adherence: 1 }, today)
     ).toBe('completed');
   });
 
-  test('past milestone with adherence < 0.6 is missed', () => {
+  test('past milestone with zero tasks done is missed', () => {
     const today = utcDate('2026-07-15');
     const milestone = { date: utcDate('2026-07-10') };
     expect(
-      goalAdherence.computeMilestoneStatus(milestone, { tasksTotal: 4, adherence: 0.25 }, today)
+      goalAdherence.computeMilestoneStatus(milestone, { tasksTotal: 4, tasksDone: 0, adherence: 0 }, today)
     ).toBe('missed');
+  });
+
+  test('past milestone with some but not all tasks done is partial', () => {
+    const today = utcDate('2026-07-15');
+    const milestone = { date: utcDate('2026-07-10') };
+    expect(
+      goalAdherence.computeMilestoneStatus(
+        milestone,
+        { tasksTotal: 4, tasksDone: 1, adherence: 0.25 },
+        today
+      )
+    ).toBe('partial');
+    expect(
+      goalAdherence.computeMilestoneStatus(
+        milestone,
+        { tasksTotal: 4, tasksDone: 3, adherence: 0.75 },
+        today
+      )
+    ).toBe('partial');
   });
 
   test('past milestone with zero tasks (weekly/monthly node) defaults to completed', () => {
