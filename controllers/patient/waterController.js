@@ -41,10 +41,22 @@ exports.logWater = async (req, res) => {
         skipped.push(entry);
         continue;
       }
-      // Avoid duplicate entries (same time + same amount)
-      const exists = waterLog.entries.some(
-        (e) => e.time === entry.time && e.amount === entry.amount
-      );
+      // Dedupe on timestamp (millisecond precision), not time+amount - the
+      // app always logs a fixed stepSize (e.g. every tap is the same
+      // 0.25L/250ml), so two legitimate taps a few seconds apart share both
+      // the same `amount` AND the same minute-granular `time` ("HH:mm").
+      // Matching on that pair silently dropped every entry in a batch after
+      // the first whenever a patient logged more than one glass within the
+      // same minute (very much the normal case for the app's debounced
+      // burst-of-taps sync) - the water total would stay stuck at whatever
+      // the first tap's worth was, no matter how many more times "+" was
+      // tapped. entry.timestamp is unique per tap (see
+      // WaterController.addWater/addWaterToViewedDay), so it's what
+      // actually identifies "this exact log", not amount/time.
+      const entryTimestamp = entry.timestamp ? new Date(entry.timestamp).getTime() : null;
+      const exists =
+        entryTimestamp != null &&
+        waterLog.entries.some((e) => e.timestamp && new Date(e.timestamp).getTime() === entryTimestamp);
       if (!exists) {
         waterLog.entries.push({
           amount: entry.amount,
