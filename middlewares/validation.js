@@ -89,6 +89,8 @@ const schemas = {
             'Thyroid',
             'Thyroid Disease',
             'PCOD/PCOS',
+            'Endometriosis',
+            'Prostate Issues',
             'Gastric Disease',
             'Lung Disease',
             'Other'

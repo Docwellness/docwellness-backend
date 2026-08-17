@@ -12,6 +12,16 @@ const mealLogSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
+    // Canonical "which calendar day is this" identifier, UTC 'YYYY-MM-DD'
+    // (see dietController.js's dateToDayKey/normalizeDate) - `date` alone is
+    // exact-value-equal for any two writes that went through normalizeDate,
+    // but dayKey makes the day identity explicit and queryable, and backs
+    // the uniqueness guarantee below so a patient can never end up with two
+    // MealLog documents silently splitting one day's data.
+    dayKey: {
+      type: String,
+      index: true,
+    },
     meals: [
       {
         mealType: {
@@ -82,5 +92,16 @@ const mealLogSchema = new mongoose.Schema(
 
 // Index for efficient querying by patient and date
 mealLogSchema.index({ patientId: 1, date: 1 });
+
+// One meal log per patient per calendar day - the real guard against a
+// past/current day's log ever getting silently duplicated or merged into
+// the wrong day. `sparse` here only skips a document missing EVERY indexed
+// field; patientId is always set, so a pre-dayKey document is *not*
+// excluded and would collide with any sibling also missing dayKey (both
+// index as `dayKey: null`) - run scripts/maintenance/backfill-meal-log-day-
+// keys.js before scripts/maintenance/ensure-indexes.js in any environment
+// with data older than this field, or index creation fails on the
+// resulting duplicate-key error.
+mealLogSchema.index({ patientId: 1, dayKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('MealLog', mealLogSchema);

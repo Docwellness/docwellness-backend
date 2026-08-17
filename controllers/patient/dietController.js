@@ -30,6 +30,18 @@ const parseDateOrNull = (value) => {
 const normalizeDate = (dateObj) =>
   new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
 
+// UTC 'YYYY-MM-DD' identifier for the calendar day a (normalizeDate'd) date
+// falls on - see MealLog.js's dayKey field. Deliberately not
+// toISOString().split('T')[0]: dateObj here is already midnight-UTC from
+// normalizeDate, but building it from the UTC getters directly keeps this
+// correct even if called on a non-normalized date.
+const dateToDayKey = (dateObj) => {
+  const year = dateObj.getUTCFullYear();
+  const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // The plan's real week-1 start date - prefers weekSchedule (the same anchor
 // used to build weekStartDate/weekEndDate everywhere else, and what the
 // dietician actually picked/rescheduled - see utils/weekSchedule.js) over
@@ -1238,11 +1250,20 @@ exports.submitMealLog = async (req, res, next) => {
     const targetDate = normalizeDate(new Date(date));
     const today = normalizeDate(new Date());
 
-    // Reject if the target date is in the past
-    if (targetDate < today) {
+    // Reject only if the target date is in the future - a patient logs what
+    // they *did* eat, which can only ever be today or an earlier day (see
+    // DietController.isDateLoggable/diet_view.dart's day strip, which
+    // already only ever offers today-or-past dates for logging). This used
+    // to reject the opposite direction (`targetDate < today`), which
+    // blocked every legitimate past-day submission with "Cannot modify past
+    // meal logs" and had no effect on the real bug: since the app's
+    // sendLogMeal() always sent today's date regardless of which day was
+    // selected, a past-day log always silently landed on today's document
+    // instead of being rejected or saved to the right day.
+    if (targetDate > today) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot modify past meal logs',
+        message: 'Cannot log a meal for a future date',
       });
     }
 
@@ -1275,9 +1296,13 @@ exports.submitMealLog = async (req, res, next) => {
       log = new MealLog({
         patientId: req.user._id,
         date: targetDate,
+        dayKey: dateToDayKey(targetDate),
         meals: [],
         totalCalories: 0,
       });
+    } else if (!log.dayKey) {
+      // Backfill on first touch for a pre-dayKey document.
+      log.dayKey = dateToDayKey(targetDate);
     }
 
     // Overwrite-or-append per (servingTime, recipeId)
