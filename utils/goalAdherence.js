@@ -22,7 +22,12 @@ const {
   ExerciseLog,
   ExercisePlan,
 } = require('../models');
-const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE, EXERCISE_TASK_TITLE } = require('./seedGoalTimeline');
+const {
+  MEAL_LINKED_TASK_TITLES,
+  WATER_TASK_TITLE,
+  EXERCISE_TASK_TITLE,
+  SUPPLEMENTS_TASK_TITLE,
+} = require('./seedGoalTimeline');
 const { resolveDayGroupForDate } = require('./dayGroups');
 
 const ADHERENCE_COMPLETE_THRESHOLD = 0.6;
@@ -210,10 +215,15 @@ async function computeAdherenceForMilestones(patientId, milestoneIds, milestones
   const taskDoneMap = await computeTaskDoneMap(patientId, milestones);
 
   const tasks = await MilestoneTask.find({ milestoneId: { $in: milestoneIds } })
-    .select('milestoneId')
+    .select('milestoneId title')
     .lean();
   const tasksByMilestone = new Map();
   for (const t of tasks) {
+    // Optional, no-log-source - excluded from the client's own "x/N tasks
+    // done" tally too (see SUPPLEMENTS_TASK_TITLE), so a day with every
+    // required task done but Supplements left unchecked must read as
+    // 'completed' here, not 'partial'.
+    if (t.title === SUPPLEMENTS_TASK_TITLE) continue;
     const key = t.milestoneId.toString();
     if (!tasksByMilestone.has(key)) tasksByMilestone.set(key, []);
     tasksByMilestone.get(key).push(t._id.toString());

@@ -46,6 +46,17 @@ const MEAL_LINKED_TASK_TITLES = new Set([
 // but still counts toward the same completion).
 const MEAL_GROUP_TASK_TITLES = new Set([...MEAL_LINKED_TASK_TITLES, 'Supplements']);
 
+// Optional, no-log-source task - the client pulls this out of the meal
+// group into its own dashed-border card and deliberately excludes it from
+// both the "Log Meal" x/7 count and the day's overall "x/N tasks done"
+// tally (see docwellness-user's TaskGroups.conceptualTotal). computeMilestoneStatus
+// (goalAdherence.js) must exclude it from tasksTotal/tasksDone the same
+// way, or a day with every REQUIRED task done but Supplements left unchecked
+// reads as 'partial' (amber) server-side while the client's own summary
+// already shows every task complete (green) - the two disagreeing on
+// whether an optional task counts is exactly that bug.
+const SUPPLEMENTS_TASK_TITLE = 'Supplements';
+
 // Progress-based (not a manual checkbox) task, backed by WaterLog.
 const WATER_TASK_TITLE = 'Water Intake';
 
@@ -277,6 +288,7 @@ module.exports = {
   DEFAULT_DAILY_TASKS,
   MEAL_LINKED_TASK_TITLES,
   MEAL_GROUP_TASK_TITLES,
+  SUPPLEMENTS_TASK_TITLE,
   WATER_TASK_TITLE,
   EXERCISE_TASK_TITLE,
 };
