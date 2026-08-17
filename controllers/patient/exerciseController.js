@@ -183,7 +183,13 @@ exports.submitExerciseLog = async (req, res, next) => {
           message: 'Each exercise needs a valid exerciseId',
         });
       }
-      if (item.durationMinutes != null && (typeof item.durationMinutes !== 'number' || item.durationMinutes <= 0)) {
+      // remove: true (see below) un-logs an already-logged exercise -
+      // duration is meaningless for that, so it's exempt from this check.
+      if (
+        !item.remove &&
+        item.durationMinutes != null &&
+        (typeof item.durationMinutes !== 'number' || item.durationMinutes <= 0)
+      ) {
         return res.status(400).json({
           success: false,
           message: 'durationMinutes must be a positive number when provided',
@@ -210,8 +216,17 @@ exports.submitExerciseLog = async (req, res, next) => {
     // Resolve each item's real durationMinutes (client-sent, or estimated)
     // up front so a single unresolvable item fails the whole request before
     // any DB write, same as the exerciseId/durationMinutes validation above.
+    // remove: true items skip resolution entirely - see docwellness-user's
+    // ExerciseController.removeExerciseLog (mirrors submitMealLog's
+    // servings: 0 un-log signal), there's nothing to estimate for a
+    // removal.
     const resolvedExercises = [];
     for (const item of exercises) {
+      if (item.remove) {
+        resolvedExercises.push({ ...item });
+        continue;
+      }
+
       const planEntry = planEntryByExerciseId.get(item.exerciseId);
       const sets = item.sets ?? planEntry?.sets ?? null;
       const reps = item.reps ?? planEntry?.reps ?? null;
@@ -249,6 +264,15 @@ exports.submitExerciseLog = async (req, res, next) => {
     }
 
     resolvedExercises.forEach((item) => {
+      const existingIndex = log.exercises.findIndex(
+        (e) => e.exerciseId.toString() === item.exerciseId
+      );
+
+      if (item.remove) {
+        if (existingIndex >= 0) log.exercises.splice(existingIndex, 1);
+        return;
+      }
+
       const met = exerciseById.get(item.exerciseId)?.met;
       const caloriesBurned = calcCaloriesBurned({
         met,
@@ -256,9 +280,6 @@ exports.submitExerciseLog = async (req, res, next) => {
         durationMinutes: item.durationMinutes,
       }) || 0;
 
-      const existingIndex = log.exercises.findIndex(
-        (e) => e.exerciseId.toString() === item.exerciseId
-      );
       const entry = {
         exerciseId: item.exerciseId,
         durationMinutes: item.durationMinutes,

@@ -17,7 +17,7 @@ const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelp
  */
 exports.createProgress = async (req, res, next) => {
   try {
-    const { date, weight, notes, beforeImage, afterImage, arm, waist, hip } = req.body;
+    const { date, weight, notes, beforeImage, afterImage, arm, waist, hip, week } = req.body;
 
     // Get user's height for BMI calculation
     const user = await User.findById(req.user._id).select('healthProfile');
@@ -72,6 +72,15 @@ exports.createProgress = async (req, res, next) => {
       bodyImage2: bodyImage2Url,
       beforeImage,
       afterImage,
+      // Which weekly checkpoint (Goal Journey's weekly Milestone nodes -
+      // see seedGoalTimeline.js) this entry belongs to, so the app's Log My
+      // Body sheet can fetch/edit "Week N"'s entry specifically instead of
+      // just falling back to whatever the most recent Progress doc happens
+      // to be - a patient can log against an earlier reached week just as
+      // easily as the current one. Not date-derived: the week a patient
+      // logs against is a deliberate choice made in the sheet, independent
+      // of exactly which day `date` falls on.
+      week: week ? parseInt(week, 10) : null,
     });
 
     // Update user's health profile with new weight and body measurements
@@ -102,7 +111,7 @@ exports.createProgress = async (req, res, next) => {
  */
 exports.getProgress = async (req, res, next) => {
   try {
-    const { startDate, endDate, page = 1, limit = 10 } = req.query;
+    const { startDate, endDate, week, page = 1, limit = 10 } = req.query;
 
     const query = { patientId: req.user._id };
 
@@ -111,6 +120,14 @@ exports.getProgress = async (req, res, next) => {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
+    }
+
+    // Which weekly checkpoint (see the `week` field set by createProgress) -
+    // used by the Log My Body sheet to fetch "Week N"'s previously-logged
+    // entry so it can be shown/edited instead of only ever creating new ones.
+    if (week !== undefined) {
+      const weekNum = parseInt(week, 10);
+      if (!Number.isNaN(weekNum)) query.week = weekNum;
     }
 
     const progress = await Progress.find(query)
@@ -273,7 +290,7 @@ exports.getProgressStats = async (req, res, next) => {
  */
 exports.updateProgress = async (req, res, next) => {
   try {
-    const { weight, notes, beforeImage, afterImage, achieved } = req.body;
+    const { weight, notes, beforeImage, afterImage, achieved, arm, waist, hip } = req.body;
 
     let progress = await Progress.findOne({
       _id: req.params.id,
@@ -305,6 +322,43 @@ exports.updateProgress = async (req, res, next) => {
     if (beforeImage !== undefined) progress.beforeImage = beforeImage;
     if (afterImage !== undefined) progress.afterImage = afterImage;
     if (achieved !== undefined) progress.achieved = achieved;
+    // Same optional body-measurement fields createProgress accepts - lets
+    // the Log My Body sheet's "Update Logged Data" path (editing an
+    // already-logged week, see docwellness-user's ProgressController.
+    // submitBodyData) edit these too, not just weight/notes.
+    if (arm !== undefined) progress.arm = arm ? parseFloat(arm) : undefined;
+    if (waist !== undefined) progress.waist = waist ? parseFloat(waist) : undefined;
+    if (hip !== undefined) progress.hip = hip ? parseFloat(hip) : undefined;
+
+    const profileUpdate = {};
+    if (arm) profileUpdate['healthProfile.arm'] = parseFloat(arm);
+    if (waist) profileUpdate['healthProfile.waist'] = parseFloat(waist);
+    if (hip) profileUpdate['healthProfile.hip'] = parseFloat(hip);
+    if (Object.keys(profileUpdate).length > 0) {
+      await User.findByIdAndUpdate(req.user._id, profileUpdate);
+    }
+
+    // Same multipart body-image upload createProgress accepts - see routes/
+    // patient.js's PUT /progress/:id, now wired with the same upload.fields
+    // middleware so re-logging a week can replace its photo(s) too.
+    const imageFile =
+      (req.files && req.files.bodyImage && req.files.bodyImage[0]) ||
+      (req.files && req.files.beforeImage && req.files.beforeImage[0]);
+    if (imageFile) {
+      const uploadResult = await cloudinary.uploader.upload(imageFile.path, {
+        folder: cloudinaryUserFolder(req.user._id, 'progress'),
+      });
+      progress.bodyImage = uploadResult.secure_url;
+      await fs.unlink(imageFile.path).catch(() => {});
+    }
+    if (req.files && req.files.bodyImage2 && req.files.bodyImage2[0]) {
+      const filePath2 = req.files.bodyImage2[0].path;
+      const uploadResult2 = await cloudinary.uploader.upload(filePath2, {
+        folder: cloudinaryUserFolder(req.user._id, 'progress'),
+      });
+      progress.bodyImage2 = uploadResult2.secure_url;
+      await fs.unlink(filePath2).catch(() => {});
+    }
 
     await progress.save();
 

@@ -11,8 +11,19 @@
 // "streak", to keep it unambiguous next to those two.
 
 const { MS_PER_DAY } = require('./trackingBuckets');
-const { Milestone, MilestoneTask, CheckIn, Goal, Progress, MealLog, WaterLog } = require('../models');
-const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE } = require('./seedGoalTimeline');
+const {
+  Milestone,
+  MilestoneTask,
+  CheckIn,
+  Goal,
+  Progress,
+  MealLog,
+  WaterLog,
+  ExerciseLog,
+  ExercisePlan,
+} = require('../models');
+const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE, EXERCISE_TASK_TITLE } = require('./seedGoalTimeline');
+const { resolveDayGroupForDate } = require('./dayGroups');
 
 const ADHERENCE_COMPLETE_THRESHOLD = 0.6;
 
@@ -32,9 +43,12 @@ function startOfTodayUTC() {
  * real MealLog for that milestone's day has a matching mealType entry; the
  * Water Intake task (WATER_TASK_TITLE) is done when that day's WaterLog
  * total reaches its goal, with a 0..1 progress fraction alongside it since
- * water isn't a discrete yes/no like a meal being logged; every other task
- * (Supplements, Walk, Sleep) is done via the existing CheckIn flow. Used by
- * both computeAdherenceForMilestones (aggregate stats) and
+ * water isn't a discrete yes/no like a meal being logged; Log Exercise
+ * (EXERCISE_TASK_TITLE) is done when every exercise assigned for that day's
+ * dayGroup (via the patient's active ExercisePlan) has a matching
+ * ExerciseLog entry, same 0..1 progress fraction reasoning as water; every
+ * other task (Supplements, Sleep) is done via the existing CheckIn flow.
+ * Used by both computeAdherenceForMilestones (aggregate stats) and
  * timelinePayload.js (per-task shaping for the API response), so adherence/
  * streak and what the client displays as "done" can never disagree.
  *
@@ -58,7 +72,7 @@ async function computeTaskDoneMap(patientId, milestones) {
   const checkedInIds = new Set(checkIns.map((c) => c.taskId.toString()));
 
   const dates = milestones.map((m) => new Date(m.date)).sort((a, b) => a - b);
-  const [mealLogs, waterLogs] = await Promise.all([
+  const [mealLogs, waterLogs, exerciseLogs, exercisePlan] = await Promise.all([
     MealLog.find({
       patientId,
       date: { $gte: dates[0], $lte: dates[dates.length - 1] },
@@ -67,7 +81,16 @@ async function computeTaskDoneMap(patientId, milestones) {
       patientId,
       date: { $gte: dateKeyUTC(dates[0]), $lte: dateKeyUTC(dates[dates.length - 1]) },
     }).lean(),
+    ExerciseLog.find({
+      patientId,
+      date: { $gte: dates[0], $lte: dates[dates.length - 1] },
+    }).lean(),
+    // Single doc, not date-ranged - dailyExercises is keyed by dayGroup
+    // (Monday/Tuesday/Wednesday/Thursday), same recurring-per-week shape
+    // DietPlan uses, not one entry per calendar date.
+    ExercisePlan.findOne({ patientId, status: 'Active' }).select('dailyExercises').lean(),
   ]);
+  const dailyExercises = exercisePlan?.dailyExercises || [];
 
   const mealsByDateKey = new Map();
   for (const log of mealLogs) {
@@ -92,6 +115,13 @@ async function computeTaskDoneMap(patientId, milestones) {
     }
   }
   const waterByDateKey = new Map(waterLogs.map((w) => [w.date, w]));
+
+  const exercisesByDateKey = new Map();
+  for (const log of exerciseLogs) {
+    const key = dateKeyUTC(log.date);
+    const ids = new Set((log.exercises || []).map((e) => e.exerciseId?.toString()).filter(Boolean));
+    exercisesByDateKey.set(key, ids);
+  }
 
   const milestoneById = new Map(milestones.map((m) => [m._id.toString(), m]));
   for (const t of tasks) {
@@ -123,6 +153,29 @@ async function computeTaskDoneMap(patientId, milestones) {
         linked: true,
         loggedNote: `${(total / 1000).toFixed(1)}/${(goal / 1000).toFixed(1)} L`,
         progress,
+      });
+      continue;
+    }
+
+    if (t.title === EXERCISE_TASK_TITLE) {
+      // dailyExercises is a recurring per-dayGroup list (Monday/Tuesday/
+      // Wednesday/Thursday), not one entry per calendar date - resolve
+      // which group this milestone's actual date falls into, same mapping
+      // exerciseController.js's getTodayExerciseStats uses.
+      const dayGroup = milestone ? resolveDayGroupForDate(new Date(milestone.date)) : null;
+      const plannedCount = dayGroup
+        ? dailyExercises.filter((e) => e.dayGroup === dayGroup).length
+        : 0;
+      const loggedCount = dateKey ? exercisesByDateKey.get(dateKey)?.size ?? 0 : 0;
+      // No exercises assigned this day at all - nothing to miss, same
+      // "no tasks -> completed" reasoning computeMilestoneStatus already
+      // applies to a milestone with zero MilestoneTask docs.
+      const done = plannedCount > 0 ? loggedCount >= plannedCount : true;
+      result.set(t._id.toString(), {
+        done,
+        linked: true,
+        loggedNote: plannedCount > 0 ? `${loggedCount}/${plannedCount} logged` : null,
+        progress: plannedCount > 0 ? Math.min(1, loggedCount / plannedCount) : null,
       });
       continue;
     }

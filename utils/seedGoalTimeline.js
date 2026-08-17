@@ -8,9 +8,12 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // has no dedicated log model and stays manually checked off via CheckIn.
 // Client apps roll these 8 up into a single "Log Meal" x/8 progress row
 // rather than showing 8 separate checklist rows (see MEAL_GROUP_TASK_TITLES).
-// Water Intake is similarly progress-based, backed by WaterLog instead of a
-// manual checkbox (see WATER_TASK_TITLE). Walk and Sleep stay simple,
-// individually-displayed manual check-ins.
+// Water Intake and Log Exercise are similarly progress-based, backed by
+// WaterLog/ExerciseLog instead of a manual checkbox (see WATER_TASK_TITLE/
+// EXERCISE_TASK_TITLE) - Log Exercise replaces the old plain "Walk"
+// checkbox, which tracked nothing real (a manual tick with no log behind
+// it) despite the app having a real Exercise Plan/logging feature by the
+// time this was written. Sleep stays a simple, manually-checked task.
 const DEFAULT_DAILY_TASKS = [
   { title: 'Morning Drink', metric: '', icon: 'morning_drink', sortOrder: 1 },
   { title: 'Breakfast', metric: '', icon: 'breakfast', sortOrder: 2 },
@@ -21,7 +24,7 @@ const DEFAULT_DAILY_TASKS = [
   { title: 'Night Drink', metric: '', icon: 'night_drink', sortOrder: 7 },
   { title: 'Supplements', metric: '', icon: 'supplements', sortOrder: 8 },
   { title: 'Water Intake', metric: '2.5 L goal', icon: 'water_drop', sortOrder: 9 },
-  { title: 'Walk', metric: '30 min', icon: 'walk', sortOrder: 10 },
+  { title: 'Log Exercise', metric: '', icon: 'exercise', sortOrder: 10 },
   { title: 'Sleep by 11 pm', metric: '7+ hrs', icon: 'sleep', sortOrder: 11 },
 ];
 
@@ -45,6 +48,10 @@ const MEAL_GROUP_TASK_TITLES = new Set([...MEAL_LINKED_TASK_TITLES, 'Supplements
 
 // Progress-based (not a manual checkbox) task, backed by WaterLog.
 const WATER_TASK_TITLE = 'Water Intake';
+
+// Progress-based (not a manual checkbox) task, backed by ExerciseLog +
+// that day's ExercisePlan.dailyExercises (see computeTaskDoneMap).
+const EXERCISE_TASK_TITLE = 'Log Exercise';
 
 function toDateOnly(d) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -271,4 +278,5 @@ module.exports = {
   MEAL_LINKED_TASK_TITLES,
   MEAL_GROUP_TASK_TITLES,
   WATER_TASK_TITLE,
+  EXERCISE_TASK_TITLE,
 };

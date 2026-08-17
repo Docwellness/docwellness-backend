@@ -1276,11 +1276,14 @@ exports.submitMealLog = async (req, res, next) => {
     }
 
     for (const item of items) {
+      // servings === 0 is a valid, deliberate "un-log this item" signal
+      // (see below) - only negative/non-numeric values are actually
+      // invalid.
       if (
         !item.servingTime ||
         !mongoose.Types.ObjectId.isValid(item.recipeId) ||
         typeof item.servings !== 'number' ||
-        item.servings <= 0
+        item.servings < 0
       ) {
         return res.status(400).json({
           success: false,
@@ -1305,16 +1308,29 @@ exports.submitMealLog = async (req, res, next) => {
       log.dayKey = dateToDayKey(targetDate);
     }
 
-    // Overwrite-or-append per (servingTime, recipeId)
+    // Overwrite-or-append per (servingTime, recipeId) - servings === 0
+    // means the patient explicitly set an already-logged item's portion
+    // back down to 0 to un-log it (see docwellness-user's
+    // LogMealContainer/CustomPortionDropDown), so it removes that entry
+    // outright instead of writing a zero-servings row.
     items.forEach((item) => {
       const newCalories = item.caloriesConsumed || 0;
 
-      const existing = log.meals.find(
+      const existingIndex = log.meals.findIndex(
         (meal) =>
           meal.servingTime === item.servingTime &&
           meal.recipeId &&
           meal.recipeId.toString() === item.recipeId
       );
+      const existing = existingIndex >= 0 ? log.meals[existingIndex] : null;
+
+      if (item.servings === 0) {
+        if (existing) {
+          log.totalCalories -= existing.caloriesConsumed || 0;
+          log.meals.splice(existingIndex, 1);
+        }
+        return;
+      }
 
       if (existing) {
         // Adjust totalCalories: remove old calories, add new
@@ -1346,64 +1362,75 @@ exports.submitMealLog = async (req, res, next) => {
       const receiverId = config.defaultDieticianId;
       const senderId = req.user._id;
 
-      const recipeIds = items.map((i) => i.recipeId);
-      const recipesInfo = await Recipe.find({ _id: { $in: recipeIds } })
-        .select('name image nutrition')
-        .lean();
+      // Un-logs (servings === 0, see above) shouldn't read as
+      // "Logged"/"Updated" in the dietician-facing chat summary - skip the
+      // whole notification when a submission was nothing but un-logs
+      // (nothing was actually added or changed for the dietician to see).
+      const loggedItems = items.filter((i) => i.servings > 0);
 
-      const totalCaloriesLogged = items.reduce(
-        (sum, item) => sum + (item.caloriesConsumed || 0),
-        0
-      );
-      const totalServingsLogged = items.reduce((sum, item) => sum + (item.servings || 0), 0);
+      if (loggedItems.length > 0) {
+        const recipeIds = loggedItems.map((i) => i.recipeId);
+        const recipesInfo = await Recipe.find({ _id: { $in: recipeIds } })
+          .select('name image nutrition')
+          .lean();
 
-      const mealNames = items.map((item) => {
-        const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
-        return recipe?.name || 'Meal';
-      });
+        const totalCaloriesLogged = loggedItems.reduce(
+          (sum, item) => sum + (item.caloriesConsumed || 0),
+          0
+        );
+        const totalServingsLogged = loggedItems.reduce((sum, item) => sum + (item.servings || 0), 0);
 
-      const chatText = isFirstTime
-        ? `Logged ${mealNames[0]}${mealNames.length > 1 ? ` and ${mealNames.length - 1} more` : ''} for today`
-        : `Updated ${mealNames[0]}${mealNames.length > 1 ? ` and ${mealNames.length - 1} more` : ''}`;
-
-      let conversation = await Conversation.findOne({
-        $and: [{ 'participants.userId': senderId }, { 'participants.userId': receiverId }],
-      });
-
-      if (!conversation) {
-        conversation = await Conversation.create({
-          participants: [{ userId: senderId }, { userId: receiverId }],
+        const mealNames = loggedItems.map((item) => {
+          const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
+          return recipe?.name || 'Meal';
         });
+
+        const chatText = isFirstTime
+          ? `Logged ${mealNames[0]}${mealNames.length > 1 ? ` and ${mealNames.length - 1} more` : ''} for today`
+          : `Updated ${mealNames[0]}${mealNames.length > 1 ? ` and ${mealNames.length - 1} more` : ''}`;
+
+        let conversation = await Conversation.findOne({
+          $and: [{ 'participants.userId': senderId }, { 'participants.userId': receiverId }],
+        });
+
+        if (!conversation) {
+          conversation = await Conversation.create({
+            participants: [{ userId: senderId }, { userId: receiverId }],
+          });
+        }
+
+        const firstRecipe = recipesInfo[0];
+        const mealChatMessage = await Chat.create({
+          conversationId: conversation._id,
+          senderId,
+          receiverId,
+          message: chatText,
+          messageType: 'meal_log',
+          attachment: firstRecipe?.image || null,
+          metadata: {
+            mealLogId: log._id,
+            action: isFirstTime ? 'added' : 'updated',
+            itemName: mealNames.join(', '),
+            calories: totalCaloriesLogged,
+            servings: totalServingsLogged,
+            servingTime: loggedItems[0]?.servingTime || '',
+            totalConsumed: log.totalCalories,
+          },
+        });
+
+        conversation.lastMessage = chatText;
+        conversation.lastMessageAt = new Date();
+        conversation.participants.forEach((p) => {
+          if (p.userId.toString() !== senderId.toString()) p.unreadCount += 1;
+        });
+        await conversation.save();
+
+        if (io) {
+          io.to(`user:${receiverId}`).emit('newMessage', mealChatMessage);
+        }
       }
 
-      const firstRecipe = recipesInfo[0];
-      const mealChatMessage = await Chat.create({
-        conversationId: conversation._id,
-        senderId,
-        receiverId,
-        message: chatText,
-        messageType: 'meal_log',
-        attachment: firstRecipe?.image || null,
-        metadata: {
-          mealLogId: log._id,
-          action: isFirstTime ? 'added' : 'updated',
-          itemName: mealNames.join(', '),
-          calories: totalCaloriesLogged,
-          servings: totalServingsLogged,
-          servingTime: items[0]?.servingTime || '',
-          totalConsumed: log.totalCalories,
-        },
-      });
-
-      conversation.lastMessage = chatText;
-      conversation.lastMessageAt = new Date();
-      conversation.participants.forEach((p) => {
-        if (p.userId.toString() !== senderId.toString()) p.unreadCount += 1;
-      });
-      await conversation.save();
-
       if (io) {
-        io.to(`user:${receiverId}`).emit('newMessage', mealChatMessage);
         io.to(`user:${receiverId}`).emit('meal_log_update', {
           patientId: senderId,
           logId: log._id,

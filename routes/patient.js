@@ -249,9 +249,21 @@ router.get('/progress/:id', patientOnly, progressController.getProgressById);
 
 /**
  * @route   PUT /api/patient/progress/:id
- * @desc    Update progress entry
+ * @desc    Update progress entry (with optional body image upload - same
+ *          fields as POST /progress, for editing an already-logged week)
  */
-router.put('/progress/:id', patientOnly, progressController.updateProgress);
+router.put(
+  '/progress/:id',
+  patientOnly,
+  uploadLimiter,
+  upload.fields([
+    { name: 'bodyImage', maxCount: 1 },
+    { name: 'bodyImage2', maxCount: 1 },
+    { name: 'beforeImage', maxCount: 1 },
+    { name: 'afterImage', maxCount: 1 },
+  ]),
+  progressController.updateProgress
+);
 
 /**
  * @route   POST /api/patient/progress/:id/images

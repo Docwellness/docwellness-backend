@@ -80,7 +80,7 @@ describe('seedGoalTimeline', () => {
         'Night Drink',
         'Supplements',
         'Water Intake',
-        'Walk',
+        'Log Exercise',
         'Sleep by 11 pm',
       ])
     );
