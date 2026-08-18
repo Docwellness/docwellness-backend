@@ -9,7 +9,9 @@ const {
   User,
   MealLog,
   GenerationLog,
+  Notification,
 } = require('../../models');
+const { sendPushToTokens } = require('../../utils/push');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const { seedGoalTimeline } = require('../../utils/seedGoalTimeline');
@@ -2471,6 +2473,37 @@ exports.activateDietPlan = async (req, res, next) => {
       },
       { new: false }
     );
+
+    // In-app Notification (always) + best-effort real push (never blocks or
+    // fails activation) - same "DB write always happens, push is
+    // independently best-effort" convention as createNudge/
+    // notifyPatientsOfQuote/runGoalNudgeSweep.
+    Notification.create({
+      userId: patientId,
+      title: 'Your diet plan is ready',
+      message: 'Your dietician has activated your diet plan - tap to see this week\'s meals.',
+      type: 'diet_plan',
+      referenceId: dietPlan._id,
+      referenceModel: 'DietPlan',
+    })
+      .then(async () => {
+        const patient = await User.findById(patientId).select('deviceTokens').lean();
+        const tokens = (patient?.deviceTokens || []).map((t) => t.token);
+        return sendPushToTokens(
+          tokens,
+          {
+            title: 'Your diet plan is ready',
+            body: "Your dietician has activated your diet plan - tap to see this week's meals.",
+            data: { deepLink: 'docwellness://diet', dietPlanId: String(dietPlan._id) },
+          },
+          (deadToken) => {
+            User.updateOne({ _id: patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
+              () => {}
+            );
+          }
+        );
+      })
+      .catch((err) => console.error('[activateDietPlan] notification/push failed (non-fatal):', err.message));
 
     return res.status(200).json({
       success: true,

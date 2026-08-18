@@ -10,6 +10,7 @@ const {
   resolvePlanStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
+const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
 
 /**
  * GET /patients/:patientId/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
@@ -215,12 +216,6 @@ exports.getPatientTrackingData = async (req, res, next) => {
 // GET /api/dietician/patients/:patientId/meal-log/today-stats?date=YYYY-MM-DD
 // ============================================================
 
-const parseDateOrNull = (value) => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
 // UTC-based - see the matching normalizeDate in controllers/patient/dietController.js
 // for why: local getters made this drift by the server's UTC offset whenever
 // it wasn't 0, causing already-logged days to read back as 0 consumed.
@@ -265,20 +260,13 @@ exports.getPatientMealLogStats = async (req, res, next) => {
 
     const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
 
-    const activationStart = parseDateOrNull(dietPlan.activationDate);
-    const requestStart = parseDateOrNull(dietPlan.request?.startDateForDiet);
-    const startDate = activationStart || requestStart;
-
-    let currentWeek = 1;
-    if (startDate) {
-      const startDay = normalizeDate(startDate);
-      const diffMs = today.getTime() - startDay.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      let computedWeek = Math.floor(diffDays / 7) + 1;
-      if (computedWeek < 1) computedWeek = 1;
-      if (computedWeek > 4) computedWeek = 4;
-      currentWeek = computedWeek;
-    }
+    // weekSchedule-aware (matches controllers/patient/dietController.js's
+    // getActiveDietPlanForPatient) - a plain diff-from-activationDate estimate
+    // here previously ignored weekSchedule entirely, so a week that had been
+    // individually rescheduled (see utils/weekSchedule.js) made this endpoint
+    // pick the wrong week's dailyMeals while the patient app picked the right
+    // one, and the two apps' calorie rings disagreed for the same day.
+    const currentWeek = resolveCurrentWeek(dietPlan, today);
 
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
 

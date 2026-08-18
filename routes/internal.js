@@ -12,6 +12,8 @@ const router = express.Router();
 const config = require('../config/environment');
 const { runRenewalReminderSweep } = require('../controllers/internal/renewalReminderController');
 const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeController');
+const { runMealReminderSweep } = require('../controllers/internal/mealReminderController');
+const { runWaterReminderSweep } = require('../controllers/internal/waterReminderController');
 
 function requireCronSecret(req, res, next) {
   // Two trigger sources need to authenticate here: Vercel Cron (dev), which
@@ -51,6 +53,35 @@ router.post('/cron/renewal-reminders', requireCronSecret, async (req, res, next)
 router.post('/cron/goal-nudges', requireCronSecret, async (req, res, next) => {
   try {
     const result = await runGoalNudgeSweep();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/internal/cron/meal-reminder?slot=Breakfast
+ * @desc    Fixed-time sweep (see vercel.json - one cron entry per
+ *          servingTime slot): reminds patients who have that slot planned
+ *          for today's day-group and haven't logged it yet.
+ */
+router.post('/cron/meal-reminder', requireCronSecret, async (req, res, next) => {
+  try {
+    const result = await runMealReminderSweep({ slot: req.query.slot });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/internal/cron/water-reminder?checkpoint=1
+ * @desc    Fixed-time sweep (see vercel.json - 4 checkpoints across the
+ *          day): reminds patients who haven't reached their water goal yet.
+ */
+router.post('/cron/water-reminder', requireCronSecret, async (req, res, next) => {
+  try {
+    const result = await runWaterReminderSweep({ checkpoint: req.query.checkpoint });
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

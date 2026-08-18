@@ -6,9 +6,10 @@
 
 const mongoose = require('mongoose');
 const { ProcessedEvent } = require('../models');
-const { Chat, Conversation } = require('../../models'); // Use legacy models!
+const { Chat, Conversation, Notification, User } = require('../../models'); // Use legacy models!
 const ChatLogger = require('./ChatLogger');
 const config = require('../../config/environment');
+const { sendPushToTokens } = require('../../utils/push');
 
 const { EVENTS } = ChatLogger;
 
@@ -258,6 +259,53 @@ class MealLogSyncService {
             conversation_id: convId,
             receiver_id: dieticianId,
           });
+        }
+
+        // In-app Notification + best-effort push for the dietician - only
+        // on a genuinely new log entry (not the in-place-update branch
+        // above), so editing an already-logged meal's servings doesn't
+        // re-notify. Never blocks or fails the sync - same "DB write always
+        // happens, push is independently best-effort" convention as every
+        // other push call site in this codebase.
+        try {
+          const notif = await Notification.create({
+            userId: dieticianId,
+            title: 'New meal logged',
+            message: newMessage.message,
+            type: 'chat',
+            referenceId: convId,
+            referenceModel: 'Chat',
+          });
+
+          if (ioInstance) {
+            ioInstance.to(`user:${dieticianId}`).emit('notification.new', {
+              id: notif._id,
+              title: notif.title,
+              message: notif.message,
+              type: notif.type,
+              createdAt: notif.createdAt,
+            });
+          }
+
+          const dietician = await User.findById(dieticianId).select('deviceTokens').lean();
+          const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+          sendPushToTokens(
+            tokens,
+            {
+              title: 'New meal logged',
+              body: newMessage.message,
+              data: { deepLink: 'docwellness://chat', conversationId: String(convId) },
+            },
+            (deadToken) => {
+              User.updateOne({ _id: dieticianId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
+                () => {}
+              );
+            }
+          ).catch((err) =>
+            ChatLogger.error('push_send_error', { ...logContext, meal_log_id, error: err.message })
+          );
+        } catch (notifErr) {
+          ChatLogger.error('notification_create_error', { ...logContext, meal_log_id, error: notifErr });
         }
       }
 

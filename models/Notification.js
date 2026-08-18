@@ -29,6 +29,8 @@ const notificationSchema = new mongoose.Schema(
         'membership_renewal',
         'milestone',
         'quote',
+        'meal_reminder',
+        'water_reminder',
       ],
       default: 'system',
     },

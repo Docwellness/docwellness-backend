@@ -13,6 +13,17 @@
     {
       "path": "/api/internal/cron/goal-nudges",
       "schedule": "30 3 * * *"
-    }
+    },
+    { "path": "/api/internal/cron/meal-reminder?slot=Morning%20Drink", "schedule": "0 1 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Breakfast", "schedule": "0 3 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Brunch", "schedule": "0 5 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Lunch", "schedule": "0 7 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Evening%20Snack", "schedule": "0 11 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Dinner", "schedule": "0 14 * * *" },
+    { "path": "/api/internal/cron/meal-reminder?slot=Night%20Drink", "schedule": "30 15 * * *" },
+    { "path": "/api/internal/cron/water-reminder?checkpoint=1", "schedule": "30 4 * * *" },
+    { "path": "/api/internal/cron/water-reminder?checkpoint=2", "schedule": "30 7 * * *" },
+    { "path": "/api/internal/cron/water-reminder?checkpoint=3", "schedule": "30 10 * * *" },
+    { "path": "/api/internal/cron/water-reminder?checkpoint=4", "schedule": "30 13 * * *" }
   ]
 }

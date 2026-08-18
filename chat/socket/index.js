@@ -16,6 +16,7 @@ const {
 const config = require('../../config/environment');
 const Notification = require('../../models/Notification');
 const { getUserFromSupabaseToken } = require('../../utils/supabaseAuth');
+const { sendPushToTokens } = require('../../utils/push');
 
 const { EVENTS } = ChatLogger;
 
@@ -372,6 +373,28 @@ function initializeChatSocketV1(io) {
               referenceId: notif.referenceId?.toString(),
               createdAt: notif.createdAt,
             });
+
+            // Best-effort real OS push, in addition to the socket event
+            // above - the socket event only reaches a client with an open
+            // connection to this conversation; a backgrounded/killed app
+            // needs the actual FCM push to ever learn a message arrived.
+            // Never blocks or fails the send - same convention as every
+            // other push call site (see utils/push.js).
+            const receiver = await User.findById(receiverId).select('deviceTokens').lean();
+            const tokens = (receiver?.deviceTokens || []).map((t) => t.token);
+            sendPushToTokens(
+              tokens,
+              {
+                title: notifTitle,
+                body: notifMessage || 'New message',
+                data: { deepLink: 'docwellness://chat', conversationId: String(result.message.conversationId) },
+              },
+              (deadToken) => {
+                User.updateOne({ _id: receiverId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
+                  () => {}
+                );
+              }
+            ).catch((err) => ChatLogger.error('push_send_error', { ...logContext, error: err.message }));
           } catch (notifErr) {
             ChatLogger.error('notification_create_error', { ...logContext, error: notifErr });
           }
