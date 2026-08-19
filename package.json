@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "DocWellness - Health and Wellness Application Backend API",
   "main": "app.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
