@@ -47,13 +47,22 @@ async function sendPushToTokens(tokens, { title, body, data } = {}, onInvalidTok
 
   try {
     // eslint-disable-next-line global-require
-    const admin = require('firebase-admin');
+    // Same firebase-admin v14 namespace removal as getApp() above -
+    // admin.messaging(app) doesn't exist either (admin.messaging is
+    // undefined at the top-level require) - getMessaging(app) via the
+    // modular firebase-admin/messaging subpath is the replacement. This is
+    // the second half of why push stayed broken after fixing getApp()
+    // alone: initialization started succeeding, but every actual send then
+    // threw "admin.messaging is not a function", caught right below and
+    // logged as "[push] send failed" - same silent-failure shape as the
+    // init bug, just one call further in.
+    const { getMessaging } = require('firebase-admin/messaging');
     const stringData = {};
     for (const [key, value] of Object.entries(data || {})) {
       stringData[key] = String(value);
     }
 
-    const response = await admin.messaging(fcmApp).sendEachForMulticast({
+    const response = await getMessaging(fcmApp).sendEachForMulticast({
       tokens,
       notification: { title, body },
       data: stringData,
