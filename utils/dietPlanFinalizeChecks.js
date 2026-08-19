@@ -1,9 +1,8 @@
-// Deterministic checks run at finalize time (finalizeWeekPlan and
-// finalizeEntireDietPlan in controllers/dietician/dietPlanController.js),
-// re-verifying the dietician's actual submitted/edited selections rather
-// than trusting the AI-generation-time warnings, which go stale the moment
-// a recipe is added/swapped. One implementation shared by both finalize
-// call sites so the rule can't drift between them.
+// Deterministic checks run at finalize time (finalizeWeekPlan in
+// controllers/dietician/dietPlanController.js), re-verifying the
+// dietician's actual submitted/edited selections rather than trusting the
+// AI-generation-time warnings, which go stale the moment a recipe is
+// added/swapped.
 //
 // Reuses SIDE_SALAD_ELIGIBLE_SLOTS from dietPlanOptions.js - the same
 // side/salad cross-listing exception applied by validateDietPlan at

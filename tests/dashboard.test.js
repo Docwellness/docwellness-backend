@@ -102,4 +102,33 @@ describe('dietician patient access', () => {
 
     expect(res.status).toBe(403);
   });
+
+  // AI_EXECUTION_PLAN.md Phase 2, P2-05 - a dietician with no DietPlanRequest
+  // relationship to a patient must be denied, not just any authenticated
+  // dietician. Covers all three endpoints assertDieticianOwnsPatient guards
+  // (see controllers/dietician/patientController.js).
+  test('a dietician with no diet plan request for a patient is denied on profile/deactivate/delete', async () => {
+    const unrelatedDietician = await createDietician();
+    const patient = await createPatient({
+      profile: { fullName: 'Unassigned Patient' },
+    });
+    registerTestToken('dietician-token', unrelatedDietician._id);
+
+    const profileRes = await request(app)
+      .get(`/api/dietician/patients/${patient._id}/profile`)
+      .set('Authorization', 'Bearer dietician-token');
+    expect(profileRes.status).toBe(403);
+
+    const deactivateRes = await request(app)
+      .put(`/api/dietician/patients/${patient._id}/deactivate`)
+      .set('Authorization', 'Bearer dietician-token')
+      .send({ isActive: false });
+    expect(deactivateRes.status).toBe(403);
+
+    const deleteRes = await request(app)
+      .delete(`/api/dietician/patients/${patient._id}`)
+      .set('Authorization', 'Bearer dietician-token')
+      .send({ confirmEmail: patient.email });
+    expect(deleteRes.status).toBe(403);
+  });
 });

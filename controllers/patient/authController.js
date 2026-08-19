@@ -30,6 +30,9 @@ const {
   getSupabaseAdmin,
 } = require('../../utils/supabaseAuth');
 const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
+const { isLoginLocked, registerFailedLogin, clearFailedLoginAttempts } = require('../../utils/loginLockout');
+const { dedupedRefresh } = require('../../utils/refreshDedup');
+const { logAuditEvent } = require('../../utils/auditLog');
 
 const sessionResponse = (session) => ({
   accessToken: session.access_token,
@@ -126,7 +129,13 @@ exports.verifySignupOtpEndpoint = async (req, res, next) => {
 /**
  * @desc    Log in with email/password - server-side replacement for the
  *          client calling supabase.auth.signInWithPassword() directly.
+ *          Mounted at both /api/patient/auth/login and
+ *          /api/dietician/auth/login (routes/patient.js, routes/dietician.js)
+ *          - `req.loginRole` (set by middlewares/deviceRisk.js's loginRole()
+ *          on each mount) picks the lockout threshold (P9-B2: 5/15min
+ *          patient, 3/10min dietician) and drives the audit-log role field.
  * @route   POST /api/patient/auth/login
+ * @route   POST /api/dietician/auth/login
  * @access  Public
  * @body    { email, password }
  */
@@ -137,14 +146,44 @@ exports.login = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
+    const role = req.loginRole || 'patient';
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const lockStatus = await isLoginLocked(role, normalizedEmail);
+    if (lockStatus.locked) {
+      logAuditEvent('login_locked', { role, email: normalizedEmail });
+      res.set('Retry-After', String(lockStatus.retryAfter));
+      return res.status(429).json({
+        success: false,
+        message: 'Too many failed login attempts. Please try again later.',
+        retryAfter: lockStatus.retryAfter,
+      });
+    }
+
     let session;
     try {
       session = await signInWithPassword(email.trim(), password);
     } catch (err) {
+      logAuditEvent('login_failed', { role, email: normalizedEmail });
+
+      const failure = await registerFailedLogin(role, normalizedEmail);
+      if (failure.locked) {
+        logAuditEvent('login_locked', { role, email: normalizedEmail });
+        res.set('Retry-After', String(failure.retryAfter));
+        return res.status(429).json({
+          success: false,
+          message: 'Too many failed login attempts. Please try again later.',
+          retryAfter: failure.retryAfter,
+        });
+      }
+
       // Generic message regardless of whether the email or password was
       // wrong - same reasoning as forgotPassword's generic response below.
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
+
+    await clearFailedLoginAttempts(role, normalizedEmail);
+    logAuditEvent('login_success', { role, email: normalizedEmail });
 
     res.status(200).json({ success: true, data: sessionResponse(session) });
   } catch (error) {
@@ -263,6 +302,7 @@ exports.forgotPassword = async (req, res, next) => {
       console.log('Password reset requested but Supabase had no matching identity:', email);
     }
 
+    logAuditEvent('password_reset_requested', { email: email.toLowerCase() });
     res.status(200).json(genericResponse);
   } catch (error) {
     next(error);
@@ -295,6 +335,7 @@ exports.resetPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired code. Please try again.' });
     }
 
+    logAuditEvent('password_reset_completed', { email: email.toLowerCase() });
     res.status(200).json({
       success: true,
       message: 'Password reset. Please sign in with your new password.',
@@ -308,8 +349,12 @@ exports.resetPassword = async (req, res, next) => {
  * @desc    Exchanges a refresh token for a new session - server-side
  *          replacement for the client's own supabase.auth.refreshSession(),
  *          called proactively by the app before an access token expires
- *          (see docwellness-user's ApiService.request()).
+ *          (see docwellness-user's ApiService.request()). Concurrent calls
+ *          carrying the same refresh token are de-duplicated (P9-B3,
+ *          utils/refreshDedup.js) rather than each independently racing
+ *          Supabase's own refresh-token rotation.
  * @route   POST /api/patient/auth/refresh
+ * @route   POST /api/dietician/auth/refresh
  * @access  Public
  * @body    { refreshToken }
  */
@@ -321,11 +366,14 @@ exports.refresh = async (req, res, next) => {
     }
 
     let session;
+    let deduped;
     try {
-      session = await refreshSession(refreshToken);
+      ({ session, deduped } = await dedupedRefresh(refreshToken, () => refreshSession(refreshToken)));
     } catch (err) {
       return res.status(401).json({ success: false, message: 'Session expired, please log in again' });
     }
+
+    logAuditEvent(deduped ? 'refresh_deduped' : 'refresh_used', { role: req.loginRole || 'patient' });
 
     res.status(200).json({ success: true, data: sessionResponse(session) });
   } catch (error) {
@@ -430,6 +478,7 @@ exports.logout = async (req, res, next) => {
       await signOutSession(callerToken, 'global');
     }
     console.log('Patient logged out:', req.user._id);
+    logAuditEvent('logout', { role: req.user.role, userId: req.user._id.toString() });
     res.status(200).json({
       success: true,
       message: 'Logged out successfully',

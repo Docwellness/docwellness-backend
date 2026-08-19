@@ -33,6 +33,7 @@ const { authController } = require('../controllers/patient');
 
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
 const { authLimiter, aiGenerationLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
+const { loginRole, deviceRiskGate } = require('../middlewares/deviceRisk');
 
 const dieticianOnlyMiddleware = [authenticate, dieticianOnly];
 
@@ -52,6 +53,25 @@ router.param('imageId', validateObjectIdParam);
 router.param('imageId', validateObjectIdParam);
 
 /**
+ * @route   POST /api/dietician/auth/login
+ * @desc    Log in with email/password - reuses the same role-agnostic
+ *          controller the patient app uses (P9-B1/P9-D1, AI_EXECUTION_PLAN.md
+ *          Phase 9). DocDesk now proxies login through here instead of
+ *          calling Supabase directly from the Flutter app, so the stricter
+ *          dietician lockout threshold (P9-B2: 3 attempts/10min) and
+ *          device-risk block (P9-B5: jailbroken/rooted devices are refused
+ *          outright, not just soft-flagged) actually apply to it.
+ */
+router.post('/auth/login', authLimiter, loginRole('dietician'), deviceRiskGate('dietician'), authController.login);
+
+/**
+ * @route   POST /api/dietician/auth/refresh
+ * @desc    Exchanges a refresh token for a new session - see
+ *          routes/patient.js's identical mount for the shared controller.
+ */
+router.post('/auth/refresh', authLimiter, loginRole('dietician'), authController.refresh);
+
+/**
  * @route   GET /api/dietician/auth/me
  * @desc    Get current logged in dietician. Reuses the same generic getMe
  *          handler patient auth uses - the User model is shared across
@@ -63,10 +83,7 @@ router.get('/auth/me', dieticianOnlyMiddleware, authController.getMe);
 // Forgot/reset password - reuses the same role-agnostic Supabase-OTP flow
 // as the patient app (see controllers/patient/authController.js's
 // forgotPassword/resetPassword - neither looks at role, just email), rather
-// than duplicating the logic here. DocDesk still logs in via a direct
-// client-side Supabase call (see docwellness-dietician's AuthController),
-// but password reset needs the backend's service-role key to generate the
-// recovery OTP and email it via Resend, so it goes through here instead.
+// than duplicating the logic here.
 router.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
 router.post('/auth/reset-password', authLimiter, authController.resetPassword);
 
@@ -266,10 +283,17 @@ router.put(
   dietPlanController.finalizeWeekPlan
 );
 
+// AI_EXECUTION_PLAN.md Phase 7, P7-05 (save-draft) - persists in-progress,
+// not-yet-finalized selections so closing the builder mid-edit doesn't
+// discard them back to generatedPlan's original AI output. No validation
+// gate (unlike finalize-week above) - see saveDraftWeek's doc comment.
+// `week` travels in the body, not the URL - same convention as
+// finalize-week just above (buildFinalizeWeekPayload on the Flutter side
+// builds one payload shape shared by both).
 router.put(
-  '/patients/:patientId/diet-plans/:dietPlanId/finalize-all',
+  '/patients/:patientId/diet-plans/:dietPlanId/save-draft',
   dieticianOnlyMiddleware,
-  dietPlanController.finalizeEntireDietPlan
+  dietPlanController.saveDraftWeek
 );
 
 router.post(

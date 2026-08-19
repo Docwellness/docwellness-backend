@@ -8,7 +8,7 @@ const {
   Progress,
   Chat,
   Conversation,
-  Payment,
+  MealLog,
   Notification,
 } = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
@@ -31,6 +31,17 @@ const formatDate = (value) => {
   const year = date.getFullYear();
   return `${day}-${month}-${year}`;
 };
+
+/**
+ * Whether `dieticianId` has ever had a diet-plan-request relationship with
+ * `patientId` - the same relationship listPatientsForDietician (see
+ * dietPlanController.js) scopes its "new"/"ongoing"/"past" tabs by, so a
+ * patient visible in any tab is always accessible here too. Without this,
+ * any authenticated dietician-role account could view/deactivate/delete any
+ * patient in the system, not just their own.
+ */
+const assertDieticianOwnsPatient = (dieticianId, patientId) =>
+  DietPlanRequest.exists({ patient: patientId, dieticianId });
 
 const isProfileComplete = (user) => {
   const profile = user.profile || {};
@@ -67,6 +78,13 @@ exports.getPatientProfile = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'Patient not found',
+      });
+    }
+
+    if (!(await assertDieticianOwnsPatient(req.user._id, patient._id))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this patient',
       });
     }
 
@@ -295,6 +313,13 @@ exports.togglePatientActive = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
 
+    if (!(await assertDieticianOwnsPatient(req.user._id, patient._id))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this patient',
+      });
+    }
+
     patient.isActive = typeof isActive === 'boolean' ? isActive : !patient.isActive;
     await patient.save();
 
@@ -336,6 +361,13 @@ exports.deletePatient = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
 
+    if (!(await assertDieticianOwnsPatient(req.user._id, patient._id))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this patient',
+      });
+    }
+
     if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== patient.email) {
       return res.status(400).json({
         success: false,
@@ -349,7 +381,7 @@ exports.deletePatient = async (req, res, next) => {
       FirstConsultation.deleteMany({ patient: patientId }),
       ManualPaymentProof.deleteMany({ patient: patientId }),
       Progress.deleteMany({ patientId }),
-      Payment.deleteMany({ patientId }),
+      MealLog.deleteMany({ patientId }),
       Notification.deleteMany({ userId: patientId }),
       Chat.deleteMany({ $or: [{ senderId: patientId }, { receiverId: patientId }] }),
       Conversation.deleteMany({ 'participants.userId': patientId }),

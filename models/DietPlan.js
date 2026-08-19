@@ -138,6 +138,20 @@ const dietPlanSchema = new mongoose.Schema(
       type: Object,
       default: null,
     },
+    // AI_EXECUTION_PLAN.md Phase 7, P7-05 (save-draft) - same {weeks:[{week,
+    // dailyMeals}]} shape as finalizedPlan above, but written by
+    // saveDraftWeek (dietPlanController.js) instead of finalizeWeekPlan, and
+    // never passed through computeFinalizeBlockingIssues - a draft is
+    // explicitly allowed to be incomplete or invalid, since it hasn't been
+    // finalized yet. Independent of finalizedPlan: finalizing a week doesn't
+    // clear its draft entry, but getDraftWeekOptions always prefers
+    // finalizedPlan over draftPlan for a given week when both exist, so a
+    // stale draft can never resurrect over already-finalized, patient-
+    // visible selections.
+    draftPlan: {
+      type: Object,
+      default: null,
+    },
     weeksSummary: [
       {
         week: { type: Number, required: true },

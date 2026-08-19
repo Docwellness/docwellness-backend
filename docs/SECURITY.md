@@ -9,7 +9,7 @@ code or configuration by itself.
 
 | Secret | Where it lives | Scope |
 |---|---|---|
-| `JWT_SECRET` | backend `.env` | signs/verifies backend session tokens |
+| `JWT_SECRET` | backend `.env` | required at boot (config/environment.js fails fast without it) but not currently used to sign/verify any live auth token - session tokens are Supabase-issued and verified via Supabase's own `auth.getUser()` (see `utils/supabaseAuth.js`), not a local JWT check |
 | `MONGODB_URI` | backend `.env` | full database access |
 | `SUPABASE_SERVICE_ROLE_KEY` | backend `.env` | full Supabase DB access - server-side only |
 | `SUPABASE_PUBLISHABLE_KEY` / anon key | Flutter apps (dart-define) | client-safe by design - only allows what RLS policies permit |
@@ -43,9 +43,10 @@ than hardcoding it inline.
    while investigating - handling it should stop it from spreading further.
 2. Rotate it immediately at the source:
    - **JWT_SECRET** - generate a new random value and update it in the
-     backend's env config. This immediately invalidates every existing
-     session/token; every logged-in user is signed out and must log in
-     again. Coordinate before rotating in production.
+     backend's env config. It isn't used to sign or verify any live session
+     token today (see the table above), so rotating it does not sign anyone
+     out - it's still required at boot and worth rotating on exposure like
+     any other leaked secret, just without that side effect.
    - **MongoDB URI / password** - dev still runs against MongoDB Atlas
      (rotate the database user's password in the Atlas dashboard). Prod
      runs against the dedicated self-hosted instance described in

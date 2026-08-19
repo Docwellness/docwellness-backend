@@ -1,4 +1,11 @@
 const Notification = require('../models/Notification');
+const { getOrSetJSON } = require('../utils/cache');
+
+// AI_EXECUTION_PLAN.md Phase 5, P5-06 - same short-TTL, no-invalidation
+// tradeoff as chat/controllers/index.js's getUnreadCount: this badge count
+// is read far more often than it changes, and a few seconds of staleness
+// is an acceptable cost for not building write-path invalidation.
+const UNREAD_COUNT_CACHE_TTL_SECONDS = 20;
 
 /**
  * GET /api/dietician/notifications
@@ -38,10 +45,12 @@ exports.getNotifications = async (req, res) => {
  */
 exports.getUnreadCount = async (req, res) => {
   try {
-    const count = await Notification.countDocuments({
-      userId: req.user._id,
-      isRead: false,
-    });
+    const userId = req.user._id;
+    const count = await getOrSetJSON(
+      `notifications:unread-count:${userId}`,
+      UNREAD_COUNT_CACHE_TTL_SECONDS,
+      () => Notification.countDocuments({ userId, isRead: false })
+    );
     return res.json({ success: true, data: { unreadCount: count } });
   } catch (err) {
     console.error('getUnreadCount error:', err);

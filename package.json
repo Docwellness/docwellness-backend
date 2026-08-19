@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "node chat/tests/chat.test.js",
+    "test": "jest --runInBand --forceExit",
+    "test:chat-legacy": "node chat/tests/chat.test.js",
     "test:chat": "node chat/tests/chat.test.js",
     "test:integration": "jest",
     "test:watch": "jest --watch",
@@ -49,6 +50,7 @@
     "multer": "^2.0.2",
     "openai": "^6.9.1",
     "pino-http": "^11.0.0",
+    "rate-limit-redis": "^4.3.1",
     "resend": "^6.17.2",
     "socket.io": "^4.8.1",
     "ws": "^8.21.0"

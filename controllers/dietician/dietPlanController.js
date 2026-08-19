@@ -1762,6 +1762,9 @@ exports.getDraftWeekOptions = async (req, res, next) => {
 
     const planWeeks = Array.isArray(parsedPlan.weeks) ? parsedPlan.weeks : [];
     const finalizedWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    // AI_EXECUTION_PLAN.md Phase 7, P7-05 (save-draft) - see saveDraftWeek
+    // above and models/DietPlan.js's draftPlan field doc comment.
+    const draftWeeks = Array.isArray(dietPlan.draftPlan?.weeks) ? dietPlan.draftPlan.weeks : [];
 
     // Prefer the dietician's actual finalized selections (real servings,
     // and possibly more recipes than the AI's original picks - e.g. an
@@ -1770,9 +1773,14 @@ exports.getDraftWeekOptions = async (req, res, next) => {
     // time (see finalizeWeekPlan below), so re-opening an already-
     // finalized week via "Update Diet Plan" must read from finalizedPlan
     // or it silently resets every serving/selection back to the AI's
-    // original defaults.
+    // original defaults. A saved-but-not-yet-finalized draft sits between
+    // the two: real dietician selections, just not finalized yet - so it
+    // wins over the AI's raw output but always loses to an actual
+    // finalized week (finalizing a week doesn't clear its draft entry, so
+    // a stale draft must never resurrect over it).
     const findWeekEntry = (weekNum) =>
       finalizedWeeks.find((entry) => entry?.week === weekNum) ||
+      draftWeeks.find((entry) => entry?.week === weekNum) ||
       planWeeks.find((entry) => entry?.week === weekNum);
 
     const currentWeekEntry = findWeekEntry(parsedWeekNumber);
@@ -1791,8 +1799,15 @@ exports.getDraftWeekOptions = async (req, res, next) => {
     // field at all - see dietPlanJsonSchema.js). The dietician app needs
     // this to know whether a `servings` of exactly 1 is a genuine explicit
     // choice or just the "not yet set" placeholder default - see
-    // isUnexplicitDefault in patients_controller.dart.
+    // isUnexplicitDefault in patients_controller.dart. isDraftSaved is the
+    // same signal for the draftPlan tier: a saved draft also carries real,
+    // dietician-set servings (never the AI's placeholder default), so the
+    // Flutter side should treat isFinalized || isDraftSaved as "explicit
+    // servings" for that same purpose. Mutually exclusive with isFinalized
+    // by construction (findWeekEntry always prefers finalizedWeeks first).
     const isFinalized = finalizedWeeks.some((entry) => entry?.week === parsedWeekNumber);
+    const isDraftSaved =
+      !isFinalized && draftWeeks.some((entry) => entry?.week === parsedWeekNumber);
 
     const [recipeDocs, weightTrend] = await Promise.all([
       fetchRecipePoolForOptions({ Recipe, dieticianId }),
@@ -1840,6 +1855,7 @@ exports.getDraftWeekOptions = async (req, res, next) => {
         dayGroups,
         weightTrend,
         isFinalized,
+        isDraftSaved,
         riskFlags: dietPlan.riskFlags || [],
         validationWarnings: dietPlan.validationWarnings || [],
       },
@@ -2062,50 +2078,31 @@ exports.finalizeWeekPlan = async (req, res, next) => {
 };
 
 /**
- * @desc    Finalize the entire 4-week diet plan
- *          Note: Finalizing locks all selections but does not expose the diet to the patient until activateDietPlan is called.
- * @route   PUT /api/dietician/patients/:patientId/diet-plans/:dietPlanId/finalize-all
+ * @desc    Save the dietician's in-progress, not-yet-finalized selections for
+ *          a week (AI_EXECUTION_PLAN.md Phase 7, P7-05: save-draft). Unlike
+ *          finalizeWeekPlan, this never runs computeFinalizeBlockingIssues -
+ *          a draft is explicitly allowed to be incomplete or invalid, since
+ *          it hasn't been finalized yet - and never touches weeksSummary or
+ *          promotes the plan's status, since neither is meant to reflect
+ *          not-yet-real, patient-invisible selections. Exists so that
+ *          closing the builder mid-edit doesn't silently discard the
+ *          dietician's work back to generatedPlan's original AI output (see
+ *          getDraftWeekOptions's fallback chain below).
+ * @route   PUT /api/dietician/patients/:patientId/diet-plans/:dietPlanId/save-draft
  * @access  Private (Dietician)
+ * @body    { week, selectedMeals: [...] } - same shape finalize-week accepts
+ *          (week in the body, not the URL - see routes/dietician.js)
  */
-exports.finalizeEntireDietPlan = async (req, res, next) => {
+exports.saveDraftWeek = async (req, res, next) => {
   try {
     const { patientId, dietPlanId } = req.params;
     const dieticianId = req.user._id;
-    const { weeks } = req.body || {};
+    const parsedWeekNumber = Number(req.body?.week);
 
-    if (!Array.isArray(weeks) || weeks.length === 0) {
+    if (!Number.isInteger(parsedWeekNumber) || parsedWeekNumber < 1 || parsedWeekNumber > 4) {
       return res.status(400).json({
         success: false,
-        message: 'weeks must be a non-empty array',
-      });
-    }
-
-    const weekNumbers = weeks.map((week) => week?.week).filter((week) => typeof week === 'number');
-    const invalidWeek = weeks.find(
-      (week) => !Number.isInteger(week?.week) || week.week < 1 || week.week > 4
-    );
-
-    if (invalidWeek) {
-      return res.status(400).json({
-        success: false,
-        message: 'Each week entry must include a week number between 1 and 4',
-      });
-    }
-
-    const uniqueWeeks = new Set(weekNumbers);
-    if (uniqueWeeks.size !== weeks.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'Duplicate week entries detected',
-      });
-    }
-
-    const requiredWeeks = [1, 2, 3, 4];
-    const missingWeeks = requiredWeeks.filter((required) => !uniqueWeeks.has(required));
-    if (missingWeeks.length > 0 || uniqueWeeks.size !== requiredWeeks.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'You must provide selections for weeks 1 through 4',
+        message: 'weekNumber must be an integer between 1 and 4',
       });
     }
 
@@ -2119,11 +2116,23 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
       });
     }
 
-    const dietPlan = await DietPlan.findOne({
-      _id: dietPlanId,
-      patientId,
-      dieticianId,
-    }).populate('request');
+    const cleanedSelectedMeals = cleanSelectedMeals(req.body?.selectedMeals);
+
+    // Same de-dup as finalizeWeekPlan (a Lunch/Dinner slot can legitimately
+    // hold multiple entries - a main dish plus separately-selected sides/
+    // salad - so only exact {dayGroup, servingTime, recipeId} repeats are
+    // dropped) - deliberately no recipe-lookup/computeWeekSummary/
+    // computeFinalizeBlockingIssues here, see doc comment above.
+    const seenMealKeys = new Set();
+    const normalizedMeals = cleanedSelectedMeals.filter((meal) => {
+      if (!REQUIRED_SERVING_TIMES.includes(meal.servingTime)) return false;
+      const key = `${meal.dayGroup}|${meal.servingTime}|${meal.recipeId}`;
+      if (seenMealKeys.has(key)) return false;
+      seenMealKeys.add(key);
+      return true;
+    });
+
+    const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId });
 
     if (!dietPlan) {
       return res.status(404).json({
@@ -2132,148 +2141,28 @@ exports.finalizeEntireDietPlan = async (req, res, next) => {
       });
     }
 
-    const normalizedWeeks = [];
-    const normalizedSummaries = [];
-
-    // Clean/dedupe every week's meals first (no DB access needed for this
-    // part), so every recipeId referenced across all 4 weeks can be fetched
-    // in a single query before computing each week's summary.
-    const weeksWithNormalizedMeals = weeks.map((weekEntry) => {
-      if (!Array.isArray(weekEntry.dailyMeals)) {
-        throw new Error(`Week ${weekEntry.week}: dailyMeals must be an array`);
-      }
-
-      const cleanedDailyMeals = cleanSelectedMeals(weekEntry.dailyMeals);
-
-      // Removed validation for missing servingTimes
-
-      // Keep every selected recipe for a slot (not just one) - see the
-      // matching fix/comment in finalizeWeekPlan above.
-      const seenMealKeys = new Set();
-      const normalizedMeals = cleanedDailyMeals.filter((meal) => {
-        if (!REQUIRED_SERVING_TIMES.includes(meal.servingTime)) return false;
-        const key = `${meal.dayGroup}|${meal.servingTime}|${meal.recipeId}`;
-        if (seenMealKeys.has(key)) return false;
-        seenMealKeys.add(key);
-        return true;
-      });
-
-      return { week: weekEntry.week, normalizedMeals };
-    });
-
-    const allRecipeIds = [
-      ...new Set(
-        weeksWithNormalizedMeals
-          .flatMap((w) => w.normalizedMeals.map((m) => m.recipeId))
-          .filter(Boolean)
-      ),
-    ];
-    const allRecipeDocs = allRecipeIds.length
-      ? await Recipe.find({ _id: { $in: allRecipeIds } })
-          .select('nutrition servingSize secondaryComponent category servingTime name tags')
-          .lean()
-      : [];
-    const recipeDocsById = new Map(allRecipeDocs.map((r) => [r._id.toString(), r]));
-
-    // Re-verify every week's actual submitted selections before saving
-    // anything - see the matching check/rationale in finalizeWeekPlan.
-    // Accumulated across all 4 weeks so the dietician sees every problem
-    // at once instead of fixing one week, resubmitting, and hitting the
-    // next.
-    const blockingIssuesByWeek = [];
-
-    weeksWithNormalizedMeals.forEach(({ week, normalizedMeals }) => {
-      normalizedWeeks.push({ week, dailyMeals: normalizedMeals });
-
-      // Computed server-side from each recipe's *current* nutrition data,
-      // not trusted from the client's submitted summary - see
-      // computeWeekSummary's doc comment and the matching fix in
-      // finalizeWeekPlan above.
-      const computedSummary = computeWeekSummary(normalizedMeals, allRecipeDocs);
-      normalizedSummaries.push({
-        week,
-        totalCalories: computedSummary.totalCalories,
-        fatPercent: 0,
-        fatGrams: computedSummary.fatGrams,
-        carbPercent: 0,
-        carbGrams: computedSummary.carbGrams,
-        proteinPercent: 0,
-        proteinGrams: computedSummary.proteinGrams,
-        fiberGrams: computedSummary.fiberGrams,
-      });
-
-      const blockingIssues = computeFinalizeBlockingIssues({
-        normalizedMeals,
-        recipeDocsById,
-        calorieBudget: dietPlan.calorieStrategy?.calorieBudget,
-        computedSummary,
-      });
-      if (blockingIssues.hasBlockingIssues) {
-        blockingIssuesByWeek.push({ week, ...blockingIssues });
-      }
-    });
-
-    if (blockingIssuesByWeek.length > 0) {
-      return res.status(422).json({
-        success: false,
-        message: `Cannot finalize: severe issues found in ${blockingIssuesByWeek.length} week(s).`,
-        details: blockingIssuesByWeek,
-      });
+    if (!dietPlan.draftPlan || !Array.isArray(dietPlan.draftPlan.weeks)) {
+      dietPlan.draftPlan = { weeks: [] };
     }
 
-    dietPlan.finalizedPlan = { weeks: normalizedWeeks };
-    dietPlan.weeksSummary = normalizedSummaries;
-    dietPlan.status = 'Finalized';
-    dietPlan.markModified('finalizedPlan');
+    const weekPayload = { week: parsedWeekNumber, dailyMeals: normalizedMeals };
+    const existingIndex = dietPlan.draftPlan.weeks.findIndex(
+      (entry) => entry.week === parsedWeekNumber
+    );
+    if (existingIndex > -1) {
+      dietPlan.draftPlan.weeks[existingIndex] = weekPayload;
+    } else {
+      dietPlan.draftPlan.weeks.push(weekPayload);
+    }
+
+    dietPlan.markModified('draftPlan');
     await dietPlan.save();
-
-    // Auto-send payment request to patient after all 4 weeks are finalized
-    let paymentRequestSent = false;
-    if (dietPlan.request) {
-      const dietPlanRequest = await DietPlanRequest.findById(dietPlan.request);
-      if (dietPlanRequest && dietPlanRequest.status === 'Unpaid') {
-        dietPlanRequest.paymentRequested = true;
-        dietPlanRequest.paymentRequestedAt = new Date();
-        dietPlanRequest.status = 'PaymentRequested';
-        dietPlanRequest.latestPaymentStatus = 'Pending';
-        await dietPlanRequest.save({ validateBeforeSave: false });
-
-        await User.findByIdAndUpdate(
-          patientId,
-          {
-            $set: {
-              'status.requestId': dietPlanRequest._id,
-              'status.requestStatus': 'PaymentRequested',
-              'status.canSendPaymentRequest': false,
-              'status.hasPaymentUpdate': false,
-            },
-          },
-          { new: false }
-        );
-        paymentRequestSent = true;
-        console.log(
-          `Auto-sent payment request to patient ${patientId} after finalizing all 4 weeks`
-        );
-      }
-    }
 
     return res.status(200).json({
       success: true,
-      data: {
-        dietPlanId: dietPlan._id,
-        status: dietPlan.status,
-        finalizedPlan: dietPlan.finalizedPlan,
-        weeksSummary: dietPlan.weeksSummary,
-        paymentRequestSent,
-      },
+      data: { week: parsedWeekNumber, savedAt: new Date().toISOString() },
     });
   } catch (error) {
-    if (error.message && error.message.startsWith('Week')) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
     next(error);
   }
 };

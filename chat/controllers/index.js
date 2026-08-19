@@ -16,8 +16,17 @@ const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { User, Conversation } = require('../../models');
 const Notification = require('../../models/Notification');
 const { ConversationV1 } = require('../models');
+const { getOrSetJSON } = require('../../utils/cache');
 
 const { EVENTS } = ChatLogger;
+
+// AI_EXECUTION_PLAN.md Phase 5, P5-06 - chat unread count is read on every
+// app foreground/reconnect but only actually changes on a new message or a
+// mark-as-read, so a short cache absorbs repeat reads without the badge
+// feeling stale. Deliberately no write-path invalidation (see
+// utils/cache.js's doc comment) - 15s of staleness on an unread badge is an
+// acceptable, explicitly-chosen tradeoff, not a correctness issue.
+const UNREAD_COUNT_CACHE_TTL_SECONDS = 15;
 
 /**
  * GET /v1/conversations
@@ -621,39 +630,47 @@ exports.getUnreadCount = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    const [legacyConversations, v1Conversations] = await Promise.all([
-      Conversation.find({ 'participants.userId': userId }).lean(),
-      ConversationV1.find({ 'participants.userId': userId }).lean(),
-    ]);
+    const unreadCount = await getOrSetJSON(
+      `chat:unread-count:${userId}`,
+      UNREAD_COUNT_CACHE_TTL_SECONDS,
+      async () => {
+        const [legacyConversations, v1Conversations] = await Promise.all([
+          Conversation.find({ 'participants.userId': userId }).lean(),
+          ConversationV1.find({ 'participants.userId': userId }).lean(),
+        ]);
 
-    const v1UnreadByOtherUser = {};
-    v1Conversations.forEach((conv) => {
-      const me = conv.participants.find((p) => String(p.userId) === String(userId));
-      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
-      if (me && other) v1UnreadByOtherUser[String(other.userId)] = me.unreadCount || 0;
-    });
+        const v1UnreadByOtherUser = {};
+        v1Conversations.forEach((conv) => {
+          const me = conv.participants.find((p) => String(p.userId) === String(userId));
+          const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+          if (me && other) v1UnreadByOtherUser[String(other.userId)] = me.unreadCount || 0;
+        });
 
-    let unreadCount = 0;
-    const countedOtherUsers = new Set();
+        let count = 0;
+        const countedOtherUsers = new Set();
 
-    legacyConversations.forEach((conv) => {
-      const me = conv.participants.find((p) => String(p.userId) === String(userId));
-      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
-      if (!me || !other) return;
-      const otherId = String(other.userId);
-      const unread = v1UnreadByOtherUser[otherId] !== undefined ? v1UnreadByOtherUser[otherId] : (me.unreadCount || 0);
-      unreadCount += unread;
-      countedOtherUsers.add(otherId);
-    });
+        legacyConversations.forEach((conv) => {
+          const me = conv.participants.find((p) => String(p.userId) === String(userId));
+          const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+          if (!me || !other) return;
+          const otherId = String(other.userId);
+          const unread = v1UnreadByOtherUser[otherId] !== undefined ? v1UnreadByOtherUser[otherId] : (me.unreadCount || 0);
+          count += unread;
+          countedOtherUsers.add(otherId);
+        });
 
-    v1Conversations.forEach((conv) => {
-      const me = conv.participants.find((p) => String(p.userId) === String(userId));
-      const other = conv.participants.find((p) => String(p.userId) !== String(userId));
-      if (!me || !other) return;
-      const otherId = String(other.userId);
-      if (countedOtherUsers.has(otherId)) return;
-      unreadCount += me.unreadCount || 0;
-    });
+        v1Conversations.forEach((conv) => {
+          const me = conv.participants.find((p) => String(p.userId) === String(userId));
+          const other = conv.participants.find((p) => String(p.userId) !== String(userId));
+          if (!me || !other) return;
+          const otherId = String(other.userId);
+          if (countedOtherUsers.has(otherId)) return;
+          count += me.unreadCount || 0;
+        });
+
+        return count;
+      }
+    );
 
     res.json({ success: true, data: { unreadCount } });
   } catch (error) {

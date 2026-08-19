@@ -6,6 +6,23 @@
 // existing `{success:false, message}` shape used everywhere else, so a
 // 429 looks like any other handled error to existing Flutter-side code.
 const rateLimit = require('express-rate-limit');
+const { client: redis, isEnabled: redisEnabled } = require('../utils/redisClient');
+
+// Redis-backed store when available (P9-B4, AI_EXECUTION_PLAN.md Phase 9) -
+// express-rate-limit's default in-memory store only tracks counts within a
+// single process, which doesn't hold up on a multi-instance/serverless
+// deployment (the Vercel-hosted dev-api). Falls back to the in-memory
+// default when Redis isn't configured, same optional-Redis convention as
+// utils/redisClient.js itself - never a hard requirement to boot.
+let redisStoreFactory = null;
+if (redisEnabled) {
+  // eslint-disable-next-line global-require
+  const { RedisStore } = require('rate-limit-redis');
+  redisStoreFactory = () =>
+    new RedisStore({
+      sendCommand: (...args) => redis.call(...args),
+    });
+}
 
 function makeLimiter({ windowMs, limit, message }) {
   return rateLimit({
@@ -14,12 +31,27 @@ function makeLimiter({ windowMs, limit, message }) {
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message },
+    // A fresh store per limiter (not one shared instance) so each route
+    // group's counters stay independent, matching the pre-Redis in-memory
+    // behavior where every rateLimit() call already got its own store.
+    store: redisStoreFactory ? redisStoreFactory() : undefined,
+    // This is a per-IP window with no per-test reset hook, and every
+    // integration test shares one supertest/127.0.0.1 "IP" across the whole
+    // `--runInBand` Jest run (see jest.config.js) - without this, tests that
+    // legitimately need to fire many requests at a rate-limited route (e.g.
+    // tests/loginLockout.test.js exercising P9-B2's account-level lockout)
+    // would trip this unrelated IP-level limiter first. No existing test
+    // exercises this limiter's own 429 behavior, so skipping it under test
+    // doesn't reduce coverage of anything.
+    skip: () => process.env.NODE_ENV === 'test',
   });
 }
 
-// Signup/forgot-password/email-check - spam and enumeration-prone. Actual
-// login happens client-side against Supabase, not this backend, so there's
-// no traditional "login form" endpoint here to protect against brute force.
+// Signup/forgot-password/login/reset-password - spam, enumeration, and
+// (now that authController.login is a real server-side endpoint - see
+// AI_EXECUTION_PLAN.md Phase 9, P9-B1) brute-force-prone. Login additionally
+// gets its own account-level lockout (utils/loginLockout.js, P9-B2) on top
+// of this shared per-IP window.
 const authLimiter = makeLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 20,

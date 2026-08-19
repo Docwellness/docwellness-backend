@@ -40,6 +40,7 @@ const {
 const upload = require('../middlewares/upload');
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
 const { authLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
+const { loginRole, deviceRiskGate } = require('../middlewares/deviceRisk');
 
 // Middleware to check if user is a patient
 const patientOnly = [authenticate, roleCheck('patient')];
@@ -75,8 +76,10 @@ router.post('/auth/verify-signup-otp', authLimiter, authController.verifySignupO
  * @route   POST /api/patient/auth/login
  * @desc    Log in with email/password - server-side replacement for the
  *          client calling supabase.auth.signInWithPassword() directly.
+ *          loginRole('patient') + deviceRiskGate('patient') (P9-B2/P9-B5)
+ *          pick the patient lockout threshold and soft device-risk policy.
  */
-router.post('/auth/login', authLimiter, authController.login);
+router.post('/auth/login', authLimiter, loginRole('patient'), deviceRiskGate('patient'), authController.login);
 
 /**
  * @route   POST /api/patient/auth/register
@@ -114,7 +117,7 @@ router.post('/auth/reset-password', authLimiter, authController.resetPassword);
  * @desc    Exchanges a refresh token for a new session - server-side
  *          replacement for the client's own supabase.auth.refreshSession().
  */
-router.post('/auth/refresh', authLimiter, authController.refresh);
+router.post('/auth/refresh', authLimiter, loginRole('patient'), authController.refresh);
 
 // ==========================================
 // Authentication Routes (Protected)

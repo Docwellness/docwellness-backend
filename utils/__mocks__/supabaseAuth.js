@@ -15,13 +15,52 @@
  */
 
 const tokenToUserId = new Map();
+// email -> { password, session } - controls signInWithPassword (P9-B2 tests).
+const credentials = new Map();
+// refreshToken -> session - controls refreshSession (P9-B3 tests).
+const refreshTokens = new Map();
+let refreshCallCount = 0;
+// Small artificial delay so two near-simultaneous refresh requests in a
+// dedup test reliably overlap in utils/refreshDedup.js's in-flight map,
+// instead of the first one resolving before the second's request handler
+// even starts (supertest's HTTP round-trip is otherwise fast enough that
+// they wouldn't reproduce the race being tested).
+const REFRESH_DELAY_MS = 25;
 
 function registerTestToken(token, userId) {
   tokenToUserId.set(token, userId.toString());
 }
 
+/**
+ * Makes `signInWithPassword(email, password)` succeed with `session` for
+ * this exact email/password pair - any other password for that email (or
+ * an unregistered email) rejects, same as the real Supabase call would for
+ * wrong credentials. Used by tests/loginLockout.test.js (P9-B2).
+ */
+function registerTestCredentials(email, password, session) {
+  credentials.set(email.toLowerCase(), { password, session });
+}
+
+/**
+ * Makes `refreshSession(refreshToken)` succeed with `session` for this
+ * exact token. Used by tests/loginLockout.test.js's refresh-dedup coverage
+ * (P9-B3) to assert the underlying Supabase call only happens once for
+ * concurrent callers.
+ */
+function registerTestRefreshToken(refreshToken, session) {
+  refreshTokens.set(refreshToken, session);
+}
+
 function clearTestTokens() {
   tokenToUserId.clear();
+  credentials.clear();
+  refreshTokens.clear();
+  refreshCallCount = 0;
+}
+
+/** How many times the underlying refreshSession() mock actually ran. */
+function getRefreshCallCount() {
+  return refreshCallCount;
 }
 
 async function getUserFromSupabaseToken(token) {
@@ -50,9 +89,36 @@ async function verifySupabaseToken() {
   );
 }
 
+async function signInWithPassword(email, password) {
+  const entry = credentials.get(email.toLowerCase());
+  if (!entry || entry.password !== password) {
+    const err = new Error('Invalid email or password');
+    err.code = 'invalid_credentials';
+    throw err;
+  }
+  return entry.session;
+}
+
+async function refreshSession(refreshToken) {
+  refreshCallCount += 1;
+  await new Promise((resolve) => setTimeout(resolve, REFRESH_DELAY_MS));
+  const session = refreshTokens.get(refreshToken);
+  if (!session) {
+    const err = new Error('Session expired, please log in again');
+    err.code = 'invalid_refresh_token';
+    throw err;
+  }
+  return session;
+}
+
 module.exports = {
   getUserFromSupabaseToken,
   verifySupabaseToken,
+  signInWithPassword,
+  refreshSession,
   registerTestToken,
+  registerTestCredentials,
+  registerTestRefreshToken,
   clearTestTokens,
+  getRefreshCallCount,
 };
