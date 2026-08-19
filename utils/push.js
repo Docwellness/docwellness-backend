@@ -19,7 +19,15 @@ function getApp() {
     const admin = require('firebase-admin');
     const serviceAccountJson = Buffer.from(config.fcm.serviceAccountBase64, 'base64').toString('utf8');
     const serviceAccount = JSON.parse(serviceAccountJson);
-    app = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    // firebase-admin v14 removed the old admin.credential.* namespace -
+    // cert() is exported directly at the top level now. admin.credential
+    // was undefined (not the serviceAccount JSON) that was actually
+    // throwing here ("Cannot read properties of undefined (reading
+    // 'cert')"), silently disabling every push send in any environment
+    // where FCM_SERVICE_ACCOUNT_BASE64 was actually configured - this
+    // never surfaced locally/on Vercel dev because that env var is unset
+    // there, so getApp() returned null before ever reaching this line.
+    app = admin.initializeApp({ credential: admin.cert(serviceAccount) });
     return app;
   } catch (err) {
     console.error('[push] failed to initialize firebase-admin, push disabled:', err.message);
