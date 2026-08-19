@@ -88,7 +88,7 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
       {
         title,
         body: message,
-        data: { deepLink: 'docwellness://home', servingTime: slot },
+        data: { deepLink: 'docwellness://timeline', servingTime: slot },
       },
       (deadToken) => {
         User.updateOne({ _id: plan.patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
