@@ -10,6 +10,7 @@ const { getChatIO } = require('../chat');
 const { ConversationV1, MessageV1 } = require('../chat/models');
 const Notification = require('../models/Notification');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { sendPushToTokens } = require('../utils/push');
 
 // Chat Controller Version: 2.3.0
 // Last Updated: 2026-01-22
@@ -562,6 +563,25 @@ exports.sendMessage = async (req, res, next) => {
           createdAt: notif.createdAt,
         });
       }
+
+      // Best-effort real OS push, in addition to the socket event above -
+      // the socket event only reaches a client with an open connection to
+      // this conversation; a backgrounded/killed app needs the actual FCM
+      // push to ever learn a message arrived. Never blocks or fails the
+      // send - same convention as chat/socket/index.js's identical call.
+      const receiver = await User.findById(receiverId).select('deviceTokens').lean();
+      const tokens = (receiver?.deviceTokens || []).map((t) => t.token);
+      sendPushToTokens(
+        tokens,
+        {
+          title: notifTitle,
+          body: notifMessage || 'New message',
+          data: { deepLink: 'docwellness://chat', conversationId: String(conversation._id) },
+        },
+        (deadToken) => {
+          User.updateOne({ _id: receiverId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
+        }
+      ).catch((err) => console.error('[push] chat send failed:', err.message));
     } catch (notifError) {
       console.error('Notification creation error:', notifError);
     }
@@ -954,6 +974,52 @@ exports.sendDoctorNote = async (req, res, next) => {
       }
     } catch (socketError) {
       console.error('Socket broadcast error (doctor note):', socketError);
+    }
+
+    // Create a notification + push for the patient - doctor notes previously
+    // had neither, so they never reached the notification list or the
+    // system tray, only a live socket event (missed if the app wasn't open).
+    try {
+      const dietician = await User.findById(dieticianId).select('profile.fullName').lean();
+      const notifTitle = `New note from ${dietician?.profile?.fullName || 'Your Dietician'}`;
+      const notifMessage = noteContent.trim().slice(0, 100);
+
+      const notif = await Notification.create({
+        userId: patientId,
+        title: notifTitle,
+        message: notifMessage,
+        type: 'chat',
+        referenceId: conversation._id,
+        referenceModel: 'Chat',
+      });
+
+      const ioRef = getChatIO();
+      if (ioRef) {
+        ioRef.to(`user:${patientId}`).emit('notification.new', {
+          id: notif._id,
+          title: notif.title,
+          message: notif.message,
+          type: notif.type,
+          referenceId: notif.referenceId?.toString(),
+          createdAt: notif.createdAt,
+        });
+      }
+
+      const receiver = await User.findById(patientId).select('deviceTokens').lean();
+      const tokens = (receiver?.deviceTokens || []).map((t) => t.token);
+      sendPushToTokens(
+        tokens,
+        {
+          title: notifTitle,
+          body: notifMessage || 'New note',
+          data: { deepLink: 'docwellness://chat', conversationId: String(conversation._id) },
+        },
+        (deadToken) => {
+          User.updateOne({ _id: patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
+        }
+      ).catch((err) => console.error('[push] doctor note send failed:', err.message));
+    } catch (notifError) {
+      console.error('Notification creation error (doctor note):', notifError);
     }
 
     res.status(201).json({
