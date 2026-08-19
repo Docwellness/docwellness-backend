@@ -72,7 +72,7 @@ async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
       {
         title,
         body: message,
-        data: { deepLink: 'docwellness://home', checkpoint: checkpoint || '' },
+        data: { deepLink: 'docwellness://timeline', checkpoint: checkpoint || '' },
       },
       (deadToken) => {
         User.updateOne({ _id: patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});

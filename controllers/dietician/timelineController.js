@@ -60,8 +60,16 @@ exports.getDayLogs = asyncHandler(async (req, res) => {
  * @access  Dietician only
  */
 exports.createNudge = asyncHandler(async (req, res) => {
-  const { userId, milestoneId, message } = req.body || {};
+  const { userId, milestoneId, message, nudgeType } = req.body || {};
   if (!userId || !message) throw ApiError.badRequest('userId and message are required');
+
+  // 'chat' (the NudgeSheet's "Let's review your week - free for a chat?"
+  // quick-pick) opens the Chat screen on tap; every other nudge (the
+  // canned task reminders, and any custom message - the safe default)
+  // opens the Goal Journey milestone sheet instead, same as the
+  // reminder/goal-nudge-sweep pushes below.
+  const deepLink =
+    nudgeType === 'chat' ? 'docwellness://chat' : `docwellness://timeline?focus=${milestoneId || ''}`;
 
   await assertAssignedGoal(userId, req.user._id);
 
@@ -102,7 +110,7 @@ exports.createNudge = asyncHandler(async (req, res) => {
     {
       title: 'Message from your dietician',
       body: message,
-      data: { deepLink: `docwellness://timeline?focus=${milestoneId || ''}` },
+      data: { deepLink },
     },
     (deadToken) => {
       User.updateOne({ _id: userId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
