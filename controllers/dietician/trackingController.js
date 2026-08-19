@@ -11,6 +11,7 @@ const {
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
+const { computeMealRatio } = require('../../utils/weekNutritionSummary');
 
 /**
  * GET /patients/:patientId/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
@@ -301,7 +302,7 @@ exports.getPatientMealLogStats = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-          .select('name image servingSize nutrition servingTime')
+          .select('name image servingSize secondaryComponent components nutrition servingTime')
           .lean()
       : [];
 
@@ -313,15 +314,20 @@ exports.getPatientMealLogStats = async (req, res, next) => {
         name: recipe.name || null,
         image: recipe.image || null,
         servingTime: recipe.servingTime || null,
-        // Base (per-recipe) nutrition/quantity - a recipe's own reference
-        // serving (e.g. Steamed Rice = 300g/521kcal), not what the dietician
-        // actually assigned for this specific meal slot (dailyMeals[].servings,
-        // e.g. 75g). Only used below to compute the assigned-quantity ratio -
-        // using these raw here previously made every planned/consumed number
-        // reflect the recipe's full base size regardless of the real
-        // prescribed portion (e.g. a 75g assignment showing as 300g/521kcal,
-        // ~4x too much).
-        baseQuantity: recipe.servingSize?.quantity || 1,
+        // Raw shape computeMealRatio (utils/weekNutritionSummary.js) needs -
+        // servingSize/secondaryComponent/components as stored, not flattened
+        // to a single baseQuantity. That single-quantity/single-ratio
+        // shortcut (assignedQuantity / baseQuantity, applied uniformly to
+        // the whole recipe) silently ignored componentServings/
+        // secondaryServings on any multi-component recipe, and drifted from
+        // both the dietician app's own live "Total Budget" preview and the
+        // patient app's Home screen (controllers/patient/dietController.js's
+        // getTodayMealLogStats, fixed the same way) - all three now share
+        // this one canonical formula instead of three separate
+        // reimplementations of it.
+        servingSize: recipe.servingSize || null,
+        secondaryComponent: recipe.secondaryComponent || null,
+        components: recipe.components || null,
         calories: recipe.nutrition?.calories || 0,
         protein: recipe.nutrition?.protein || 0,
         carbs: recipe.nutrition?.carbs || 0,
@@ -331,16 +337,15 @@ exports.getPatientMealLogStats = async (req, res, next) => {
     });
 
     // Ratio of what the dietician actually assigned vs. the recipe's own base
-    // serving, keyed by servingTime+recipeId - the single scale factor that
-    // must apply to every calorie/macro number below (planned and consumed
-    // alike) instead of the recipe's raw, unscaled base nutrition.
+    // serving(s), keyed by servingTime+recipeId - the single scale factor
+    // that must apply to every calorie/macro number below (planned and
+    // consumed alike) instead of the recipe's raw, unscaled base nutrition.
     const assignedRatioByKey = {};
     todaysDailyMeals.forEach((meal) => {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
       const key = `${meal.servingTime}:${recipe.id}`;
-      const assignedQuantity = meal.servings ?? recipe.baseQuantity;
-      assignedRatioByKey[key] = recipe.baseQuantity ? assignedQuantity / recipe.baseQuantity : 1;
+      assignedRatioByKey[key] = computeMealRatio(meal, recipe);
     });
 
     // Recomputed live from the recipe's *current* data (fetched by id) each
