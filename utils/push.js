@@ -28,6 +28,7 @@ function getApp() {
     // never surfaced locally/on Vercel dev because that env var is unset
     // there, so getApp() returned null before ever reaching this line.
     app = admin.initializeApp({ credential: admin.cert(serviceAccount) });
+    console.log(`[push] firebase-admin initialized (project: ${serviceAccount.project_id || 'unknown'})`);
     return app;
   } catch (err) {
     console.error('[push] failed to initialize firebase-admin, push disabled:', err.message);
@@ -43,7 +44,20 @@ function getApp() {
  */
 async function sendPushToTokens(tokens, { title, body, data } = {}, onInvalidToken) {
   const fcmApp = getApp();
-  if (!fcmApp || !Array.isArray(tokens) || tokens.length === 0) return;
+  // Both silent-return conditions had no logging at all, on either side of
+  // the two firebase-admin API fixes above - impossible to tell from
+  // Coolify logs alone whether a "nothing happened" push was this early
+  // return (no fcmApp, or this user has zero registered device tokens) or
+  // a genuine send that actually reached FCM. Logged now specifically so
+  // that distinction is visible without guessing.
+  if (!fcmApp) {
+    console.warn('[push] skipped: getApp() returned null (FCM not configured or failed to init)');
+    return;
+  }
+  if (!Array.isArray(tokens) || tokens.length === 0) {
+    console.warn('[push] skipped: no device tokens for this user');
+    return;
+  }
 
   try {
     // eslint-disable-next-line global-require
@@ -68,7 +82,13 @@ async function sendPushToTokens(tokens, { title, body, data } = {}, onInvalidTok
       data: stringData,
     });
 
+    console.log(
+      `[push] sent to ${tokens.length} token(s): ${response.successCount} succeeded, ${response.failureCount} failed`
+    );
     response.responses.forEach((r, i) => {
+      if (!r.success) {
+        console.warn(`[push] token ${i} failed: ${r.error?.code || r.error?.message || 'unknown error'}`);
+      }
       if (!r.success && r.error?.code === 'messaging/registration-token-not-registered') {
         onInvalidToken?.(tokens[i]);
       }
