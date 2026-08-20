@@ -513,12 +513,20 @@ async function getTodayStatsInternal(patientId) {
   const loggedServingTimes = new Set((todayLog?.meals || []).map((m) => m.servingTime));
   const mealsLogged = loggedServingTimes.size;
 
+  // Neither field used to exist on the DietPlan schema (see models/
+  // DietPlan.js - status is the real active-plan flag, calorieStrategy.
+  // calorieBudget the real per-day calorie budget) - this always matched no
+  // plan at all and silently fell back to a flat 2000, regardless of the
+  // patient's actual target. This is a simplified single-day budget figure
+  // for the chat-notification payload below (matching what the dietician
+  // app's "Required Calories" shows), not the precise actual-recipe total
+  // getTodayMealLogStats computes for the Home screen.
   const activePlan = await DietPlan.findOne({
     patientId,
-    isActive: true,
+    status: 'Active',
   });
 
-  const plannedCalories = activePlan?.dailyCalorieTarget || 2000;
+  const plannedCalories = activePlan?.calorieStrategy?.calorieBudget || 2000;
 
   return {
     totalCalories,

@@ -160,4 +160,4 @@ function componentRatiosByLabel(meal, recipe) {
   return ratios;
 }
 
-module.exports = { computeWeekSummary, componentRatiosByLabel };
+module.exports = { computeWeekSummary, componentRatiosByLabel, computeMealRatio };
