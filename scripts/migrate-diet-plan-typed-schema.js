@@ -30,6 +30,13 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
+// Prod connects over TLS to the self-hosted instance's private CA - a bare
+// mongoose.connect(uri) against it fails with a misleading "self-signed
+// certificate in certificate chain" error. connectDB.resolveTlsCAFile is
+// exposed by config/database.js specifically so one-off scripts don't have
+// to duplicate (or silently omit) this - see scripts/migrate-dev-catalog-to-prod.js
+// for the same pattern against a second/prod connection.
+const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
 const VERIFY = process.argv.includes('--verify');
@@ -196,7 +203,9 @@ async function main() {
   }
 
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(process.env.MONGODB_URI);
+  const tlsCAFile = connectDB.resolveTlsCAFile();
+  const connectOptions = tlsCAFile ? { tls: true, tlsCAFile } : {};
+  await mongoose.connect(process.env.MONGODB_URI, connectOptions);
   console.log('Connected.');
 
   try {
