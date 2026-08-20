@@ -44,7 +44,14 @@ afterAll(async () => {
 const auth = (req) => req.set('Authorization', 'Bearer dietician-token');
 
 async function makeFoodItem(name, calories) {
-  return FoodItem.create({ name, normalizedName: name.toLowerCase(), nutritionPer100g: { calories, protein: 10, carbs: 30, fats: 5, fiber: 3 } });
+  // Upsert, not create - a real-world FoodItem is global, and some tests
+  // call setup() more than once (e.g. to get two independent diet plans),
+  // which would otherwise collide on the unique normalizedName index.
+  return FoodItem.findOneAndUpdate(
+    { normalizedName: name.toLowerCase() },
+    { $setOnInsert: { name, normalizedName: name.toLowerCase(), nutritionPer100g: { calories, protein: 10, carbs: 30, fats: 5, fiber: 3 } } },
+    { upsert: true, returnDocument: 'after' }
+  );
 }
 
 async function makeResolvedRecipe({ dieticianId, name, servingTime, foodItem }) {
@@ -210,5 +217,82 @@ describe('POST .../finalize-plan-item-week', () => {
     ).send({});
     expect(res.status).toBe(200);
     expect(res.body.data.workflowStatus).toBe('finalized');
+  });
+});
+
+describe('POST .../plan-items (add)', () => {
+  test('adds a second item to a meal slot, pointing at the recipe\'s V1', async () => {
+    const { dietician, patient, dietPlan, mealSlot, oats } = await setup();
+    const { recipe: secondRecipe, v1: secondV1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Poha', servingTime: 'Breakfast', foodItem: oats });
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items`)
+    ).send({ mealSlotId: mealSlot._id.toString(), recipeId: secondRecipe._id.toString() });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.planItem.recipeVersionId).toBe(secondV1._id.toString());
+
+    const itemsInSlot = await PlanItem.find({ mealSlotId: mealSlot._id });
+    expect(itemsInSlot).toHaveLength(2); // the original from setup() + this new one
+  });
+
+  test('404s for a recipe with no Active V1', async () => {
+    const { patient, dietPlan, mealSlot } = await setup();
+    const noVersionRecipeId = new mongoose.Types.ObjectId();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items`)
+    ).send({ mealSlotId: mealSlot._id.toString(), recipeId: noVersionRecipeId.toString() });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('404s for a mealSlotId belonging to a different diet plan', async () => {
+    const { patient, dietPlan, recipe } = await setup();
+    const other = await setup();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items`)
+    ).send({ mealSlotId: other.mealSlot._id.toString(), recipeId: recipe._id.toString() });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('DELETE .../plan-items/:planItemId (remove)', () => {
+  test('removes the item entirely, no replacement', async () => {
+    const { patient, dietPlan, planItem } = await setup();
+
+    const res = await auth(
+      request(app).delete(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${planItem._id}`)
+    );
+
+    expect(res.status).toBe(200);
+    expect(await PlanItem.findById(planItem._id)).toBeNull();
+  });
+
+  test('refuses to remove a locked item', async () => {
+    const { patient, dietPlan, planItem } = await setup();
+    planItem.locked = true;
+    await planItem.save();
+
+    const res = await auth(
+      request(app).delete(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${planItem._id}`)
+    );
+
+    expect(res.status).toBe(409);
+    expect(await PlanItem.findById(planItem._id)).not.toBeNull();
+  });
+
+  test('404s for a planItemId belonging to a different diet plan', async () => {
+    const { patient, dietPlan } = await setup();
+    const other = await setup();
+
+    const res = await auth(
+      request(app).delete(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${other.planItem._id}`)
+    );
+
+    expect(res.status).toBe(404);
+    expect(await PlanItem.findById(other.planItem._id)).not.toBeNull(); // untouched
   });
 });

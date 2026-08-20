@@ -54,6 +54,17 @@ async function loadOwnedPlanItem(dietPlan, planItemId) {
   return { planItem, mealSlot, dayPlan };
 }
 
+/** Throws if mealSlotId doesn't belong to this dietPlan - same ownership discipline as loadOwnedPlanItem. */
+async function loadOwnedMealSlot(dietPlan, mealSlotId) {
+  const mealSlot = await MealSlotPlan.findById(mealSlotId);
+  if (!mealSlot) throw new Error('MealSlot not found');
+  const dayPlan = await DayPlan.findById(mealSlot.dayPlanId);
+  if (!dayPlan || String(dayPlan.dietPlanId) !== String(dietPlan._id)) {
+    throw new Error('MealSlot not found');
+  }
+  return { mealSlot, dayPlan };
+}
+
 /**
  * @desc    Step 2: fill every slot for the given week(s) with a PlanItem
  *          pointing at a recipe's V1 RecipeVersion - no scaling, see
@@ -320,6 +331,82 @@ exports.swapRecipeVersion = async (req, res, next) => {
     return res.status(200).json({ success: true, data: { item } });
   } catch (error) {
     if (error.message === 'PlanItem not found' || error.message?.startsWith('No Active V1') || error.message?.includes('unresolved ingredients')) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Step 2: add an extra recipe to a meal slot (a slot can hold more
+ *          than one item - e.g. a dietician wants two independent dishes at
+ *          Lunch, not just the auto-generated main+linked-side). Points at
+ *          the chosen recipe's Active, fully-resolved V1 - same eligibility
+ *          gate as menuGenerationService.js's candidate pool.
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/plan-items
+ * @access  Private (Dietician)
+ */
+exports.addPlanItem = async (req, res, next) => {
+  try {
+    const dietPlan = await loadPlanItemDietPlan(req, res);
+    if (!dietPlan) return;
+
+    const { mealSlotId, recipeId } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(mealSlotId) || !mongoose.Types.ObjectId.isValid(recipeId)) {
+      return res.status(400).json({ success: false, message: 'mealSlotId and recipeId must be valid ids' });
+    }
+
+    await loadOwnedMealSlot(dietPlan, mealSlotId);
+
+    const v1 = await RecipeVersion.findOne({ parentRecipeId: recipeId, versionNumber: 1, status: 'Active' });
+    if (!v1) {
+      return res.status(404).json({ success: false, message: 'No Active V1 RecipeVersion found for this recipe' });
+    }
+    if (v1.hasUnresolvedIngredients) {
+      return res.status(404).json({ success: false, message: 'This recipe has unresolved ingredients and cannot be added yet' });
+    }
+
+    const planItem = await PlanItem.create({
+      mealSlotId,
+      recipeVersionId: v1._id,
+      calculatedNutrition: v1.nutritionPerServing,
+    });
+
+    return res.status(201).json({ success: true, data: { planItem } });
+  } catch (error) {
+    if (error.message === 'MealSlot not found') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Step 2: remove one item from a meal slot entirely, no
+ *          replacement (distinct from swap, which replaces the recipe -
+ *          this leaves the slot with one fewer item, or empty).
+ * @route   DELETE /api/dietician/patients/:patientId/diet-plans/:dietPlanId/plan-items/:planItemId
+ * @access  Private (Dietician)
+ */
+exports.removePlanItem = async (req, res, next) => {
+  try {
+    const dietPlan = await loadPlanItemDietPlan(req, res);
+    if (!dietPlan) return;
+
+    const { planItemId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(planItemId)) {
+      return res.status(400).json({ success: false, message: 'planItemId must be a valid id' });
+    }
+
+    const { planItem } = await loadOwnedPlanItem(dietPlan, planItemId);
+    if (planItem.locked) {
+      return res.status(409).json({ success: false, message: 'This item is locked and cannot be removed' });
+    }
+    await PlanItem.deleteOne({ _id: planItemId });
+
+    return res.status(200).json({ success: true, data: { removed: true } });
+  } catch (error) {
+    if (error.message === 'PlanItem not found') {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);

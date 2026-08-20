@@ -357,6 +357,18 @@ router.post(
   planItemController.autoBalance
 );
 
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/plan-items',
+  dieticianOnlyMiddleware,
+  planItemController.addPlanItem
+);
+
+router.delete(
+  '/patients/:patientId/diet-plans/:dietPlanId/plan-items/:planItemId',
+  dieticianOnlyMiddleware,
+  planItemController.removePlanItem
+);
+
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/plan-items',
   dieticianOnlyMiddleware,
