@@ -76,6 +76,45 @@ describe('buildEligibleV1Pool', () => {
     expect(poolRecipeIds).not.toContain(String(unresolved._id));
   });
 
+  test('includes a recipe with no `status` field stored at all - real historical data predating that field', async () => {
+    // Recipe.status was added additively in an earlier phase and was never
+    // backfilled onto pre-existing recipes - Mongoose's schema default
+    // ('Active') only applies when hydrating a document into a JS object,
+    // never to how MongoDB's query engine matches a filter against the raw
+    // stored BSON. Recipe.create()/`new Recipe().save()` ALWAYS applies
+    // defaults on write, so it can't reproduce this - insertOne via the raw
+    // driver bypasses Mongoose entirely, matching what real historical data
+    // actually looks like. Confirmed against real prod: this exact gap made
+    // every generate-menu call return createdPlanItemCount: 0, every slot
+    // unfillable, despite 96% FoodItem nutrition coverage.
+    const dieticianId = new mongoose.Types.ObjectId();
+    const oats = await makeFoodItem('Oats');
+    const statusSetRecipe = await makeResolvedRecipe({ dieticianId, name: 'Has Status', servingTime: 'Breakfast', foodItem: oats });
+
+    const legacyRecipeId = new mongoose.Types.ObjectId();
+    await Recipe.collection.insertOne({
+      _id: legacyRecipeId,
+      dieticianId,
+      name: 'Legacy Recipe (No Status Field)',
+      servingTime: 'Breakfast',
+      category: 'Indian',
+      components: [{ label: 'Legacy Recipe (No Status Field)', quantity: 100, unit: 'g' }],
+      ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
+      nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
+      // Deliberately NO `status` key at all.
+    });
+    // No post-save hook fires for a raw insertOne (it's not a Mongoose
+    // save) - manually sync V1 the same way the real backfill script would.
+    const { syncV1FromRecipe } = require('../services/recipeVersioningService');
+    const legacyRecipe = await Recipe.findById(legacyRecipeId);
+    await syncV1FromRecipe(legacyRecipe);
+
+    const pool = await buildEligibleV1Pool({ dieticianId });
+    const poolRecipeIds = pool.map((c) => c.id);
+    expect(poolRecipeIds).toContain(String(legacyRecipeId));
+    expect(poolRecipeIds).toContain(String(statusSetRecipe._id));
+  });
+
   test('excludes recipes whose allergens overlap with the given allergies', async () => {
     const dieticianId = new mongoose.Types.ObjectId();
     const peanut = await makeFoodItem('Peanut');

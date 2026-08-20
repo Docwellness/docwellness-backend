@@ -37,7 +37,16 @@ const { Recipe, RecipeVersion, DayPlan, MealSlotPlan, PlanItem } = require('../m
  * recipeSelectionEngine.js already uses for other exclusions.
  */
 async function buildEligibleV1Pool({ dieticianId, allergies = [] }) {
-  const recipes = await Recipe.find({ dieticianId, status: 'Active' }).select(
+  // { $ne: 'Archived' }, NOT { status: 'Active' } - Recipe.status was added
+  // additively in an earlier phase and was never backfilled onto historical
+  // recipes, so most real recipes have no `status` field stored in Mongo at
+  // all (Mongoose's schema default only applies when READING a document
+  // into a JS object, never to how MongoDB's query engine matches a filter
+  // against the raw stored BSON - a literal `status: 'Active'` filter
+  // silently excludes every pre-existing recipe). Confirmed the hard way:
+  // this exact bug made every slot unfillable against real prod data
+  // (createdPlanItemCount: 0) despite 96% FoodItem nutrition coverage.
+  const recipes = await Recipe.find({ dieticianId, status: { $ne: 'Archived' } }).select(
     'name servingTime tags dietaryHabits allergens category'
   );
   if (recipes.length === 0) return [];
