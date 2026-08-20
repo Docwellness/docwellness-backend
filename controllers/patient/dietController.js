@@ -10,6 +10,7 @@ const {
   resolvePlanStartDate,
   resolveCurrentWeek,
 } = require('../../utils/dietPlanWeek');
+const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -76,7 +77,37 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       });
     }
 
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(dietPlan);
+
+    // Timed supplements (dosage/instructions/timingAnchor) live in the typed
+    // days[] schema (models/DietPlan.js, Phase 1c) - a separate structure
+    // from dailyMeals[] entirely, since a plain recipe selection has no
+    // timing/dosage fields at all. Only populated for weeks/slots the
+    // dietician actually used the wizard's Supplement Injection on (via
+    // POST .../supplements) - a plan with none is just an empty list here,
+    // same as before this existed. Grouped by week number so it can be
+    // attached to both the current week and every entry in `weeks` below,
+    // the same way dailyMeals already is.
+    const supplementScheduleByWeek = new Map();
+    (Array.isArray(dietPlan.days) ? dietPlan.days : []).forEach((day) => {
+      const entries = [];
+      (day.meals || []).forEach((meal) => {
+        (meal.supplements || []).forEach((supplement) => {
+          if (!supplement?.supplementId) return;
+          entries.push({
+            dayGroup: day.dayGroup,
+            servingTime: meal.servingTime,
+            supplementId: supplement.supplementId.toString(),
+            dosage: supplement.dosage || null,
+            instructions: supplement.instructions || null,
+            timingAnchor: supplement.timingAnchor || 'with',
+          });
+        });
+      });
+      if (entries.length === 0) return;
+      const existing = supplementScheduleByWeek.get(day.week) || [];
+      supplementScheduleByWeek.set(day.week, [...existing, ...entries]);
+    });
 
     const recipeIds = new Set();
     weeks.forEach((week) => {
@@ -86,6 +117,9 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         }
       });
     });
+    for (const entries of supplementScheduleByWeek.values()) {
+      entries.forEach((entry) => recipeIds.add(entry.supplementId));
+    }
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
@@ -266,6 +300,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       const weekWithFixedMeals = {
         ...week,
         dailyMeals: fixMeals(week.dailyMeals),
+        supplementSchedule: supplementScheduleByWeek.get(Number(week.week)) || [],
       };
 
       // All weeks the plan actually has, carrying every day-group the same
@@ -286,6 +321,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           weekEndDate: scheduleEntry?.endDate || null,
           weekSummary: summary,
           dailyMeals: fixMeals(w.dailyMeals),
+          supplementSchedule: supplementScheduleByWeek.get(weekNum) || [],
         };
       });
 
@@ -364,7 +400,7 @@ exports.getWeekCompletion = async (req, res, next) => {
     }
     const weekStart = normalizeDate(weekStartRaw);
 
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(dietPlan);
     const weekData = weeks.find((w) => Number(w.week) === weekNum);
     const dailyMeals = weekData?.dailyMeals || [];
 
@@ -698,7 +734,7 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
     // weeks are actually present in finalizedPlan.weeks.
     const currentWeek = resolveCurrentWeek(dietPlan, referenceDate);
 
-    const readyWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const readyWeeks = getFinalizedWeeks(dietPlan);
     if (readyWeeks.length === 0) {
       return res.status(200).json({
         success: true,
@@ -791,7 +827,7 @@ exports.getTodayMealLogStats = async (req, res, next) => {
       });
     }
 
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(dietPlan);
 
     const currentWeek = resolveCurrentWeek(dietPlan, today);
 
@@ -1066,7 +1102,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
       });
     }
 
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(dietPlan);
 
     const recipeIds = new Set();
     weeks.forEach((week) => {

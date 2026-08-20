@@ -1,4 +1,15 @@
 const mongoose = require('mongoose');
+const { DAY_GROUPS } = require('../utils/dayGroups');
+
+const REQUIRED_SERVING_TIMES = [
+  'Morning Drink',
+  'Breakfast',
+  'Brunch',
+  'Lunch',
+  'Evening Snack',
+  'Dinner',
+  'Night Drink',
+];
 
 const dietPlanSchema = new mongoose.Schema(
   {
@@ -152,6 +163,126 @@ const dietPlanSchema = new mongoose.Schema(
       type: Object,
       default: null,
     },
+    // --- Deterministic diet-plan engine fields (Phase 1c) ---
+    // Added alongside finalizedPlan/draftPlan above, not replacing them yet:
+    // controllers still read/write the legacy blob directly. `days[]` below
+    // becomes the source of truth once scripts/migrate-diet-plan-typed-
+    // schema.js has run and utils/dietPlanLegacyView.js's shim is reading
+    // from it - see that migration script's header for the cutover sequence.
+    // Snapshot of the generation targets used for THIS plan/cycle - distinct
+    // from calorieStrategy/macroStrategy above (which stay authoritative for
+    // the AI-era fields) so the deterministic engine has one place to read
+    // per-slot calorie split, tolerance, and allergy/preference constraints
+    // without re-deriving them from FirstConsultation on every run.
+    targetProfile: {
+      tolerancePercent: { type: Number, default: null },
+      // servingTime -> fraction of totalCalories, e.g. {'Breakfast':0.25}.
+      mealDistribution: { type: Map, of: Number, default: {} },
+      allergies: { type: [String], default: [] },
+      preferences: {
+        eatingStyle: { type: String, default: null },
+        avoid: { type: [String], default: [] },
+      },
+      createdAt: { type: Date, default: null },
+    },
+    // servingTime -> portion multiplier, applied by services/weekTweakService.js
+    // to every unlocked item in that slot for the currently-open week only.
+    weekTweaks: { type: Map, of: Number, default: {} },
+    // Set by scripts/migrate-diet-plan-typed-schema.js once this plan's
+    // pre-existing finalizedPlan/draftPlan history has been backfilled into
+    // days[]/legacyDraftPlanArchive below - the script's idempotency marker,
+    // so re-running it after a partial failure skips already-migrated plans
+    // (a plan created after the dual-write in finalizeWeekPlan went live
+    // never needs backfilling and is marked migrated on first sight).
+    daysSchemaMigratedAt: { type: Date, default: null },
+    // Audit-only holding place for a draft-only week (present in draftPlan
+    // but with no corresponding finalizedPlan entry) found during migration
+    // - has no home in the typed days[] schema (which only ever holds real
+    // finalized selections, see finalizeWeekPlan's dual-write comment) and
+    // is never read by the app. Same {weeks:[{week,dailyMeals}]} shape as
+    // draftPlan. Dropped, along with finalizedPlan/draftPlan themselves, in
+    // the later cleanup PR once days[] is the confirmed source of truth.
+    legacyDraftPlanArchive: { type: Object, default: null },
+    // Keyed by {week, dayGroup} - DAY_GROUPS has exactly 4 entries (Monday/
+    // Tuesday/Wednesday/Thursday), not 7 real calendar days, matching
+    // utils/dayGroups.js's repeat-across-the-week model (Monday's meals also
+    // apply Friday, etc.) that the legacy dailyMeals[].dayGroup shape already
+    // uses. A day with no matching {week,dayGroup} entry is not yet
+    // generated for that week.
+    days: [
+      {
+        week: { type: Number, required: true },
+        dayGroup: { type: String, enum: DAY_GROUPS, required: true },
+        meals: [
+          {
+            servingTime: { type: String, enum: REQUIRED_SERVING_TIMES, required: true },
+            items: [
+              {
+                recipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe', required: true },
+                // Same value/semantics as the legacy dailyMeals[].servings
+                // field it replaces - the prescribed quantity of this recipe
+                // (e.g. 3 chapatis, 8 almonds, 400g of Chole), NOT a bounded
+                // scaling ratio - a real prescribed quantity can legitimately
+                // fall outside any narrow "reasonable multiplier" range, so
+                // this field intentionally has no min/max constraint at the
+                // schema level. services/recipeSelectionEngine.js and
+                // services/dietPlanAutoBalanceService.js apply their own
+                // sane-range clamp (e.g. 0.5-3.0x of a recipe's authored
+                // yield) as application logic when THEY compute a value for
+                // this field, not as a document-level invariant every writer
+                // must satisfy - a dietician manually prescribing 8 almonds
+                // must never fail to save.
+                servingMultiplier: { type: Number, default: 1, min: 0 },
+                // Kept 1:1 with Recipe.components[] for a multi-component
+                // recipe (e.g. Idli/Sambar/Chutney), mirroring the legacy
+                // componentServings[] shape so per-component quantities
+                // survive independent of servingMultiplier.
+                componentServings: { type: [Number], default: undefined },
+                // Skipped by services/dietPlanAutoBalanceService.js and
+                // services/weekTweakService.js - the dietician has manually
+                // pinned this item's portion.
+                locked: { type: Boolean, default: false },
+                isLinkedComponent: { type: Boolean, default: false },
+                parentRecipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe', default: null },
+                swapHistory: [
+                  {
+                    fromRecipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
+                    toRecipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
+                    at: { type: Date, default: Date.now },
+                    reason: { type: String, default: null },
+                  },
+                ],
+                // Cached at selection/scale time so reads never re-join
+                // Recipe just to show calories/macros.
+                calculatedNutrition: {
+                  calories: { type: Number, default: null },
+                  protein: { type: Number, default: null },
+                  carbs: { type: Number, default: null },
+                  fats: { type: Number, default: null },
+                  fiber: { type: Number, default: null },
+                },
+                displayText: { type: String, default: null },
+              },
+            ],
+            supplements: [
+              {
+                // Still a Recipe doc (category:'Supplements') - see
+                // dietPlanOptions.js's SUPPLEMENTS_PSEUDO_SLOT.
+                supplementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe', required: true },
+                dosage: { type: String, default: null },
+                instructions: { type: String, default: null },
+                timingAnchor: { type: String, enum: ['pre', 'with', 'post'], default: 'with' },
+                locked: { type: Boolean, default: true },
+                // Supplements already don't count toward nutrition.calories
+                // today (they carry supplementFacts instead) - this just
+                // makes that existing behavior explicit/queryable.
+                excludeFromCalories: { type: Boolean, default: true },
+              },
+            ],
+          },
+        ],
+      },
+    ],
     weeksSummary: [
       {
         week: { type: Number, required: true },

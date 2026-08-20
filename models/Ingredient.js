@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { ALLERGY_CATEGORY_KEYWORDS } = require('../utils/dietaryConstraintValidator');
 
 // A shared, per-dietician canonical ingredient record. Originally just an
 // image cache (so a photo fetched once for e.g. "Onion" is reused across
@@ -61,6 +62,44 @@ const ingredientSchema = new mongoose.Schema(
     // precise base-unit total, e.g. "330g (~3 medium onion)".
     friendlyUnitLabel: {
       type: String,
+    },
+    // --- Deterministic diet-plan engine fields (all additive/optional -
+    // existing docs stay valid with none of these set; nothing reads them
+    // until the engine, services/recipeSelectionEngine.js, ships) ---
+    // Per-100g nutrition reference, distinct from a recipe's own
+    // `nutrition` (which is per-serving-as-authored) - lets the engine
+    // compute nutrition from raw ingredient quantities when needed, e.g.
+    // for a custom/scaled component rather than only the dietician's
+    // pre-authored per-serving figure.
+    nutritionPer100g: {
+      calories: { type: Number, default: null },
+      protein: { type: Number, default: null },
+      carbs: { type: Number, default: null },
+      fats: { type: Number, default: null },
+      fiber: { type: Number, default: null },
+    },
+    // g/ml, for volume<->weight conversion where unitConversions above
+    // doesn't already give a direct answer for the needed unit.
+    density: { type: Number, default: null },
+    // Trim/peel/cooking loss, 0-100. Currently unused by any
+    // quantity/nutrition calculation - reserved for the engine's future
+    // raw-to-edible-weight adjustment, not applied anywhere yet.
+    wastePercentage: { type: Number, default: 0, min: 0, max: 100 },
+    clinical: {
+      glycemicIndex: { type: Number, default: null },
+      // Uses the same allergy-category keys as
+      // utils/dietaryConstraintValidator.js's ALLERGY_CATEGORY_KEYWORDS
+      // (the consultation form's actual allergy options), not a separate
+      // clinical taxonomy, so the engine can compare this directly against
+      // a patient's stated allergies with no translation layer.
+      allergens: {
+        type: [String],
+        enum: Object.keys(ALLERGY_CATEGORY_KEYWORDS),
+        default: [],
+      },
+      // Free-form reusable labels (e.g. 'high-potassium', 'low-fodmap') for
+      // filters beyond the fixed dietaryHabits/freeFrom booleans.
+      tags: { type: [String], default: [] },
     },
   },
   {

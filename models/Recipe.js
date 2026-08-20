@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { inferAllergenCategoriesFromIngredientNames, ALLERGY_CATEGORY_KEYWORDS } = require('../utils/dietaryConstraintValidator');
 
 const recipeSchema = new mongoose.Schema(
   {
@@ -247,11 +248,88 @@ const recipeSchema = new mongoose.Schema(
       },
       default: undefined,
     },
+    // --- Deterministic diet-plan engine fields (all additive/optional -
+    // existing docs stay valid with none of these set; nothing reads them
+    // until the engine, services/recipeSelectionEngine.js, ships) ---
+    // The yield `nutrition`/`components` are calibrated to - distinct from
+    // `servings` (a display count) since a recipe's authored nutrition may
+    // already be scoped to a different base amount (e.g. "per 250g bowl"
+    // vs "per 1 serving = 2 idlis").
+    baseYield: {
+      quantity: { type: Number, default: null },
+      unit: { type: String, default: null },
+    },
+    cookingMethod: {
+      type: String,
+      enum: ['raw', 'boiled', 'steamed', 'fried', 'baked', 'roasted'],
+      default: 'raw',
+    },
+    // Cooked-weight/raw-weight ratio (e.g. raw rice 1.0 -> cooked 3.0) -
+    // reserved for a future raw-ingredient-based nutrition recompute, not
+    // applied to `nutrition`/`nutritionPerServing` by anything yet.
+    moistureChangeFactor: { type: Number, default: 1 },
+    // Per-servingTime suitability weight (0-1+) the engine's scoring uses
+    // alongside calorie/macro fit - e.g. {'Breakfast':1.0,'Brunch':0.6}.
+    // Empty by default; scripts/migrate-diet-plan-typed-schema.js's
+    // sibling backfill step derives an initial value from `servingTime`
+    // + `tags` so the engine has real signal without every recipe being
+    // manually re-tagged first.
+    mealSlotSuitability: { type: Map, of: Number, default: {} },
+    // Free-form reusable labels beyond the fixed dietaryHabits/freeFrom
+    // booleans (e.g. 'low-fodmap', 'high-potassium').
+    dietaryTags: { type: [String], default: [] },
+    // Auto-aggregated from `ingredients[].name` in the pre-save hook below
+    // (same category keys as Ingredient.clinical.allergens) - a cache for
+    // the engine to filter on without re-scanning ingredient names on every
+    // generation run. Never authored directly.
+    allergens: {
+      type: [String],
+      enum: Object.keys(ALLERGY_CATEGORY_KEYWORDS),
+      default: [],
+    },
+    version: { type: Number, default: 1 },
+    parentRecipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe', default: null },
+    status: { type: String, enum: ['Active', 'Archived'], default: 'Active' },
+    // Cache of `nutrition`, refreshed in the pre-save hook below - exists so
+    // engine code can read a field explicitly scoped "per serving" without
+    // assuming that's what the legacy `nutrition` field means (it is today,
+    // but isn't named that way).
+    nutritionPerServing: {
+      calories: { type: Number, default: null },
+      protein: { type: Number, default: null },
+      carbs: { type: Number, default: null },
+      fats: { type: Number, default: null },
+      fiber: { type: Number, default: null },
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// Best-effort, non-blocking: keeps `allergens`/`nutritionPerServing` in sync
+// with `ingredients`/`nutrition` whenever either changes, so callers never
+// have to remember to recompute them by hand. Never throws - a recipe save
+// must never fail because of this bookkeeping.
+recipeSchema.pre('save', function () {
+  try {
+    if (this.isNew || this.isModified('ingredients')) {
+      const names = (this.ingredients || []).map((ingredient) => ingredient?.name);
+      this.allergens = inferAllergenCategoriesFromIngredientNames(names);
+    }
+    if (this.isNew || this.isModified('nutrition')) {
+      this.nutritionPerServing = {
+        calories: this.nutrition?.calories ?? null,
+        protein: this.nutrition?.protein ?? null,
+        carbs: this.nutrition?.carbs ?? null,
+        fats: this.nutrition?.fats ?? null,
+        fiber: this.nutrition?.fiber ?? null,
+      };
+    }
+  } catch (err) {
+    console.error('Recipe pre-save allergen/nutrition cache failed (non-blocking):', err.message);
+  }
+});
 
 // Had no indexes at all before this - dieticianId scoping is present on
 // every query (multi-tenant: a dietician only ever sees their own

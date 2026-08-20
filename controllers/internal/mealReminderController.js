@@ -2,6 +2,7 @@ const { DietPlan, MealLog, User, Notification } = require('../../models');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
 const { sendPushToTokens } = require('../../utils/push');
+const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
 
 const normalizeDate = (dateObj) =>
   new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
@@ -41,7 +42,7 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
 
   let notified = 0;
   for (const plan of activePlans) {
-    const weeks = Array.isArray(plan.finalizedPlan?.weeks) ? plan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(plan);
     const currentWeek = resolveCurrentWeek(plan, today);
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek));
     if (!week) continue;

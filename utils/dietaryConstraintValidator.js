@@ -290,6 +290,30 @@ function findAllergenConflicts({ ingredients, allergyOptions = [], allergyOtherI
 }
 
 /**
+ * Infers which allergy categories (ALLERGY_CATEGORY_KEYWORDS' keys) a list of
+ * ingredient names likely triggers, using the same substring heuristic as
+ * findAllergenConflicts above. Used to auto-aggregate Recipe.allergens at
+ * save time (see models/Recipe.js's pre-save hook) so the deterministic diet
+ * -plan engine can filter recipes against a patient's stated allergies
+ * without re-scanning every ingredient name on every generation run.
+ */
+function inferAllergenCategoriesFromIngredientNames(ingredientNames) {
+  if (!Array.isArray(ingredientNames) || ingredientNames.length === 0) return [];
+  const matched = new Set();
+  for (const rawName of ingredientNames) {
+    if (!rawName) continue;
+    const normalizedIngredient = normalizeAllergyKeyword(rawName);
+    for (const [category, keywords] of Object.entries(ALLERGY_CATEGORY_KEYWORDS)) {
+      if (matched.has(category)) continue;
+      if (keywords.some((keyword) => normalizedIngredient.includes(keyword) || keyword.includes(normalizedIngredient))) {
+        matched.add(category);
+      }
+    }
+  }
+  return [...matched];
+}
+
+/**
  * Looks up a single answer's value from a FirstConsultation.customAnswers
  * array by fieldId. Used to read the dietary-safety-critical answers (eating
  * style, allergies, foods to avoid) collected via the dynamic consultation
@@ -310,5 +334,7 @@ module.exports = {
   validateGeneratedIngredients,
   mapEatingStyleToDietFlag,
   findAllergenConflicts,
+  inferAllergenCategoriesFromIngredientNames,
   getConsultationAnswer,
+  ALLERGY_CATEGORY_KEYWORDS,
 };

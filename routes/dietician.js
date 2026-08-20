@@ -303,6 +303,47 @@ router.post(
 );
 
 // ==========================================
+// Clever UX (Phase 3): Week Tweak, Swap vs Scale, Exception Review,
+// Supplement Injection - all operate on the typed days[] schema.
+// ==========================================
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/week-tweak',
+  dieticianOnlyMiddleware,
+  dietPlanController.applyWeekTweakEndpoint
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/swap',
+  dieticianOnlyMiddleware,
+  dietPlanController.applyRecipeSwapOrScale
+);
+
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/swap-alternatives',
+  dieticianOnlyMiddleware,
+  dietPlanController.getSwapAlternatives
+);
+
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/days',
+  dieticianOnlyMiddleware,
+  dietPlanController.getWeekDays
+);
+
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/exceptions',
+  dieticianOnlyMiddleware,
+  dietPlanController.getPlanExceptions
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/supplements',
+  dieticianOnlyMiddleware,
+  dietPlanController.upsertSupplementForSlot
+);
+
+// ==========================================
 // Exercise Plan (catalog + assignment)
 // ==========================================
 

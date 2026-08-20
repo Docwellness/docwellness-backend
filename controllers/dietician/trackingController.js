@@ -1,6 +1,7 @@
 const { MealLog, DietPlan, User, Recipe, ExercisePlan, ExerciseLog } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
+const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
 const {
   localDateStr,
   formatShortDate,
@@ -258,7 +259,7 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       });
     }
 
-    const weeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const weeks = getFinalizedWeeks(dietPlan);
 
     // weekSchedule-aware (matches controllers/patient/dietController.js's
     // getActiveDietPlanForPatient) - a plain diff-from-activationDate estimate

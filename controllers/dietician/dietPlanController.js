@@ -14,6 +14,10 @@ const {
 const { sendPushToTokens } = require('../../utils/push');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
+const { generateDietPlanDeterministically } = require('../../services/recipeSelectionEngine');
+const { applyWeekTweak } = require('../../services/weekTweakService');
+const { balanceWeek } = require('../../services/dietPlanAutoBalanceService');
+const { findSwapAlternatives, applySwap, applyScale, findItem } = require('../../services/recipeSwapEngine');
 const { seedGoalTimeline } = require('../../utils/seedGoalTimeline');
 const { parsePagination, buildPaginationMeta } = require('../../utils/pagination');
 const {
@@ -54,6 +58,8 @@ const {
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
 const { buildWeekSchedule, cascadeWeekScheduleFrom } = require('../../utils/weekSchedule');
+const { generateWeekPlan } = require('../../services/dietPlanGenerationService');
+const { getFinalizedWeeks, getDraftWeeks, applyLegacyWeekPayload } = require('../../utils/dietPlanLegacyView');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -769,7 +775,7 @@ exports.sendPaymentRequest = async (req, res, next) => {
  */
 exports.runDietPlanGeneration = runDietPlanGeneration;
 
-async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
+async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine = 'ai' }) {
   const patientId = dietPlan.patientId?._id?.toString() || dietPlan.patientId?.toString();
   const firstConsultationId =
     dietPlan.firstConsultation?._id?.toString() || dietPlan.firstConsultation?.toString();
@@ -814,7 +820,9 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   }
 
   const candidateRecipes = await Recipe.find(recipeFilter)
-    .select('name servingTime dietaryHabits freeFrom nutrition ingredients servingSize components tags category _id')
+    .select(
+      'name servingTime dietaryHabits freeFrom nutrition ingredients servingSize components tags category _id mealSlotSuitability'
+    )
     .lean();
 
   const allergyOptions = getAnswer(SAFETY_FIELD_IDS.ALLERGIES) || [];
@@ -858,7 +866,15 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
     // Lets the AI identify accompaniments (side/salad) and their portions
     // so it can compose a main + sides combo for Lunch/Dinner, instead of
     // picking exactly one recipe per slot - see buildPrompt's combo rule.
+    // Also read by services/recipeSelectionEngine.js's combo logic (its
+    // deterministic equivalent) to distinguish true slot-owners from
+    // broadened-in accompaniments.
     tags: r.tags || [],
+    // Per-servingTime suitability weight (Phase 1b) - ignored by the AI
+    // prompt (not referenced in buildPrompt), read by
+    // services/recipeSelectionEngine.js's scoring. A .lean() doc's Map
+    // field comes back as a plain object, matching what that scorer expects.
+    mealSlotSuitability: r.mealSlotSuitability || {},
     // The dish's real, independently-adjustable components (see
     // models/Recipe.js's `components`) - e.g. Idli/Sambar/Chutney in
     // nos/bowl/tbsp, not one forced gram total. Falls back to a
@@ -918,9 +934,22 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   let attemptsUsed = 0;
   let repairChangesMade = [];
 
+  // Same input/output contract for both producers (see
+  // services/recipeSelectionEngine.js's header comment) - everything below
+  // this point (parsing, validateDietPlan, repair, risk flags, merge/save)
+  // is identical regardless of which one ran.
+  const generatePlanText =
+    engine === 'deterministic'
+      ? (args) =>
+          generateDietPlanDeterministically({
+            ...args,
+            mealDistribution: dietPlan.targetProfile?.mealDistribution || null,
+          })
+      : generateDietPlanWithAI;
+
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
     attemptsUsed = attempt;
-    generatedText = await generateDietPlanWithAI({
+    generatedText = await generatePlanText({
       patient: dietPlan.patientId,
       firstConsultation: dietPlan.firstConsultation,
       calorieStrategy: dietPlan.calorieStrategy,
@@ -1084,7 +1113,10 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers }) {
   // regenerated and produces an identical warning twice.
   dietPlan.validationWarnings = [...new Set([...(dietPlan.validationWarnings || []), ...newValidationWarnings])];
   dietPlan.riskFlags = [...new Set([...(dietPlan.riskFlags || []), ...newRiskFlags])];
-  dietPlan.modelSnapshot = config.openai.dietPlanModel;
+  // Provenance: which engine actually produced this generation, for
+  // support/debugging - reuses this existing field rather than adding a new
+  // one (see services/dietPlanGenerationService.js's header comment).
+  dietPlan.modelSnapshot = engine === 'deterministic' ? 'deterministic-v1' : config.openai.dietPlanModel;
   dietPlan.inputHash = inputHash;
   await dietPlan.save();
 
@@ -1254,10 +1286,10 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
     ]);
 
     // dietPlan.status is already 'Draft' from construction above -
-    // runDietPlanGeneration saves generatedPlan/validationWarnings/etc.
-    // without touching status, which is what a later regeneration (that
-    // must not downgrade an already-Finalized/Active plan) needs too.
-    const generationResult = await runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers });
+    // generateWeekPlan saves generatedPlan/validationWarnings/etc. without
+    // touching status, which is what a later regeneration (that must not
+    // downgrade an already-Finalized/Active plan) needs too.
+    const generationResult = await generateWeekPlan({ dietPlan, dieticianId, weekNumbers });
     if (!generationResult.ok) {
       return res.status(generationResult.status).json({ success: false, message: generationResult.message });
     }
@@ -1349,9 +1381,7 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
         existingWeekNumbers = [];
       }
     }
-    const finalizedWeekNumbers = Array.isArray(dietPlan.finalizedPlan?.weeks)
-      ? dietPlan.finalizedPlan.weeks.map((w) => w.week)
-      : [];
+    const finalizedWeekNumbers = getFinalizedWeeks(dietPlan).map((w) => w.week);
 
     // The week being superseded - week 2 for Golden's [3,4], week (N-1) for
     // Platinum's single week N - is always sortedWeekNumbers[0] - 1 in both
@@ -1415,7 +1445,7 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
       });
     }
 
-    const generationResult = await runDietPlanGeneration({
+    const generationResult = await generateWeekPlan({
       dietPlan,
       dieticianId,
       weekNumbers: sortedWeekNumbers,
@@ -1653,9 +1683,7 @@ exports.getFinalizedWeekDetails = async (req, res, next) => {
       });
     }
 
-    const planWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks)
-      ? dietPlan.finalizedPlan.weeks
-      : [];
+    const planWeeks = getFinalizedWeeks(dietPlan);
     const currentWeekEntry = planWeeks.find((entry) => entry?.week === parsedWeekNumber);
 
     if (!currentWeekEntry) {
@@ -1761,10 +1789,10 @@ exports.getDraftWeekOptions = async (req, res, next) => {
     }
 
     const planWeeks = Array.isArray(parsedPlan.weeks) ? parsedPlan.weeks : [];
-    const finalizedWeeks = Array.isArray(dietPlan.finalizedPlan?.weeks) ? dietPlan.finalizedPlan.weeks : [];
+    const finalizedWeeks = getFinalizedWeeks(dietPlan);
     // AI_EXECUTION_PLAN.md Phase 7, P7-05 (save-draft) - see saveDraftWeek
     // above and models/DietPlan.js's draftPlan field doc comment.
-    const draftWeeks = Array.isArray(dietPlan.draftPlan?.weeks) ? dietPlan.draftPlan.weeks : [];
+    const draftWeeks = getDraftWeeks(dietPlan);
 
     // Prefer the dietician's actual finalized selections (real servings,
     // and possibly more recipes than the AI's original picks - e.g. an
@@ -1994,6 +2022,15 @@ exports.finalizeWeekPlan = async (req, res, next) => {
     } else {
       dietPlan.finalizedPlan.weeks.push(weekPayload);
     }
+
+    // Dual-write into the typed days[] schema (Phase 1c/1d) alongside the
+    // legacy blob above - only finalizeWeekPlan does this, not saveDraftWeek,
+    // since days[] must only ever hold real finalized selections (a draft
+    // save must never clobber an already-finalized week's days[] entry with
+    // incomplete/unreviewed data). Nothing reads days[] yet - this just
+    // keeps it populated going forward so the migration script only has to
+    // backfill history, not every future write.
+    applyLegacyWeekPayload(dietPlan, weekPayload);
 
     const normalizedSummary = {
       week: weekNumber,
@@ -2403,6 +2440,337 @@ exports.activateDietPlan = async (req, res, next) => {
         requestStatus: dietPlan.request ? dietPlan.request.status : null,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// Phase 3: Clever UX endpoints over the typed days[] schema (Phase 1c/1d) -
+// Week Tweak, Swap vs Scale, Exception Review, Supplement Injection. All
+// operate on days[] directly, independent of which engine (AI or
+// deterministic) originally generated the week.
+// ==========================================
+
+async function loadDietPlanForClever(req, res) {
+  const { patientId, dietPlanId } = req.params;
+  const dieticianId = req.user._id;
+  if (!mongoose.Types.ObjectId.isValid(patientId) || !mongoose.Types.ObjectId.isValid(dietPlanId)) {
+    res.status(400).json({ success: false, message: 'Invalid patient or diet plan id' });
+    return null;
+  }
+  const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId });
+  if (!dietPlan) {
+    res.status(404).json({ success: false, message: 'Diet plan not found for this patient' });
+    return null;
+  }
+  return dietPlan;
+}
+
+/**
+ * @desc    Apply a Week Tweak multiplier to every unlocked item in one
+ *          servingTime slot, for one week
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/week-tweak
+ * @access  Private (Dietician)
+ */
+exports.applyWeekTweakEndpoint = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.body?.week);
+    const { servingTime } = req.body || {};
+    const multiplier = Number(req.body?.multiplier);
+
+    if (!Number.isInteger(week) || week < 1 || week > 4) {
+      return res.status(400).json({ success: false, message: 'week must be an integer between 1 and 4' });
+    }
+    if (!REQUIRED_SERVING_TIMES.includes(servingTime)) {
+      return res.status(400).json({ success: false, message: 'servingTime is not a recognized serving slot' });
+    }
+    if (!(multiplier > 0)) {
+      return res.status(400).json({ success: false, message: 'multiplier must be a positive number' });
+    }
+
+    const changedItems = applyWeekTweak({ dietPlan, week, servingTime, multiplier });
+    await dietPlan.save();
+
+    return res.status(200).json({
+      success: true,
+      data: { week, servingTime, multiplier, changedItemCount: changedItems.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Swap an item's recipe, or rescale its portion - the "Swap vs
+ *          Scale" action sheet
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/swap
+ * @access  Private (Dietician)
+ */
+exports.applyRecipeSwapOrScale = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.body?.week);
+    const { dayGroup, servingTime, itemId, action, newRecipeId, reason } = req.body || {};
+    const newMultiplier = req.body?.newMultiplier !== undefined ? Number(req.body.newMultiplier) : undefined;
+
+    if (!DAY_GROUPS.includes(dayGroup) || !REQUIRED_SERVING_TIMES.includes(servingTime) || !itemId) {
+      return res.status(400).json({ success: false, message: 'week, dayGroup, servingTime, and itemId are required' });
+    }
+
+    let item;
+    if (action === 'scale') {
+      if (!(newMultiplier > 0)) {
+        return res.status(400).json({ success: false, message: 'newMultiplier must be a positive number' });
+      }
+      const existingItem = findItem({ dietPlan, week, dayGroup, servingTime, itemId });
+      const recipe = await Recipe.findById(existingItem.recipeId).select('nutritionPerServing').lean();
+      item = applyScale({ dietPlan, week, dayGroup, servingTime, itemId, newMultiplier, recipe });
+    } else if (action === 'swap') {
+      if (!mongoose.Types.ObjectId.isValid(newRecipeId)) {
+        return res.status(400).json({ success: false, message: 'newRecipeId must be a valid recipe id' });
+      }
+      const newRecipe = await Recipe.findOne({ _id: newRecipeId, dieticianId: req.user._id })
+        .select('name nutritionPerServing')
+        .lean();
+      if (!newRecipe) {
+        return res.status(404).json({ success: false, message: 'newRecipeId does not reference a known recipe' });
+      }
+      item = applySwap({ dietPlan, week, dayGroup, servingTime, itemId, newRecipe, reason: reason || null });
+    } else {
+      return res.status(400).json({ success: false, message: "action must be 'swap' or 'scale'" });
+    }
+
+    await dietPlan.save();
+    return res.status(200).json({ success: true, data: { item } });
+  } catch (error) {
+    if (error.message?.startsWith('No item found for')) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Top-3 lighter/heavier alternatives for one item, from the
+ *          dietician's own recipe pool for that slot
+ * @route   GET /api/dietician/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/swap-alternatives
+ * @access  Private (Dietician)
+ */
+exports.getSwapAlternatives = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.params.week);
+    const { dayGroup, servingTime, itemId, direction } = req.query || {};
+    if (!DAY_GROUPS.includes(dayGroup) || !REQUIRED_SERVING_TIMES.includes(servingTime) || !itemId) {
+      return res.status(400).json({ success: false, message: 'dayGroup, servingTime, and itemId query params are required' });
+    }
+
+    const item = findItem({ dietPlan, week, dayGroup, servingTime, itemId });
+    const currentRecipe = await Recipe.findById(item.recipeId).select('nutrition').lean();
+    const currentCalories = currentRecipe?.nutrition?.calories;
+    if (!(currentCalories > 0)) {
+      return res.status(422).json({ success: false, message: "This item's current recipe has no usable calorie data." });
+    }
+
+    const pool = await Recipe.find({ dieticianId: req.user._id, category: { $ne: 'Supplements' } })
+      .select('name servingTime nutrition mealSlotSuitability')
+      .lean();
+    const recipePool = pool.map((r) => ({
+      id: r._id.toString(),
+      name: r.name,
+      servingTime: r.servingTime,
+      calories: r.nutrition?.calories ?? null,
+      mealSlotSuitability: r.mealSlotSuitability || {},
+    }));
+
+    const alternatives = findSwapAlternatives({
+      recipePool,
+      servingTime,
+      currentCalories,
+      direction: direction === 'lighter' || direction === 'heavier' ? direction : null,
+      excludeRecipeId: item.recipeId.toString(),
+    });
+
+    return res.status(200).json({ success: true, data: { currentCalories, alternatives } });
+  } catch (error) {
+    if (error.message?.startsWith('No item found for')) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    The typed days[] structure for one week, WITH each item's/
+ *          supplement's Mongoose subdocument _id - the wizard's Smart
+ *          Recipe Cards (Fraction Dial, Swap vs Scale) need these ids to
+ *          target a specific item via the swap/week-tweak endpoints above.
+ *          Distinct from getFinalizedWeekDetails (which reads the legacy
+ *          finalizedPlan blob - plain dailyMeals entries with no _id at
+ *          all) and getDraftWeekOptions (pre-finalize AI draft review).
+ * @route   GET /api/dietician/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/days
+ * @access  Private (Dietician)
+ */
+exports.getWeekDays = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.params.week);
+    const weekDays = (dietPlan.days || []).filter((d) => d.week === week);
+
+    const recipeIds = new Set();
+    for (const day of weekDays) {
+      for (const meal of day.meals || []) {
+        for (const item of meal.items || []) recipeIds.add(item.recipeId?.toString());
+        for (const supplement of meal.supplements || []) recipeIds.add(supplement.supplementId?.toString());
+      }
+    }
+    const recipeDocs = recipeIds.size
+      ? await Recipe.find({ _id: { $in: [...recipeIds] } }).select('name').lean()
+      : [];
+    const nameById = new Map(recipeDocs.map((r) => [r._id.toString(), r.name]));
+
+    const days = weekDays.map((day) => ({
+      dayGroup: day.dayGroup,
+      meals: (day.meals || []).map((meal) => ({
+        servingTime: meal.servingTime,
+        items: (meal.items || []).map((item) => ({
+          itemId: item._id.toString(),
+          recipeId: item.recipeId?.toString(),
+          recipeName: nameById.get(item.recipeId?.toString()) || null,
+          servingMultiplier: item.servingMultiplier,
+          locked: item.locked,
+          isLinkedComponent: item.isLinkedComponent,
+          calculatedNutrition: item.calculatedNutrition,
+          displayText: item.displayText,
+        })),
+        supplements: (meal.supplements || []).map((supplement) => ({
+          supplementId: supplement.supplementId?.toString(),
+          supplementName: nameById.get(supplement.supplementId?.toString()) || null,
+          dosage: supplement.dosage,
+          instructions: supplement.instructions,
+          timingAnchor: supplement.timingAnchor,
+        })),
+      })),
+    }));
+
+    return res.status(200).json({ success: true, data: { week, days } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Validator warnings + per-day-group auto-balance calorie
+ *          deviation suggestions for one week - the Exception Review step
+ * @route   GET /api/dietician/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/exceptions
+ * @access  Private (Dietician)
+ */
+exports.getPlanExceptions = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.params.week);
+    const weekDays = (dietPlan.days || []).filter((d) => d.week === week);
+    const recipeIds = [
+      ...new Set(
+        weekDays.flatMap((d) => d.meals.flatMap((m) => m.items.map((i) => i.recipeId?.toString()))).filter(Boolean)
+      ),
+    ];
+    const recipeDocs = recipeIds.length
+      ? await Recipe.find({ _id: { $in: recipeIds } }).select('nutritionPerServing').lean()
+      : [];
+    const recipesById = new Map(recipeDocs.map((r) => [r._id.toString(), r]));
+
+    const dailyCalorieTarget = dietPlan.calorieStrategy?.calorieBudget || dietPlan.totalCalories || null;
+    const { warnings, tolerancePercent } = balanceWeek({ dietPlan, week, recipesById, dailyCalorieTarget });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        week,
+        tolerancePercent,
+        calorieExceptions: warnings,
+        validationWarnings: dietPlan.validationWarnings || [],
+        riskFlags: dietPlan.riskFlags || [],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Add or update a supplement entry (with timing anchor) on one
+ *          {week, dayGroup, servingTime} slot - Timeline Builder's
+ *          Supplement Injection
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/supplements
+ * @access  Private (Dietician)
+ */
+exports.upsertSupplementForSlot = async (req, res, next) => {
+  try {
+    const dietPlan = await loadDietPlanForClever(req, res);
+    if (!dietPlan) return;
+
+    const week = Number(req.body?.week);
+    const { dayGroup, servingTime, supplementId, dosage, instructions, timingAnchor } = req.body || {};
+
+    if (!Number.isInteger(week) || week < 1 || week > 4) {
+      return res.status(400).json({ success: false, message: 'week must be an integer between 1 and 4' });
+    }
+    if (!DAY_GROUPS.includes(dayGroup) || !REQUIRED_SERVING_TIMES.includes(servingTime)) {
+      return res.status(400).json({ success: false, message: 'dayGroup/servingTime is not recognized' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(supplementId)) {
+      return res.status(400).json({ success: false, message: 'supplementId must be a valid recipe id' });
+    }
+    if (!['pre', 'with', 'post'].includes(timingAnchor)) {
+      return res.status(400).json({ success: false, message: "timingAnchor must be 'pre', 'with', or 'post'" });
+    }
+
+    const supplement = await Recipe.findOne({
+      _id: supplementId,
+      dieticianId: req.user._id,
+      category: 'Supplements',
+    }).lean();
+    if (!supplement) {
+      return res.status(404).json({ success: false, message: 'supplementId does not reference a known supplement' });
+    }
+
+    if (!Array.isArray(dietPlan.days)) dietPlan.days = [];
+    let day = dietPlan.days.find((d) => d.week === week && d.dayGroup === dayGroup);
+    if (!day) {
+      dietPlan.days.push({ week, dayGroup, meals: [] });
+      day = dietPlan.days[dietPlan.days.length - 1];
+    }
+    let meal = day.meals.find((m) => m.servingTime === servingTime);
+    if (!meal) {
+      day.meals.push({ servingTime, items: [], supplements: [] });
+      meal = day.meals[day.meals.length - 1];
+    }
+
+    const existingIndex = meal.supplements.findIndex((s) => s.supplementId?.toString() === supplementId);
+    const entry = { supplementId, dosage: dosage || null, instructions: instructions || null, timingAnchor };
+    if (existingIndex > -1) {
+      Object.assign(meal.supplements[existingIndex], entry);
+    } else {
+      meal.supplements.push(entry);
+    }
+
+    dietPlan.markModified('days');
+    await dietPlan.save();
+
+    return res.status(200).json({ success: true, data: { week, dayGroup, servingTime, supplement: entry } });
   } catch (error) {
     next(error);
   }

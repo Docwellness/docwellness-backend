@@ -72,6 +72,11 @@ module.exports = {
     translationModel: process.env.OPENAI_MODEL_TRANSLATION || 'gpt-4o-mini',
     dietPlanModel: process.env.OPENAI_MODEL_DIET_PLAN || 'gpt-4o',
   },
+  // Which engine services/dietPlanGenerationService.js uses to build new
+  // diet-plan weeks: 'ai' (default, current OpenAI pipeline) or
+  // 'deterministic' (the rules-based engine). Flipping this is the entire
+  // cutover/rollback mechanism between the two - see that service's header.
+  dietPlanEngine: (process.env.DIET_PLAN_ENGINE || 'ai').toLowerCase(),
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB
   defaultDieticianId: process.env.DEFAULT_DIETICIAN_ID,
