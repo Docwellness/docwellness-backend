@@ -26,6 +26,7 @@ const {
   reviewController,
   uploadExerciseController,
   exercisePlanController,
+  planItemController,
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
@@ -303,27 +304,11 @@ router.post(
 );
 
 // ==========================================
-// Clever UX (Phase 3): Week Tweak, Swap vs Scale, Exception Review,
-// Supplement Injection - all operate on the typed days[] schema.
+// Clever UX (Phase 3): Exception Review (read-only), Supplement Injection -
+// operate on the typed days[] schema. Week Tweak and Swap vs Scale were
+// removed as part of v4.0's hard cutover (see planItemController.js's
+// header comment) - a days-array plan's Step 5 is read-only now.
 // ==========================================
-
-router.post(
-  '/patients/:patientId/diet-plans/:dietPlanId/week-tweak',
-  dieticianOnlyMiddleware,
-  dietPlanController.applyWeekTweakEndpoint
-);
-
-router.post(
-  '/patients/:patientId/diet-plans/:dietPlanId/swap',
-  dieticianOnlyMiddleware,
-  dietPlanController.applyRecipeSwapOrScale
-);
-
-router.get(
-  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/swap-alternatives',
-  dieticianOnlyMiddleware,
-  dietPlanController.getSwapAlternatives
-);
 
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/days',
@@ -341,6 +326,59 @@ router.post(
   '/patients/:patientId/diet-plans/:dietPlanId/supplements',
   dieticianOnlyMiddleware,
   dietPlanController.upsertSupplementForSlot
+);
+
+// ==========================================
+// v4.0: Ingredient-Level Portioning + Recipe Versioning - operate on
+// PlanItem/RecipeVersion/DayPlan/MealSlotPlan/SupplementItem, only for a
+// DietPlan whose dataModel === 'plan-item' (see planItemController.js's
+// loadPlanItemDietPlan). New URLs, not overloading /swap or /supplements
+// above - the payload shapes are fundamentally incompatible with the
+// days-array Clever UX endpoints, and reusing those URLs for a new shape
+// would silently break any in-flight days-array client.
+// ==========================================
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/generate-menu',
+  dieticianOnlyMiddleware,
+  aiGenerationLimiter,
+  planItemController.generateMenu
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/create-custom-version',
+  dieticianOnlyMiddleware,
+  planItemController.createCustomRecipeVersion
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/auto-balance',
+  dieticianOnlyMiddleware,
+  planItemController.autoBalance
+);
+
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/plan-items',
+  dieticianOnlyMiddleware,
+  planItemController.getWeekPlanItems
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/swap-recipe-version',
+  dieticianOnlyMiddleware,
+  planItemController.swapRecipeVersion
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/timeline-supplements',
+  dieticianOnlyMiddleware,
+  planItemController.upsertSupplementItem
+);
+
+router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/finalize-plan-item-week',
+  dieticianOnlyMiddleware,
+  planItemController.finalizePlanItemWeek
 );
 
 // ==========================================

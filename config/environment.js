@@ -77,6 +77,18 @@ module.exports = {
   // 'deterministic' (the rules-based engine). Flipping this is the entire
   // cutover/rollback mechanism between the two - see that service's header.
   dietPlanEngine: (process.env.DIET_PLAN_ENGINE || 'ai').toLowerCase(),
+  // v4.0: which storage model a NEWLY-CREATED DietPlan gets -
+  // 'days-array' (default, current embedded days[]/servingMultiplier
+  // system, live in production) or 'plan-item' (the new ingredient-level-
+  // portioning/RecipeVersion system). Recorded once per-plan onto
+  // DietPlan.dataModel at creation time (createAndGenerateDietPlan) and
+  // never changes mid-life - flipping this env var only affects plans
+  // created AFTER the flip; every existing Active/Finalized plan keeps
+  // working exactly as before, untouched, forever. Do not set this to
+  // 'plan-item' outside dev/staging until the Phase 7 regression suite is
+  // green and Phase 0's per-dietician nutrition-data coverage gate is met -
+  // see the "Diet Plan v4.0" plan doc's Phase 2 rollout sequencing.
+  dietPlanDataModel: (process.env.DIET_PLAN_DATA_MODEL || 'days-array').toLowerCase(),
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB
   defaultDieticianId: process.env.DEFAULT_DIETICIAN_ID,

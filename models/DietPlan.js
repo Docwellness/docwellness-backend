@@ -1,15 +1,6 @@
 const mongoose = require('mongoose');
 const { DAY_GROUPS } = require('../utils/dayGroups');
-
-const REQUIRED_SERVING_TIMES = [
-  'Morning Drink',
-  'Breakfast',
-  'Brunch',
-  'Lunch',
-  'Evening Snack',
-  'Dinner',
-  'Night Drink',
-];
+const { REQUIRED_SERVING_TIMES } = require('../utils/servingTimes');
 
 const dietPlanSchema = new mongoose.Schema(
   {
@@ -161,6 +152,31 @@ const dietPlanSchema = new mongoose.Schema(
     // visible selections.
     draftPlan: {
       type: Object,
+      default: null,
+    },
+    // --- v4.0 ingredient-level portioning + recipe versioning fields ---
+    // Which storage model this plan's week/day/meal data actually lives in -
+    // decided once at creation time (createAndGenerateDietPlan) and never
+    // changed mid-life: 'days-array' (default, the embedded `days[]` below,
+    // servingMultiplier-based) or 'plan-item' (DayPlan/MealSlotPlan/PlanItem/
+    // RecipeVersion collections, ingredient-level rawQuantity-based). A given
+    // patient's plan is 100% one or the other - never a mix - so every
+    // days[]-reading function in this codebase keeps working untouched for
+    // every plan created before/without the DIET_PLAN_DATA_MODEL flag flipped,
+    // and every new plan-item-reading function only ever runs against plans
+    // that were actually built that way. See utils/dietPlanReadDispatch.js.
+    dataModel: {
+      type: String,
+      enum: ['days-array', 'plan-item'],
+      default: 'days-array',
+    },
+    // 5-step wizard progress, 'plan-item' plans only - null on every
+    // days-array plan (unambiguously "predates the wizard", never confused
+    // with a real state). Mirrors the 5 wizard steps 1:1, replacing the old
+    // wizard's isFinalized-boolean-only gating with real named states.
+    workflowStatus: {
+      type: String,
+      enum: ['targets_set', 'menu_generated', 'portions_refined', 'timeline_defined', 'finalized'],
       default: null,
     },
     // --- Deterministic diet-plan engine fields (Phase 1c) ---

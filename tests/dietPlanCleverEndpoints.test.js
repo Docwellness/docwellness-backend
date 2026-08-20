@@ -1,7 +1,10 @@
 /**
- * Phase 3 API endpoints (routes/dietician.js) - week-tweak, swap, scale,
- * swap-alternatives, exceptions, supplements - exercised end-to-end via
- * supertest against a DietPlan already populated with days[].
+ * Phase 3 API endpoints (routes/dietician.js) - exceptions, supplements -
+ * exercised end-to-end via supertest against a DietPlan already populated
+ * with days[]. Week Tweak/Swap/Swap-vs-Scale coverage was removed here
+ * along with those endpoints themselves as part of v4.0's hard cutover
+ * (see planItemController.js's header comment) - a days-array plan's
+ * Step 5 is read-only now, so only the read-only endpoints remain tested.
  */
 
 const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/testDb');
@@ -77,104 +80,6 @@ async function setup() {
 }
 
 const auth = (req) => req.set('Authorization', 'Bearer dietician-token');
-
-describe('POST .../week-tweak', () => {
-  test('scales unlocked items in the slot and updates weekTweaks', async () => {
-    const { patient, dietPlan } = await setup();
-
-    const res = await auth(
-      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/week-tweak`)
-    ).send({ week: 1, servingTime: 'Lunch', multiplier: 1.25 });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ week: 1, servingTime: 'Lunch', multiplier: 1.25, changedItemCount: 1 });
-
-    const saved = await DietPlan.findById(dietPlan._id).lean();
-    expect(saved.days[0].meals[0].items[0].servingMultiplier).toBeCloseTo(1.25);
-  });
-
-  test('rejects an unrecognized servingTime', async () => {
-    const { patient, dietPlan } = await setup();
-    const res = await auth(
-      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/week-tweak`)
-    ).send({ week: 1, servingTime: 'Second Breakfast', multiplier: 1.25 });
-    expect(res.status).toBe(400);
-  });
-});
-
-describe('POST .../swap (action: scale)', () => {
-  test('rescales an item and recomputes its calculatedNutrition', async () => {
-    const { patient, dietPlan, itemId } = await setup();
-
-    const res = await auth(
-      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/swap`)
-    ).send({ week: 1, dayGroup: 'Monday', servingTime: 'Lunch', itemId, action: 'scale', newMultiplier: 0.5 });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.item.servingMultiplier).toBe(0.5);
-    expect(res.body.data.item.calculatedNutrition.calories).toBe(250); // 500 * 0.5
-  });
-});
-
-describe('POST .../swap (action: swap)', () => {
-  test('replaces the recipe and records swapHistory', async () => {
-    const { patient, dietPlan, itemId, lighterRecipe } = await setup();
-
-    const res = await auth(
-      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/swap`)
-    ).send({
-      week: 1,
-      dayGroup: 'Monday',
-      servingTime: 'Lunch',
-      itemId,
-      action: 'swap',
-      newRecipeId: lighterRecipe._id.toString(),
-      reason: 'over budget',
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.item.recipeId).toBe(lighterRecipe._id.toString());
-    expect(res.body.data.item.calculatedNutrition.calories).toBe(200);
-
-    const saved = await DietPlan.findById(dietPlan._id).lean();
-    expect(saved.days[0].meals[0].items[0].swapHistory).toHaveLength(1);
-  });
-
-  test('404s for a recipeId belonging to a different dietician', async () => {
-    const { patient, dietPlan, itemId } = await setup();
-    const otherDietician = await createDietician();
-    const foreignRecipe = await Recipe.create({ dieticianId: otherDietician._id, name: 'Foreign', servingTime: 'Lunch' });
-
-    const res = await auth(
-      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/swap`)
-    ).send({
-      week: 1,
-      dayGroup: 'Monday',
-      servingTime: 'Lunch',
-      itemId,
-      action: 'swap',
-      newRecipeId: foreignRecipe._id.toString(),
-    });
-
-    expect(res.status).toBe(404);
-  });
-});
-
-describe('GET .../weeks/:week/swap-alternatives', () => {
-  test('returns lighter alternatives sorted by calorie proximity', async () => {
-    const { patient, dietPlan, itemId } = await setup();
-
-    const res = await auth(
-      request(app).get(
-        `/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/weeks/1/swap-alternatives`
-      ).query({ dayGroup: 'Monday', servingTime: 'Lunch', itemId, direction: 'lighter' })
-    );
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.currentCalories).toBe(500);
-    expect(res.body.data.alternatives.map((a) => a.name)).toEqual(['Light Salad']);
-  });
-});
 
 describe('GET .../weeks/:week/exceptions', () => {
   test('flags a day whose recomputed total is outside tolerance', async () => {

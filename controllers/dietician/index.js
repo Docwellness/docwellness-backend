@@ -18,6 +18,7 @@ const articleController = require('./articleController');
 const reviewController = require('./reviewController');
 const uploadExerciseController = require('./uploadExerciseController');
 const exercisePlanController = require('./exercisePlanController');
+const planItemController = require('./planItemController');
 
 module.exports = {
   manualPaymentController,
@@ -40,4 +41,5 @@ module.exports = {
   reviewController,
   uploadExerciseController,
   exercisePlanController,
+  planItemController,
 };

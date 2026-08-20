@@ -30,6 +30,12 @@ const ExerciseLog = require('./ExerciseLog');
 const CustomFoodRequest = require('./CustomFoodRequest');
 const JourneyImage = require('./JourneyImage');
 const NeedAttentionLog = require('./NeedAttentionLog');
+const FoodItem = require('./FoodItem');
+const RecipeVersion = require('./RecipeVersion');
+const DayPlan = require('./DayPlan');
+const MealSlotPlan = require('./MealSlotPlan');
+const PlanItem = require('./PlanItem');
+const SupplementItem = require('./SupplementItem');
 
 module.exports = {
   User,
@@ -64,4 +70,10 @@ module.exports = {
   CustomFoodRequest,
   JourneyImage,
   NeedAttentionLog,
+  FoodItem,
+  RecipeVersion,
+  DayPlan,
+  MealSlotPlan,
+  PlanItem,
+  SupplementItem,
 };

@@ -170,6 +170,15 @@ const recipeSchema = new mongoose.Schema(
         description: { type: String, default: '' },
         image: String,
         isScalable: { type: Boolean, default: true },
+        // v4.0: optional link to the global FoodItem nutrition record for
+        // this ingredient. NOT backfilled onto existing recipes' history -
+        // this array stays the legacy, days-array-system display path
+        // throughout coexistence (see models/Ingredient.js's own comment on
+        // why this array's order/shape is never touched). Only ever
+        // populated as a side effect of services/recipeVersioningService.js
+        // resolving names to FoodItems when generating this recipe's V1
+        // RecipeVersion - never read by any days-array-system code.
+        foodItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem', default: null },
       },
     ],
     instructions: [
@@ -329,6 +338,24 @@ recipeSchema.pre('save', function () {
   } catch (err) {
     console.error('Recipe pre-save allergen/nutrition cache failed (non-blocking):', err.message);
   }
+});
+
+// v4.0: keeps this recipe's V1 RecipeVersion (services/recipeVersioningService.js)
+// up to date on every save. Fire-and-forget (post-save, not pre-save, and
+// never awaited) - a recipe save must never be slowed down or fail because
+// of this bookkeeping, and syncV1FromRecipe itself never throws (see its own
+// try/catch) and is cheap/idempotent to re-run even when nothing
+// ingredient-relevant actually changed (deliberately not gated on
+// isModified() here - Mongoose's modified-path tracking is unreliable to
+// rely on this late in the post-save hook chain). Lazy-required to avoid a
+// module-load-time dependency between this model and the service layer,
+// matching services/dietPlanGenerationService.js's existing lazy-require
+// convention for the same reason.
+recipeSchema.post('save', function (doc) {
+  const { syncV1FromRecipe } = require('../services/recipeVersioningService');
+  syncV1FromRecipe(doc).catch((err) => {
+    console.error(`Recipe post-save V1 RecipeVersion sync failed (non-blocking) for ${doc._id}:`, err.message);
+  });
 });
 
 // Had no indexes at all before this - dieticianId scoping is present on

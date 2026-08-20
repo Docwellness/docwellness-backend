@@ -11,6 +11,7 @@ const {
   resolveCurrentWeek,
 } = require('../../utils/dietPlanWeek');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
+const { buildPlanItemPatientView } = require('../../utils/dietPlanReadDispatch');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -77,7 +78,23 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       });
     }
 
-    const weeks = getFinalizedWeeks(dietPlan);
+    // v4.0: a 'plan-item' plan has no finalizedPlan blob at all - its
+    // dailyMeals/ingredient/supplement data is synthesized from
+    // DayPlan/MealSlotPlan/PlanItem/RecipeVersion instead. See
+    // utils/dietPlanReadDispatch.js's header comment - this is currently
+    // the only one of dietController.js's several getFinalizedWeeks call
+    // sites that's been made dataModel-aware.
+    let weeks;
+    let recipeVersionOverrides = {};
+    let planItemSupplementScheduleByWeek = {};
+    if (dietPlan.dataModel === 'plan-item') {
+      const planItemView = await buildPlanItemPatientView(dietPlan);
+      weeks = planItemView.weeks;
+      recipeVersionOverrides = planItemView.recipeVersionOverrides;
+      planItemSupplementScheduleByWeek = planItemView.supplementScheduleByWeek;
+    } else {
+      weeks = getFinalizedWeeks(dietPlan);
+    }
 
     // Timed supplements (dosage/instructions/timingAnchor) live in the typed
     // days[] schema (models/DietPlan.js, Phase 1c) - a separate structure
@@ -107,6 +124,14 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       if (entries.length === 0) return;
       const existing = supplementScheduleByWeek.get(day.week) || [];
       supplementScheduleByWeek.set(day.week, [...existing, ...entries]);
+    });
+    // v4.0: dietPlan.days is always empty for a plan-item plan, so the loop
+    // above is a no-op for one - merge in the SupplementItem-sourced
+    // schedule built above instead.
+    Object.entries(planItemSupplementScheduleByWeek).forEach(([week, entries]) => {
+      const weekNum = Number(week);
+      const existing = supplementScheduleByWeek.get(weekNum) || [];
+      supplementScheduleByWeek.set(weekNum, [...existing, ...entries]);
     });
 
     const recipeIds = new Set();
@@ -199,6 +224,26 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         language: Array.isArray(recipe.language) ? recipe.language : [recipe.language || 'English'],
         translations: recipe.translations || {},
       };
+    });
+
+    // v4.0: override with the EXACT prescribed ingredients/steps/nutrition
+    // for a plan-item plan - the base Recipe fetched above may have been
+    // edited since, or this patient's plan may be using a dietician-
+    // customized version (V2+) with different quantities than the base
+    // recipe's own. servingSize.quantity is pinned to 1 alongside
+    // dailyMeals[].servings (see dietPlanReadDispatch.js's header comment)
+    // so getRecipesForServing's servings/servingSize.quantity ratio always
+    // resolves to exactly 1 - the version's nutritionPerServing below is
+    // already the real final number, not something to rescale further.
+    // A no-op for every days-array plan (recipeVersionOverrides stays {}).
+    Object.entries(recipeVersionOverrides).forEach(([recipeId, override]) => {
+      if (!recipes[recipeId]) return;
+      recipes[recipeId].ingredients = override.ingredients;
+      recipes[recipeId].instructions = override.steps;
+      recipes[recipeId].nutritionPerServing = override.nutritionPerServing;
+      recipes[recipeId].nutrition = override.nutritionPerServing;
+      recipes[recipeId].servingSize = { ...recipes[recipeId].servingSize, quantity: 1 };
+      recipes[recipeId].components = override.components;
     });
 
     const activationStart = parseDateOrNull(dietPlan.activationDate);
