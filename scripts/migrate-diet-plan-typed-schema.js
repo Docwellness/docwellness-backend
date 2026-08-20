@@ -46,12 +46,34 @@ const VERIFY = process.argv.includes('--verify');
 // does not preserve the original array order the dietician's payload
 // happened to arrive in, so --verify must compare as a multiset, not a
 // strict array-order deep-equal (which would false-positive on every plan).
+//
+// componentServings/secondaryServings are semantically redundant for the
+// 2-element case (componentServings[1] === secondaryServings) - both
+// daysFromLegacyWeekPayload (forward) and buildLegacyWeeksView (backward,
+// see utils/dietPlanLegacyView.js) each synthesize whichever of the pair is
+// missing, so an entry that originally had only ONE of the two comes back
+// out of days[] with BOTH populated. That's a harmless representational
+// superset (same effective quantities), not data loss - so this
+// canonicalizes the redundant pair down to just componentServings before
+// comparing, rather than flagging every such entry as diverged.
 function canonicalizeDailyMeal(meal) {
+  const normalized = { ...meal };
+  if (
+    normalized.secondaryServings !== undefined &&
+    (!Array.isArray(normalized.componentServings) || normalized.componentServings.length === 0)
+  ) {
+    normalized.componentServings = [
+      typeof normalized.servings === 'number' && normalized.servings > 0 ? normalized.servings : 1,
+      normalized.secondaryServings,
+    ];
+  }
+  delete normalized.secondaryServings;
+
   return JSON.stringify(
-    Object.keys(meal)
+    Object.keys(normalized)
       .sort()
       .reduce((acc, key) => {
-        acc[key] = meal[key];
+        acc[key] = normalized[key];
         return acc;
       }, {})
   );

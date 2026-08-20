@@ -226,4 +226,55 @@ describe('migrate-diet-plan-typed-schema.js --verify', () => {
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0].diffs[0].week).toBe(1);
   });
+
+  // Reproduces a real prod divergence: daysFromLegacyWeekPayload (forward)
+  // synthesizes componentServings from a lone secondaryServings, and
+  // buildLegacyWeeksView (backward) synthesizes secondaryServings from a
+  // lone 2-element componentServings - so an entry that originally had only
+  // ONE of the two comes back out of days[] with BOTH populated. That's a
+  // harmless representational superset (identical effective quantities),
+  // which --verify must not flag as diverged.
+  test('does not flag divergence for entries using only secondaryServings or only componentServings originally', async () => {
+    const dietician = await createDietician();
+    const patient = await createPatient();
+    const mainRecipe = await Recipe.create({ dieticianId: dietician._id, name: 'Banana Mix', servingTime: 'Breakfast' });
+    const comboRecipe = await Recipe.create({ dieticianId: dietician._id, name: 'Idli Sambar', servingTime: 'Lunch' });
+
+    const plan = await DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'Finalized',
+      finalizedPlan: {
+        weeks: [
+          {
+            week: 1,
+            dailyMeals: [
+              // Legacy shape: only secondaryServings, no componentServings.
+              {
+                dayGroup: 'Monday',
+                servingTime: 'Breakfast',
+                recipeId: mainRecipe._id.toString(),
+                servings: 1,
+                secondaryServings: 2,
+              },
+              // Components-aware shape: only componentServings, no secondaryServings.
+              {
+                dayGroup: 'Monday',
+                servingTime: 'Lunch',
+                recipeId: comboRecipe._id.toString(),
+                servings: 1,
+                componentServings: [3, 1],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await runBackfill({ DietPlan, Recipe, daysFromLegacyWeekPayload, getFinalizedWeeks, getDraftWeeks, execute: true });
+    const result = await runVerify({ DietPlan, buildLegacyWeeksView, getFinalizedWeeks });
+
+    expect(result.failures).toEqual([]);
+    expect(result.clean).toBe(1);
+  });
 });
