@@ -48,6 +48,7 @@ async function makeV1() {
       { foodItemId: milk._id, rawQuantity: 200, unit: 'g' },
     ],
     steps: ['Boil milk', 'Add oats'],
+    components: [{ label: 'Oats Porridge', quantity: 1, unit: 'bowl' }],
     nutritionPerServing: { calories: 40 * 3.89 + 200 * 0.42, protein: 40 * 0.17 + 200 * 0.034, carbs: null, fats: null, fiber: null },
     status: 'Active',
   });
@@ -86,6 +87,31 @@ describe('createCustomVersion', () => {
     // protein: 50*0.17 + 250*0.034 = 8.5 + 8.5 = 17
     expect(v2.nutritionPerServing.protein).toBeCloseTo(17);
     expect(v2.hasUnresolvedIngredients).toBe(false);
+  });
+
+  test('scales the real-world serving components proportionally to the calorie change', async () => {
+    const { v1, oats, milk } = await makeV1(); // 1 bowl at 155.6+84=239.6 cal
+
+    const v2 = await createCustomVersion(v1._id, [
+      { foodItemId: oats._id, rawQuantity: 80, unit: 'g' }, // exactly 2x oats
+      { foodItemId: milk._id, rawQuantity: 400, unit: 'g' }, // exactly 2x milk
+    ]);
+
+    expect(v2.nutritionPerServing.calories).toBeCloseTo(239.6 * 2, 0);
+    const [component] = v2.toObject().components;
+    expect(component).toMatchObject({ label: 'Oats Porridge', quantity: 2, unit: 'bowl' }); // 1 bowl -> 2 bowls
+  });
+
+  test('leaves components unscaled (ratio 1) when the new calories cannot be resolved', async () => {
+    const { v1 } = await makeV1();
+    const mystery = await FoodItem.create({ name: 'Mystery Grain', normalizedName: 'mystery-grain', nutritionPer100g: {} }); // no macros
+
+    const v2 = await createCustomVersion(v1._id, [{ foodItemId: mystery._id, rawQuantity: 50, unit: 'g' }]);
+
+    expect(v2.hasUnresolvedIngredients).toBe(true);
+    expect(v2.nutritionPerServing.calories).toBeNull();
+    const [component] = v2.toObject().components;
+    expect(component).toMatchObject({ label: 'Oats Porridge', quantity: 1, unit: 'bowl' }); // unchanged, not silently zeroed
   });
 
   test('a second edit increments from the LATEST version, not always original+1', async () => {

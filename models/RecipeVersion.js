@@ -69,6 +69,30 @@ const recipeVersionSchema = new mongoose.Schema(
       },
     ],
     steps: { type: [String], default: [] },
+    // Real-world serving-unit measurement of the WHOLE dish (e.g. "Palak
+    // Paratha" -> [{label:'Palak Paratha', quantity:2, unit:'piece'}],
+    // "Khichdi" -> [{quantity:1, unit:'bowl'}]) - distinct from
+    // ingredients[] above (the raw food items IN the dish, e.g. wheat
+    // flour/spinach/oil in grams). Copied from the parent Recipe's own
+    // `components` at V1 creation (services/recipeVersioningService.js's
+    // syncV1FromRecipe) and proportionally rescaled by createCustomVersion
+    // whenever ingredients are edited/auto-balanced, so "2 pieces" becomes
+    // "3 pieces" if the dietician doubles the recipe rather than staying
+    // stuck at the V1 figure. This is what the wizard's Step 3 list and
+    // patient-facing views render instead of a bare gram/calorie figure.
+    // No unit enum here (mirrors Recipe.components' own lack of one) -
+    // historical recipes can carry a component unit outside COMPONENT_UNITS,
+    // and syncV1FromRecipe copying one through must never fail validation.
+    components: {
+      type: [
+        {
+          label: { type: String, required: true },
+          quantity: { type: Number, required: true },
+          unit: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
     // Computed by services/recipeVersioningService.js from
     // ingredients[].rawQuantity * FoodItem.nutritionPer100g/100, summed - the
     // "real per-ingredient macros" this whole model exists to provide,

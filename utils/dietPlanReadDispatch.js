@@ -146,11 +146,18 @@ async function buildPlanItemPatientView(dietPlan) {
           fats: version.nutritionPerServing?.fats ?? 0,
           fiber: version.nutritionPerServing?.fiber ?? 0,
         },
-        components: (version.ingredients || []).map((ingredient) => ({
-          label: foodItemNameById.get(String(ingredient.foodItemId)) || 'Ingredient',
-          quantity: ingredient.rawQuantity,
-          unit: ingredient.unit,
-        })),
+        // Prefer the version's real whole-dish serving unit (e.g. "2 piece"
+        // for a paratha, "1 bowl" for khichdi) - only synthesize one
+        // ingredient-per-pseudo-component when a version predates the
+        // `components` field (created before this field existed), so an old
+        // version still renders something rather than nothing.
+        components: version.components?.length
+          ? version.components.map((component) => ({ label: component.label, quantity: component.quantity, unit: component.unit }))
+          : (version.ingredients || []).map((ingredient) => ({
+              label: foodItemNameById.get(String(ingredient.foodItemId)) || 'Ingredient',
+              quantity: ingredient.rawQuantity,
+              unit: ingredient.unit,
+            })),
       };
     }
   }

@@ -159,6 +159,7 @@ async function syncV1FromRecipe(recipe) {
       moistureChangeFactor: recipe.moistureChangeFactor,
       ingredients: versionIngredients,
       steps: recipe.instructions || [],
+      components: recipe.components || [],
       nutritionPerServing,
       hasUnresolvedIngredients: allUnresolvedNames.length > 0,
       unresolvedIngredientNames: allUnresolvedNames,
@@ -227,6 +228,21 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     foodItemsById
   );
 
+  // Real-world serving quantity (e.g. "2 pieces") scales with the recipe,
+  // same proportion as the calorie change - if editing ingredients doubled
+  // the calories, the dish is now roughly twice the real-world serving too.
+  // Falls back to an unscaled copy (ratio 1) when either side's calories
+  // aren't resolvable - a component quantity should never be computed from
+  // an unknown baseline.
+  const originalCalories = original.nutritionPerServing?.calories;
+  const newCalories = nutritionPerServing?.calories;
+  const componentScaleRatio = originalCalories > 0 && newCalories > 0 ? newCalories / originalCalories : 1;
+  const scaledComponents = (original.components || []).map((component) => ({
+    label: component.label,
+    quantity: Math.round(component.quantity * componentScaleRatio * 100) / 100,
+    unit: component.unit,
+  }));
+
   return RecipeVersion.create({
     name: original.name,
     parentRecipeId: original.parentRecipeId,
@@ -236,6 +252,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     moistureChangeFactor: original.moistureChangeFactor,
     ingredients: updatedIngredients,
     steps: original.steps,
+    components: scaledComponents,
     nutritionPerServing,
     hasUnresolvedIngredients,
     unresolvedIngredientNames,

@@ -108,10 +108,11 @@ test('returns real (not mis-scaled) nutrition, exact ingredients/steps, and the 
   expect(recipeInResponse.nutritionPerServing.calories).toBeCloseTo(389);
   expect(recipeInResponse.ingredients).toEqual([{ name: 'Oats', quantity: 100, unit: 'g', image: null, isScalable: true }]);
   // components is what food_card.dart's FoodCard actually renders (it only
-  // falls back to servingSize.quantity/unit when components is empty) -
-  // must reflect the real per-ingredient quantity, not the base recipe's
-  // possibly-stale components[] or the misleading pinned servingSize=1.
-  expect(recipeInResponse.components).toEqual([{ label: 'Oats', quantity: 100, unit: 'g' }]);
+  // falls back to servingSize.quantity/unit when components is empty) - the
+  // real whole-dish serving unit from RecipeVersion.components (copied from
+  // the base Recipe's own components at V1 sync), NOT a per-ingredient
+  // breakdown and NOT the misleading pinned servingSize=1.
+  expect(recipeInResponse.components).toEqual([{ label: 'Oats Porridge', quantity: 100, unit: 'g' }]);
 
   expect(res.body.data.week.supplementSchedule).toEqual([
     expect.objectContaining({ dayGroup: 'Monday', servingTime: 'Breakfast', supplementId: supplement._id.toString(), dosage: '1 tablet', timingAnchor: 'post' }),
