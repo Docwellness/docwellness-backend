@@ -18,6 +18,7 @@ const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
 const { createCustomVersion } = require('../../services/recipeVersioningService');
 const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek } = require('../../services/ingredientAutoBalanceService');
+const { validatePlanForActivation } = require('../../services/planActivationService');
 const { swapToRecipe } = require('../../services/recipeVersionSwapService');
 
 async function loadPlanItemDietPlan(req, res) {
@@ -438,6 +439,9 @@ exports.upsertSupplementItem = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(supplementRecipeId)) {
       return res.status(400).json({ success: false, message: 'supplementRecipeId must be a valid recipe id' });
     }
+    if (!['pre', 'with', 'post'].includes(timingAnchor)) {
+      return res.status(400).json({ success: false, message: "timingAnchor must be 'pre', 'with', or 'post'" });
+    }
 
     const dayPlan = await DayPlan.findOneAndUpdate(
       { dietPlanId: dietPlan._id, week, dayGroup },
@@ -452,8 +456,8 @@ exports.upsertSupplementItem = async (req, res, next) => {
 
     const supplementItem = await SupplementItem.findOneAndUpdate(
       { mealSlotId: mealSlot._id, supplementRecipeId },
-      { $set: { dosage: dosage ?? null, instructions: instructions ?? null, timingAnchor: timingAnchor || 'with' } },
-      { upsert: true, returnDocument: 'after' }
+      { $set: { dosage: dosage ?? null, instructions: instructions ?? null, timingAnchor } },
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
     if (dietPlan.workflowStatus === 'portions_refined') {
@@ -468,9 +472,11 @@ exports.upsertSupplementItem = async (req, res, next) => {
 };
 
 /**
- * @desc    Step 5: mark this plan's wizard progress finalized - a
- *          sanity-check confirmation, not a new server-side validation
- *          gate (the dietician has already reviewed the detailed view).
+ * @desc    Step 5: activate this plan - the real spec.md gate, blocking
+ *          unless every generated day is within +/-5% of the plan's
+ *          calorie target (services/planActivationService.js). Only
+ *          flips workflowStatus once that holds; the dietician having
+ *          reviewed the detailed view is not itself sufficient.
  * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/finalize-plan-item-week
  * @access  Private (Dietician)
  */
@@ -479,10 +485,36 @@ exports.finalizePlanItemWeek = async (req, res, next) => {
     const dietPlan = await loadPlanItemDietPlan(req, res);
     if (!dietPlan) return;
 
+    const targetCalories = dietPlan.calorieStrategy?.calorieBudget;
+    if (!(targetCalories > 0)) {
+      return res.status(400).json({ success: false, message: 'This plan has no calorie target set (Step 1) - cannot validate activation.' });
+    }
+
+    const validation = await validatePlanForActivation(dietPlan._id, targetCalories);
+    if (!validation.withinTolerance) {
+      const offDays = validation.days.filter((day) => !day.withinTolerance);
+      return res.status(422).json({
+        success: false,
+        message: `${offDays.length} day(s) are outside the +/-5% calorie tolerance and must be adjusted before activating.`,
+        data: { days: validation.days },
+      });
+    }
+
+    // Mirrors legacy finalizeWeekPlan's own "Draft -> Finalized" promotion
+    // (dietPlanController.js) - dietPlanController.js::activateDietPlan
+    // requires dietPlan.status === 'Finalized' before it will flip a plan to
+    // 'Active'. workflowStatus alone (below) is wizard-progress bookkeeping,
+    // not this model-wide status field - without this, the dietician app's
+    // "Confirm & Activate" (finalize-plan-item-week, then .../activate)
+    // would 400 on the activate call every time for a plan-item plan.
+    if (dietPlan.status === 'Draft') {
+      dietPlan.status = 'Finalized';
+    }
+
     dietPlan.workflowStatus = 'finalized';
     await dietPlan.save();
 
-    return res.status(200).json({ success: true, data: { workflowStatus: dietPlan.workflowStatus } });
+    return res.status(200).json({ success: true, data: { workflowStatus: dietPlan.workflowStatus, days: validation.days } });
   } catch (error) {
     next(error);
   }

@@ -39,7 +39,7 @@ afterAll(async () => {
 
 const auth = (req) => req.set('Authorization', 'Bearer dietician-token');
 
-test('Step 1 (targets) -> Step 2 (generate, all V1) -> Step 3 (edit one item to V2) -> Step 5 (finalize view shows V2 for the edited item, V1 elsewhere)', async () => {
+test('Step 1 (targets) -> Step 2 (generate) -> Step 3 (refine) -> Step 4 (supplement) -> Step 5 (finalize + activate)', async () => {
   const dietician = await createDietician();
   const patient = await createPatient();
   registerTestToken('dietician-token', dietician._id);
@@ -134,10 +134,63 @@ test('Step 1 (targets) -> Step 2 (generate, all V1) -> Step 3 (edit one item to 
     expect(item.recipeVersion.versionNumber).toBe(1);
   }
 
-  // Finalize.
+  // Step 4: inject a timing-anchored supplement into one slot.
+  const supplement = await Recipe.create({
+    dieticianId: dietician._id,
+    name: 'Multivitamin',
+    servingTime: 'Breakfast',
+    category: 'Supplements',
+  });
+  const timelineRes = await auth(
+    request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/timeline-supplements`)
+  ).send({ week: 1, dayGroup: 'Monday', servingTime: 'Breakfast', supplementRecipeId: String(supplement._id), dosage: '1 tablet', timingAnchor: 'post' });
+  expect(timelineRes.status).toBe(200);
+
+  // Bring every generated day within the finalize gate's +/-5% tolerance -
+  // the raw 7-slots-per-day generation total (389*7=2723 cal) is nowhere
+  // near the plan's 2000 cal target, and finalize now enforces that for
+  // real (services/planActivationService.js).
+  const autoBalanceRes = await auth(
+    request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/auto-balance`)
+  ).send({ scope: 'week', week: 1, targetDailyCalories: 2000 });
+  expect(autoBalanceRes.status).toBe(200);
+
+  // The finalize view's supplement now shows up alongside the resolved
+  // recipe versions.
+  const finalPlanItemsRes = await auth(
+    request(app).get(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/weeks/1/plan-items`)
+  );
+  const mondayBreakfast = finalPlanItemsRes.body.data.days
+    .find((d) => d.dayGroup === 'Monday')
+    .meals.find((m) => m.servingTime === 'Breakfast');
+  expect(mondayBreakfast.supplements).toEqual([
+    expect.objectContaining({ supplementName: 'Multivitamin', dosage: '1 tablet', timingAnchor: 'post' }),
+  ]);
+
+  // Finalize - blocked unless every day is within +/-5% of target (proven
+  // by the auto-balance step above actually being required first).
   const finalizeRes = await auth(
     request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
   ).send({});
   expect(finalizeRes.status).toBe(200);
   expect(finalizeRes.body.data.workflowStatus).toBe('finalized');
+  expect(finalizeRes.body.data.days.length).toBeGreaterThan(0);
+  for (const day of finalizeRes.body.data.days) {
+    expect(day.withinTolerance).toBe(true);
+  }
+
+  const afterFinalize = await DietPlan.findById(dietPlan._id);
+  expect(afterFinalize.status).toBe('Finalized'); // required by dietPlanController.js::activateDietPlan's own gate
+
+  // Activate - the real "make this plan live for the patient" endpoint the
+  // dietician app's Confirm & Activate button calls right after finalize
+  // (plan_item_finalize_step_controller.dart::finalizeAndActivate).
+  const activateRes = await auth(
+    request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/activate`)
+  ).send({});
+  expect(activateRes.status).toBe(200);
+
+  const afterActivate = await DietPlan.findById(dietPlan._id);
+  expect(afterActivate.status).toBe('Active');
+  expect(afterActivate.activationDate).not.toBeNull();
 });

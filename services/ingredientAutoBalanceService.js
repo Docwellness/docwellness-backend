@@ -9,12 +9,18 @@
  * it shares one code path with manual ingredient editing rather than a
  * second divergent one.
  *
- * Known risk, flagged in the plan doc rather than solved here: uniform
- * proportional scaling of independent ingredient quantities can produce
- * unrealistic real-world portions (e.g. "1.3 eggs") more visibly than the
- * old single-scalar servingMultiplier did. No rounding/sanity heuristic is
- * applied here beyond a plain 2-decimal round - the Step 3 Ingredient
- * Editor UI (Phase 5) is where a dietician would see and correct this.
+ * Risk mitigation (design.md's "Auto-balance could produce implausible
+ * ingredient quantities" risk): uniform proportional scaling of independent
+ * ingredient quantities can in principle demand an arbitrarily large or
+ * small scale to hit a target exactly (e.g. "10x every ingredient"). Rather
+ * than ever apply that, the ratio is clamped to
+ * [MIN_SCALE_RATIO, MAX_SCALE_RATIO] - a target outside what that clamped
+ * ratio can reach is deliberately under/over-shot instead of producing an
+ * unrealistic portion. Per design.md, this means the day is "left flagged as
+ * outside tolerance rather than produce an unrealistic quantity" - that
+ * flagging is services/planActivationService.js's job at finalize time, not
+ * this function's; a caller here just gets a version that didn't fully hit
+ * its requested target.
  */
 
 const RecipeVersion = require('../models/RecipeVersion');
@@ -23,14 +29,24 @@ const MealSlotPlan = require('../models/MealSlotPlan');
 const DayPlan = require('../models/DayPlan');
 const { createCustomVersion } = require('./recipeVersioningService');
 
+// A target requiring more than a 3x scale-up or scale-down of an ingredient's
+// current amount is treated as unreachable via uniform scaling - e.g. "1.3
+// eggs" is already a stretch at 1.3x, and something like 5x would produce a
+// clearly unrealistic real-world portion. Chosen as a simple, food-agnostic
+// bound (no per-ingredient/per-unit data needed) per design.md's "sane
+// per-ingredient bound" mitigation.
+const MIN_SCALE_RATIO = 1 / 3;
+const MAX_SCALE_RATIO = 3;
+
 /**
  * Scales every ingredient in recipeVersionId's ingredients[] by the same
- * ratio (targetCalories / current nutritionPerServing.calories), creating
- * and returning a new RecipeVersion - never mutates recipeVersionId's
- * document (same immutability guarantee as createCustomVersion itself,
- * which this delegates to). Repointing a PlanItem to the new version is the
- * caller's job (see autoBalanceDay/autoBalanceWeek below, or the API layer
- * for a single-item auto-balance call).
+ * ratio (targetCalories / current nutritionPerServing.calories), clamped to
+ * [MIN_SCALE_RATIO, MAX_SCALE_RATIO], creating and returning a new
+ * RecipeVersion - never mutates recipeVersionId's document (same
+ * immutability guarantee as createCustomVersion itself, which this
+ * delegates to). Repointing a PlanItem to the new version is the caller's
+ * job (see autoBalanceDay/autoBalanceWeek below, or the API layer for a
+ * single-item auto-balance call).
  */
 async function autoBalanceIngredients(recipeVersionId, targetCalories) {
   const currentVersion = await RecipeVersion.findById(recipeVersionId);
@@ -45,7 +61,8 @@ async function autoBalanceIngredients(recipeVersionId, targetCalories) {
     throw new Error('targetCalories must be a positive number');
   }
 
-  const ratio = targetCalories / currentCalories;
+  const requestedRatio = targetCalories / currentCalories;
+  const ratio = Math.min(MAX_SCALE_RATIO, Math.max(MIN_SCALE_RATIO, requestedRatio));
   const updatedIngredients = currentVersion.ingredients.map((ingredient) => ({
     foodItemId: ingredient.foodItemId,
     rawQuantity: Math.round(ingredient.rawQuantity * ratio * 100) / 100,
@@ -53,7 +70,12 @@ async function autoBalanceIngredients(recipeVersionId, targetCalories) {
     preparation: ingredient.preparation,
   }));
 
-  return createCustomVersion(recipeVersionId, updatedIngredients);
+  const newVersion = await createCustomVersion(recipeVersionId, updatedIngredients);
+  // In-memory annotation only (not a schema path, never persisted) - lets an
+  // immediate caller (autoBalanceDay below) see that the target couldn't be
+  // fully reached without inspecting ratios itself.
+  newVersion._wasScaleClamped = ratio !== requestedRatio;
+  return newVersion;
 }
 
 /**
@@ -93,7 +115,13 @@ async function autoBalanceDay(dayPlanId, targetDailyCalories) {
     item.recipeVersionId = newVersion._id;
     item.calculatedNutrition = newVersion.nutritionPerServing;
     await item.save();
-    results.push({ planItemId: item._id, newVersionId: newVersion._id, targetCalories: itemTargetCalories });
+    results.push({
+      planItemId: item._id,
+      newVersionId: newVersion._id,
+      targetCalories: itemTargetCalories,
+      achievedCalories: newVersion.nutritionPerServing.calories,
+      wasClamped: !!newVersion._wasScaleClamped,
+    });
   }
   return results;
 }

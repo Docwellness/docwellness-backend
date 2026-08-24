@@ -85,6 +85,25 @@ describe('autoBalanceIngredients', () => {
     expect(reloaded.toObject().ingredients).toEqual(snapshotIngredients);
   });
 
+  test('clamps the scale ratio instead of producing an unrealistic quantity for an extreme target', async () => {
+    const { version } = await makeVersion({ oatsQty: 40, milkQty: 200 }); // 239.6 cal
+    const targetCalories = 239.6 * 10; // 10x current - way beyond the 3x clamp
+
+    const newVersion = await autoBalanceIngredients(version._id, targetCalories);
+
+    const oatsIngredient = newVersion.ingredients.find((i) => String(i.foodItemId) === String(version.ingredients[0].foodItemId));
+    expect(oatsIngredient.rawQuantity).toBeCloseTo(40 * 3); // capped at 3x, not 10x
+    expect(newVersion._wasScaleClamped).toBe(true);
+    expect(newVersion.nutritionPerServing.calories).toBeLessThan(targetCalories); // target deliberately undershot
+  });
+
+  test('does not flag clamping when the target is reachable within the 3x bound', async () => {
+    const { version } = await makeVersion({ oatsQty: 40, milkQty: 200 }); // 239.6 cal
+    const newVersion = await autoBalanceIngredients(version._id, 479.2); // exactly 2x, within bound
+
+    expect(newVersion._wasScaleClamped).toBe(false);
+  });
+
   test('throws when the version has no positive current calories', async () => {
     const { oats, milk } = await makeVersion();
     const emptyVersion = await RecipeVersion.create({

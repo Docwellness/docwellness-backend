@@ -16,6 +16,30 @@
 const { getFinalizedWeeks } = require('./dietPlanLegacyView');
 const { DayPlan, MealSlotPlan, PlanItem, SupplementItem, RecipeVersion, FoodItem } = require('../models');
 
+// A single Recipe can be prescribed at more than one PlanItem (different
+// day/slot, or the same slot across weeks) at DIFFERENT versions - e.g. the
+// dietician edits ingredients for Monday's Oats Porridge (Step 3) while
+// Tuesday's Oats Porridge stays on V1. `dailyMeals[].recipeId` normally IS
+// the real Recipe._id, and every occurrence sharing a recipeId would
+// otherwise collapse onto the SAME `recipes[recipeId]` entry client-side -
+// silently applying one occurrence's edited quantities to every other
+// occurrence of that recipe. Suffixing with the version number gives each
+// distinct (recipe, version) pair its own key, so
+// controllers/patient/dietController.js can synthesize a separate `recipes`
+// entry per version - invisible to the Flutter client, which already only
+// ever treats recipeId as an opaque lookup key into `recipes`.
+const VERSIONED_ID_SEPARATOR = '::v';
+
+function versionedRecipeKey(recipeId, versionNumber) {
+  return `${recipeId}${VERSIONED_ID_SEPARATOR}${versionNumber}`;
+}
+
+/** Inverse of versionedRecipeKey - the real Recipe._id to fetch/clone from. Passing a plain (non-versioned) id back through is a no-op, so this is always safe to call regardless of which model produced the id. */
+function baseRecipeIdFromKey(key) {
+  const idx = key.indexOf(VERSIONED_ID_SEPARATOR);
+  return idx === -1 ? key : key.slice(0, idx);
+}
+
 /**
  * Synthesizes the legacy {weeks:[{week,dailyMeals}]} shape from
  * DayPlan/MealSlotPlan/PlanItem, PLUS two additive extras a days-array
@@ -88,17 +112,24 @@ async function buildPlanItemPatientView(dietPlan) {
     if (!mealSlot || !dayPlan || !version) continue;
 
     const recipeId = String(version.parentRecipeId);
+    const versionedId = versionedRecipeKey(recipeId, version.versionNumber);
     if (!weeksMap.has(dayPlan.week)) weeksMap.set(dayPlan.week, { week: dayPlan.week, dailyMeals: [] });
     weeksMap.get(dayPlan.week).dailyMeals.push({
       dayGroup: dayPlan.dayGroup,
       servingTime: mealSlot.servingTime,
-      recipeId,
+      recipeId: versionedId,
       servings: 1,
     });
 
-    const existingOverride = recipeVersionOverrides[recipeId];
-    if (!existingOverride || version.versionNumber > existingOverride.versionNumber) {
-      recipeVersionOverrides[recipeId] = {
+    // Every PlanItem referencing the same RecipeVersion._id computes an
+    // identical versionedId and identical override content (versionNumber is
+    // unique per parentRecipeId - see RecipeVersion's compound index) - a
+    // second occurrence just harmlessly recomputes the same value, not a
+    // conflict to resolve like the old highest-version-wins logic this
+    // replaced.
+    if (!recipeVersionOverrides[versionedId]) {
+      recipeVersionOverrides[versionedId] = {
+        baseRecipeId: recipeId,
         versionNumber: version.versionNumber,
         steps: version.steps || [],
         ingredients: (version.ingredients || []).map((ingredient) => ({
@@ -163,4 +194,4 @@ async function getPatientVisibleWeeks(dietPlan) {
   return getFinalizedWeeks(dietPlan);
 }
 
-module.exports = { getPatientVisibleWeeks, buildPlanItemPatientView };
+module.exports = { getPatientVisibleWeeks, buildPlanItemPatientView, versionedRecipeKey, baseRecipeIdFromKey };

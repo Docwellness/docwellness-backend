@@ -22,12 +22,13 @@ let FoodItem;
 let Recipe;
 let getPatientVisibleWeeks;
 let buildPlanItemPatientView;
+let versionedRecipeKey;
 
 beforeAll(async () => {
   await connectTestDb();
   mongoose = require('mongoose');
   ({ DietPlan, DayPlan, MealSlotPlan, PlanItem, SupplementItem, RecipeVersion, FoodItem, Recipe } = require('../models'));
-  ({ getPatientVisibleWeeks, buildPlanItemPatientView } = require('../utils/dietPlanReadDispatch'));
+  ({ getPatientVisibleWeeks, buildPlanItemPatientView, versionedRecipeKey } = require('../utils/dietPlanReadDispatch'));
 });
 
 afterEach(async () => {
@@ -81,7 +82,7 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
     return { dietPlan, recipe, v1, oats, planItem, supplement };
   }
 
-  test('getPatientVisibleWeeks synthesizes dailyMeals from PlanItem, using the underlying Recipe id', async () => {
+  test('getPatientVisibleWeeks synthesizes dailyMeals with a version-qualified recipeId', async () => {
     const { dietPlan, recipe } = await seedPlanItemPlan();
 
     const weeks = await getPatientVisibleWeeks(dietPlan);
@@ -89,7 +90,7 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
     expect(weeks).toHaveLength(1);
     expect(weeks[0].week).toBe(1);
     expect(weeks[0].dailyMeals).toEqual([
-      { dayGroup: 'Monday', servingTime: 'Breakfast', recipeId: String(recipe._id), servings: 1 },
+      { dayGroup: 'Monday', servingTime: 'Breakfast', recipeId: versionedRecipeKey(String(recipe._id), 1), servings: 1 },
     ]);
   });
 
@@ -98,7 +99,8 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
 
     const { recipeVersionOverrides } = await buildPlanItemPatientView(dietPlan);
 
-    const override = recipeVersionOverrides[String(recipe._id)];
+    const override = recipeVersionOverrides[versionedRecipeKey(String(recipe._id), 1)];
+    expect(override.baseRecipeId).toBe(String(recipe._id));
     expect(override.versionNumber).toBe(1);
     expect(override.ingredients).toEqual([{ name: 'Oats', quantity: 100, unit: 'g', image: null, isScalable: true }]);
     // 100g oats @ 389kcal/100g = 389 - proves getRecipesForServing's
@@ -116,9 +118,37 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
 
     const { recipeVersionOverrides } = await buildPlanItemPatientView(dietPlan);
 
-    const override = recipeVersionOverrides[String(recipe._id)];
+    const override = recipeVersionOverrides[versionedRecipeKey(String(recipe._id), 2)];
     expect(override.versionNumber).toBe(2);
     expect(override.ingredients[0].quantity).toBe(250);
+  });
+
+  test('two occurrences of the SAME recipe at different versions each keep their own distinct override', async () => {
+    // Regression test for the bug this versioned-key scheme fixes: editing
+    // ONE PlanItem's portions used to overwrite recipeVersionOverrides for
+    // every OTHER occurrence of that same recipe too (keyed only by
+    // recipeId, "highest version wins"), so an untouched sibling meal would
+    // incorrectly inherit the edited quantities. Monday keeps V1, Tuesday's
+    // occurrence of the identical recipe is edited to V2 - both must be
+    // independently retrievable afterward.
+    const { dietPlan, recipe, v1, oats } = await seedPlanItemPlan();
+
+    const tuesdayDayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: dietPlan.patientId, week: 1, dayGroup: 'Tuesday' });
+    const tuesdayMealSlot = await MealSlotPlan.create({ dayPlanId: tuesdayDayPlan._id, servingTime: 'Breakfast' });
+    const { createCustomVersion } = require('../services/recipeVersioningService');
+    const v2 = await createCustomVersion(v1._id, [{ foodItemId: oats._id, rawQuantity: 250, unit: 'g' }]);
+    await PlanItem.create({ mealSlotId: tuesdayMealSlot._id, recipeVersionId: v2._id, calculatedNutrition: v2.nutritionPerServing });
+
+    const { weeks, recipeVersionOverrides } = await buildPlanItemPatientView(dietPlan);
+
+    const mondayMeal = weeks[0].dailyMeals.find((m) => m.dayGroup === 'Monday');
+    const tuesdayMeal = weeks[0].dailyMeals.find((m) => m.dayGroup === 'Tuesday');
+    expect(mondayMeal.recipeId).toBe(versionedRecipeKey(String(recipe._id), 1));
+    expect(tuesdayMeal.recipeId).toBe(versionedRecipeKey(String(recipe._id), 2));
+    expect(mondayMeal.recipeId).not.toBe(tuesdayMeal.recipeId);
+
+    expect(recipeVersionOverrides[mondayMeal.recipeId].ingredients[0].quantity).toBe(100); // Monday's V1 untouched
+    expect(recipeVersionOverrides[tuesdayMeal.recipeId].ingredients[0].quantity).toBe(250); // Tuesday's V2 edit
   });
 
   test('buildPlanItemPatientView maps SupplementItem into the legacy supplementScheduleByWeek shape', async () => {

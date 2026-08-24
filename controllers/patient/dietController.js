@@ -11,7 +11,7 @@ const {
   resolveCurrentWeek,
 } = require('../../utils/dietPlanWeek');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
-const { buildPlanItemPatientView } = require('../../utils/dietPlanReadDispatch');
+const { buildPlanItemPatientView, baseRecipeIdFromKey } = require('../../utils/dietPlanReadDispatch');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -138,7 +138,11 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
     weeks.forEach((week) => {
       (week?.dailyMeals || []).forEach((meal) => {
         if (meal?.recipeId) {
-          recipeIds.add(meal.recipeId.toString());
+          // A plan-item plan's meal.recipeId is versioned (see
+          // dietPlanReadDispatch.js's versionedRecipeKey) - resolve back to
+          // the real Recipe._id to actually fetch; a no-op for a days-array
+          // plan's already-plain id.
+          recipeIds.add(baseRecipeIdFromKey(meal.recipeId.toString()));
         }
       });
     });
@@ -236,14 +240,25 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
     // resolves to exactly 1 - the version's nutritionPerServing below is
     // already the real final number, not something to rescale further.
     // A no-op for every days-array plan (recipeVersionOverrides stays {}).
-    Object.entries(recipeVersionOverrides).forEach(([recipeId, override]) => {
-      if (!recipes[recipeId]) return;
-      recipes[recipeId].ingredients = override.ingredients;
-      recipes[recipeId].instructions = override.steps;
-      recipes[recipeId].nutritionPerServing = override.nutritionPerServing;
-      recipes[recipeId].nutrition = override.nutritionPerServing;
-      recipes[recipeId].servingSize = { ...recipes[recipeId].servingSize, quantity: 1 };
-      recipes[recipeId].components = override.components;
+    // Keyed by versionedRecipeKey (recipeId + versionNumber), NOT the bare
+    // recipeId - a clone is created per distinct version rather than
+    // overwriting recipes[recipeId] in place, so two occurrences of the same
+    // Recipe at different versions (one dietician-edited, one still V1)
+    // each keep their own exact prescribed ingredients/nutrition instead of
+    // one occurrence's edit silently bleeding into the other's display.
+    Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
+      const baseRecipe = recipes[override.baseRecipeId];
+      if (!baseRecipe) return;
+      recipes[versionedId] = {
+        ...baseRecipe,
+        id: versionedId,
+        ingredients: override.ingredients,
+        instructions: override.steps,
+        nutritionPerServing: override.nutritionPerServing,
+        nutrition: override.nutritionPerServing,
+        servingSize: { ...baseRecipe.servingSize, quantity: 1 },
+        components: override.components,
+      };
     });
 
     const activationStart = parseDateOrNull(dietPlan.activationDate);

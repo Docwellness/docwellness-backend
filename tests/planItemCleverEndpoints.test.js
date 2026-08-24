@@ -74,7 +74,16 @@ async function setup() {
   const oats = await makeFoodItem('Oats', 389);
   const { recipe, v1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Oats Porridge', servingTime: 'Breakfast', foodItem: oats });
 
-  const dietPlan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id, dataModel: 'plan-item', workflowStatus: 'menu_generated' });
+  const dietPlan = await DietPlan.create({
+    patientId: patient._id,
+    dieticianId: dietician._id,
+    dataModel: 'plan-item',
+    workflowStatus: 'menu_generated',
+    // Matches the one PlanItem's actual calories exactly, so tests in this
+    // file that don't care about activation tolerance (everything except
+    // the finalize-plan-item-week describe block) aren't affected by it.
+    calorieStrategy: { calorieBudget: v1.nutritionPerServing.calories },
+  });
   const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: patient._id, week: 1, dayGroup: 'Monday' });
   const mealSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Breakfast' });
   const planItem = await PlanItem.create({ mealSlotId: mealSlot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
@@ -207,16 +216,93 @@ describe('POST .../timeline-supplements', () => {
     const all = await SupplementItem.find({});
     expect(all).toHaveLength(1);
   });
+
+  test('rejects an invalid timingAnchor', async () => {
+    const { dietician, patient, dietPlan } = await setup();
+    const supplement = await Recipe.create({ dieticianId: dietician._id, name: 'Multivitamin', servingTime: 'Breakfast', category: 'Supplements' });
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/timeline-supplements`)
+    ).send({ week: 1, dayGroup: 'Monday', servingTime: 'Breakfast', supplementRecipeId: supplement._id.toString(), timingAnchor: 'sometime' });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects a missing timingAnchor', async () => {
+    const { dietician, patient, dietPlan } = await setup();
+    const supplement = await Recipe.create({ dieticianId: dietician._id, name: 'Multivitamin', servingTime: 'Breakfast', category: 'Supplements' });
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/timeline-supplements`)
+    ).send({ week: 1, dayGroup: 'Monday', servingTime: 'Breakfast', supplementRecipeId: supplement._id.toString() });
+
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST .../finalize-plan-item-week', () => {
-  test('sets workflowStatus to finalized', async () => {
+  test('sets workflowStatus to finalized when every day is within +/-5% of target', async () => {
     const { patient, dietPlan } = await setup();
     const res = await auth(
       request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
     ).send({});
     expect(res.status).toBe(200);
     expect(res.body.data.workflowStatus).toBe('finalized');
+    expect(res.body.data.days[0].withinTolerance).toBe(true);
+  });
+
+  test('422s and does not finalize when a day is outside +/-5% of target', async () => {
+    const { patient, dietPlan } = await setup();
+    dietPlan.calorieStrategy = { calorieBudget: 100 }; // the one PlanItem is ~389 cal - way outside tolerance
+    await dietPlan.save();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
+    ).send({});
+    expect(res.status).toBe(422);
+    expect(res.body.data.days[0].withinTolerance).toBe(false);
+
+    const reloaded = await DietPlan.findById(dietPlan._id);
+    expect(reloaded.workflowStatus).not.toBe('finalized');
+  });
+
+  test('400s when the plan has no calorie target set', async () => {
+    const { patient, dietPlan } = await setup();
+    dietPlan.calorieStrategy = undefined;
+    await dietPlan.save();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
+    ).send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('promotes DietPlan.status Draft -> Finalized on success, required by dietPlanController.js::activateDietPlan', async () => {
+    const { patient, dietPlan } = await setup();
+    expect(dietPlan.status).toBe('Draft');
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
+    ).send({});
+    expect(res.status).toBe(200);
+
+    const reloaded = await DietPlan.findById(dietPlan._id);
+    expect(reloaded.status).toBe('Finalized');
+  });
+
+  test('400s for a days-array plan and never touches its status', async () => {
+    const dietician = await createDietician();
+    const patient = await createPatient();
+    const dietPlan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id }); // default dataModel, status: 'Draft'
+    registerTestToken('dietician-token', dietician._id);
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/finalize-plan-item-week`)
+    ).send({});
+    expect(res.status).toBe(400);
+
+    const reloaded = await DietPlan.findById(dietPlan._id);
+    expect(reloaded.status).toBe('Draft'); // untouched - loadPlanItemDietPlan rejects before the status-promotion logic ever runs
   });
 });
 
