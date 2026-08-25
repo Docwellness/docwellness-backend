@@ -8,14 +8,15 @@
 //
 // A recipe is eligible for a servingTime slot if either:
 //   - its own stored `servingTime` matches exactly (the normal case), or
-//   - it's tagged 'side' or 'salad' AND the slot is Lunch, Dinner, or
-//     Evening Snack - sides (chapati/bhakri/rice) and salads are cooked
-//     once with a fixed servingTime:'Lunch' (see scripts/add-side-dish-
-//     recipes.js / add-salad-recipes.js) but in real usage accompany both
-//     lunch and dinner (and occasionally an evening snack) just as
-//     naturally - confirmed against Dr. Tejasvini's own source diet plans,
-//     where a single Dinner routinely includes a bhakri *and* a chapati
-//     *and* a salad alongside the main dish.
+//   - it's tagged 'side' or 'salad' AND the slot is Lunch or Dinner -
+//     sides (chapati/bhakri/rice) and salads are cooked once with a fixed
+//     servingTime:'Lunch' (see scripts/add-side-dish-recipes.js / add-
+//     salad-recipes.js) but in real usage accompany both lunch and dinner
+//     just as naturally - confirmed against Dr. Tejasvini's own source
+//     diet plans, where a single Dinner routinely includes a bhakri *and*
+//     a chapati *and* a salad alongside the main dish. Evening Snack is
+//     deliberately excluded - a lunch/dinner side/salad (e.g. Varan) is
+//     never a legitimate evening snack on its own.
 // This is purely a query-time broadening for these options-building call
 // sites - it does not change any recipe's stored `servingTime`, so every
 // other consumer (getServingTimeSummary's per-slot counts, the AI
@@ -45,7 +46,7 @@ const REQUIRED_SERVING_TIMES = [
 
 const SUPPLEMENTS_PSEUDO_SLOT = 'Supplements';
 
-const SIDE_SALAD_ELIGIBLE_SLOTS = new Set(['Lunch', 'Dinner', 'Evening Snack']);
+const SIDE_SALAD_ELIGIBLE_SLOTS = new Set(['Lunch', 'Dinner']);
 
 /**
  * Fetches the dietician's full recipe pool once - the raw material for

@@ -44,7 +44,7 @@ const CHAPATI = { id: 'chapati-side', name: 'Chapati', servingTime: 'Lunch', cal
 // matches the slot exactly) so buildWeek can fully populate every
 // untested slot without itself triggering spurious slot_mismatch warnings
 // (unlike reusing CHAPATI - a Lunch-only side - which is only legitimately
-// cross-listable into Lunch/Dinner/Evening Snack, not every slot).
+// cross-listable into Lunch/Dinner, not every slot).
 const FILLERS = {};
 REQUIRED_SERVING_TIMES.forEach((servingTime) => {
   const fillerId = `filler-${servingTime.toLowerCase().replace(/\s+/g, '-')}`;

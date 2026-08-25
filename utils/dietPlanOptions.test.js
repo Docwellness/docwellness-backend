@@ -54,13 +54,13 @@ test('a Lunch-only recipe appears ONLY under the Lunch bucket', () => {
   assert.ok(!(map.Breakfast || []).some((r) => r._id.toString() === 'lunch-biryani'));
 });
 
-test('side/salad recipes cross-list into Lunch, Dinner, and Evening Snack only', () => {
+test('side/salad recipes cross-list into Lunch and Dinner only', () => {
   const map = buildRecipesByServingTimeMap(fixtureDocs);
   [...SIDE_SALAD_ELIGIBLE_SLOTS].forEach((slot) => {
     assert.ok(map[slot].some((r) => r._id.toString() === 'chapati-side'), `Chapati missing from ${slot}`);
     assert.ok(map[slot].some((r) => r._id.toString() === 'salad-item'), `Salad missing from ${slot}`);
   });
-  ['Breakfast', 'Morning Drink', 'Brunch', 'Night Drink'].forEach((slot) => {
+  ['Breakfast', 'Morning Drink', 'Brunch', 'Night Drink', 'Evening Snack'].forEach((slot) => {
     const bucket = map[slot] || [];
     assert.ok(!bucket.some((r) => r._id.toString() === 'chapati-side'), `Chapati leaked into ${slot}`);
   });

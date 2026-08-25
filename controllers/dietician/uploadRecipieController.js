@@ -1029,9 +1029,11 @@ exports.listRecipes = async (req, res, next) => {
     } else if (servingTime && SIDE_SALAD_ELIGIBLE_SLOTS.has(servingTime)) {
       // Same cross-listing eligibility the AI generation engine already
       // uses (services/recipeSelectionEngine.js) - a side/salad-tagged
-      // recipe is a legitimate accompaniment for Lunch/Dinner/Evening Snack
-      // regardless of its own authored servingTime, so a dietician manually
-      // adding/swapping a recipe for one of those slots should see it too.
+      // recipe is a legitimate accompaniment for Lunch/Dinner regardless of
+      // its own authored servingTime, so a dietician manually adding/
+      // swapping a recipe for one of those slots should see it too.
+      // Evening Snack is intentionally NOT in SIDE_SALAD_ELIGIBLE_SLOTS - a
+      // lunch/dinner side is never a legitimate evening snack.
       // Skipped when an explicit `tag` filter is requested - that caller
       // already knows exactly which tag it wants, no broadening needed.
       filter.$or = [{ servingTime }, { tags: { $in: ['side', 'salad'] } }];

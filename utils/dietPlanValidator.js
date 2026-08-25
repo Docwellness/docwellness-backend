@@ -104,10 +104,12 @@ function validateDietPlan({
       }
 
       // Side/salad recipes are natively tagged with one servingTime (e.g.
-      // Chapati is 'Lunch') but legitimately accompany Lunch, Dinner, and
-      // Evening Snack too (see dietPlanOptions.js's identical exception) -
-      // without this, every AI-composed combo would false-flag its own
-      // sides as mismatched.
+      // Chapati is 'Lunch') but legitimately accompany both Lunch and
+      // Dinner too (see dietPlanOptions.js's identical exception) - without
+      // this, every AI-composed combo would false-flag its own sides as
+      // mismatched. Deliberately NOT extended to Evening Snack (see that
+      // file's comment) - a lunch/dinner side found there is a real bug,
+      // not a legitimate combo.
       const isSideOrSalad = Array.isArray(recipe.tags) && recipe.tags.some((t) => t === 'side' || t === 'salad');
       const isCrossListedSlot = isSideOrSalad && SIDE_SALAD_ELIGIBLE_SLOTS.has(meal.servingTime);
       if (
