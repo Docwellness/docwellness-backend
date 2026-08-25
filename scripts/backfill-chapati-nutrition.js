@@ -15,8 +15,8 @@
  *   node scripts/backfill-chapati-nutrition.js --execute  # actually write
  */
 require('dotenv').config();
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 const { normalize } = require('../utils/ingredientLibrary');
 
 const EXECUTE = process.argv.includes('--execute');
@@ -34,7 +34,11 @@ const REFERENCE_NUTRITION_PER_100G = {
 const REFERENCE_PIECE_GRAMS = 40; // "1 piece" = one handful-size chapati
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI);
+  // Never mongoose.connect(uri) directly here - prod's self-hosted Mongo
+  // needs the custom CA file connectDB() builds from MONGODB_TLS_CA_BASE64
+  // (see config/database.js's own comment); without it this fails with a
+  // misleading "self-signed certificate in certificate chain" error.
+  await connectDB();
   try {
     const { FoodItem } = require('../models');
 

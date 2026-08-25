@@ -12,17 +12,21 @@
  *   (defaults to fooditem-nutrition-audit.json in the repo root)
  */
 require('dotenv').config();
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 const { normalize } = require('../utils/ingredientLibrary');
 
 const OUT_FILE = process.argv[2] || path.join(__dirname, '..', 'fooditem-nutrition-audit.json');
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
 
 async function main() {
-  await mongoose.connect(process.env.MONGODB_URI);
+  // Never mongoose.connect(uri) directly here - prod's self-hosted Mongo
+  // needs the custom CA file connectDB() builds from MONGODB_TLS_CA_BASE64
+  // (see config/database.js's own comment); without it this fails with a
+  // misleading "self-signed certificate in certificate chain" error.
+  await connectDB();
 
   try {
     const { Recipe, FoodItem } = require('../models');
