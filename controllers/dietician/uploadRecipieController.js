@@ -14,6 +14,7 @@ const {
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValidator');
 const { TOP_CATEGORIES, resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
+const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
@@ -1023,11 +1024,19 @@ exports.listRecipes = async (req, res, next) => {
     if (category && category !== 'All') {
       filter.category = category;
     }
-    if (servingTime) {
-      filter.servingTime = servingTime;
-    }
     if (tag) {
       filter.tags = tag;
+    } else if (servingTime && SIDE_SALAD_ELIGIBLE_SLOTS.has(servingTime)) {
+      // Same cross-listing eligibility the AI generation engine already
+      // uses (services/recipeSelectionEngine.js) - a side/salad-tagged
+      // recipe is a legitimate accompaniment for Lunch/Dinner/Evening Snack
+      // regardless of its own authored servingTime, so a dietician manually
+      // adding/swapping a recipe for one of those slots should see it too.
+      // Skipped when an explicit `tag` filter is requested - that caller
+      // already knows exactly which tag it wants, no broadening needed.
+      filter.$or = [{ servingTime }, { tags: { $in: ['side', 'salad'] } }];
+    } else if (servingTime) {
+      filter.servingTime = servingTime;
     }
 
     // Supplements are an exclusive shortcut section - never mix into a
@@ -1041,7 +1050,7 @@ exports.listRecipes = async (req, res, next) => {
       Recipe.countDocuments(filter),
       Recipe.find(filter)
         .select(
-          '_id name image category cuisine servingTime servings ingredients nutrition.calories description createdAt'
+          '_id name image category cuisine servingTime servings ingredients nutrition.calories description createdAt tags'
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1062,6 +1071,7 @@ exports.listRecipes = async (req, res, next) => {
       calories: recipe.nutrition?.calories ?? null,
       description: recipe.description || '',
       createdAt: recipe.createdAt,
+      tags: Array.isArray(recipe.tags) ? recipe.tags : [],
     }));
 
     return res.status(200).json({
