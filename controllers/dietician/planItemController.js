@@ -16,7 +16,7 @@ const { DietPlan, Recipe, RecipeVersion, FoodItem, DayPlan, MealSlotPlan, PlanIt
 const { REQUIRED_SERVING_TIMES } = require('../../utils/servingTimes');
 const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
-const { createCustomVersion } = require('../../services/recipeVersioningService');
+const { createCustomVersion, resolveGramsForIngredient } = require('../../services/recipeVersioningService');
 const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek } = require('../../services/ingredientAutoBalanceService');
 const { validatePlanForActivation } = require('../../services/planActivationService');
 const { swapToRecipe } = require('../../services/recipeVersionSwapService');
@@ -248,6 +248,18 @@ exports.getWeekPlanItems = async (req, res, next) => {
     // recompute still happens server-side in createCustomVersion at Save
     // time - this is display-only, matching services/recipeVersioningService.js's
     // own computeNutritionFromIngredients math so the two never diverge).
+    //
+    // resolvedGramsPerUnit is the grams-equivalent of exactly ONE unit of
+    // this ingredient's OWN unit (e.g. 40 for a 'piece' of Chapati, 1.2 for
+    // a 'nos' Almond), computed the same way createCustomVersion resolves
+    // nutrition (services/recipeVersioningService.js's resolveGramsForIngredient) -
+    // still never the raw unitConversions/density map itself. Without this,
+    // the client could only ever show a live calorie figure for a 'g'-unit
+    // ingredient (see ingredient_editor_sheet.dart's own doc comment on
+    // that former limitation) - every other unit showed "-" regardless of
+    // how complete the FoodItem's own nutrition data actually was. Null
+    // when unresolvable (no FoodItem, or no known conversion for this
+    // unit) - the client already treats null as "-", never a guessed number.
     const foodItemIds = recipeVersions.flatMap((v) => v.ingredients.map((ing) => ing.foodItemId));
     const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } }).select('name nutritionPer100g unitConversions density');
     const foodItemById = new Map(foodItems.map((f) => [String(f._id), f]));
@@ -261,6 +273,7 @@ exports.getWeekPlanItems = async (req, res, next) => {
             ...ing,
             foodItemName: foodItem?.name || null,
             nutritionPer100g: foodItem?.nutritionPer100g || null,
+            resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
           };
         });
         return [String(v._id), plain];

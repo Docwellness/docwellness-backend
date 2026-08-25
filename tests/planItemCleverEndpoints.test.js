@@ -183,6 +183,61 @@ describe('GET .../weeks/:week/plan-items', () => {
     expect(breakfast.items[0].recipeVersion.parentRecipeId).toBe(recipe._id.toString());
     expect(breakfast.items[0].recipeVersion.ingredients[0].foodItemName).toBe('Oats');
     expect(breakfast.items[0].recipeVersion.ingredients[0].nutritionPer100g.calories).toBe(389);
+    // 'g' resolves trivially to 1 gram per unit.
+    expect(breakfast.items[0].recipeVersion.ingredients[0].resolvedGramsPerUnit).toBe(1);
+  });
+
+  test('resolvedGramsPerUnit resolves a non-g unit via the FoodItem\'s own unitConversions', async () => {
+    const { dietician, patient } = await setup();
+    const chapati = await FoodItem.findOneAndUpdate(
+      { normalizedName: 'chapati' },
+      {
+        $setOnInsert: {
+          name: 'Chapati',
+          normalizedName: 'chapati',
+          nutritionPer100g: { calories: 260, protein: 7.5, carbs: 50, fats: 4, fiber: 4.5 },
+          unitConversions: { piece: 40 },
+        },
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    const { v1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Chapati Meal', servingTime: 'Lunch', foodItem: chapati });
+    v1.ingredients = [{ foodItemId: chapati._id, rawQuantity: 2, unit: 'piece' }];
+    await v1.save();
+    const dietPlan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id, dataModel: 'plan-item', workflowStatus: 'menu_generated' });
+    const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: patient._id, week: 1, dayGroup: 'Monday' });
+    const mealSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Lunch' });
+    await PlanItem.create({ mealSlotId: mealSlot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+
+    const res = await auth(
+      request(app).get(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/weeks/1/plan-items`)
+    );
+
+    const lunch = res.body.data.days.find((d) => d.dayGroup === 'Monday').meals.find((m) => m.servingTime === 'Lunch');
+    expect(lunch.items[0].recipeVersion.ingredients[0].resolvedGramsPerUnit).toBe(40);
+  });
+
+  test('resolvedGramsPerUnit is null when the FoodItem has no conversion for the ingredient\'s unit', async () => {
+    const { dietician, patient } = await setup();
+    const almonds = await FoodItem.findOneAndUpdate(
+      { normalizedName: 'almonds' },
+      { $setOnInsert: { name: 'Almonds', normalizedName: 'almonds', nutritionPer100g: { calories: 579, protein: 21, carbs: 22, fats: 50, fiber: 12 } } },
+      { upsert: true, returnDocument: 'after' }
+    );
+    const { v1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Almond Snack', servingTime: 'Evening Snack', foodItem: almonds });
+    v1.ingredients = [{ foodItemId: almonds._id, rawQuantity: 5, unit: 'nos' }];
+    await v1.save();
+    const dietPlan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id, dataModel: 'plan-item', workflowStatus: 'menu_generated' });
+    const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: patient._id, week: 1, dayGroup: 'Monday' });
+    const mealSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Evening Snack' });
+    await PlanItem.create({ mealSlotId: mealSlot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+
+    const res = await auth(
+      request(app).get(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/weeks/1/plan-items`)
+    );
+
+    const snack = res.body.data.days.find((d) => d.dayGroup === 'Monday').meals.find((m) => m.servingTime === 'Evening Snack');
+    expect(snack.items[0].recipeVersion.ingredients[0].resolvedGramsPerUnit).toBeNull();
   });
 });
 
