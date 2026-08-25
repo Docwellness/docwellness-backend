@@ -54,6 +54,7 @@
  *   node scripts/seed-realistic-test-patient.js --execute --approve-payment
  *   node scripts/seed-realistic-test-patient.js --execute --dietician-email=someone@else.com
  *   node scripts/seed-realistic-test-patient.js --execute --delete=<patientId>      # remove this patient (Mongo + real Supabase identity) and everything under them
+ *   node scripts/seed-realistic-test-patient.js --execute --delete-email=<email>    # same, looked up by email instead - the id printed on creation is easy to lose in scrollback
  */
 
 require('dotenv').config();
@@ -76,6 +77,7 @@ function argValue(flag, fallback) {
 const DIETICIAN_EMAIL = argValue('dietician-email', 'dr.tejasvini.pawar@gmail.com');
 const GENDER = argValue('gender', 'Female'); // Female | Male
 const DELETE_PATIENT_ID = argValue('delete', null);
+const DELETE_EMAIL = argValue('delete-email', null);
 
 function randomPassword() {
   const digits = Math.floor(1000 + Math.random() * 9000);
@@ -223,9 +225,12 @@ async function runDelete() {
   } = require('../models');
   const { getSupabaseAdmin } = require('../utils/supabaseAuth');
 
-  const patient = await User.findById(DELETE_PATIENT_ID);
+  // --delete-email is the more convenient handle right after --execute
+  // creates a patient (the printed email is easy to copy; the ObjectId is
+  // easy to lose in scrollback) - both resolve to the same lookup below.
+  const patient = DELETE_EMAIL ? await User.findOne({ email: DELETE_EMAIL, role: 'patient' }) : await User.findById(DELETE_PATIENT_ID);
   if (!patient) {
-    console.log(`No User found for id ${DELETE_PATIENT_ID} - nothing to delete.`);
+    console.log(`No patient found for ${DELETE_EMAIL ? `email ${DELETE_EMAIL}` : `id ${DELETE_PATIENT_ID}`} - nothing to delete.`);
     return;
   }
   console.log(`Found patient: ${patient.profile?.fullName || patient.email} (${patient._id})`);
@@ -457,8 +462,9 @@ async function runCreate() {
     console.log(`  patientId:           ${patient._id}`);
     console.log(`  firstConsultationId: ${firstConsultation._id}`);
     console.log(`  requestId:           ${dietPlanRequest._id}`);
-    console.log('\nTo clean this up later, run:');
+    console.log('\nTo clean this up later, run either:');
     console.log(`  node scripts/seed-realistic-test-patient.js --execute --delete=${patient._id}`);
+    console.log(`  node scripts/seed-realistic-test-patient.js --execute --delete-email=${patientEmail}`);
   } catch (err) {
     // Roll back the Supabase identity so a failed run doesn't leave an
     // orphaned account blocking a retry with the same email - same pattern
@@ -468,8 +474,10 @@ async function runCreate() {
   }
 }
 
+const DELETE_MODE = !!(DELETE_PATIENT_ID || DELETE_EMAIL);
+
 async function main() {
-  console.log(DELETE_PATIENT_ID ? '=== DELETE MODE ===' : EXECUTE ? '=== EXECUTING realistic test-patient creation ===' : '=== DRY RUN (pass --execute to write) ===');
+  console.log(DELETE_MODE ? '=== DELETE MODE ===' : EXECUTE ? '=== EXECUTING realistic test-patient creation ===' : '=== DRY RUN (pass --execute to write) ===');
 
   console.log('Connecting to MongoDB...');
   const tlsCAFile = connectDB.resolveTlsCAFile();
@@ -478,7 +486,7 @@ async function main() {
   console.log('Connected.');
 
   try {
-    if (DELETE_PATIENT_ID) {
+    if (DELETE_MODE) {
       await runDelete();
     } else {
       console.log(`Target dietician: ${DIETICIAN_EMAIL}`);
