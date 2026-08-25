@@ -130,7 +130,14 @@ exports.createCustomRecipeVersion = async (req, res, next) => {
     }
 
     const { planItem } = await loadOwnedPlanItem(dietPlan, planItemId);
-    const newVersion = await createCustomVersion(planItem.recipeVersionId, ingredients, { createdBy: req.user._id });
+    // regenerateSteps: true - this is the dietician's own explicit Save from
+    // the Ingredient Editor, unlike ingredientAutoBalanceService.js's
+    // automatic (and frequent) auto-balance, which never passes this - see
+    // createCustomVersion's own doc comment.
+    const newVersion = await createCustomVersion(planItem.recipeVersionId, ingredients, {
+      createdBy: req.user._id,
+      regenerateSteps: true,
+    });
 
     planItem.recipeVersionId = newVersion._id;
     planItem.calculatedNutrition = newVersion.nutritionPerServing;

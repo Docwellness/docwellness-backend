@@ -5,6 +5,7 @@ const { RECIPE_JSON_SCHEMA } = require('./recipeJsonSchema');
 const { DIET_PLAN_JSON_SCHEMA, REQUIRED_SERVING_TIMES } = require('./dietPlanJsonSchema');
 const { DISH_EXTRACTION_JSON_SCHEMA } = require('./dishExtractionJsonSchema');
 const { EXERCISE_JSON_SCHEMA } = require('./exerciseJsonSchema');
+const { RECIPE_STEPS_REWRITE_JSON_SCHEMA } = require('./recipeStepsRewriteJsonSchema');
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -1122,6 +1123,111 @@ IMPORTANT: Translate naturally into ${lang} script. NO markdown, ONLY JSON.`;
   return translations;
 };
 
+/**
+ * Narrow, single-purpose AI call: rewrites ONLY the quantity/unit mentions
+ * embedded in a recipe's free-text cooking steps (e.g. "1 tsp (5g) cumin")
+ * so they match a NEW, FIXED ingredient list - never touching which
+ * ingredients are used, their order, nutrition, or anything about the step
+ * text beyond a quantity mention. Exists because generateRecipeWithAI's
+ * update mode is the wrong tool for this: its prompt tells the model to
+ * regenerate the entire ingredient list from scratch against dietary
+ * constraints, which would silently discard the dietician's exact,
+ * just-typed quantities. The only caller is
+ * recipeVersioningService.js's createCustomVersion, when a dietician
+ * manually edits ingredient quantities (never auto-balance, which stays
+ * fast/deterministic/offline - see that function's own comment).
+ *
+ * Never throws - returns `steps` unchanged on any failure (empty/refused/
+ * malformed response), since a Save must never fail because of this
+ * refinement, same "never blocks the caller" discipline as
+ * recipeVersioningService.js's syncV1FromRecipe.
+ */
+const rewriteRecipeStepsForIngredients = async ({ name, ingredients, steps }) => {
+  if (!Array.isArray(steps) || steps.length === 0) return steps || [];
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return steps;
+
+  const systemPrompt = `You are a precise recipe-instruction editor. You are given a recipe's cooking steps and its EXACT, FIXED ingredient list - those quantities are final and you must NEVER change, add, or remove an ingredient. Your ONLY job is to rewrite the steps so every quantity/unit mentioned in the text matches the given ingredient list exactly, while leaving everything else about the steps completely unchanged: same number of steps, same order, same actions, same language, same style. Do not add, remove, or reorder steps. Do not change which ingredients are used or invent new ones. Do not change any wording beyond what's strictly needed to correct a quantity/unit mention. If a step doesn't mention a quantity, leave it completely untouched, verbatim.
+
+RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
+{ "steps": ["string - step 1", "string - step 2", ...] }
+NO markdown, NO explanations, ONLY the JSON object.`;
+
+  const userPrompt = `Recipe: ${name || 'Untitled recipe'}
+
+FIXED INGREDIENT LIST (exact - do not change these quantities, do not add/remove ingredients):
+${JSON.stringify(ingredients, null, 2)}
+
+CURRENT STEPS (rewrite ONLY the quantity/unit mentions in these to match the list above):
+${JSON.stringify(steps, null, 2)}`;
+
+  const jsonSchemaConfig = {
+    name: 'recipe_steps_rewrite',
+    schema: RECIPE_STEPS_REWRITE_JSON_SCHEMA,
+    strict: true,
+  };
+
+  let parsed;
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.responses.create({
+        model: config.openai.translationModel,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        text: { format: { type: 'json_schema', ...jsonSchemaConfig } },
+      });
+
+      const part = response?.output?.[0]?.content?.[0];
+      if (part?.type === 'refusal') {
+        lastError = new Error(`Model refused: ${part.refusal}`);
+        break;
+      }
+      const raw = typeof part === 'string' ? part : part?.text || response?.output_text || '';
+      parsed = parseJsonFromModelOutput(raw);
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`rewriteRecipeStepsForIngredients attempt ${attempt} failed:`, error.message);
+    }
+  }
+
+  if (!parsed) {
+    try {
+      const fallback = await openai.chat.completions.create({
+        model: config.openai.translationModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_schema', json_schema: jsonSchemaConfig },
+      });
+      const message = fallback?.choices?.[0]?.message;
+      if (!message?.refusal) {
+        parsed = parseJsonFromModelOutput(message?.content || '');
+      } else {
+        lastError = new Error(`Model refused: ${message.refusal}`);
+      }
+    } catch (fallbackError) {
+      lastError = fallbackError;
+      console.error('rewriteRecipeStepsForIngredients chat fallback failed:', fallbackError.message);
+    }
+  }
+
+  if (!parsed || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
+    console.error(
+      `rewriteRecipeStepsForIngredients failed for "${name}" (non-blocking, keeping original steps):`,
+      lastError?.message || 'no steps returned'
+    );
+    return steps;
+  }
+
+  return parsed.steps;
+};
+
 module.exports = {
   generateDietPlanWithAI,
   generateRecipeWithAI,
@@ -1129,4 +1235,5 @@ module.exports = {
   generateExerciseTranslations,
   extractDishesFromDocument,
   generateTranslations,
+  rewriteRecipeStepsForIngredients,
 };

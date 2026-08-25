@@ -30,6 +30,7 @@ const RecipeVersion = require('../models/RecipeVersion');
 const FoodItem = require('../models/FoodItem');
 const PlanItem = require('../models/PlanItem');
 const { normalize } = require('../utils/ingredientLibrary');
+const { rewriteRecipeStepsForIngredients } = require('../utils/openaiClient');
 
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
 
@@ -203,8 +204,21 @@ async function syncV1FromRecipe(recipe) {
  * the caller's job, e.g. the create-custom-version endpoint handler - this
  * function only creates the document and returns it). Never mutates
  * `originalVersionId`'s document.
+ *
+ * `regenerateSteps` (default false) rewrites the new version's step text via
+ * utils/openaiClient.js's rewriteRecipeStepsForIngredients so quantity
+ * mentions in the prose (e.g. "1 tsp (5g) cumin") stay honest with the
+ * edited ingredients - without it, `steps` is copied verbatim from
+ * `original` forever, which is what silently left every past version's
+ * cooking-step text describing V1's quantities. Deliberately opt-in, not
+ * the default: the caller here is shared with
+ * services/ingredientAutoBalanceService.js's autoBalanceWeek, which runs
+ * automatically and frequently (every Refine Portions entry) and must stay
+ * fast/deterministic/offline - only controllers/dietician/planItemController.js's
+ * createCustomRecipeVersion (an explicit, infrequent dietician "Save" action)
+ * passes true.
  */
-async function createCustomVersion(originalVersionId, updatedIngredients, { createdBy = null } = {}) {
+async function createCustomVersion(originalVersionId, updatedIngredients, { createdBy = null, regenerateSteps = false } = {}) {
   const original = await RecipeVersion.findById(originalVersionId);
   if (!original) {
     throw new Error(`RecipeVersion not found: ${originalVersionId}`);
@@ -243,6 +257,20 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     unit: component.unit,
   }));
 
+  let steps = original.steps;
+  if (regenerateSteps && Array.isArray(original.steps) && original.steps.length > 0) {
+    const namedIngredients = updatedIngredients.map((ingredient) => {
+      const foodItem = foodItemsById.get(String(ingredient.foodItemId));
+      return {
+        name: foodItem?.name || 'Unknown ingredient',
+        quantity: ingredient.rawQuantity,
+        unit: ingredient.unit,
+        ...(ingredient.preparation ? { preparation: ingredient.preparation } : {}),
+      };
+    });
+    steps = await rewriteRecipeStepsForIngredients({ name: original.name, ingredients: namedIngredients, steps: original.steps });
+  }
+
   return RecipeVersion.create({
     name: original.name,
     parentRecipeId: original.parentRecipeId,
@@ -251,7 +279,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     cookingMethod: original.cookingMethod,
     moistureChangeFactor: original.moistureChangeFactor,
     ingredients: updatedIngredients,
-    steps: original.steps,
+    steps,
     components: scaledComponents,
     nutritionPerServing,
     hasUnresolvedIngredients,

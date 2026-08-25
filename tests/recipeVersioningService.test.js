@@ -7,16 +7,26 @@
 
 const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/testDb');
 
+jest.mock('../utils/openaiClient', () => ({
+  rewriteRecipeStepsForIngredients: jest.fn(),
+}));
+
 let mongoose;
 let FoodItem;
 let RecipeVersion;
 let createCustomVersion;
+let rewriteRecipeStepsForIngredients;
 
 beforeAll(async () => {
   await connectTestDb();
   mongoose = require('mongoose');
   ({ FoodItem, RecipeVersion } = require('../models'));
   ({ createCustomVersion } = require('../services/recipeVersioningService'));
+  ({ rewriteRecipeStepsForIngredients } = require('../utils/openaiClient'));
+});
+
+beforeEach(() => {
+  rewriteRecipeStepsForIngredients.mockReset();
 });
 
 afterEach(async () => {
@@ -143,6 +153,65 @@ describe('createCustomVersion', () => {
     expect(v2.unresolvedIngredientNames).toHaveLength(1);
     // Only the resolved (oats) contribution is counted.
     expect(v2.nutritionPerServing.calories).toBeCloseTo(40 * 3.89);
+  });
+
+  test('leaves steps untouched and never calls the AI rewrite when regenerateSteps is omitted (default false)', async () => {
+    const { v1, oats, milk } = await makeV1();
+
+    const v2 = await createCustomVersion(v1._id, [
+      { foodItemId: oats._id, rawQuantity: 50, unit: 'g' },
+      { foodItemId: milk._id, rawQuantity: 200, unit: 'g' },
+    ]);
+
+    expect(v2.toObject().steps).toEqual(['Boil milk', 'Add oats']);
+    expect(rewriteRecipeStepsForIngredients).not.toHaveBeenCalled();
+  });
+
+  test('regenerateSteps: true calls the AI rewrite with the new named ingredients and uses its result', async () => {
+    const { v1, oats, milk } = await makeV1();
+    rewriteRecipeStepsForIngredients.mockResolvedValue(['Boil 200g milk', 'Add 50g oats']);
+
+    const v2 = await createCustomVersion(
+      v1._id,
+      [
+        { foodItemId: oats._id, rawQuantity: 50, unit: 'g' },
+        { foodItemId: milk._id, rawQuantity: 200, unit: 'g' },
+      ],
+      { regenerateSteps: true }
+    );
+
+    expect(rewriteRecipeStepsForIngredients).toHaveBeenCalledTimes(1);
+    const call = rewriteRecipeStepsForIngredients.mock.calls[0][0];
+    expect(call.name).toBe('Oats Porridge');
+    expect(call.steps).toEqual(['Boil milk', 'Add oats']);
+    expect(call.ingredients).toEqual([
+      { name: 'Oats', quantity: 50, unit: 'g' },
+      { name: 'Milk', quantity: 200, unit: 'g' },
+    ]);
+    expect(v2.toObject().steps).toEqual(['Boil 200g milk', 'Add 50g oats']);
+  });
+
+  test('regenerateSteps: true is skipped when the original version has no steps to rewrite', async () => {
+    const oats = await FoodItem.create({
+      name: 'Oats',
+      normalizedName: 'oats-2',
+      nutritionPer100g: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
+    });
+    const v1 = await RecipeVersion.create({
+      name: 'No-Steps Recipe',
+      parentRecipeId: new mongoose.Types.ObjectId(),
+      versionNumber: 1,
+      ingredients: [{ foodItemId: oats._id, rawQuantity: 40, unit: 'g' }],
+      steps: [],
+      status: 'Active',
+    });
+
+    const v2 = await createCustomVersion(v1._id, [{ foodItemId: oats._id, rawQuantity: 50, unit: 'g' }], {
+      regenerateSteps: true,
+    });
+
+    expect(rewriteRecipeStepsForIngredients).not.toHaveBeenCalled();
+    expect(v2.toObject().steps).toEqual([]);
   });
 
   test('throws for a non-existent originalVersionId', async () => {
