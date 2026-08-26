@@ -22,7 +22,19 @@
  * only connectDB() knows how to resolve (see that file's own comment on
  * migrate-dev-catalog-to-prod.js for what a raw connect() does there
  * instead: a misleading "self-signed certificate in certificate chain"
- * error). This same MONGODB_URI-driven connect works unchanged against dev.
+ * error). Meant to be run directly wherever MONGODB_URI already points at
+ * the target DB - e.g. Coolify's Terminal tab for prod (its Scheduled
+ * Tasks command field is a varchar(255) column, see scripts/lookup-
+ * dietician-id.js's own history for why that one exists) - not from a
+ * machine that can't reach that DB at all (prod's Mongo has no public IP).
+ *
+ * Looks the dietician up by _id, not email - see scripts/lookup-dietician-
+ * id.js's own comment: prod's dietician User document is meant to mirror
+ * dev's by _id (prod was originally cloned from the same source), but its
+ * stored email/role can legitimately differ (confirmed: dev has
+ * tejasvini@docwellness.fit, prod's real login is
+ * dr.tejasvini.pawar@gmail.com) - an email-keyed lookup would silently
+ * find nothing on prod.
  *
  * Usage:
  *   node scripts/backfill-hand-authored-recipe-steps.js            # dry run
@@ -33,7 +45,7 @@ const mongoose = require('mongoose');
 const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
-const DIETICIAN_EMAIL = 'tejasvini@docwellness.fit';
+const DIETICIAN_ID = '6a5e0c3619fa51068811c304';
 
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING cooking-step backfill ===' : '=== DRY RUN (pass --execute to write) ===');
@@ -46,8 +58,8 @@ async function main() {
     const { generateCookingStepsForFixedIngredients } = require('../utils/openaiClient');
     const { syncV1FromRecipe } = require('../services/recipeVersioningService');
 
-    const dietician = await User.findOne({ email: DIETICIAN_EMAIL, role: 'dietician' });
-    if (!dietician) throw new Error(`Dietician not found: ${DIETICIAN_EMAIL}`);
+    const dietician = await User.findById(DIETICIAN_ID);
+    if (!dietician) throw new Error(`Dietician not found: ${DIETICIAN_ID}`);
     console.log(`Target dietician: ${dietician.profile?.fullName || dietician.email} (${dietician._id})\n`);
 
     const recipes = await Recipe.find({
