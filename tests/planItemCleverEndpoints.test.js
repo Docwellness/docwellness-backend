@@ -147,6 +147,44 @@ describe('POST .../create-custom-version', () => {
   });
 });
 
+describe('POST .../update-item-recipe-version', () => {
+  test('resolves free-text ingredients to FoodItems, creates a new RecipeVersion under the same parentRecipeId, and repoints only this PlanItem', async () => {
+    const { patient, dietPlan, planItem, recipe, oats } = await setup();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/update-item-recipe-version`)
+    ).send({
+      planItemId: planItem._id.toString(),
+      recipe: {
+        name: 'Oats Porridge (AI-updated)',
+        ingredients: [{ name: oats.name, quantity: 150, unit: 'g' }],
+        cookingSteps: ['Cook oats in water.'],
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.recipeVersion.versionNumber).toBe(2);
+    expect(res.body.data.recipeVersion.parentRecipeId).toBe(recipe._id.toString());
+    expect(res.body.data.planItem.recipeVersionId).toBe(res.body.data.recipeVersion._id);
+
+    const savedPlan = await DietPlan.findById(dietPlan._id);
+    expect(savedPlan.workflowStatus).toBe('portions_refined');
+  });
+
+  test('400s when no ingredient matches a known food item', async () => {
+    const { patient, dietPlan, planItem } = await setup();
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/update-item-recipe-version`)
+    ).send({
+      planItemId: planItem._id.toString(),
+      recipe: { name: 'Mystery Dish', ingredients: [{ name: 'Completely Unknown Ingredient', quantity: 50, unit: 'g' }] },
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('POST .../auto-balance', () => {
   test('scope:item scales the PlanItem\'s ingredients to hit targetCalories', async () => {
     const { patient, dietPlan, planItem, v1 } = await setup();

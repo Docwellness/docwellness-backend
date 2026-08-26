@@ -352,6 +352,12 @@ router.post(
 );
 
 router.post(
+  '/patients/:patientId/diet-plans/:dietPlanId/update-item-recipe-version',
+  dieticianOnlyMiddleware,
+  planItemController.updateItemRecipeVersion
+);
+
+router.post(
   '/patients/:patientId/diet-plans/:dietPlanId/auto-balance',
   dieticianOnlyMiddleware,
   planItemController.autoBalance

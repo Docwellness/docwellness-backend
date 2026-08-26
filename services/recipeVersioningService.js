@@ -292,9 +292,89 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
   });
 }
 
+/**
+ * Creates a brand-new RecipeVersion for `originalVersionId`'s parent recipe
+ * from a full free-text recipe snapshot (name-based ingredients, e.g. the
+ * AI-regenerated preview "Update AI Inputs" produces) rather than
+ * already-resolved {foodItemId, rawQuantity, unit} lines - resolves each
+ * ingredient's name to a FoodItem the same way syncV1FromRecipe does for a
+ * saved Recipe document, without requiring (or mutating) any Recipe document
+ * at all. This is what lets a dietician apply an AI-regenerated recipe to
+ * ONE plan item (controllers/dietician/planItemController.js's
+ * updateItemRecipeVersion, this function's only caller) without overwriting
+ * the shared catalog recipe every other patient/plan using it still points
+ * at - PATCHing the Recipe document (recipe_details.dart's "Save Recipe")
+ * would do that; this never touches it.
+ */
+async function createVersionFromSnapshot(originalVersionId, snapshot, { createdBy = null } = {}) {
+  const original = await RecipeVersion.findById(originalVersionId);
+  if (!original) {
+    throw new Error(`RecipeVersion not found: ${originalVersionId}`);
+  }
+  if (original.status !== 'Active') {
+    throw new Error(`RecipeVersion ${originalVersionId} is not Active (status: ${original.status})`);
+  }
+  const ingredients = snapshot?.ingredients;
+  if (!Array.isArray(ingredients) || ingredients.length === 0) {
+    throw new Error('snapshot.ingredients must be a non-empty array');
+  }
+
+  const normalizedNames = ingredients.map((ingredient) => normalize(ingredient.name));
+  const foodItems = await FoodItem.find({ normalizedName: { $in: normalizedNames } });
+  const foodItemsByNormalizedName = new Map(foodItems.map((foodItem) => [foodItem.normalizedName, foodItem]));
+  const foodItemsById = new Map(foodItems.map((foodItem) => [String(foodItem._id), foodItem]));
+
+  const versionIngredients = ingredients
+    .map((ingredient) => {
+      const foodItem = foodItemsByNormalizedName.get(normalize(ingredient.name));
+      return foodItem
+        ? { foodItemId: foodItem._id, rawQuantity: ingredient.quantity, unit: ingredient.unit, preparation: null }
+        : null;
+    })
+    .filter(Boolean);
+
+  if (versionIngredients.length === 0) {
+    throw new Error("None of this recipe's ingredients matched a known food item");
+  }
+
+  const unmatchedNames = ingredients
+    .filter((ingredient) => !foodItemsByNormalizedName.has(normalize(ingredient.name)))
+    .map((ingredient) => ingredient.name);
+
+  const { nutritionPerServing, unresolvedIngredientNames: unresolvedFromNutrition } = computeNutritionFromIngredients(
+    versionIngredients,
+    foodItemsById
+  );
+  const allUnresolvedNames = Array.from(new Set([...unmatchedNames, ...unresolvedFromNutrition]));
+
+  const latest = await RecipeVersion.findOne({ parentRecipeId: original.parentRecipeId }).sort({ versionNumber: -1 });
+  const nextVersionNumber = (latest?.versionNumber || original.versionNumber) + 1;
+
+  return RecipeVersion.create({
+    name: snapshot.name || original.name,
+    parentRecipeId: original.parentRecipeId,
+    versionNumber: nextVersionNumber,
+    baseYield: original.baseYield,
+    cookingMethod: original.cookingMethod,
+    moistureChangeFactor: original.moistureChangeFactor,
+    ingredients: versionIngredients,
+    steps: Array.isArray(snapshot.cookingSteps) ? snapshot.cookingSteps : original.steps,
+    components: Array.isArray(snapshot.components) && snapshot.components.length > 0 ? snapshot.components : original.components,
+    nutritionPerServing,
+    hasUnresolvedIngredients: allUnresolvedNames.length > 0,
+    unresolvedIngredientNames: allUnresolvedNames,
+    mealSlotSuitability: original.mealSlotSuitability,
+    dietaryTags: original.dietaryTags,
+    allergens: original.allergens,
+    status: 'Active',
+    createdBy,
+  });
+}
+
 module.exports = {
   computeNutritionFromIngredients,
   resolveGramsForIngredient,
   syncV1FromRecipe,
   createCustomVersion,
+  createVersionFromSnapshot,
 };
