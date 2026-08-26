@@ -1228,6 +1228,105 @@ ${JSON.stringify(steps, null, 2)}`;
   return parsed.steps;
 };
 
+/**
+ * Narrow, single-purpose AI call: generates cooking steps from scratch for a
+ * recipe whose ingredient list is already final (hand-authored, no AI
+ * generation wanted for it) but which has NO cooking steps at all yet.
+ * Sibling to rewriteRecipeStepsForIngredients above - same "never touch the
+ * fixed ingredient list" discipline, except this one authors new step text
+ * instead of correcting quantity mentions in existing text (there is no
+ * existing text to correct). Exists for scripts/backfill-hand-authored-
+ * recipe-steps.js, which backfills the ~98 recipes imported by
+ * scripts/import-hand-authored-recipes.js with `instructions: []` (that
+ * dataset only ever specified name/category/servingTime/ingredients).
+ *
+ * Never throws - returns [] on any failure (empty/refused/malformed
+ * response), so a backfill run can log and move on to the next recipe
+ * rather than aborting the batch.
+ */
+const generateCookingStepsForFixedIngredients = async ({ name, servingTime, ingredients }) => {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return [];
+
+  const systemPrompt = `You are an expert chef. You are given a dish's name and its EXACT, FIXED ingredient list with quantities - that list is final and you must NEVER add, remove, or imply a different ingredient or quantity. Your ONLY job is to write clear, authentic, dish-specific cooking steps for how this exact dish, made from exactly these ingredients, is actually prepared - never generic or unrelated steps (e.g. a soup-style "boil water, add vegetables, season to taste" sequence is never acceptable for a dish it doesn't actually describe). Write 4-10 steps in order, each a complete instruction referencing the given ingredients/quantities naturally where relevant (e.g. cooking method, temperature/time if implied by the dish, plating). If the "dish" is actually a supplement/tablet/capsule (servingTime Morning/Night Drink category items like a capsule or tablet), write simple, accurate intake steps instead of cooking steps (e.g. "Take with a glass of water after breakfast").
+
+RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
+{ "steps": ["string - step 1", "string - step 2", ...] }
+NO markdown, NO explanations, ONLY the JSON object.`;
+
+  const userPrompt = `Recipe: ${name || 'Untitled recipe'}
+Serving Time: ${servingTime || 'Unspecified'}
+
+FIXED INGREDIENT LIST (exact - do not change these quantities, do not add/remove ingredients, do not invent others):
+${JSON.stringify(ingredients, null, 2)}`;
+
+  const jsonSchemaConfig = {
+    name: 'recipe_steps_rewrite',
+    schema: RECIPE_STEPS_REWRITE_JSON_SCHEMA,
+    strict: true,
+  };
+
+  let parsed;
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.responses.create({
+        model: config.openai.translationModel,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        text: { format: { type: 'json_schema', ...jsonSchemaConfig } },
+      });
+
+      const part = response?.output?.[0]?.content?.[0];
+      if (part?.type === 'refusal') {
+        lastError = new Error(`Model refused: ${part.refusal}`);
+        break;
+      }
+      const raw = typeof part === 'string' ? part : part?.text || response?.output_text || '';
+      parsed = parseJsonFromModelOutput(raw);
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`generateCookingStepsForFixedIngredients attempt ${attempt} failed:`, error.message);
+    }
+  }
+
+  if (!parsed) {
+    try {
+      const fallback = await openai.chat.completions.create({
+        model: config.openai.translationModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_schema', json_schema: jsonSchemaConfig },
+      });
+      const message = fallback?.choices?.[0]?.message;
+      if (!message?.refusal) {
+        parsed = parseJsonFromModelOutput(message?.content || '');
+      } else {
+        lastError = new Error(`Model refused: ${message.refusal}`);
+      }
+    } catch (fallbackError) {
+      lastError = fallbackError;
+      console.error('generateCookingStepsForFixedIngredients chat fallback failed:', fallbackError.message);
+    }
+  }
+
+  if (!parsed || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
+    console.error(
+      `generateCookingStepsForFixedIngredients failed for "${name}" (non-blocking, no steps written):`,
+      lastError?.message || 'no steps returned'
+    );
+    return [];
+  }
+
+  return parsed.steps;
+};
+
 module.exports = {
   generateDietPlanWithAI,
   generateRecipeWithAI,
@@ -1236,4 +1335,5 @@ module.exports = {
   extractDishesFromDocument,
   generateTranslations,
   rewriteRecipeStepsForIngredients,
+  generateCookingStepsForFixedIngredients,
 };
