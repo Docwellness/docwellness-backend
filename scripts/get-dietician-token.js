@@ -11,8 +11,16 @@
  * no MongoDB connection at all, and Supabase itself is a public API, so
  * this can be run from anywhere - it does NOT need to run inside Coolify.
  *
- * The password is read from a masked terminal prompt, never a CLI arg or
- * env var, so it never ends up in shell history or process listings.
+ * The password is read from a plain terminal prompt (visible as you type -
+ * see below), never a CLI arg or env var, so it at least never ends up in
+ * shell history or process listings. An earlier version tried to mask the
+ * input by monkey-patching readline's internal _writeToOutput to draw
+ * asterisks - that's a known-fragile trick (breaks readline's own cursor
+ * tracking) and hung indefinitely in real interactive use; only a plain
+ * (piped, non-interactive) test run had validated it, which takes a
+ * different code path entirely and never exercised real typing. Removed in
+ * favor of the vanilla readline.question this file's own --yes confirmation
+ * prompt already uses successfully elsewhere.
  *
  * Usage:
  *   node scripts/get-dietician-token.js [email]
@@ -25,16 +33,10 @@ const DEFAULT_EMAIL = 'tejasvini@docwellness.fit';
 const email = process.argv[2] || DEFAULT_EMAIL;
 
 function promptPassword(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    // Mask typed characters with '*' instead of echoing the real password.
-    const originalWrite = rl._writeToOutput;
-    rl._writeToOutput = function (chunk) {
-      originalWrite.call(rl, chunk.replace(/./g, '*'));
-    };
     rl.question(question, (answer) => {
       rl.close();
-      process.stdout.write('\n');
       resolve(answer);
     });
   });
@@ -42,6 +44,7 @@ function promptPassword(question) {
 
 async function main() {
   console.log(`Signing in as ${email} ...`);
+  console.log('(password will be visible as you type - make sure no one is looking over your shoulder)');
   const password = await promptPassword('Password: ');
 
   const { signInWithPassword } = require('../utils/supabaseAuth');
