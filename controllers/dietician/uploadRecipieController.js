@@ -802,6 +802,99 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
 };
 
 /**
+ * @desc    One-off maintenance operation: AI-generates and saves cooking
+ *          steps for every one of this dietician's recipes that currently
+ *          has none (instructions: [] or missing) - e.g. the hand-authored
+ *          batch scripts/import-hand-authored-recipes.js created without
+ *          any (see scripts/backfill-hand-authored-recipe-steps.js, the
+ *          equivalent direct-DB-access script this endpoint mirrors).
+ *
+ *          Exists as an HTTP route, not just a script, because prod's
+ *          MongoDB has no public IP (self-hosted on a private-subnet-only
+ *          Oracle VM - see docs/db-migration-oracle.md) and is unreachable
+ *          from outside Coolify's network. This process already holds a
+ *          correctly-configured connection to whichever DB it's actually
+ *          running against (dev or prod), so calling it as dietician-
+ *          authenticated dietician herself, over the same HTTPS API the
+ *          app already exposes, needs no direct database access or
+ *          connection string at all - see scripts/trigger-cooking-steps-
+ *          backfill.js, a thin HTTP client for this route.
+ *
+ *          Dry-run by default (generates and returns the steps without
+ *          saving) - pass ?execute=true to actually write them.
+ * @route   POST /api/dietician/recipes/backfill-cooking-steps
+ * @access  Private (Dietician)
+ * @query   execute ('true' to write; omitted/anything else = dry run)
+ */
+exports.backfillCookingSteps = async (req, res, next) => {
+  try {
+    const dieticianId = req.user._id;
+    const execute = req.query?.execute === 'true';
+
+    const recipes = await Recipe.find({
+      dieticianId,
+      $or: [{ instructions: { $size: 0 } }, { instructions: { $exists: false } }],
+    }).sort({ servingTime: 1, name: 1 });
+
+    const { syncV1FromRecipe } = require('../../services/recipeVersioningService');
+    const { generateCookingStepsForFixedIngredients } = require('../../utils/openaiClient');
+
+    const results = [];
+    let updated = 0;
+    let failed = 0;
+
+    for (const recipe of recipes) {
+      let steps;
+      try {
+        steps = await generateCookingStepsForFixedIngredients({
+          name: recipe.name,
+          servingTime: recipe.servingTime,
+          ingredients: (recipe.ingredients || []).map((i) => ({
+            name: i.name,
+            quantity: i.quantity,
+            unit: i.unit,
+          })),
+        });
+      } catch (err) {
+        failed++;
+        results.push({ recipeId: String(recipe._id), name: recipe.name, error: err.message });
+        continue;
+      }
+
+      if (!Array.isArray(steps) || steps.length === 0) {
+        failed++;
+        results.push({ recipeId: String(recipe._id), name: recipe.name, error: 'no steps returned' });
+        continue;
+      }
+
+      if (execute) {
+        try {
+          recipe.instructions = steps;
+          await recipe.save();
+          await syncV1FromRecipe(recipe);
+          updated++;
+        } catch (err) {
+          failed++;
+          results.push({ recipeId: String(recipe._id), name: recipe.name, error: err.message });
+          continue;
+        }
+      }
+
+      results.push({ recipeId: String(recipe._id), name: recipe.name, steps });
+    }
+
+    return res.status(200).json({
+      success: true,
+      executed: execute,
+      summary: { total: recipes.length, updated, failed },
+      results,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    List recipes by serving time with optional cuisine filtering
  * @route   GET /api/dietician/recipes/by-serving-time
  * @access  Private (Dietician)
