@@ -36,15 +36,28 @@
  * dr.tejasvini.pawar@gmail.com) - an email-keyed lookup would silently
  * find nothing on prod.
  *
+ * --limit=N processes at most N recipes this run (oldest-missing-first,
+ * same sort order every run) instead of all of them - for a runner with no
+ * visibility into progress and a possible hidden execution timeout (e.g. a
+ * Coolify Scheduled Task/one-off job, which has no streaming terminal and
+ * an unknown runtime cap), running ~98 sequential real AI calls in one shot
+ * is risky. Idempotent either way: re-running only ever touches recipes
+ * still missing instructions, so repeated small --limit runs converge on
+ * the same end state as one big run - just re-invoke the same command
+ * until a run reports "Found 0 recipe(s)".
+ *
  * Usage:
- *   node scripts/backfill-hand-authored-recipe-steps.js            # dry run
- *   node scripts/backfill-hand-authored-recipe-steps.js --execute   # write
+ *   node scripts/backfill-hand-authored-recipe-steps.js                       # dry run, all of them
+ *   node scripts/backfill-hand-authored-recipe-steps.js --execute             # write, all of them
+ *   node scripts/backfill-hand-authored-recipe-steps.js --execute --limit=15  # write only the next 15, re-run to continue
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
+const limitArg = process.argv.find((a) => a.startsWith('--limit='));
+const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
 const DIETICIAN_ID = '6a5e0c3619fa51068811c304';
 
 async function main() {
@@ -62,12 +75,16 @@ async function main() {
     if (!dietician) throw new Error(`Dietician not found: ${DIETICIAN_ID}`);
     console.log(`Target dietician: ${dietician.profile?.fullName || dietician.email} (${dietician._id})\n`);
 
-    const recipes = await Recipe.find({
+    let recipeQuery = Recipe.find({
       dieticianId: dietician._id,
       $or: [{ instructions: { $size: 0 } }, { instructions: { $exists: false } }],
     }).sort({ servingTime: 1, name: 1 });
+    if (LIMIT) recipeQuery = recipeQuery.limit(LIMIT);
+    const recipes = await recipeQuery;
 
-    console.log(`Found ${recipes.length} recipe(s) with no cooking steps.\n`);
+    console.log(
+      `Found ${recipes.length} recipe(s) with no cooking steps${LIMIT ? ` (--limit=${LIMIT} applied)` : ''}.\n`
+    );
 
     let updated = 0;
     let failed = 0;
