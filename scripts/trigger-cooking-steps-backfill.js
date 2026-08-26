@@ -21,35 +21,50 @@
  *   4. Ask for interactive confirmation (unless --yes was passed).
  *   5. Execute: POST with execute=true, print the final summary.
  *
- * Requires:
- *   API_BASE_URL           e.g. https://api.docwellness.fit (no trailing slash)
- *   DIETICIAN_ACCESS_TOKEN a valid Supabase access token for the target
- *                          dietician account (the same bearer token the
- *                          dietician app sends as `Authorization: Bearer
- *                          <token>`) - grab one from an already-logged-in
- *                          session (e.g. the dietician app's network
- *                          inspector) rather than scripting a fresh login
- *                          here, which would require handling the
- *                          dietician's Supabase password directly.
+ * Requires (as either a CLI flag or an env var - see Usage below; the flag
+ * wins if both are given):
+ *   API_BASE_URL / --api-base-url=   e.g. https://api.docwellness.fit (no trailing slash)
+ *   DIETICIAN_ACCESS_TOKEN / --token= a valid Supabase access token for the
+ *                          target dietician account (the same bearer token
+ *                          the dietician app sends as `Authorization:
+ *                          Bearer <token>`) - grab one from an already-
+ *                          logged-in session (e.g. the dietician app's
+ *                          network inspector) rather than scripting a
+ *                          fresh login here, which would require handling
+ *                          the dietician's Supabase password directly.
+ *
+ * CLI flags exist alongside the env vars specifically because Coolify's
+ * one-off command/job runner has already been seen (see the removed
+ * scripts/run-catalog-migration.js's own history) not to reliably pass
+ * `VAR=value` shell-style prefixes into the executed process - a single
+ * command line with explicit flags sidesteps that entirely.
  *
  * Usage:
- *   API_BASE_URL=https://... DIETICIAN_ACCESS_TOKEN=eyJ... \
- *     node scripts/trigger-cooking-steps-backfill.js
+ *   node scripts/trigger-cooking-steps-backfill.js \
+ *     --api-base-url=https://api.docwellness.fit --token=eyJ...
  *       # runs the dry run, shows a preview, asks "proceed? (yes/no)"
  *
- *   ... node scripts/trigger-cooking-steps-backfill.js --yes
- *       # same, but skips the confirmation prompt (for CI/automation)
+ *   ... --yes    # same, but skips the confirmation prompt (for CI/jobs -
+ *                # REQUIRED for a non-interactive runner like a Coolify
+ *                # one-off job, which has no terminal to answer "yes" to)
+ *   ... --dry-run   # preview only, never writes, no prompt
  *
- *   ... node scripts/trigger-cooking-steps-backfill.js --dry-run
- *       # preview only, never writes, no prompt
+ *   Equivalently, via env vars instead of flags:
+ *   API_BASE_URL=https://... DIETICIAN_ACCESS_TOKEN=eyJ... \
+ *     node scripts/trigger-cooking-steps-backfill.js
  */
 
 const readline = require('readline');
 
+const flag = (name) => {
+  const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return arg ? arg.slice(name.length + 3) : null;
+};
+
 const SKIP_CONFIRM = process.argv.includes('--yes') || process.argv.includes('-y');
 const DRY_RUN_ONLY = process.argv.includes('--dry-run');
-const API_BASE_URL = process.env.API_BASE_URL;
-const DIETICIAN_ACCESS_TOKEN = process.env.DIETICIAN_ACCESS_TOKEN;
+const API_BASE_URL = flag('api-base-url') || process.env.API_BASE_URL;
+const DIETICIAN_ACCESS_TOKEN = flag('token') || process.env.DIETICIAN_ACCESS_TOKEN;
 
 function printResults(body) {
   for (const r of body.results) {
@@ -95,8 +110,14 @@ function askYesNo(question) {
 
 async function main() {
   console.log('=== Step 1/5: checking configuration ===');
-  if (!API_BASE_URL) throw new Error('API_BASE_URL env var is required (e.g. https://api.docwellness.fit)');
-  if (!DIETICIAN_ACCESS_TOKEN) throw new Error('DIETICIAN_ACCESS_TOKEN env var is required');
+  if (!API_BASE_URL) {
+    throw new Error(
+      'API base URL is required: pass --api-base-url=https://api.docwellness.fit or set API_BASE_URL'
+    );
+  }
+  if (!DIETICIAN_ACCESS_TOKEN) {
+    throw new Error('Dietician token is required: pass --token=eyJ... or set DIETICIAN_ACCESS_TOKEN');
+  }
   console.log(`API_BASE_URL=${API_BASE_URL}`);
   console.log('DIETICIAN_ACCESS_TOKEN=<set>\n');
 
@@ -123,6 +144,13 @@ async function main() {
 
   console.log('\n=== Step 4/5: confirmation ===');
   let proceed = SKIP_CONFIRM;
+  if (!proceed && !process.stdin.isTTY) {
+    // A non-interactive runner (Coolify one-off job, CI) has no terminal to
+    // answer a prompt - readline would just hang or read immediate EOF as
+    // "no", silently stopping with no obvious explanation. Fail loudly
+    // instead, telling the operator exactly what flag fixes it.
+    throw new Error('No interactive terminal to confirm on - re-run with --yes to proceed non-interactively.');
+  }
   if (!proceed) {
     proceed = await askYesNo(
       `Write these ${dryRun.summary.total - dryRun.summary.failed} recipe(s)' steps to the database? Type "yes" to proceed: `
