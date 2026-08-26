@@ -23,8 +23,9 @@
  * previously-cached image found under an old alias spelling.
  *
  * Usage:
- *   node scripts/migrate-canonical-ingredients.js            # dry run
- *   node scripts/migrate-canonical-ingredients.js --execute  # actually write
+ *   node scripts/migrate-canonical-ingredients.js                                        # dry run, default dietician
+ *   node scripts/migrate-canonical-ingredients.js --dietician-email=someone@example.com   # dry run, specific dietician
+ *   node scripts/migrate-canonical-ingredients.js --execute                               # actually write
  */
 
 require('dotenv').config();
@@ -33,7 +34,8 @@ const { CANONICAL_INGREDIENTS, resolveCanonical } = require('./canonical-ingredi
 const { normalize } = require('../utils/ingredientLibrary');
 
 const EXECUTE = process.argv.includes('--execute');
-const DIETICIAN_EMAIL = 'localdietician@dev.local';
+const dieticianEmailArg = process.argv.find((a) => a.startsWith('--dietician-email='));
+const DIETICIAN_EMAIL = dieticianEmailArg ? dieticianEmailArg.split('=')[1] : 'localdietician@dev.local';
 
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING canonical ingredient migration ===' : '=== DRY RUN (pass --execute to write) ===');
