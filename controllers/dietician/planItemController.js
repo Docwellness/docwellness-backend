@@ -16,7 +16,7 @@ const { DietPlan, Recipe, RecipeVersion, FoodItem, DayPlan, MealSlotPlan, PlanIt
 const { REQUIRED_SERVING_TIMES } = require('../../utils/servingTimes');
 const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
-const { createCustomVersion, resolveGramsForIngredient } = require('../../services/recipeVersioningService');
+const { createCustomVersion, resolveGramsForIngredient, createVersionFromSnapshot } = require('../../services/recipeVersioningService');
 const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek } = require('../../services/ingredientAutoBalanceService');
 const { validatePlanForActivation } = require('../../services/planActivationService');
 const { swapToRecipe } = require('../../services/recipeVersionSwapService');
@@ -152,6 +152,56 @@ exports.createCustomRecipeVersion = async (req, res, next) => {
   } catch (error) {
     if (error.message === 'PlanItem not found' || error.message?.startsWith('RecipeVersion not found')) {
       return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Applies an AI-regenerated recipe snapshot ("Update AI Inputs" -
+ *          free-text ingredients, not yet resolved to FoodItems) to ONE plan
+ *          item only: creates a new RecipeVersion under the item's existing
+ *          parentRecipeId and repoints just this PlanItem, mirroring
+ *          createCustomRecipeVersion above but for AI-regenerated output
+ *          rather than manually-edited, already-FoodItem-resolved ingredient
+ *          lines. Never touches the shared Recipe document - unlike PATCHing
+ *          the recipe (which would change it for every other patient/plan
+ *          using it), this only changes what this one plan item points at.
+ * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/update-item-recipe-version
+ * @access  Private (Dietician)
+ */
+exports.updateItemRecipeVersion = async (req, res, next) => {
+  try {
+    const dietPlan = await loadPlanItemDietPlan(req, res);
+    if (!dietPlan) return;
+
+    const { planItemId, recipe } = req.body || {};
+    if (!mongoose.Types.ObjectId.isValid(planItemId)) {
+      return res.status(400).json({ success: false, message: 'planItemId must be a valid id' });
+    }
+    if (!recipe || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
+      return res.status(400).json({ success: false, message: 'recipe.ingredients must be a non-empty array' });
+    }
+
+    const { planItem } = await loadOwnedPlanItem(dietPlan, planItemId);
+    const newVersion = await createVersionFromSnapshot(planItem.recipeVersionId, recipe, { createdBy: req.user._id });
+
+    planItem.recipeVersionId = newVersion._id;
+    planItem.calculatedNutrition = newVersion.nutritionPerServing;
+    await planItem.save();
+
+    if (dietPlan.workflowStatus === 'menu_generated') {
+      dietPlan.workflowStatus = 'portions_refined';
+      await dietPlan.save();
+    }
+
+    return res.status(200).json({ success: true, data: { planItem, recipeVersion: newVersion } });
+  } catch (error) {
+    if (error.message === 'PlanItem not found' || error.message?.startsWith('RecipeVersion not found')) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    if (error.message?.includes('ingredients') && error.message?.includes('matched')) {
+      return res.status(400).json({ success: false, message: error.message });
     }
     next(error);
   }
