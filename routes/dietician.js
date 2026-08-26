@@ -507,17 +507,6 @@ router.post(
   uploadRecipieController.updateRecipeFromEdits
 );
 
-// One-off maintenance: backfill AI-generated cooking steps for every recipe
-// that has none. Must be registered before '/recipes/:id' below (Express
-// would otherwise match this path as :id) - see the other GET exceptions
-// just below for the same reason.
-router.post(
-  '/recipes/backfill-cooking-steps',
-  dieticianOnlyMiddleware,
-  aiGenerationLimiter,
-  uploadRecipieController.backfillCookingSteps
-);
-
 // Get recipe categories with counts
 router.get(
   '/recipes/categories',
