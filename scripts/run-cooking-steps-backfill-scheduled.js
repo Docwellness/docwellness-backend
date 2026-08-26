@@ -16,12 +16,17 @@
  * the scheduled task's command field):
  *   DIETICIAN_EMAIL      the dietician's real login email
  *   DIETICIAN_PASSWORD   her real password
- *   API_BASE_URL         defaults to http://localhost:<PORT|5000> - correct
- *                        if this task runs inside the already-running app
- *                        container (the normal case for a Coolify Scheduled
- *                        Task on an existing resource); override only if it
- *                        actually runs in a separate container without the
- *                        app server up, e.g. https://api.docwellness.fit
+ *   API_BASE_URL         REQUIRED - the actual public prod URL, e.g.
+ *                        https://api.docwellness.fit (see docs/cron-
+ *                        setup.md for this repo's documented prod domain;
+ *                        confirm against Coolify's actual configured
+ *                        domain for this resource before relying on it).
+ *                        No localhost fallback: a Coolify Scheduled Task
+ *                        commonly runs in a separate one-off container
+ *                        without the app server itself up, where localhost
+ *                        would just fail to connect - or worse, silently
+ *                        hit the wrong thing if something else happens to
+ *                        be listening there. Must always point at prod.
  *   EXECUTE               'true' to actually write; anything else (or
  *                        unset) stays a dry run that only previews and logs
  *                        what it would do. Defaults to dry-run-only as a
@@ -42,7 +47,7 @@ const { signInWithPassword } = require('../utils/supabaseAuth');
 
 const DIETICIAN_EMAIL = process.env.DIETICIAN_EMAIL;
 const DIETICIAN_PASSWORD = process.env.DIETICIAN_PASSWORD;
-const API_BASE_URL = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+const API_BASE_URL = process.env.API_BASE_URL;
 const EXECUTE = process.env.EXECUTE === 'true';
 
 function printResults(body) {
@@ -76,6 +81,11 @@ async function main() {
   console.log('=== Step 1/4: checking configuration ===');
   if (!DIETICIAN_EMAIL) throw new Error('DIETICIAN_EMAIL env var is required');
   if (!DIETICIAN_PASSWORD) throw new Error('DIETICIAN_PASSWORD env var is required');
+  if (!API_BASE_URL) {
+    throw new Error(
+      'API_BASE_URL env var is required and must point at prod (e.g. https://api.docwellness.fit) - no localhost fallback'
+    );
+  }
   console.log(`DIETICIAN_EMAIL=${DIETICIAN_EMAIL}`);
   console.log(`API_BASE_URL=${API_BASE_URL}`);
   console.log(`EXECUTE=${EXECUTE}`);
