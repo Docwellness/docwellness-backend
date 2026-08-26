@@ -17,13 +17,20 @@
  *
  * Idempotent: re-running only processes recipes still missing instructions.
  *
+ * Connects via connectDB() (config/database.js), not a raw mongoose.connect()
+ * - required against prod's self-hosted Mongo, which needs the custom TLS CA
+ * only connectDB() knows how to resolve (see that file's own comment on
+ * migrate-dev-catalog-to-prod.js for what a raw connect() does there
+ * instead: a misleading "self-signed certificate in certificate chain"
+ * error). This same MONGODB_URI-driven connect works unchanged against dev.
+ *
  * Usage:
  *   node scripts/backfill-hand-authored-recipe-steps.js            # dry run
  *   node scripts/backfill-hand-authored-recipe-steps.js --execute   # write
  */
 require('dotenv').config();
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
 const DIETICIAN_EMAIL = 'tejasvini@docwellness.fit';
@@ -31,7 +38,7 @@ const DIETICIAN_EMAIL = 'tejasvini@docwellness.fit';
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING cooking-step backfill ===' : '=== DRY RUN (pass --execute to write) ===');
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(process.env.MONGODB_URI);
+  await connectDB();
   console.log('Connected.');
 
   try {
