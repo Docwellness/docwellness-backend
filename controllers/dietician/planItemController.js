@@ -14,6 +14,7 @@
 const mongoose = require('mongoose');
 const { DietPlan, Recipe, RecipeVersion, FoodItem, DayPlan, MealSlotPlan, PlanItem, SupplementItem } = require('../../models');
 const { REQUIRED_SERVING_TIMES } = require('../../utils/servingTimes');
+const { COMPONENT_UNITS } = require('../../utils/recipeJsonSchema');
 const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
 const { createCustomVersion, resolveGramsForIngredient, createVersionFromSnapshot } = require('../../services/recipeVersioningService');
@@ -310,9 +311,30 @@ exports.getWeekPlanItems = async (req, res, next) => {
     // how complete the FoodItem's own nutrition data actually was. Null
     // when unresolvable (no FoodItem, or no known conversion for this
     // unit) - the client already treats null as "-", never a guessed number.
+    //
+    // gramsPerUnitByUnit is the SAME figure precomputed for every unit this
+    // ingredient COULD be switched to (not just its current one) - lets the
+    // Ingredient Editor recompute a live calorie figure the instant a
+    // dietician changes an ingredient's unit, instead of the previous
+    // "switching a unit invalidates the calorie figure to '-' until the
+    // version is re-fetched after Save" behavior (reported as "Lemon" only
+    // when switched to 'tsp' - the client had no way to resolve a unit it
+    // hadn't been told about). Only ever includes units that actually
+    // resolve for this FoodItem (never a guessed number, same as
+    // resolvedGramsPerUnit) - a unit missing from the map means "still
+    // unresolvable for this ingredient", exactly like resolvedGramsPerUnit
+    // being null does today.
     const foodItemIds = recipeVersions.flatMap((v) => v.ingredients.map((ing) => ing.foodItemId));
     const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } }).select('name nutritionPer100g unitConversions density');
     const foodItemById = new Map(foodItems.map((f) => [String(f._id), f]));
+    const gramsPerUnitMapFor = (foodItem) => {
+      const map = {};
+      for (const unit of COMPONENT_UNITS) {
+        const grams = resolveGramsForIngredient(foodItem, 1, unit);
+        if (grams !== null) map[unit] = grams;
+      }
+      return map;
+    };
 
     const recipeVersionById = new Map(
       recipeVersions.map((v) => {
@@ -324,6 +346,7 @@ exports.getWeekPlanItems = async (req, res, next) => {
             foodItemName: foodItem?.name || null,
             nutritionPer100g: foodItem?.nutritionPer100g || null,
             resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
+            gramsPerUnitByUnit: foodItem ? gramsPerUnitMapFor(foodItem) : {},
           };
         });
         return [String(v._id), plain];
