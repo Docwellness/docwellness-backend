@@ -35,19 +35,39 @@ const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../utils/co
 
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
 
+// Universal cooking-measurement constants (NOT ingredient-specific data,
+// unlike FoodItem.unitConversions) - a teaspoon/tablespoon/cup is always
+// the same volume regardless of what's in it. Standard US cooking
+// conventions, same figures already implicit in this catalog's own
+// FoodItem.unitConversions entries (e.g. Oil: tbsp:14 / density 0.933
+// implies ~15ml/tbsp; Ghee: tbsp:13.5 similarly implies ~15ml/tbsp).
+const STANDARD_VOLUME_ML = { ml: 1, tsp: 5, tbsp: 15, cup: 240 };
+
 // Converts one ingredient line's {rawQuantity, unit} into a grams-equivalent
 // for nutrition math, using whatever conversion data the FoodItem carries.
 // Returns null (never a guessed number) when no real conversion is known -
 // per the v4.0 plan's "never silently approximate" rule, an unconvertible
 // unit makes that ingredient's contribution unresolved, same as a missing
 // nutritionPer100g does.
+//
+// Resolution order: (1) an ingredient-specific unitConversions[unit] entry,
+// when the FoodItem has one - always most accurate, since it can reflect a
+// real per-piece/per-egg/etc. weight that a generic formula never could;
+// (2) for any of the standard volume units (ml/tsp/tbsp/cup) with no
+// explicit override, rawQuantity * STANDARD_VOLUME_ML[unit] * density -
+// this is what lets switching an ingredient's unit (e.g. Lemon from
+// 'piece' to 'tsp') keep resolving instead of silently going unresolvable
+// just because nobody hand-authored a tsp-specific entry for it. Still
+// returns null, never a guessed number, when density itself isn't known -
+// this only ever bridges volume<->mass for an ingredient whose real
+// density is on file, it never invents one.
 function resolveGramsForIngredient(foodItem, rawQuantity, unit) {
   if (unit === 'g') return rawQuantity;
   if (foodItem?.unitConversions && typeof foodItem.unitConversions[unit] === 'number') {
     return rawQuantity * foodItem.unitConversions[unit];
   }
-  if (unit === 'ml' && typeof foodItem?.density === 'number') {
-    return rawQuantity * foodItem.density;
+  if (typeof STANDARD_VOLUME_ML[unit] === 'number' && typeof foodItem?.density === 'number') {
+    return rawQuantity * STANDARD_VOLUME_ML[unit] * foodItem.density;
   }
   return null;
 }
