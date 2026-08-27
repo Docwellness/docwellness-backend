@@ -122,8 +122,19 @@ function selectMainAndAccompaniment({ eligible, servingTime, target, macroStrate
           (typeof recipe.mealSlotSuitability?.[servingTime] === 'number' ? recipe.mealSlotSuitability[servingTime] : 1) -
           varietyPenaltyFor(recipe.id, recentlyUsed),
       }));
-      scoredAccompaniments.sort((a, b) => b.score - a.score);
-      accompaniment = scoredAccompaniments[0].recipe;
+      // Weighted-random among the top 3, same as the main dish above - NOT
+      // a pure greedy top-1 pick. Every candidate here starts from the same
+      // default suitability (1) whenever mealSlotSuitability is unset (the
+      // common case - see buildEligibleV1Pool's callers), so a plain sort
+      // only ever separates candidates once varietyPenaltyFor has already
+      // penalized one of them; until then ties resolve by array order,
+      // which means whichever accompaniment happens to sort first would win
+      // EVERY call, day-group after day-group, once its penalty decays back
+      // out of the immediate-repeat window - a structural repetition bug of
+      // exactly the kind reported against Varan dominating every Lunch/
+      // Dinner. pickWeighted's randomization is what actually rotates
+      // through the tied candidates instead of locking onto one.
+      accompaniment = pickWeighted(scoredAccompaniments, rand);
     }
   }
 
