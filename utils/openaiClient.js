@@ -6,6 +6,7 @@ const { DIET_PLAN_JSON_SCHEMA, REQUIRED_SERVING_TIMES } = require('./dietPlanJso
 const { DISH_EXTRACTION_JSON_SCHEMA } = require('./dishExtractionJsonSchema');
 const { EXERCISE_JSON_SCHEMA } = require('./exerciseJsonSchema');
 const { RECIPE_STEPS_REWRITE_JSON_SCHEMA } = require('./recipeStepsRewriteJsonSchema');
+const { RECIPE_COMPONENTS_GENERATION_JSON_SCHEMA } = require('./recipeComponentsGenerationJsonSchema');
 const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('./coreIngredientHeuristic');
 
 const openai = new OpenAI({
@@ -1355,6 +1356,117 @@ ${JSON.stringify(ingredients, null, 2)}`;
   return parsed.steps;
 };
 
+/**
+ * Backfills "Makes (on the plate)" (Recipe.components) for a recipe whose
+ * ingredients are already fixed/trusted - same narrow-scope sibling
+ * pattern as generateCookingStepsForFixedIngredients just above (never
+ * touches ingredients/nutrition/quantities, only asks the model for ONE
+ * new field). Exists for exactly the same reason that function does: the
+ * hand-authored batch (scripts/import-hand-authored-recipes.js) only ever
+ * specified name/category/servingTime/ingredients, so ~99 recipes have
+ * neither `components` nor a usable legacy `servingSize` for
+ * scripts/migrate-recipe-components.js's mechanical migration to work
+ * from - there's no existing data to derive a realistic portion from, it
+ * has to be authored.
+ *
+ * Reuses generateRecipeWithAI's own COMPONENTS RULE guidance (see that
+ * function's prompt) condensed into the system prompt below, so a
+ * standalone dal gets one bowl-shaped component and a countable dish like
+ * "Chapati" or "Masala Omelette" gets a natural countable unit instead of
+ * an arbitrary gram total.
+ */
+const generateComponentsForFixedIngredients = async ({ name, servingTime, category, ingredients }) => {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return [];
+
+  const systemPrompt = `You are an expert Indian dietician. You are given a dish's name and its EXACT, FIXED ingredient list with quantities - that list is final, you are not re-authoring the recipe. Your ONLY job is to describe "components": one serving of this dish, broken into its real, separately-servable/countable parts, the way a dietician would actually prescribe it and a patient would actually count it - NOT a generic weight.
+
+COMPONENTS RULE:
+- A dish built around a countable item uses that item's own unit and a whole-number-friendly quantity: "Masala Omelette" -> [{"label":"Masala Omelette","quantity":2,"unit":"egg"}] (2 eggs), "Idli with Sambar and Chutney" -> [{"label":"Idli","quantity":3,"unit":"nos"},{"label":"Sambar","quantity":1,"unit":"bowl"},{"label":"Chutney","quantity":2,"unit":"tbsp"}], "Chapati" -> [{"label":"Chapati","quantity":2,"unit":"piece"}].
+- A dish that's genuinely a single scoopable/pourable mass with no natural count uses "g" or "ml": "Oats Porridge" -> [{"label":"Oats Porridge","quantity":250,"unit":"g"}], "Buttermilk" -> [{"label":"Buttermilk","quantity":200,"unit":"ml"}].
+- "nos" = a generic countable unit for items with no more specific unit of their own (idli, dumpling, cutlet); "bowl"/"cup"/"piece"/"slice"/"egg"/"tbsp"/"tsp" when they're the natural way that specific item is served/counted; "g"/"ml" only for genuinely unitless masses/liquids.
+- List every component a patient would recognize as a distinct part of the plate (typically 1-3) - not every ingredient (a dal's tempering oil is an ingredient, not its own component). A simple single-part dish still gets exactly one components entry, repeating the dish name as its label.
+- If the "dish" is actually a supplement/tablet/capsule, use its own natural dosage unit (e.g. quantity:1, unit:"piece" for one tablet/capsule).
+- Size the quantity/unit to genuinely match the given ingredient list's total amount (e.g. if the fixed ingredients total ~250g of oats+milk, the component quantity should reflect that, not an arbitrary round number).
+
+RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
+{ "components": [{ "label": "string", "quantity": number, "unit": "g"|"ml"|"cup"|"tbsp"|"tsp"|"piece"|"nos"|"bowl"|"egg"|"slice" }] }
+NO markdown, NO explanations, ONLY the JSON object.`;
+
+  const userPrompt = `Recipe: ${name || 'Untitled recipe'}
+Category: ${category || 'Unspecified'}
+Serving Time: ${servingTime || 'Unspecified'}
+
+FIXED INGREDIENT LIST (exact - do not change these quantities, do not add/remove ingredients, do not invent others):
+${JSON.stringify(ingredients, null, 2)}`;
+
+  const jsonSchemaConfig = {
+    name: 'recipe_components_generation',
+    schema: RECIPE_COMPONENTS_GENERATION_JSON_SCHEMA,
+    strict: true,
+  };
+
+  let parsed;
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.responses.create({
+        model: config.openai.translationModel,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        text: { format: { type: 'json_schema', ...jsonSchemaConfig } },
+      });
+
+      const part = response?.output?.[0]?.content?.[0];
+      if (part?.type === 'refusal') {
+        lastError = new Error(`Model refused: ${part.refusal}`);
+        break;
+      }
+      const raw = typeof part === 'string' ? part : part?.text || response?.output_text || '';
+      parsed = parseJsonFromModelOutput(raw);
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`generateComponentsForFixedIngredients attempt ${attempt} failed:`, error.message);
+    }
+  }
+
+  if (!parsed) {
+    try {
+      const fallback = await openai.chat.completions.create({
+        model: config.openai.translationModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_schema', json_schema: jsonSchemaConfig },
+      });
+      const message = fallback?.choices?.[0]?.message;
+      if (!message?.refusal) {
+        parsed = parseJsonFromModelOutput(message?.content || '');
+      } else {
+        lastError = new Error(`Model refused: ${message.refusal}`);
+      }
+    } catch (fallbackError) {
+      lastError = fallbackError;
+      console.error('generateComponentsForFixedIngredients chat fallback failed:', fallbackError.message);
+    }
+  }
+
+  if (!parsed || !Array.isArray(parsed.components) || parsed.components.length === 0) {
+    console.error(
+      `generateComponentsForFixedIngredients failed for "${name}" (non-blocking, no components written):`,
+      lastError?.message || 'no components returned'
+    );
+    return [];
+  }
+
+  return parsed.components;
+};
+
 module.exports = {
   generateDietPlanWithAI,
   generateRecipeWithAI,
@@ -1364,4 +1476,5 @@ module.exports = {
   generateTranslations,
   rewriteRecipeStepsForIngredients,
   generateCookingStepsForFixedIngredients,
+  generateComponentsForFixedIngredients,
 };
