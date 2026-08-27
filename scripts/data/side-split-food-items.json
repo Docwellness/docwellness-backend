@@ -1,0 +1,120 @@
+{
+  "gheeUnitConversions": {
+    "g": 1,
+    "cup": 218,
+    "tbsp": 13.5,
+    "tsp": 4.5
+  },
+  "newItems": [
+    {
+      "name": "Coconut Oil",
+      "nutritionPer100g": {
+        "calories": 862,
+        "protein": 0,
+        "carbs": 0,
+        "fats": 100,
+        "fiber": 0
+      },
+      "unitConversions": {
+        "g": 1,
+        "cup": 218,
+        "tbsp": 13.6,
+        "tsp": 4.5
+      },
+      "density": null
+    },
+    {
+      "name": "Celery",
+      "nutritionPer100g": {
+        "calories": 16,
+        "protein": 0.7,
+        "carbs": 3,
+        "fats": 0.2,
+        "fiber": 1.6
+      },
+      "unitConversions": {
+        "g": 1
+      },
+      "density": null
+    },
+    {
+      "name": "Mayonnaise",
+      "nutritionPer100g": {
+        "calories": 680,
+        "protein": 1.1,
+        "carbs": 1.6,
+        "fats": 75,
+        "fiber": 0
+      },
+      "unitConversions": {
+        "g": 1,
+        "tbsp": 13.8,
+        "tsp": 4.6
+      },
+      "density": null
+    },
+    {
+      "name": "Vegetable Broth",
+      "nutritionPer100g": {
+        "calories": 5,
+        "protein": 0.3,
+        "carbs": 1,
+        "fats": 0.1,
+        "fiber": 0
+      },
+      "unitConversions": {
+        "g": 1
+      },
+      "density": 1
+    },
+    {
+      "name": "Baking Soda",
+      "nutritionPer100g": {
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0,
+        "fiber": 0
+      },
+      "unitConversions": {
+        "g": 1,
+        "tbsp": 13.8,
+        "tsp": 4.6
+      },
+      "density": null
+    },
+    {
+      "name": "Butter",
+      "nutritionPer100g": {
+        "calories": 717,
+        "protein": 0.9,
+        "carbs": 0.1,
+        "fats": 81,
+        "fiber": 0
+      },
+      "unitConversions": {
+        "g": 1,
+        "cup": 227,
+        "tbsp": 14.2,
+        "tsp": 4.7
+      },
+      "density": null
+    },
+    {
+      "name": "Dijon Mustard",
+      "nutritionPer100g": {
+        "calories": 66,
+        "protein": 4.4,
+        "carbs": 5.3,
+        "fats": 4,
+        "fiber": 3.3
+      },
+      "unitConversions": {
+        "g": 1,
+        "tbsp": 15,
+        "tsp": 5
+      },
+      "density": null
+    }
+  ]
+}

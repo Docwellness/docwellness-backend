@@ -1,0 +1,4332 @@
+[
+  {
+    "oldName": "Palak Paneer with Chapati",
+    "name": "Palak Paneer",
+    "ingredients": [
+      {
+        "name": "Spinach",
+        "quantity": 200,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in iron and vitamins, provides a vibrant green color.",
+        "isScalable": true
+      },
+      {
+        "name": "Paneer",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Protein Rich",
+        "priceLevel": "₹₹",
+        "description": "A good source of protein and calcium.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and balance.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with its pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides a nutty flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Garam Masala",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "A blend of spices for warmth and complexity.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Blanch the spinach in boiling water for 2 minutes, then immediately transfer to ice water to retain color.",
+      "Drain the spinach and blend it into a smooth puree.",
+      "Heat oil in a pan, add cumin seeds and let them splutter.",
+      "Add chopped onions, garlic, ginger, and green chilli. Sauté until onions are golden brown.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Stir in turmeric powder, garam masala, and salt.",
+      "Add the spinach puree and cook for 5 minutes on medium heat.",
+      "Add paneer cubes and simmer for another 5 minutes, allowing the flavors to meld.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 20,
+      "carbs": 30,
+      "fats": 35,
+      "fiber": 6
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Gobi Matar with Chapati",
+    "name": "Gobi Matar",
+    "ingredients": [
+      {
+        "name": "Cauliflower",
+        "quantity": 200,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in vitamins C and K, and a good source of fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Peas",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "High in protein and fiber, providing essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and a spicy kick.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with its pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor and aids digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy flavor and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and a burst of flavor.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Chop the cauliflower into small florets and rinse them thoroughly.",
+      "Heat oil in a pan over medium heat and add cumin seeds. Let them splutter.",
+      "Add chopped onions and sauté until golden brown.",
+      "Add ginger and garlic, sauté for another minute until fragrant.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Stir in turmeric, red chili powder, coriander powder, and salt. Mix well.",
+      "Add cauliflower florets and green peas. Stir to coat them with the spices.",
+      "Cover and cook on low heat for 10-15 minutes until the vegetables are tender.",
+      "Garnish with chopped cilantro before serving."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 12,
+      "carbs": 60,
+      "fats": 20,
+      "fiber": 14
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Dal Palak with Chapati",
+    "name": "Dal Palak",
+    "ingredients": [
+      {
+        "name": "Toor Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, essential for a balanced diet.",
+        "isScalable": true
+      },
+      {
+        "name": "Spinach",
+        "quantity": 150,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "High in iron and vitamins, adds a fresh taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Ghee",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Adds richness and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish, adds freshness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the toor dal thoroughly and soak it in water for 15 minutes.",
+      "In a pressure cooker, add the soaked dal, 300 ml of water, turmeric powder, and salt. Cook for 3-4 whistles until the dal is soft.",
+      "In a pan, heat ghee and add cumin seeds. Once they splutter, add chopped onions, ginger, garlic, and green chilli. Sauté until onions are golden brown.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Add the spinach and cook until it wilts.",
+      "Mix the cooked dal into the pan with the spinach mixture. Simmer for 5-7 minutes, adjusting salt as needed.",
+      "Garnish with coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 520,
+      "protein": 22,
+      "carbs": 78,
+      "fats": 15,
+      "fiber": 12
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Tofu Bhurji with Chapati",
+    "name": "Tofu Bhurji",
+    "ingredients": [
+      {
+        "name": "Tofu",
+        "quantity": 150,
+        "unit": "g",
+        "category": "Protein Rich",
+        "priceLevel": "₹₹",
+        "description": "Rich in protein and a great meat substitute.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and freshness.",
+        "isScalable": true
+      },
+      {
+        "name": "Bell Pepper",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds crunch and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the savory taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy note.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances all flavors.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Olive Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹₹",
+        "description": "Used for sautéing, adds healthy fats.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat olive oil in a pan over medium heat.",
+      "Add cumin seeds and let them splutter.",
+      "Add chopped onions and sauté until translucent.",
+      "Add minced garlic, ginger, and green chili; sauté for a minute.",
+      "Add chopped tomatoes and cook until soft.",
+      "Stir in turmeric, coriander powder, and salt.",
+      "Add crumbled tofu and green bell pepper; mix well.",
+      "Cook for 5-7 minutes, stirring occasionally.",
+      "Garnish with chopped cilantro and serve hot."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 22,
+      "carbs": 20,
+      "fats": 30,
+      "fiber": 6
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Bharwan Shimla Mirch with Chapati",
+    "name": "Bharwan Shimla Mirch",
+    "ingredients": [
+      {
+        "name": "Bell Pepper",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in vitamins A and C, adds a sweet flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Potato",
+        "quantity": 150,
+        "unit": "g",
+        "category": "Carbohydrate",
+        "priceLevel": "₹",
+        "description": "Provides a creamy texture and is a good source of carbohydrates.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Peas",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds depth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds citrusy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and garnish.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Preheat the oven to 180°C (350°F).",
+      "Boil the potatoes until tender, then peel and mash them.",
+      "Heat oil in a pan, add cumin seeds, and let them splutter.",
+      "Add chopped onions, ginger, and garlic, sauté until golden brown.",
+      "Add green peas, mashed potatoes, turmeric, red chili powder, coriander powder, and salt. Mix well and cook for 5 minutes.",
+      "Cut the tops off the bell peppers and remove the seeds.",
+      "Stuff the peppers with the potato mixture and place them in a baking dish.",
+      "Bake for 20-25 minutes until the peppers are tender.",
+      "Garnish with chopped coriander leaves before serving."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 8,
+      "carbs": 80,
+      "fats": 16,
+      "fiber": 12
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Turai Sabji with Chapati",
+    "name": "Turai Sabji",
+    "ingredients": [
+      {
+        "name": "Ridge Gourd",
+        "quantity": 300,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Low in calories and high in dietary fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in vitamin C and adds tanginess.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor profile.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides a nutty flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and has anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish and adds freshness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Peel and chop the ridge gourd into small pieces.",
+      "Finely chop the onion, tomato, ginger, and garlic.",
+      "Heat oil in a pan and add cumin seeds. Let them splutter.",
+      "Add chopped onions and sauté until translucent.",
+      "Add ginger, garlic, and green chili. Sauté for a minute.",
+      "Add chopped tomatoes and cook until soft.",
+      "Stir in turmeric powder, coriander powder, and salt.",
+      "Add the chopped ridge gourd and mix well.",
+      "Cover and cook on low heat until the ridge gourd is tender.",
+      "Garnish with chopped coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 420,
+      "protein": 6,
+      "carbs": 50,
+      "fats": 20,
+      "fiber": 10
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Vegetable Korma with Pulka",
+    "name": "Vegetable Korma",
+    "ingredients": [
+      {
+        "name": "Cauliflower",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in vitamins and fiber, adds bulk to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and color, high in beta-carotene.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Peas",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides protein and a pop of color.",
+        "isScalable": true
+      },
+      {
+        "name": "Potato",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Carbohydrate",
+        "priceLevel": "₹",
+        "description": "Adds creaminess and body to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Base for the curry, adds sweetness when cooked.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds tanginess and depth to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Coconut Milk",
+        "quantity": 100,
+        "unit": "ml",
+        "category": "Dairy",
+        "priceLevel": "₹₹",
+        "description": "Provides creaminess and a subtle coconut flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Yogurt",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Adds tanginess and richness to the sauce.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor profile.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy note to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Garam Masala",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "A blend of spices that adds warmth and complexity.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavors of the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for sautéing the spices and vegetables.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat oil in a pan over medium heat. Add cumin seeds and let them splutter.",
+      "Add chopped onions, ginger, and garlic. Sauté until onions are translucent.",
+      "Add chopped tomatoes and cook until soft.",
+      "Stir in coriander powder, turmeric powder, and salt. Cook for 2 minutes.",
+      "Add cauliflower, carrots, green peas, and potatoes. Mix well.",
+      "Pour in coconut milk and yogurt. Stir to combine.",
+      "Cover and simmer for 20 minutes until vegetables are tender.",
+      "Sprinkle garam masala and mix well. Cook for another 2 minutes.",
+      "Serve hot garnished with fresh coriander leaves."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 10,
+      "carbs": 70,
+      "fats": 25,
+      "fiber": 10
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Bhindi Sabji with Jowar Bhakri",
+    "name": "Bhindi Sabji",
+    "ingredients": [
+      {
+        "name": "Okra",
+        "quantity": 200,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in fiber and vitamins, helps in digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a warm, spicy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the aroma and taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides a nutty, earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and has anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for sautéing the vegetables.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Wash and dry the okra thoroughly. Cut into 1-inch pieces.",
+      "Heat oil in a pan over medium heat. Add cumin seeds and let them splutter.",
+      "Add chopped onions and sauté until golden brown.",
+      "Add ginger, garlic, and green chilli. Sauté for another minute.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Add turmeric powder, coriander powder, and salt. Mix well.",
+      "Add the okra and stir to coat with the spices.",
+      "Cover and cook on low heat for 10-15 minutes, stirring occasionally, until the okra is tender.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 5,
+      "carbs": 30,
+      "fats": 36,
+      "fiber": 8
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Methi Dal with Jowar Bhakri",
+    "name": "Methi Dal",
+    "ingredients": [
+      {
+        "name": "Toor Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, providing essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Fenugreek Leaves",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a unique flavor and is rich in iron and vitamins.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and aids digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor and has health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor and aids digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ghee",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Adds richness and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish and adds freshness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the toor dal thoroughly and soak it in water for 15 minutes.",
+      "In a pressure cooker, add the soaked dal, turmeric powder, and 400 ml of water. Cook for 3-4 whistles until the dal is soft.",
+      "In a pan, heat ghee and add cumin seeds. Once they splutter, add chopped onions, ginger, garlic, and green chilli. Sauté until onions are golden brown.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Add fenugreek leaves and sauté for 2-3 minutes until they wilt.",
+      "Mix the cooked dal into the pan, add salt, and simmer for 5-7 minutes to blend flavors.",
+      "Garnish with coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 18,
+      "carbs": 60,
+      "fats": 15,
+      "fiber": 12
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Egg Bhurji with Bhakri",
+    "name": "Egg Bhurji",
+    "ingredients": [
+      {
+        "name": "Egg",
+        "quantity": 3,
+        "unit": "piece",
+        "category": "Protein Rich",
+        "priceLevel": "₹",
+        "description": "Rich in protein and essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides tanginess and moisture.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a spicy kick.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds depth and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and garnish.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat oil in a pan over medium heat.",
+      "Add cumin seeds and let them splutter.",
+      "Add chopped onions and sauté until translucent.",
+      "Add ginger and garlic, sauté for a minute.",
+      "Add chopped tomatoes, green chilli, turmeric, red chilli powder, and salt. Cook until tomatoes are soft.",
+      "Beat the eggs in a bowl and pour into the pan.",
+      "Stir continuously until the eggs are cooked and scrambled.",
+      "Garnish with chopped coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 24,
+      "carbs": 12,
+      "fats": 36,
+      "fiber": 3
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Bharli Vangi with Bhakri",
+    "name": "Bharli Vangi",
+    "ingredients": [
+      {
+        "name": "Brinjal",
+        "quantity": 4,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in fiber and antioxidants.",
+        "isScalable": true
+      },
+      {
+        "name": "Peanuts",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Nut/Seed",
+        "priceLevel": "₹",
+        "description": "Provides healthy fats and protein.",
+        "isScalable": true
+      },
+      {
+        "name": "Coconut",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Nut/Seed",
+        "priceLevel": "₹",
+        "description": "Adds a creamy texture and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 3,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Imparts a citrusy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthiness and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Tamarind",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Adds tanginess to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Jaggery",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Sweetener",
+        "priceLevel": "₹",
+        "description": "Balances flavors with sweetness.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish and fresh flavor.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Wash and slit the baby eggplants, keeping the stems intact.",
+      "Dry roast peanuts, coconut, coriander seeds, and cumin seeds until aromatic. Cool and grind to a coarse powder.",
+      "Mix the ground powder with chopped onion, garlic, ginger, turmeric, red chili powder, tamarind, jaggery, and salt to form a stuffing.",
+      "Stuff the eggplants with the prepared mixture.",
+      "Heat oil in a pan, add the stuffed eggplants, and cook on low heat, covered, until tender, about 20 minutes.",
+      "Garnish with chopped coriander leaves before serving."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 12,
+      "carbs": 45,
+      "fats": 35,
+      "fiber": 10
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Dal Tadka with Steamed Rice",
+    "name": "Dal Tadka",
+    "ingredients": [
+      {
+        "name": "Toor Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, essential for a balanced diet.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 500,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to cook the dal.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides tanginess and richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the aroma and taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Mustard Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a nutty flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ghee",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Enhances flavor and richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish and freshness.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall taste.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the toor dal thoroughly under running water.",
+      "In a pressure cooker, add the rinsed dal and 500 ml of water. Cook for 3-4 whistles until the dal is soft.",
+      "In a pan, heat ghee and add cumin seeds and mustard seeds. Let them splutter.",
+      "Add chopped onions, ginger, garlic, and green chilli. Sauté until onions are golden brown.",
+      "Add chopped tomatoes and cook until they are soft.",
+      "Add turmeric powder and salt. Mix well.",
+      "Pour the cooked dal into the pan and mix thoroughly. Let it simmer for 5-10 minutes.",
+      "Garnish with chopped coriander leaves before serving."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 20,
+      "carbs": 80,
+      "fats": 15,
+      "fiber": 12
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Kerala Fish Curry with Rice",
+    "name": "Kerala Fish Curry",
+    "ingredients": [
+      {
+        "name": "Fish",
+        "quantity": 150,
+        "unit": "g",
+        "category": "Protein Rich",
+        "priceLevel": "₹₹",
+        "description": "Rich in omega-3 fatty acids and protein.",
+        "isScalable": true
+      },
+      {
+        "name": "Coconut Milk",
+        "quantity": 200,
+        "unit": "ml",
+        "category": "Dairy",
+        "priceLevel": "₹₹",
+        "description": "Adds creaminess and a distinct flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coconut Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹₹",
+        "description": "Enhances the authentic taste of Kerala cuisine.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and balance.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a pungent flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Curry Leaves",
+        "quantity": 5,
+        "unit": "piece",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds a distinct aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Tamarind",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Adds tanginess to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavors.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat coconut oil in a pan and add curry leaves, chopped onions, garlic, and ginger. Sauté until onions are translucent.",
+      "Add chopped tomatoes, turmeric powder, and red chilli powder. Cook until tomatoes are soft.",
+      "Add coconut milk and tamarind paste, and bring to a gentle simmer.",
+      "Add the fish pieces and green chilli. Cook for 10-12 minutes until the fish is cooked through.",
+      "Season with salt and adjust the consistency with water if needed. Simmer for another 2-3 minutes.",
+      "Serve hot, garnished with fresh curry leaves."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 30,
+      "carbs": 15,
+      "fats": 40,
+      "fiber": 3
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Chana Dal with Rice",
+    "name": "Chana Dal",
+    "ingredients": [
+      {
+        "name": "Chana Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, providing a hearty base for the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and richness to the dal.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and a spicy kick.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor with its pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides a nutty and earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish, adding freshness.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for tempering spices.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the chana dal thoroughly and soak it in water for 30 minutes.",
+      "In a pot, add the soaked chana dal with 2 cups of water and a pinch of turmeric. Cook until the dal is soft.",
+      "In a separate pan, heat oil and add cumin seeds. Once they splutter, add chopped onions and sauté until golden brown.",
+      "Add ginger, garlic, and green chili. Sauté for another minute.",
+      "Add chopped tomatoes and cook until they soften.",
+      "Mix in the cooked chana dal, salt, and simmer for 10 minutes.",
+      "Garnish with coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 25,
+      "carbs": 80,
+      "fats": 15,
+      "fiber": 15
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Whole Masoor Dal with Rice",
+    "name": "Whole Masoor Dal",
+    "ingredients": [
+      {
+        "name": "Whole Masoor Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, providing essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and color.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the whole masoor dal thoroughly under running water.",
+      "In a pressure cooker, add the rinsed dal and 2 cups of water. Cook for 15 minutes or until soft.",
+      "In a pan, heat oil over medium heat. Add cumin seeds and let them splutter.",
+      "Add chopped onions and sauté until golden brown.",
+      "Add minced garlic, ginger, and green chilli. Sauté for another minute.",
+      "Add chopped tomatoes, turmeric powder, coriander powder, and salt. Cook until tomatoes are soft.",
+      "Add the cooked dal to the pan and mix well. Simmer for 5 minutes to blend flavors.",
+      "Garnish with chopped cilantro before serving."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 24,
+      "carbs": 80,
+      "fats": 15,
+      "fiber": 15
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Kala Chana Curry with Rice",
+    "name": "Kala Chana Curry",
+    "ingredients": [
+      {
+        "name": "Kala Chana",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, providing a hearty base for the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and richness to the sauce.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the aroma and taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat to the curry.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides a nutty flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor profile.",
+        "isScalable": true
+      },
+      {
+        "name": "Garam Masala",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "A blend of spices for warmth and complexity.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances all flavors.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for sautéing the spices and vegetables.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and color as a garnish.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Soak the kala chana overnight or for at least 8 hours.",
+      "Drain and rinse the soaked kala chana.",
+      "In a pressure cooker, add the kala chana with 2 cups of water and cook for 15 minutes or until soft.",
+      "In a pan, heat oil and add cumin seeds until they splutter.",
+      "Add chopped onions and sauté until golden brown.",
+      "Add ginger, garlic, and green chili, and sauté for another minute.",
+      "Add chopped tomatoes, turmeric, coriander powder, and salt. Cook until the tomatoes are soft.",
+      "Add the cooked kala chana along with the water to the pan.",
+      "Simmer for 10 minutes, allowing the flavors to meld.",
+      "Stir in garam masala and garnish with chopped cilantro before serving."
+    ],
+    "nutrition": {
+      "calories": 520,
+      "protein": 18,
+      "carbs": 80,
+      "fats": 15,
+      "fiber": 20
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Palak Dal with Rice",
+    "name": "Palak Dal",
+    "ingredients": [
+      {
+        "name": "Moong Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, essential for a balanced diet.",
+        "isScalable": true
+      },
+      {
+        "name": "Spinach",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "High in iron and vitamins, adds a healthy green element.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Boosts flavor and has health benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice to the dish.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory properties.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor and aids digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ghee",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Adds richness and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Used for garnish, adds freshness.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the moong dal thoroughly and soak it in water for 15 minutes.",
+      "In a pot, add the soaked dal with 300 ml of water, turmeric powder, and salt. Cook until the dal is soft.",
+      "In a separate pan, heat ghee and add cumin seeds. Once they splutter, add chopped onions, garlic, ginger, and green chilli. Sauté until onions are golden brown.",
+      "Add chopped tomatoes to the pan and cook until they soften.",
+      "Add the spinach to the pan and cook until wilted.",
+      "Combine the cooked dal with the spinach mixture and simmer for 5 minutes.",
+      "Garnish with coriander leaves and serve hot."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 18,
+      "carbs": 60,
+      "fats": 15,
+      "fiber": 12
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Masoor Dal with Rice and Ghee",
+    "name": "Masoor Dal",
+    "ingredients": [
+      {
+        "name": "Masoor Dal",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, essential for a balanced diet.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides acidity and richness.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Gives color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Powder",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a citrusy note.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for sautéing spices and vegetables.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 500,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to cook the lentils.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the red lentils thoroughly under cold water until the water runs clear.",
+      "In a pot, heat oil over medium heat. Add cumin seeds and let them splutter.",
+      "Add chopped onions and sauté until golden brown.",
+      "Add minced garlic and ginger, and sauté for another minute.",
+      "Add chopped tomatoes, turmeric powder, coriander powder, red chili powder, and salt. Cook until the tomatoes are soft.",
+      "Add the rinsed lentils and water to the pot. Stir well and bring to a boil.",
+      "Reduce the heat to low, cover, and let it simmer for 20-25 minutes until the lentils are tender.",
+      "Garnish with chopped cilantro before serving."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 18,
+      "carbs": 70,
+      "fats": 10,
+      "fiber": 15
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Thai Vegetable Curry with Rice",
+    "name": "Thai Vegetable Curry",
+    "ingredients": [
+      {
+        "name": "Coconut Milk",
+        "quantity": 200,
+        "unit": "ml",
+        "category": "Dairy",
+        "priceLevel": "₹₹",
+        "description": "Provides a creamy texture and rich flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Thai Red Curry Paste",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹₹",
+        "description": "Adds authentic Thai flavor and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Bell Pepper",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds crunch and vibrant color.",
+        "isScalable": true
+      },
+      {
+        "name": "Zucchini",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a mild flavor and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Broccoli",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in fiber and vitamins.",
+        "isScalable": true
+      },
+      {
+        "name": "Basil Leaves",
+        "quantity": 10,
+        "unit": "piece",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds fresh aroma and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Soy Sauce",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹",
+        "description": "Adds umami and saltiness.",
+        "isScalable": true
+      },
+      {
+        "name": "Lime",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Adds acidity and freshness.",
+        "isScalable": true
+      },
+      {
+        "name": "Olive Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹₹",
+        "description": "Used for sautéing vegetables.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat olive oil in a pan over medium heat.",
+      "Add red curry paste and sauté for 1-2 minutes until fragrant.",
+      "Add sliced carrots, bell pepper, zucchini, and broccoli. Stir-fry for 5 minutes.",
+      "Pour in coconut milk and bring to a simmer.",
+      "Add soy sauce and stir well.",
+      "Simmer for 10 minutes until vegetables are tender.",
+      "Add basil leaves and lime juice. Stir and cook for another 2 minutes.",
+      "Serve hot in a bowl."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 10,
+      "carbs": 45,
+      "fats": 38,
+      "fiber": 10
+    },
+    "translations": {
+      "Hindi": {
+        "name": "थाई सब्जी करी",
+        "description": "एक जीवंत और सुगंधित थाई सब्जी करी, नारियल के दूध और ताजे सब्जियों के स्वाद से भरपूर, संतोषजनक लंच के लिए एकदम सही।",
+        "ingredients": [
+          {
+            "name": "नारियल का दूध",
+            "description": "क्रीमी बनावट और समृद्ध स्वाद प्रदान करता है।",
+            "_id": "6a8ed06532e8697f0d2ce6a7"
+          },
+          {
+            "name": "लाल करी पेस्ट",
+            "description": "प्रामाणिक थाई स्वाद और मसाला जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6a8"
+          },
+          {
+            "name": "गाजर",
+            "description": "मीठास और रंग जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6a9"
+          },
+          {
+            "name": "शिमला मिर्च",
+            "description": "क्रंच और जीवंत रंग जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6aa"
+          },
+          {
+            "name": "जुकीनी",
+            "description": "हल्का स्वाद और बनावट जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6ab"
+          },
+          {
+            "name": "ब्रोकली",
+            "description": "फाइबर और विटामिन से भरपूर।",
+            "_id": "6a8ed06532e8697f0d2ce6ac"
+          },
+          {
+            "name": "तुलसी के पत्ते",
+            "description": "ताजा सुगंध और स्वाद जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6ad"
+          },
+          {
+            "name": "सोया सॉस",
+            "description": "उमामी और नमकीनता जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6ae"
+          },
+          {
+            "name": "नींबू",
+            "description": "खट्टापन और ताजगी जोड़ता है।",
+            "_id": "6a8ed06532e8697f0d2ce6af"
+          },
+          {
+            "name": "जैतून का तेल",
+            "description": "सब्जियों को भूनने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ed06532e8697f0d2ce6b0"
+          }
+        ],
+        "cookingSteps": [
+          "एक पैन में मध्यम आंच पर जैतून का तेल गर्म करें।",
+          "लाल करी पेस्ट डालें और 1-2 मिनट तक भूनें जब तक सुगंधित न हो जाए।",
+          "कटी हुई गाजर, शिमला मिर्च, जुकीनी, और ब्रोकली डालें। 5 मिनट तक भूनें।",
+          "नारियल का दूध डालें और उबालने के लिए लाएं।",
+          "सोया सॉस डालें और अच्छी तरह मिलाएं।",
+          "10 मिनट तक उबालें जब तक सब्जियाँ नरम न हो जाएं।",
+          "तुलसी के पत्ते और नींबू का रस डालें। मिलाएं और 2 मिनट और पकाएं।",
+          "गर्मागर्म एक कटोरे में परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "थाई भाज्या करी",
+        "description": "एक जीवंत आणि सुगंधित थाई भाज्या करी, नारळाच्या दूध आणि ताज्या भाज्या यांचे समृद्ध चव असलेली, संतोषजनक लंचसाठी परिपूर्ण.",
+        "ingredients": [
+          {
+            "name": "नारळाचे दूध",
+            "description": "क्रीमी टेक्चर आणि समृद्ध चव प्रदान करते.",
+            "_id": "6a8ed06532e8697f0d2ce6b2"
+          },
+          {
+            "name": "लाल करी पेस्ट",
+            "description": "प्रामाणिक थाई चव आणि मसाला वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b3"
+          },
+          {
+            "name": "गाजर",
+            "description": "गोडसरता आणि रंग वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b4"
+          },
+          {
+            "name": "बेल पेपर",
+            "description": "कुरकुरीतपणा आणि जीवंत रंग वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b5"
+          },
+          {
+            "name": "झुकीनी",
+            "description": "मऊ चव आणि टेक्चर वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b6"
+          },
+          {
+            "name": "ब्रोकली",
+            "description": "फायबर आणि जीवनसत्त्वांनी समृद्ध.",
+            "_id": "6a8ed06532e8697f0d2ce6b7"
+          },
+          {
+            "name": "तुलसीची पाने",
+            "description": "ताजगीचा सुगंध आणि चव वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b8"
+          },
+          {
+            "name": "सोया सॉस",
+            "description": "उमामी आणि मीठपणा वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6b9"
+          },
+          {
+            "name": "लिंबू",
+            "description": "आसिडिटी आणि ताजगी वाढवते.",
+            "_id": "6a8ed06532e8697f0d2ce6ba"
+          },
+          {
+            "name": "ऑलिव्ह ऑईल",
+            "description": "भाज्या पराठा करण्यासाठी वापरले जाते.",
+            "_id": "6a8ed06532e8697f0d2ce6bb"
+          }
+        ],
+        "cookingSteps": [
+          "एका पातेल्यात मध्यम आचेवर ऑलिव्ह ऑईल गरम करा.",
+          "लाल करी पेस्ट घाला आणि 1-2 मिनिटे पराठा करा जोपर्यंत सुगंधित होत नाही.",
+          "कापलेले गाजर, बेल पेपर, झुकीनी, आणि ब्रोकली घाला. 5 मिनिटे स्टर-फ्राय करा.",
+          "नारळाचे दूध ओता आणि उकळा.",
+          "सोया सॉस घाला आणि चांगले मिसळा.",
+          "भाज्या मऊ होईपर्यंत 10 मिनिटे उकळा.",
+          "तुलसीची पाने आणि लिंबाचा रस घाला. आणखी 2 मिनिटे शिजवा.",
+          "उष्णता मध्ये एका भांड्यात सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "oldName": "Japanese Miso Vegetable Soup with Rice",
+    "name": "Japanese Miso Vegetable Soup",
+    "ingredients": [
+      {
+        "name": "Miso Paste",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹₹",
+        "description": "Rich in umami flavor and probiotics.",
+        "isScalable": true
+      },
+      {
+        "name": "Tofu",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Protein Rich",
+        "priceLevel": "₹₹",
+        "description": "High in protein and low in calories.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and color.",
+        "isScalable": true
+      },
+      {
+        "name": "Spinach",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in iron and vitamins.",
+        "isScalable": true
+      },
+      {
+        "name": "Mushroom",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹₹",
+        "description": "Adds a deep, earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Spring Onion",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a fresh, mild onion flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Soy Sauce",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹",
+        "description": "Adds saltiness and depth.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 500,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Base for the soup.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat water in a pot over medium heat.",
+      "Add sliced shiitake mushrooms, grated ginger, and minced garlic. Simmer for 5 minutes.",
+      "Add diced carrot and cook until tender, about 5 minutes.",
+      "Stir in miso paste and soy sauce until dissolved.",
+      "Add cubed tofu and spinach, simmer for another 5 minutes.",
+      "Garnish with chopped green onions before serving."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 20,
+      "carbs": 45,
+      "fats": 18,
+      "fiber": 8
+    },
+    "translations": {
+      "Hindi": {
+        "name": "जापानी मिसो सब्जी सूप",
+        "description": "एक पौष्टिक और स्वादिष्ट जापानी सूप जो मिसो पेस्ट और विभिन्न ताजे सब्जियों से बना है, हल्के लेकिन संतोषजनक दोपहर के भोजन के लिए बिल्कुल सही।",
+        "ingredients": [
+          {
+            "name": "मिसो पेस्ट",
+            "description": "उमामी स्वाद और प्रोबायोटिक्स में समृद्ध।",
+            "_id": "6a8ed07732e8697f0d2ce704"
+          },
+          {
+            "name": "टोफू",
+            "description": "प्रोटीन में उच्च और कैलोरी में कम।",
+            "_id": "6a8ed07732e8697f0d2ce705"
+          },
+          {
+            "name": "गाजर",
+            "description": "मीठास और रंग जोड़ता है।",
+            "_id": "6a8ed07732e8697f0d2ce706"
+          },
+          {
+            "name": "पालक",
+            "description": "आयरन और विटामिन में समृद्ध।",
+            "_id": "6a8ed07732e8697f0d2ce707"
+          },
+          {
+            "name": "शिटाके मशरूम",
+            "description": "गहरा, मिट्टी जैसा स्वाद जोड़ता है।",
+            "_id": "6a8ed07732e8697f0d2ce708"
+          },
+          {
+            "name": "हरी प्याज",
+            "description": "ताजा, हल्का प्याज का स्वाद जोड़ता है।",
+            "_id": "6a8ed07732e8697f0d2ce709"
+          },
+          {
+            "name": "अदरक",
+            "description": "गर्मी और मसाले जोड़ता है।",
+            "_id": "6a8ed07732e8697f0d2ce70a"
+          },
+          {
+            "name": "लहसुन",
+            "description": "तेज सुगंध के साथ स्वाद को बढ़ाता है।",
+            "_id": "6a8ed07732e8697f0d2ce70b"
+          },
+          {
+            "name": "सोया सॉस",
+            "description": "नमक और गहराई जोड़ता है।",
+            "_id": "6a8ed07732e8697f0d2ce70c"
+          },
+          {
+            "name": "पानी",
+            "description": "सूप का आधार।",
+            "_id": "6a8ed07732e8697f0d2ce70d"
+          }
+        ],
+        "cookingSteps": [
+          "एक बर्तन में मध्यम आंच पर पानी गरम करें।",
+          "कटे हुए शिटाके मशरूम, कद्दूकस किया हुआ अदरक, और कटा हुआ लहसुन डालें। 5 मिनट तक उबालें।",
+          "कटी हुई गाजर डालें और नरम होने तक पकाएं, लगभग 5 मिनट।",
+          "मिसो पेस्ट और सोया सॉस डालें जब तक कि वह घुल न जाए।",
+          "क्यूब किए हुए टोफू और पालक डालें, और 5 मिनट तक और उबालें।",
+          "सेवा करने से पहले कटी हुई हरी प्याज से सजाएं।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "जपानी मिसो भाज्या सूप",
+        "description": "मिसो पेस्ट आणि विविध ताज्या भाज्या वापरून बनवलेला पोषणयुक्त आणि चवदार जपानी सूप, हलक्या पण समाधानकारक जेवणासाठी योग्य.",
+        "ingredients": [
+          {
+            "name": "मिसो पेस्ट",
+            "description": "उमामी चवीत समृद्ध आणि प्रॉबायोटिक्सने भरलेले.",
+            "_id": "6a8ed07732e8697f0d2ce70f"
+          },
+          {
+            "name": "टोफू",
+            "description": "प्रथिनात उच्च आणि कॅलोरीमध्ये कमी.",
+            "_id": "6a8ed07732e8697f0d2ce710"
+          },
+          {
+            "name": "गाजर",
+            "description": "गोडसरपणा आणि रंग वाढवतो.",
+            "_id": "6a8ed07732e8697f0d2ce711"
+          },
+          {
+            "name": "पालक",
+            "description": "आयरन आणि जीवनसत्त्वांनी समृद्ध.",
+            "_id": "6a8ed07732e8697f0d2ce712"
+          },
+          {
+            "name": "शिटाके मशरूम",
+            "description": "गडद, पृथ्वीच्या चवीत भर घालतो.",
+            "_id": "6a8ed07732e8697f0d2ce713"
+          },
+          {
+            "name": "कोथिंबीर",
+            "description": "ताज्या, सौम्य कांद्याची चव वाढवतो.",
+            "_id": "6a8ed07732e8697f0d2ce714"
+          },
+          {
+            "name": "आल्याचा तुकडा",
+            "description": "उष्णता आणि मसाला वाढवतो.",
+            "_id": "6a8ed07732e8697f0d2ce715"
+          },
+          {
+            "name": "लसूण",
+            "description": "तिखट सुगंधासह चव वाढवतो.",
+            "_id": "6a8ed07732e8697f0d2ce716"
+          },
+          {
+            "name": "सोया सॉस",
+            "description": "मीठपणा आणि गहराई वाढवतो.",
+            "_id": "6a8ed07732e8697f0d2ce717"
+          },
+          {
+            "name": "पाणी",
+            "description": "सूपचा बेस.",
+            "_id": "6a8ed07732e8697f0d2ce718"
+          }
+        ],
+        "cookingSteps": [
+          "एका पातेल्यात मध्यम आचेवर पाणी गरम करा.",
+          "कापलेले शिटाके मशरूम, किसलेले आलं आणि चिरलेला लसूण घाला. 5 मिनिटे उकळा.",
+          "कापलेले गाजर घाला आणि मऊ होईपर्यंत शिजवा, सुमारे 5 मिनिटे.",
+          "मिसो पेस्ट आणि सोया सॉस घालून विरघळेपर्यंत ढवळा.",
+          "क्यूब केलेला टोफू आणि पालक घाला, आणखी 5 मिनिटे उकळा.",
+          "सर्व्ह करण्यापूर्वी चिरलेली कोथिंबीरने सजवा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "oldName": "Vegetable Biryani with Raita",
+    "name": "Vegetable Biryani",
+    "ingredients": [
+      {
+        "name": "Basmati Rice",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹₹",
+        "description": "Long-grain rice known for its fragrance and fluffy texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in beta-carotene and adds sweetness.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Peas",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "High in fiber and protein, adds a pop of color.",
+        "isScalable": true
+      },
+      {
+        "name": "Potato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds heartiness and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds sweetness and depth of flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds tanginess and moisture.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Fresh herb for garnish and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Mint Leaves",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Yogurt",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Adds creaminess and tang.",
+        "isScalable": true
+      },
+      {
+        "name": "Garam Masala",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "A blend of spices for warmth and depth.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds color and earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a nutty, peppery flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for sautéing vegetables and spices.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the basmati rice under cold water until the water runs clear. Soak it in water for 20 minutes, then drain.",
+      "Heat vegetable oil in a large pan over medium heat. Add cumin seeds and let them splutter.",
+      "Add sliced onions, ginger, garlic, and green chili. Sauté until onions are golden brown.",
+      "Add chopped tomatoes, turmeric powder, and salt. Cook until tomatoes are soft.",
+      "Add diced carrots, potatoes, and green peas. Cook for 5 minutes, stirring occasionally.",
+      "Stir in yogurt, garam masala, and half of the chopped cilantro and mint leaves.",
+      "Add the soaked rice and 200 ml of water. Bring to a boil, then reduce heat to low, cover, and simmer for 15-20 minutes until rice is cooked and water is absorbed.",
+      "Fluff the rice with a fork, garnish with remaining cilantro and mint leaves, and serve hot."
+    ],
+    "nutrition": {
+      "calories": 550,
+      "protein": 12,
+      "carbs": 90,
+      "fats": 15,
+      "fiber": 8
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Methi Thepla with Curd",
+    "name": "Methi Thepla",
+    "ingredients": [
+      {
+        "name": "Whole Wheat Flour",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Rich in fiber and essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Fenugreek Leaves",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a distinct flavor and is rich in iron.",
+        "isScalable": true
+      },
+      {
+        "name": "Yogurt",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Adds moisture and tanginess.",
+        "isScalable": true
+      },
+      {
+        "name": "Turmeric Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Provides color and anti-inflammatory benefits.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Chilli Powder",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a mild heat.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a warm, earthy taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for kneading and cooking.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 50,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to form the dough.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "In a mixing bowl, combine whole wheat flour, fenugreek leaves, yogurt, turmeric powder, red chili powder, cumin seeds, and salt.",
+      "Add water gradually and knead into a soft dough. Add a little oil to make the dough smooth.",
+      "Divide the dough into equal portions and roll each portion into a ball.",
+      "Flatten each ball and roll it out into a thin circle using a rolling pin.",
+      "Heat a non-stick pan over medium heat. Place the rolled thepla on the pan.",
+      "Cook on both sides, applying a little oil, until golden brown spots appear.",
+      "Repeat with the remaining dough portions.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 350,
+      "protein": 10,
+      "carbs": 55,
+      "fats": 10,
+      "fiber": 8
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Egg Salad with Whole Wheat Toast",
+    "name": "Egg Salad",
+    "ingredients": [
+      {
+        "name": "Egg",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Protein Rich",
+        "priceLevel": "₹",
+        "description": "Rich in protein and essential nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Celery",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds crunch and fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Red Onion",
+        "quantity": 20,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides a mild, sweet flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Mayonnaise",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹₹",
+        "description": "Adds creaminess to the salad.",
+        "isScalable": true
+      },
+      {
+        "name": "Dijon Mustard",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹₹",
+        "description": "Gives a tangy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Lemon",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Adds freshness and acidity.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Black Pepper",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a hint of spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Parsley",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and color.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Boil the eggs for 10 minutes until hard-boiled. Cool them under cold water, peel, and chop.",
+      "Chop the celery and red onion finely.",
+      "In a bowl, combine chopped eggs, celery, and red onion.",
+      "Add mayonnaise, Dijon mustard, juice of half a lemon, salt, and black pepper. Mix well.",
+      "Garnish with chopped parsley before serving."
+    ],
+    "nutrition": {
+      "calories": 350,
+      "protein": 14,
+      "carbs": 6,
+      "fats": 28,
+      "fiber": 2
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Vegetable Soup with Whole Wheat Toast",
+    "name": "Vegetable Soup",
+    "ingredients": [
+      {
+        "name": "Carrot",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in beta-carotene and fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Celery",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a fresh, crisp flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides a savory base flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Garlic",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Enhances flavor with a pungent aroma.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds acidity and sweetness.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Beans",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds texture and nutrients.",
+        "isScalable": true
+      },
+      {
+        "name": "Potato",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Carbohydrate",
+        "priceLevel": "₹",
+        "description": "Adds heartiness and thickness.",
+        "isScalable": true
+      },
+      {
+        "name": "Olive Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹₹",
+        "description": "Healthy fat source.",
+        "isScalable": true
+      },
+      {
+        "name": "Vegetable Broth",
+        "quantity": 500,
+        "unit": "ml",
+        "category": "Sauce/Condiment",
+        "priceLevel": "₹₹",
+        "description": "Forms the soup base.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances overall flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Black Pepper",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a mild heat.",
+        "isScalable": true
+      },
+      {
+        "name": "Parsley",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and color.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Chop the carrot, celery, onion, garlic, tomato, green beans, and potato into small pieces.",
+      "Heat olive oil in a large pot over medium heat.",
+      "Add onion and garlic, sauté until translucent.",
+      "Add carrot, celery, and potato, cook for 5 minutes.",
+      "Stir in tomatoes and green beans, cook for another 3 minutes.",
+      "Pour in vegetable broth, bring to a boil.",
+      "Reduce heat, cover, and simmer for 20 minutes until vegetables are tender.",
+      "Season with salt and black pepper.",
+      "Garnish with chopped parsley before serving."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 8,
+      "carbs": 70,
+      "fats": 15,
+      "fiber": 10
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Idli with Sambar and Chutney",
+    "name": "Idli",
+    "ingredients": [
+      {
+        "name": "Rice",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Provides carbohydrates and energy.",
+        "isScalable": true
+      },
+      {
+        "name": "Urad Dal",
+        "quantity": 25,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and aids in fermentation.",
+        "isScalable": true
+      },
+      {
+        "name": "Fenugreek Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances fermentation and adds flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 150,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to make the batter.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the rice and urad dal separately under running water.",
+      "Soak the rice and urad dal in water for 4-6 hours. Add fenugreek seeds to the urad dal while soaking.",
+      "Drain the water and grind the urad dal and fenugreek seeds to a smooth batter, adding water as needed.",
+      "Grind the rice to a slightly coarse batter.",
+      "Mix both batters together, add salt, and let it ferment overnight or for 8-12 hours until it doubles in volume.",
+      "Grease idli molds and pour the batter into them.",
+      "Steam the idlis for 10-15 minutes until cooked through.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 320,
+      "protein": 8,
+      "carbs": 65,
+      "fats": 1,
+      "fiber": 3
+    },
+    "translations": {
+      "Hindi": {
+        "name": "इडली",
+        "description": "इडली एक पारंपरिक दक्षिण भारतीय नाश्ता है जो किण्वित चावल और उरद दाल के बैटर से बनाया जाता है, जिसे भाप में fluffy परिपूर्णता तक पकाया जाता है।",
+        "ingredients": [
+          {
+            "name": "चावल",
+            "description": "कार्बोहाइड्रेट और ऊर्जा प्रदान करता है।",
+            "_id": "6a8ed0a732e8697f0d2ce802"
+          },
+          {
+            "name": "उरद दाल",
+            "description": "प्रोटीन में समृद्ध है और किण्वन में मदद करता है।",
+            "_id": "6a8ed0a732e8697f0d2ce803"
+          },
+          {
+            "name": "मेथी के बीज",
+            "description": "किण्वन को बढ़ाता है और स्वाद जोड़ता है।",
+            "_id": "6a8ed0a732e8697f0d2ce804"
+          },
+          {
+            "name": "नमक",
+            "description": "स्वाद को बढ़ाता है।",
+            "_id": "6a8ed0a732e8697f0d2ce805"
+          },
+          {
+            "name": "पानी",
+            "description": "बैटर बनाने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ed0a732e8697f0d2ce806"
+          }
+        ],
+        "cookingSteps": [
+          "चावल और उरद दाल को अलग-अलग बहते पानी के नीचे धो लें।",
+          "चावल और उरद दाल को 4-6 घंटे के लिए पानी में भिगो दें। उरद दाल में भिगोते समय मेथी के बीज डालें।",
+          "पानी निकालें और उरद दाल और मेथी के बीजों को चिकना बैटर बनाने के लिए पीसें, आवश्यकतानुसार पानी डालें।",
+          "चावल को थोड़ा मोटा बैटर बनाने के लिए पीसें।",
+          "दोनों बैटर को मिलाएं, नमक डालें, और इसे रात भर या 8-12 घंटे के लिए किण्वित होने दें जब तक कि यह मात्रा में दोगुना न हो जाए।",
+          "इडली के सांचे को चिकना करें और उसमें बैटर डालें।",
+          "इडली को 10-15 मिनट तक भाप में पकाएं जब तक कि यह पूरी तरह से पक न जाए।",
+          "गर्म परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "इडली",
+        "description": "इडली ही दक्षिण भारतीय पारंपरिक नाश्त्याची डिश आहे, जी किण्वित तांदूळ आणि उडद डाळीच्या पीठापासून बनवली जाते, जी वाफवून मऊ आणि फुललेली होते.",
+        "ingredients": [
+          {
+            "name": "तांदूळ",
+            "description": "ऊर्जा आणि कार्बोहायड्रेट प्रदान करतो.",
+            "_id": "6a8ed0a732e8697f0d2ce808"
+          },
+          {
+            "name": "उडद डाळ",
+            "description": "प्रथिनात समृद्ध आणि किण्वनात मदत करते.",
+            "_id": "6a8ed0a732e8697f0d2ce809"
+          },
+          {
+            "name": "मेथी दाणे",
+            "description": "किण्वन वाढवतो आणि चव वाढवतो.",
+            "_id": "6a8ed0a732e8697f0d2ce80a"
+          },
+          {
+            "name": "मीठ",
+            "description": "चव वाढवतो.",
+            "_id": "6a8ed0a732e8697f0d2ce80b"
+          },
+          {
+            "name": "पाणी",
+            "description": "पीठ बनवण्यासाठी वापरले जाते.",
+            "_id": "6a8ed0a732e8697f0d2ce80c"
+          }
+        ],
+        "cookingSteps": [
+          "तांदूळ आणि उडद डाळ वेगवेगळ्या पाण्याखाली धुवा.",
+          "तांदूळ आणि उडद डाळ 4-6 तास पाण्यात भिजवा. उडद डाळीमध्ये भिजवताना मेथी दाणे घाला.",
+          "पाणी गाळा आणि उडद डाळ आणि मेथी दाणे एकत्र करून मऊ पीठ बनवा, आवश्यकतेनुसार पाणी घाला.",
+          "तांदळाचे थोडेसे जाड पीठ बनवा.",
+          "दोन्ही पीठ एकत्र करा, मीठ घाला आणि रातभर किंवा 8-12 तास किण्वित होऊ द्या, जेणेकरून त्याचे प्रमाण दुप्पट होईल.",
+          "इडलीच्या मोल्डना तेल लावा आणि त्यात पीठ ओता.",
+          "इडली 10-15 मिनिटे वाफवा जोपर्यंत ते व्यवस्थित शिजत नाहीत.",
+          "गरमागरम सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "oldName": "Onion Uttapa with Sambar and Chutney",
+    "name": "Onion Uttapa",
+    "ingredients": [
+      {
+        "name": "Rice",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Provides carbohydrates and energy.",
+        "isScalable": true
+      },
+      {
+        "name": "Urad Dal",
+        "quantity": 20,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds flavor and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and spice.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander Leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds freshness and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking and adds flavor.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Soak rice and urad dal separately for 4-6 hours.",
+      "Grind the soaked rice and urad dal into a smooth batter, mix them together, and let it ferment overnight.",
+      "Chop the onion, green chilli, and coriander leaves finely.",
+      "Heat a non-stick pan and add a little oil.",
+      "Pour a ladleful of batter onto the pan and spread it into a circle.",
+      "Sprinkle chopped onions, green chilli, and coriander leaves on top.",
+      "Drizzle oil around the edges and cook until the bottom is golden brown.",
+      "Flip and cook the other side for a minute.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 450,
+      "protein": 10,
+      "carbs": 80,
+      "fats": 12,
+      "fiber": 5
+    },
+    "translations": {
+      "Hindi": {
+        "name": "प्याज उत्तप",
+        "description": "प्याज उत्तप एक स्वादिष्ट दक्षिण भारतीय पैनकेक है जो किण्वित चावल और दाल के बैटर से बनाया जाता है, जिसे प्याज और मसालों के साथ शीर्ष पर रखा जाता है ताकि यह एक स्वादिष्ट रात के खाने का विकल्प बन सके।",
+        "ingredients": [
+          {
+            "name": "चावल",
+            "description": "कार्बोहाइड्रेट और ऊर्जा प्रदान करता है।",
+            "_id": "6a8ed0c132e8697f0d2ce85d"
+          },
+          {
+            "name": "उड़द दाल",
+            "description": "प्रोटीन और फाइबर में समृद्ध।",
+            "_id": "6a8ed0c132e8697f0d2ce85e"
+          },
+          {
+            "name": "प्याज",
+            "description": "स्वाद और बनावट जोड़ता है।",
+            "_id": "6a8ed0c132e8697f0d2ce85f"
+          },
+          {
+            "name": "हरी मिर्च",
+            "description": "गरमी और मसाला जोड़ता है।",
+            "_id": "6a8ed0c132e8697f0d2ce860"
+          },
+          {
+            "name": "धनिया पत्ते",
+            "description": "ताजगी और स्वाद जोड़ता है।",
+            "_id": "6a8ed0c132e8697f0d2ce861"
+          },
+          {
+            "name": "नमक",
+            "description": "स्वाद को बढ़ाता है।",
+            "_id": "6a8ed0c132e8697f0d2ce862"
+          },
+          {
+            "name": "तेल",
+            "description": "पकाने के लिए उपयोग किया जाता है और स्वाद जोड़ता है।",
+            "_id": "6a8ed0c132e8697f0d2ce863"
+          }
+        ],
+        "cookingSteps": [
+          "चावल और उड़द दाल को अलग-अलग 4-6 घंटे के लिए भिगो दें।",
+          "भिगोए हुए चावल और उड़द दाल को एक चिकने बैटर में पीसें, उन्हें मिलाएं, और रातभर किण्वित होने के लिए छोड़ दें।",
+          "प्याज, हरी मिर्च, और धनिया पत्तों को बारीक काट लें।",
+          "एक नॉन-स्टिक पैन गरम करें और थोड़ा तेल डालें।",
+          "पैन में एक लड्डू बैटर डालें और इसे एक गोलाकार में फैलाएं।",
+          "ऊपर chopped प्याज, हरी मिर्च, और धनिया पत्ते छिड़कें।",
+          "किनारों के चारों ओर तेल डालें और नीचे सुनहरा भूरा होने तक पकाएं।",
+          "उलटें और दूसरी तरफ एक मिनट तक पकाएं।",
+          "गर्म परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "प्याज उत्तपा",
+        "description": "प्याज उत्तपा हा एक चविष्ट दक्षिण भारतीय पॅनकेक आहे जो किण्वित तांदूळ आणि डाळ यांच्या पिठाने बनवला जातो, ज्यावर प्याज आणि मसाले घालून स्वादिष्ट रात्रीच्या जेवणासाठी एक पर्याय म्हणून सादर केला जातो.",
+        "ingredients": [
+          {
+            "name": "तांदूळ",
+            "description": "ऊर्जा आणि कार्बोहायड्रेट प्रदान करतो.",
+            "_id": "6a8ed0c132e8697f0d2ce865"
+          },
+          {
+            "name": "उडीद डाळ",
+            "description": "प्रथिन आणि फायबरमध्ये समृद्ध.",
+            "_id": "6a8ed0c132e8697f0d2ce866"
+          },
+          {
+            "name": "प्याज",
+            "description": "चव आणि टेक्स्चर वाढवतो.",
+            "_id": "6a8ed0c132e8697f0d2ce867"
+          },
+          {
+            "name": "हिरवी मिरची",
+            "description": "तिखटपणा आणि मसाला वाढवतो.",
+            "_id": "6a8ed0c132e8697f0d2ce868"
+          },
+          {
+            "name": "धनिया पान",
+            "description": "ताजेपणा आणि चव वाढवतो.",
+            "_id": "6a8ed0c132e8697f0d2ce869"
+          },
+          {
+            "name": "मीठ",
+            "description": "चव वाढवतो.",
+            "_id": "6a8ed0c132e8697f0d2ce86a"
+          },
+          {
+            "name": "तेल",
+            "description": "पाककृतीसाठी वापरले जाते आणि चव वाढवतो.",
+            "_id": "6a8ed0c132e8697f0d2ce86b"
+          }
+        ],
+        "cookingSteps": [
+          "तांदूळ आणि उडीद डाळ वेगवेगळ्या 4-6 तासांसाठी भिजवा.",
+          "भिजवलेला तांदूळ आणि उडीद डाळ एकत्र करून मऊ पिठात पीसा, त्यांना एकत्र करा आणि रात्रभर किण्वित होऊ द्या.",
+          "प्याज, हिरवी मिरची, आणि धनिया पान बारीक चिरा.",
+          "एक नॉन-स्टिक पॅन गरम करा आणि थोडे तेल घाला.",
+          "पॅनवर एक कडून पिठाचा चमचा ओता आणि त्याला वर्तुळात पसरवा.",
+          "त्यावर चिरलेला प्याज, हिरवी मिरची, आणि धनिया पान टाका.",
+          "कड्याभोवती तेल ओता आणि तळाशी सोनेरी तपकिरी होईपर्यंत शिजवा.",
+          "उलटून दुसऱ्या बाजूला एक मिनिट शिजवा.",
+          "गरमागरम सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "oldName": "Ragi Idli with Coconut Chutney",
+    "name": "Ragi Idli",
+    "ingredients": [
+      {
+        "name": "Ragi flour",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Rich in calcium and fiber, ideal for healthy bones and digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Urad dal",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Provides protein and helps in fermentation.",
+        "isScalable": true
+      },
+      {
+        "name": "Fenugreek seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Aids in fermentation and adds flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 200,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to make the batter.",
+        "isScalable": true
+      },
+      {
+        "name": "Baking soda",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Helps in making the idlis fluffy.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the urad dal and fenugreek seeds thoroughly and soak them in water for 4 hours.",
+      "Grind the soaked urad dal and fenugreek seeds into a smooth batter, adding water as needed.",
+      "In a large bowl, mix the ragi flour with the ground urad dal batter.",
+      "Add salt and mix well to form a smooth batter. Let it ferment overnight or for 8-10 hours.",
+      "Once fermented, add baking soda to the batter and mix gently.",
+      "Grease the idli molds and pour the batter into each mold.",
+      "Steam the idlis for 10-15 minutes until cooked through.",
+      "Remove the idlis from the molds and serve hot."
+    ],
+    "nutrition": {
+      "calories": 350,
+      "protein": 10,
+      "carbs": 70,
+      "fats": 2,
+      "fiber": 8
+    },
+    "translations": {
+      "Hindi": {
+        "name": "रागी इडली",
+        "description": "रागी इडली एक पौष्टिक दक्षिण भारतीय व्यंजन है जो फिंगर मिलेट के आटे से बनाया जाता है, जो पारंपरिक इडली में एक स्वस्थ मोड़ देता है। यह एक संपूर्ण ब्रंच के लिए आदर्श है।",
+        "ingredients": [
+          {
+            "name": "रागी का आटा",
+            "description": "कैल्शियम और फाइबर से भरपूर, स्वस्थ हड्डियों और पाचन के लिए आदर्श।",
+            "_id": "6a8ed0d732e8697f0d2ce8b2"
+          },
+          {
+            "name": "उड़द दाल",
+            "description": "प्रोटीन प्रदान करता है और किण्वन में मदद करता है।",
+            "_id": "6a8ed0d732e8697f0d2ce8b3"
+          },
+          {
+            "name": "मेथी के बीज",
+            "description": "किण्वन में मदद करता है और स्वाद बढ़ाता है।",
+            "_id": "6a8ed0d732e8697f0d2ce8b4"
+          },
+          {
+            "name": "नमक",
+            "description": "स्वाद बढ़ाता है।",
+            "_id": "6a8ed0d732e8697f0d2ce8b5"
+          },
+          {
+            "name": "पानी",
+            "description": "बेटर बनाने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ed0d732e8697f0d2ce8b6"
+          },
+          {
+            "name": "बेकिंग सोडा",
+            "description": "इडली को फुलाने में मदद करता है।",
+            "_id": "6a8ed0d732e8697f0d2ce8b7"
+          }
+        ],
+        "cookingSteps": [
+          "उड़द दाल और मेथी के बीजों को अच्छे से धोकर 4 घंटे के लिए पानी में भिगो दें।",
+          "भिगोई हुई उड़द दाल और मेथी के बीजों को चिकना बेटर बनाने के लिए पीसें, आवश्यकतानुसार पानी डालें।",
+          "एक बड़े कटोरे में, रागी का आटा और पिसी हुई उड़द दाल का बेटर मिलाएं।",
+          "नमक डालें और अच्छे से मिलाकर चिकना बेटर बनाएं। इसे रात भर या 8-10 घंटे के लिए किण्वित होने दें।",
+          "जब बेटर किण्वित हो जाए, तो उसमें बेकिंग सोडा डालें और धीरे से मिलाएं।",
+          "इडली के सांचे को चिकना करें और प्रत्येक सांचे में बेटर डालें।",
+          "इडली को 10-15 मिनट तक भाप में पकाएं जब तक कि वे अच्छी तरह से पक न जाएं।",
+          "इडली को सांचों से निकालें और गर्मागर्म परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "रागी इडली",
+        "description": "रागी इडली ही एक पौष्टिक दक्षिण भारतीय डिश आहे, जी फिंगर मिलेटच्या पीठाने बनवलेली आहे, पारंपरिक इडलीला एक आरोग्यदायी वळण देते. हे एक संपूर्ण ब्रंचसाठी परिपूर्ण आहे.",
+        "ingredients": [
+          {
+            "name": "रागी पीठ",
+            "description": "कॅल्शियम आणि फायबरमध्ये समृद्ध, आरोग्यदायी हाडे आणि पचनासाठी आदर्श.",
+            "_id": "6a8ed0d732e8697f0d2ce8b9"
+          },
+          {
+            "name": "उरद डाळ",
+            "description": "प्रोटीन प्रदान करते आणि किण्वनात मदत करते.",
+            "_id": "6a8ed0d732e8697f0d2ce8ba"
+          },
+          {
+            "name": "मेथी दाणे",
+            "description": "किण्वनात मदत करते आणि चव वाढवते.",
+            "_id": "6a8ed0d732e8697f0d2ce8bb"
+          },
+          {
+            "name": "मीठ",
+            "description": "चव वाढवते.",
+            "_id": "6a8ed0d732e8697f0d2ce8bc"
+          },
+          {
+            "name": "पाणी",
+            "description": "बॅटर तयार करण्यासाठी वापरले जाते.",
+            "_id": "6a8ed0d732e8697f0d2ce8bd"
+          },
+          {
+            "name": "बेकिंग सोडा",
+            "description": "इडल्या फुलवण्यासाठी मदत करते.",
+            "_id": "6a8ed0d732e8697f0d2ce8be"
+          }
+        ],
+        "cookingSteps": [
+          "उरद डाळ आणि मेथी दाणे चांगले धुऊन 4 तास पाण्यात भिजवा.",
+          "भिजवलेली उरद डाळ आणि मेथी दाणे एकसारखे बॅटर बनवण्यासाठी पीसून, आवश्यकतेनुसार पाणी घाला.",
+          "एक मोठ्या भांड्यात, रागी पीठ आणि पिठी केलेली उरद डाळ एकत्र करा.",
+          "मीठ घाला आणि चांगले मिसळा जेणेकरून एकसारखे बॅटर तयार होईल. याला रात्रभर किंवा 8-10 तास किण्वित होऊ द्या.",
+          "किण्वित झाल्यावर, बॅटरमध्ये बेकिंग सोडा घाला आणि सौम्यपणे मिसळा.",
+          "इडली molds चांगले ग्रीस करा आणि प्रत्येक mold मध्ये बॅटर ओता.",
+          "इडल्या 10-15 मिनिटे वाफवून शिजवा.",
+          "इडल्या molds मधून काढा आणि गरमागरम सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "oldName": "Ragi Dosa with Coconut Chutney",
+    "name": "Ragi Dosa",
+    "ingredients": [
+      {
+        "name": "Ragi flour",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Rich in calcium and fiber, ideal for gluten-free diets.",
+        "isScalable": true
+      },
+      {
+        "name": "Rice flour",
+        "quantity": 20,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Adds crispiness to the dosa.",
+        "isScalable": true
+      },
+      {
+        "name": "Yogurt",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Aids in fermentation and adds a slight tangy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 100,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to adjust the batter consistency.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor of the dosa.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a subtle earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds a mild heat to the dosa.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander leaves",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Provides freshness and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for cooking the dosa.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "In a mixing bowl, combine ragi flour, rice flour, and yogurt.",
+      "Add water gradually to form a smooth batter. The consistency should be similar to pancake batter.",
+      "Stir in salt, cumin seeds, finely chopped green chili, and coriander leaves.",
+      "Heat a non-stick pan over medium heat and lightly grease it with oil.",
+      "Pour a ladleful of batter onto the pan and spread it in a circular motion to form a thin dosa.",
+      "Drizzle a little oil around the edges and cook until the edges start to lift and the bottom turns golden brown.",
+      "Flip the dosa and cook for another minute.",
+      "Serve hot."
+    ],
+    "nutrition": {
+      "calories": 320,
+      "protein": 6,
+      "carbs": 60,
+      "fats": 8,
+      "fiber": 5
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Rava Idli with Coconut Chutney",
+    "name": "Rava Idli",
+    "ingredients": [
+      {
+        "name": "Semolina",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Provides carbohydrates and a light texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Yogurt",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Adds moisture and tanginess.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds color and nutrition.",
+        "isScalable": true
+      },
+      {
+        "name": "Mustard Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Used for tempering, adds flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Curry Leaves",
+        "quantity": 5,
+        "unit": "piece",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds aroma and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Ginger",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds warmth and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Baking Soda",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Helps in making the idlis fluffy.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for tempering and greasing.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "In a pan, heat oil and add mustard seeds. Once they splutter, add curry leaves, chopped green chili, and grated ginger. Sauté for a minute.",
+      "Add semolina to the pan and roast it lightly for 3-4 minutes until aromatic. Let it cool.",
+      "In a mixing bowl, combine the roasted semolina, yogurt, grated carrot, salt, and baking soda. Mix well to form a batter.",
+      "Grease idli molds with a little oil and pour the batter into each mold.",
+      "Steam the idlis in an idli steamer for about 10-12 minutes until cooked through.",
+      "Remove the idlis from the molds and serve hot."
+    ],
+    "nutrition": {
+      "calories": 350,
+      "protein": 8,
+      "carbs": 60,
+      "fats": 10,
+      "fiber": 3
+    },
+    "translations": {}
+  },
+  {
+    "oldName": "Grilled Paneer Sandwich with Mint Chutney",
+    "name": "Grilled Paneer Sandwich",
+    "ingredients": [
+      {
+        "name": "Paneer",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Protein Rich",
+        "priceLevel": "₹₹",
+        "description": "Rich in protein and calcium, paneer is a staple in Indian vegetarian cuisine.",
+        "isScalable": true
+      },
+      {
+        "name": "Whole Wheat Bread",
+        "quantity": 2,
+        "unit": "piece",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Provides fiber and complex carbohydrates.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds freshness and vitamin C.",
+        "isScalable": true
+      },
+      {
+        "name": "Bell Pepper",
+        "quantity": 0.25,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Rich in vitamins A and C.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.25,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds flavor and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Butter",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Used for grilling, adds flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Black Pepper",
+        "quantity": 0.25,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds a mild heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 0.25,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavors.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Slice the paneer, tomato, capsicum, and onion thinly.",
+      "Butter one side of each bread slice.",
+      "Layer the paneer, tomato, capsicum, and onion on the unbuttered side of one bread slice.",
+      "Sprinkle salt and black pepper over the vegetables.",
+      "Top with the second slice of bread, buttered side up.",
+      "Heat a grill pan over medium heat and place the sandwich on it.",
+      "Grill each side for 3-4 minutes until golden brown and the paneer is warmed through.",
+      "Remove from the pan, slice in half, and serve hot."
+    ],
+    "nutrition": {
+      "calories": 350,
+      "protein": 15,
+      "carbs": 40,
+      "fats": 15,
+      "fiber": 5
+    },
+    "translations": {}
+  }
+]
