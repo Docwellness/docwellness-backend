@@ -1,0 +1,1136 @@
+[
+  {
+    "name": "Adai Dosa (Lentil Dosa)",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Adai Dosa",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Banana Jowar Pancake",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Banana Jowar Pancake",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Curd Poha with Pomegranate",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Curd Poha with Pomegranate",
+        "quantity": 180,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Egg Salad",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Egg Salad",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Grilled Paneer Sandwich",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Grilled Paneer Sandwich",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Methi Handvo (Baked)",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Methi Handvo",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Methi Thepla",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Methi Thepla",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Oats Idli",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Oats Idli",
+        "quantity": 130,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Ragi Dosa",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Ragi Dosa",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Ragi Malt with Milk and Jaggery",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Ragi Malt with Milk and Jaggery",
+        "quantity": 255,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Rava Idli",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Rava Idli",
+        "quantity": 3,
+        "unit": "nos"
+      }
+    ]
+  },
+  {
+    "name": "Sooji Sheera with Jaggery",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Sooji Sheera",
+        "quantity": 62,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Tomato Carrot Uttapam",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Tomato Carrot Uttapam",
+        "quantity": 145,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Daliya",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Vegetable Daliya",
+        "quantity": 120,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Upma",
+    "servingTime": "Breakfast",
+    "components": [
+      {
+        "label": "Vegetable Upma",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Baked Aloo Chaat",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Baked Aloo Chaat",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Corn Pomegranate Bhutta Chaat",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Corn Pomegranate Bhutta Chaat",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Dahi Bhalla (Moong Dal)",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Dahi Bhalla",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Fruit Chaat with Chaat Masala",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Fruit Chaat",
+        "quantity": 1,
+        "unit": "bowl"
+      }
+    ]
+  },
+  {
+    "name": "Grilled Vegetable Sandwich",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Grilled Vegetable Sandwich",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Roasted Makhana Trail Mix",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Roasted Makhana Trail Mix",
+        "quantity": 60,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Roasted Puffed Rice with Peanuts",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Roasted Puffed Rice with Peanuts",
+        "quantity": 40,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Sweet Potato Chaat",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Sweet Potato Chaat",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Til Jaggery Ladoo",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Til Jaggery Ladoo",
+        "quantity": 50,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Watermelon Cucumber Salad",
+    "servingTime": "Brunch",
+    "components": [
+      {
+        "label": "Watermelon",
+        "quantity": 150,
+        "unit": "g"
+      },
+      {
+        "label": "Cucumber",
+        "quantity": 80,
+        "unit": "g"
+      },
+      {
+        "label": "Mint Leaves",
+        "quantity": 5,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Bajra Khichdi with Ghee",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Bajra Khichdi with Ghee",
+        "quantity": 90,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Bharwan Shimla Mirch",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Bharwan Shimla Mirch",
+        "quantity": 2,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Chicken Vegetable Soup",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Chicken Vegetable Soup",
+        "quantity": 162,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Grilled Fish with Steamed Vegetables",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Grilled Fish with Steamed Vegetables",
+        "quantity": 120,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Grilled Paneer Tikka (Lemon Marinade)",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Grilled Paneer Tikka",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Lauki Sabji with Moong Dal and Rice",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Lauki Sabji with Moong Dal and Rice",
+        "quantity": 200,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Light Dal Makhani",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Light Dal Makhani",
+        "quantity": 145,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Masoor Dal",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Masoor Dal",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Methi Dal",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Methi Dal",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Palak Dal",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Palak Dal",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Tofu Bhurji",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Tofu Bhurji",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Tomato Basil Soup with Grilled Paneer",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Tomato Basil Soup",
+        "quantity": 120,
+        "unit": "g"
+      },
+      {
+        "label": "Grilled Paneer",
+        "quantity": 50,
+        "unit": "g"
+      },
+      {
+        "label": "Garlic",
+        "quantity": 2,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Turai Sabji",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Turai Sabji",
+        "quantity": 300,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Jowar Khichdi",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Vegetable Jowar Khichdi",
+        "quantity": 200,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Masala Khichdi",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Vegetable Masala Khichdi",
+        "quantity": 170,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Soup",
+    "servingTime": "Dinner",
+    "components": [
+      {
+        "label": "Vegetable Soup",
+        "quantity": 500,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Adrak Chai (Ginger Tea)",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Adrak Chai",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Baked Besan Pakora",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Baked Besan Pakora",
+        "quantity": 130,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Baked Vegetable Cutlet",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Baked Vegetable Cutlet",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Coconut Jaggery Ladoo",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Coconut Jaggery Ladoo",
+        "quantity": 60,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Date and Seed Energy Balls",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Date and Seed Energy Balls",
+        "quantity": 70,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Green Tea with Ginger",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Green Tea with Ginger",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Light Bhel Puri",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Light Bhel Puri",
+        "quantity": 40,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Masala Makhana in Ghee",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Masala Makhana in Ghee",
+        "quantity": 30,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Masala Roasted Papad",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Masala Roasted Papad",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Ragi Jaggery Cookies (Baked)",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Ragi Jaggery Cookies",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Roasted Chana with Jaggery",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Roasted Chana with Jaggery",
+        "quantity": 45,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Sabudana Kheer with Jaggery",
+    "servingTime": "Evening Snack",
+    "components": [
+      {
+        "label": "Sabudana Kheer",
+        "quantity": 245,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Bharli Vangi",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Bharli Vangi",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Bhindi Sabji",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Bhindi Sabji",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Chana Dal",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Chana Dal",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Curd Rice (Thayir Sadam)",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Curd Rice",
+        "quantity": 200,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Dal Palak",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Dal Palak",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Dal Tadka",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Dal Tadka",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Egg Bhurji",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Egg Bhurji",
+        "quantity": 3,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Gobi Matar",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Gobi Matar",
+        "quantity": 400,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Kala Chana Curry",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Kala Chana Curry",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Kerala Fish Curry",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Kerala Fish Curry",
+        "quantity": 150,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Lauki Kofta in Tomato Gravy",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Lauki Kofta in Tomato Gravy",
+        "quantity": 250,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Lemon Rice with Peanuts",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Lemon Rice with Peanuts",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Masoor Dal Khichdi",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Masoor Dal Khichdi",
+        "quantity": 140,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Methi Matar Cashew Gravy",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Methi Matar Cashew Gravy",
+        "quantity": 180,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Palak Paneer",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Palak Paneer",
+        "quantity": 350,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Pithla Bhakri",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Pithla",
+        "quantity": 60,
+        "unit": "g"
+      },
+      {
+        "label": "Bhakri",
+        "quantity": 80,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Tawa Pulao",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Tawa Pulao",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Biryani",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Vegetable Biryani",
+        "quantity": 400,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Vegetable Korma",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Vegetable Korma",
+        "quantity": 450,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Whole Masoor Dal",
+    "servingTime": "Lunch",
+    "components": [
+      {
+        "label": "Whole Masoor Dal",
+        "quantity": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  {
+    "name": "Ajwain and Jeera Water",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Ajwain and Jeera Water",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Amla and Honey Tonic",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Amla and Honey Tonic",
+        "quantity": 230,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Ashwagandha Warm Milk",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Ashwagandha Warm Milk",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Brahmi Capsule",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Brahmi Capsule",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "CCF Tea (Cumin-Coriander-Fennel)",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "CCF Tea",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Chyawanprash",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Chyawanprash",
+        "quantity": 1,
+        "unit": "tsp"
+      }
+    ]
+  },
+  {
+    "name": "Ginger Lemon Warm Water",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Ginger Lemon Warm Water",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Guduchi Giloy Tablet",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Giloy Tablet",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Kokum Sharbat",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Kokum Sharbat",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Lemongrass Tea",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Lemongrass",
+        "quantity": 2,
+        "unit": "piece"
+      },
+      {
+        "label": "Water",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Methi Soaked Water",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Methi Soaked Water",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Moringa Leaf Tea",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Moringa Leaf Tea",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Pomegranate Beetroot Juice",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Pomegranate Beetroot Juice",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Sabja Basil Seed Water",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Basil Seed Water",
+        "quantity": 250,
+        "unit": "ml"
+      },
+      {
+        "label": "Lemon",
+        "quantity": 0.5,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Shatavari Capsule",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Shatavari Capsule",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Wheatgrass Juice with Lemon",
+    "servingTime": "Morning Drink",
+    "components": [
+      {
+        "label": "Wheatgrass Juice",
+        "quantity": 30,
+        "unit": "ml"
+      },
+      {
+        "label": "Water",
+        "quantity": 200,
+        "unit": "ml"
+      },
+      {
+        "label": "Lemon",
+        "quantity": 0.5,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Ajwain Digestive Water",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Ajwain Digestive Water",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Ashwagandha Capsule",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Ashwagandha Capsule",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Ashwagandha Nutmeg Milk",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Ashwagandha Nutmeg Milk",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Brahmi Shankhpushpi Tea",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Brahmi Shankhpushpi Tea",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Chamomile Tea with Honey",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Chamomile Tea with Honey",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Mulethi Licorice Tea",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Mulethi Licorice Tea",
+        "quantity": 250,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Saffron Cardamom Milk (Kesar)",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Saffron Cardamom Milk",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Shatavari Milk",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Shatavari Milk",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  },
+  {
+    "name": "Triphala Tablet",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Triphala Tablet",
+        "quantity": 1,
+        "unit": "piece"
+      }
+    ]
+  },
+  {
+    "name": "Warm Almond Milk with Saffron",
+    "servingTime": "Night Drink",
+    "components": [
+      {
+        "label": "Warm Almond Milk with Saffron",
+        "quantity": 200,
+        "unit": "ml"
+      }
+    ]
+  }
+]

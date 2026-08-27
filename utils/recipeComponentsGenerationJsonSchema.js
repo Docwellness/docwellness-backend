@@ -15,6 +15,7 @@ const RECIPE_COMPONENTS_GENERATION_JSON_SCHEMA = {
     components: {
       type: 'array',
       minItems: 1,
+      maxItems: 3,
       items: {
         type: 'object',
         additionalProperties: false,

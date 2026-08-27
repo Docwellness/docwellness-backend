@@ -1,35 +1,44 @@
 /**
  * ALL-INCLUSIVE prod backfill combining every catalog-data fix from this
  * round of work. One script, one Coolify Terminal run, three independent
- * steps (a failure/skip in one never blocks the others):
+ * steps (a failure/skip in one never blocks the others). ZERO AI calls at
+ * runtime - safe to run inside Coolify's Scheduled Task/one-off job runner
+ * (no Terminal tab in this deployment, no streaming output, unknown
+ * execution timeout - see scripts/apply-precomputed-cooking-steps.js's own
+ * header comment for the full rationale behind this "generate once
+ * locally, apply as plain data on prod" pattern, which STEP 3 below
+ * follows).
  *
- * STEP 1 - Dal side-tag backfill (scripts/backfill-dal-side-tags.js's exact
- * logic, inlined here). Root cause of "Varan shows up for every Lunch and
- * Dinner": only Varan and Sambar were ever tagged tags:['side'], so they
- * were the ONLY dal/legume-curry candidates eligible for the "dal" slot of
- * a generated combo meal (see utils/dietPlanOptions.js's
- * SIDE_SALAD_ELIGIBLE_SLOTS broadening and the AI prompt's combo rule).
- * Retags 10 more real dals (Rajma, Chole, Dal Tadka, Masoor Dal, Chana Dal,
- * Whole Masoor Dal, Dal Palak, Palak Dal, Methi Dal, Light Dal Makhani) so
- * there's real variety to rotate through. No AI calls - fast, deterministic.
+ * STEP 1 - Dal side-tag backfill. Root cause of "Varan shows up for every
+ * Lunch and Dinner": only Varan and Sambar were ever tagged
+ * tags:['side'], so they were the ONLY dal/legume-curry candidates
+ * eligible for the "dal" slot of a generated combo meal (see
+ * utils/dietPlanOptions.js's SIDE_SALAD_ELIGIBLE_SLOTS broadening and the
+ * AI prompt's combo rule). Retags 10 more real dals (Rajma, Chole, Dal
+ * Tadka, Masoor Dal, Chana Dal, Whole Masoor Dal, Dal Palak, Palak Dal,
+ * Methi Dal, Light Dal Makhani) so there's real variety to rotate through.
+ * Deterministic - no AI calls.
  *
- * STEP 2 - Mechanical `components` migration from legacy servingSize
- * (scripts/migrate-recipe-components.js's exact logic, inlined here) - for
+ * STEP 2 - Mechanical `components` migration from legacy servingSize - for
  * any recipe that has a real servingSize.quantity/unit but no `components`
  * yet, promotes servingSize (and secondaryComponent, if present) into
- * components[0]/[1]. No AI calls - fast, deterministic.
+ * components[0]/[1]. Deterministic - no AI calls.
  *
- * STEP 3 - AI-generated `components` for recipes with NEITHER `components`
- * NOR a usable servingSize (step 2 has nothing to migrate them from) - this
- * is the "Makes (on the plate)" badge showing nothing/defaulting to a
- * meaningless "1 g" placeholder in the app. Uses the new
- * generateComponentsForFixedIngredients (utils/openaiClient.js), a narrow
- * AI call scoped to author ONLY `components` for a FIXED, already-trusted
- * ingredient list - never touches ingredients/nutrition/quantities. Same
- * "narrow sibling function" pattern as generateCookingStepsForFixedIngredients
- * (see scripts/backfill-hand-authored-recipe-steps.js, which fixed the
- * equivalent gap for `instructions`). Supports --limit for safer Coolify
- * one-off runs, since this is the one step making real AI calls.
+ * STEP 3 - Applies the pre-generated `components` in
+ * scripts/data/hand-authored-batch-1-components.json to the ~99 recipes
+ * that have NEITHER `components` NOR a usable servingSize (STEP 2 has
+ * nothing to migrate them from) - this is the "Makes (on the plate)"
+ * badge showing nothing/defaulting to a meaningless "1 g" placeholder in
+ * the app. That data was generated once, locally, against dev via
+ * scripts/generate-precomputed-recipe-components.js (using
+ * utils/openaiClient.js's generateComponentsForFixedIngredients - a
+ * narrow AI call scoped to author ONLY `components` for a FIXED,
+ * already-trusted ingredient list, never touching
+ * ingredients/nutrition/quantities) and verified correct before being
+ * committed here - see that script's own header comment for provenance,
+ * and re-run it (locally, never on prod) to regenerate this data file if
+ * the underlying recipe catalog changes enough to need it. Plain,
+ * fast DB writes only at runtime, matched by recipe `name`.
  *
  * Every step saves through the master Recipe document (never RecipeVersion
  * directly, per recipe-database's "audit fixes go through the master
@@ -48,24 +57,21 @@
  * e.g. Coolify's Terminal tab for prod.
  *
  * Idempotent - every step only touches recipes still missing that step's
- * specific fix, so re-running (or re-running with a bigger --limit to
- * continue where a capped run left off) converges on the same end state.
+ * specific fix, so re-running converges on the same end state.
  *
  * Usage:
- *   node scripts/backfill-recipe-catalog-fixes.js                       # dry run, all steps, all recipes
- *   node scripts/backfill-recipe-catalog-fixes.js --execute             # write, all steps, all recipes
- *   node scripts/backfill-recipe-catalog-fixes.js --execute --limit=15  # write, cap STEP 3's AI calls at 15 this run
+ *   node scripts/backfill-recipe-catalog-fixes.js              # dry run, all steps
+ *   node scripts/backfill-recipe-catalog-fixes.js --execute     # write, all steps
  */
 require('dotenv').config();
+const path = require('path');
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
-const limitArg = process.argv.find((a) => a.startsWith('--limit='));
-const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null;
 
-// STEP 1 data - see scripts/backfill-dal-side-tags.js's own header comment
-// for why this exact list and why Khichdi/usal-type dishes are excluded.
+// STEP 1 data - see this file's own header comment for why this exact
+// list and why Khichdi/usal-type dishes are excluded.
 const DAL_RECIPE_NAMES = [
   'Rajma',
   'Chole',
@@ -78,6 +84,9 @@ const DAL_RECIPE_NAMES = [
   'Methi Dal',
   'Light Dal Makhani',
 ];
+
+// STEP 3 data - see this file's own header comment on provenance.
+const PRECOMPUTED_COMPONENTS = require(path.join(__dirname, 'data', 'hand-authored-batch-1-components.json'));
 
 async function stepDalSideTags({ Recipe, syncV1FromRecipe }) {
   console.log('\n--- STEP 1: dal side-tag backfill ---');
@@ -134,7 +143,7 @@ async function stepMechanicalComponents({ Recipe, syncV1FromRecipe }) {
     const quantity = recipe.servingSize?.quantity;
     const unit = recipe.servingSize?.unit;
     if (!(quantity > 0) || !unit) {
-      skippedNoServingSize++; // handled by STEP 3 instead, if it has ingredients to work from
+      skippedNoServingSize++; // handled by STEP 3 instead
       continue;
     }
 
@@ -168,72 +177,47 @@ async function stepMechanicalComponents({ Recipe, syncV1FromRecipe }) {
   return { total: recipes.length, updated, skippedNoServingSize, failed };
 }
 
-async function stepAiComponents({ Recipe, syncV1FromRecipe, generateComponentsForFixedIngredients }) {
-  console.log('\n--- STEP 3: AI-generated components (no components, no usable servingSize) ---');
-  let query = Recipe.find({
-    $or: [{ components: { $exists: false } }, { components: { $size: 0 } }],
-  }).sort({ servingTime: 1, name: 1 });
-  const allCandidates = (await query).filter((r) => !(r.servingSize?.quantity > 0 && r.servingSize?.unit));
-  const totalCandidates = allCandidates.length;
-  const recipes = LIMIT ? allCandidates.slice(0, LIMIT) : allCandidates;
-
-  console.log(
-    `Found ${totalCandidates} recipe(s) with no components and no usable servingSize` +
-      `${LIMIT ? ` (processing ${recipes.length} this run, --limit=${LIMIT})` : ''}.`
-  );
+async function stepPrecomputedComponents({ Recipe, syncV1FromRecipe }) {
+  console.log('\n--- STEP 3: apply precomputed components (no AI calls) ---');
+  console.log(`Loaded ${PRECOMPUTED_COMPONENTS.length} precomputed recipe(s).`);
 
   let updated = 0;
+  let skipped = 0;
+  let missing = 0;
   let failed = 0;
 
-  for (const recipe of recipes) {
-    // Re-check in case an earlier step/iteration in this same run already
-    // fixed it (STEP 2 runs first and could have covered it if data
-    // changed mid-run in a concurrent process).
+  for (const entry of PRECOMPUTED_COMPONENTS) {
+    const recipe = await Recipe.findOne({ name: entry.name });
+    if (!recipe) {
+      console.log(`  MISSING (no matching recipe on this DB): "${entry.name}"`);
+      missing++;
+      continue;
+    }
     if (Array.isArray(recipe.components) && recipe.components.length > 0) {
-      console.log(`  SKIP (already has components): "${recipe.name}"`);
+      console.log(`  SKIP (already has components): "${entry.name}"`);
+      skipped++;
       continue;
     }
 
-    let components;
-    try {
-      components = await generateComponentsForFixedIngredients({
-        name: recipe.name,
-        servingTime: recipe.servingTime,
-        category: recipe.category,
-        ingredients: (recipe.ingredients || []).map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
-      });
-    } catch (err) {
-      console.error(`  FAILED to generate components for "${recipe.name}": ${err.message}`);
-      failed++;
-      continue;
-    }
-
-    if (!Array.isArray(components) || components.length === 0) {
-      console.error(`  FAILED (no components returned) for "${recipe.name}"`);
-      failed++;
-      continue;
-    }
-
-    console.log(`  "${recipe.name}" [${recipe.servingTime}] -> ${JSON.stringify(components)}`);
+    console.log(`  "${entry.name}" [${entry.servingTime}] -> ${JSON.stringify(entry.components)}`);
 
     if (EXECUTE) {
       try {
-        recipe.components = components;
+        recipe.components = entry.components;
         await recipe.save();
         await syncV1FromRecipe(recipe);
         updated++;
       } catch (err) {
-        console.error(`    FAILED to save "${recipe.name}": ${err.message}`);
+        console.error(`    FAILED to save "${entry.name}": ${err.message}`);
         failed++;
       }
     }
   }
 
   console.log(
-    `STEP 3 ${EXECUTE ? 'DONE' : 'DRY RUN'}: total=${recipes.length} updated=${updated} failed=${failed}` +
-      (LIMIT && totalCandidates > recipes.length ? ` (${totalCandidates - recipes.length} remaining - re-run to continue)` : '')
+    `STEP 3 ${EXECUTE ? 'DONE' : 'DRY RUN'}: total=${PRECOMPUTED_COMPONENTS.length} updated=${updated} skipped=${skipped} missing=${missing} failed=${failed}`
   );
-  return { total: recipes.length, updated, failed };
+  return { total: PRECOMPUTED_COMPONENTS.length, updated, skipped, missing, failed };
 }
 
 async function main() {
@@ -245,16 +229,15 @@ async function main() {
   try {
     const { Recipe } = require('../models');
     const { syncV1FromRecipe } = require('../services/recipeVersioningService');
-    const { generateComponentsForFixedIngredients } = require('../utils/openaiClient');
 
     const step1 = await stepDalSideTags({ Recipe, syncV1FromRecipe });
     const step2 = await stepMechanicalComponents({ Recipe, syncV1FromRecipe });
-    const step3 = await stepAiComponents({ Recipe, syncV1FromRecipe, generateComponentsForFixedIngredients });
+    const step3 = await stepPrecomputedComponents({ Recipe, syncV1FromRecipe });
 
     console.log(`\n=== ${EXECUTE ? 'ALL STEPS DONE' : 'DRY RUN COMPLETE'} ===`);
-    console.log(`  STEP 1 (dal side-tags):        updated=${step1.updated} skipped=${step1.skipped} failed=${step1.failed}`);
+    console.log(`  STEP 1 (dal side-tags):         updated=${step1.updated} skipped=${step1.skipped} failed=${step1.failed}`);
     console.log(`  STEP 2 (mechanical components): updated=${step2.updated} failed=${step2.failed}`);
-    console.log(`  STEP 3 (AI components):         updated=${step3.updated} failed=${step3.failed}`);
+    console.log(`  STEP 3 (precomputed components): updated=${step3.updated} skipped=${step3.skipped} missing=${step3.missing} failed=${step3.failed}`);
   } finally {
     await mongoose.disconnect();
     console.log('Disconnected from MongoDB.');
