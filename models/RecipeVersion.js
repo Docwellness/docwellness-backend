@@ -66,6 +66,15 @@ const recipeVersionSchema = new mongoose.Schema(
         rawQuantity: { type: Number, required: true, min: 0 },
         unit: { type: String, enum: COMPONENT_UNITS, required: true },
         preparation: { type: String, default: null },
+        // recipe-core-ingredient-scaling: copied from the parent Recipe's
+        // ingredients[].role at V1 creation (services/recipeVersioningService.js's
+        // syncV1FromRecipe) and carried forward by createCustomVersion -
+        // see models/Recipe.js's own comment on the same field for the
+        // full rationale. Drives createCustomVersion's core-group-weight-
+        // change detection: a version whose ingredients carry no 'core'
+        // entry is treated as not-yet-migrated (full pass-through, same as
+        // today's behavior), not an error.
+        role: { type: String, enum: ['core', 'sub'], default: 'sub' },
       },
     ],
     steps: { type: [String], default: [] },
