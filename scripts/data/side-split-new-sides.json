@@ -1,0 +1,1130 @@
+[
+  {
+    "name": "Cucumber Raita",
+    "category": "Indian",
+    "cuisine": "North Indian",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 10,
+    "cookingTime": 20,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "bowl"
+    },
+    "ingredients": [
+      {
+        "name": "Low-fat yogurt",
+        "quantity": 200,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Rich in probiotics and calcium, helps in digestion.",
+        "isScalable": true
+      },
+      {
+        "name": "Cucumber",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Hydrating and low in calories, adds a refreshing crunch.",
+        "isScalable": true
+      },
+      {
+        "name": "Cumin seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Roasted and ground, adds a warm, earthy flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the flavors of the dish.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Grate the cucumber and squeeze out excess water.",
+      "In a bowl, whisk the low-fat yogurt until smooth.",
+      "Add the grated cucumber to the yogurt.",
+      "Roast the cumin seeds in a pan until aromatic, then grind them into a powder.",
+      "Add the roasted cumin powder and salt to the yogurt mixture.",
+      "Mix well and serve chilled."
+    ],
+    "nutrition": {
+      "calories": 150,
+      "protein": 8,
+      "carbs": 15,
+      "fats": 4,
+      "fiber": 1.5
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "खीरे का रायता",
+        "description": "एक ताज़गी भरा भारतीय साइड डिश जो कम वसा वाले दही और कद्दूकस किए हुए खीरे से बनाया जाता है, जिसे भुने हुए जीरे के पाउडर और नमक के साथ स्वादिष्ट बनाया जाता है। किसी भी भोजन के लिए हल्का और ठंडा साथ देने के लिए उत्तम।",
+        "ingredients": [
+          {
+            "name": "कम वसा वाला दही",
+            "description": "प्रोबायोटिक्स और कैल्शियम से भरपूर, पाचन में मदद करता है।",
+            "_id": "6a8ecf6b32e8697f0d2ce283"
+          },
+          {
+            "name": "खीरा",
+            "description": "पानी की कमी को पूरा करता है और कैलोरी में कम होता है, ताज़गी भरा कुरकुरापन जोड़ता है।",
+            "_id": "6a8ecf6b32e8697f0d2ce284"
+          },
+          {
+            "name": "जीरे के बीज",
+            "description": "भुने और पिसे हुए, गर्म, मिट्टी का स्वाद जोड़ते हैं।",
+            "_id": "6a8ecf6b32e8697f0d2ce285"
+          },
+          {
+            "name": "नमक",
+            "description": "डिश के स्वाद को बढ़ाता है।",
+            "_id": "6a8ecf6b32e8697f0d2ce286"
+          }
+        ],
+        "cookingSteps": [
+          "खीरे को कद्दूकस करें और अतिरिक्त पानी निचोड़ लें।",
+          "एक बाउल में कम वसा वाला दही को चिकना होने तक फेंटें।",
+          "कद्दूकस किया हुआ खीरा दही में डालें।",
+          "एक पैन में जीरे के बीजों को भूनें जब तक कि सुगंधित न हो जाएं, फिर उन्हें पाउडर में पीस लें।",
+          "भुना हुआ जीरा पाउडर और नमक दही के मिश्रण में डालें।",
+          "अच्छी तरह मिलाएं और ठंडा करके परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "काकडी रायता",
+        "description": "कमी फॅटच्या दह्याने आणि किसलेल्या काकड्याने बनवलेला एक ताजगीदार भारतीय साइड डिश, भाजलेल्या जिरे पावडर आणि मीठाने चविष्ट केलेला. कोणत्याही जेवणासोबत हलका आणि थंड करणारा साथीदार म्हणून परिपूर्ण.",
+        "ingredients": [
+          {
+            "name": "कमी फॅटचा दही",
+            "description": "प्रोबायोटिक्स आणि कॅल्शियमने समृद्ध, पचनात मदत करते.",
+            "_id": "6a8ecf6b32e8697f0d2ce288"
+          },
+          {
+            "name": "काकडी",
+            "description": "हायड्रेटिंग आणि कमी कॅलोरी, ताजगीदार कुरकुरीतपणा देते.",
+            "_id": "6a8ecf6b32e8697f0d2ce289"
+          },
+          {
+            "name": "जिरे",
+            "description": "भाजलेले आणि पावडर केलेले, उष्ण, मातीचा स्वाद वाढवतो.",
+            "_id": "6a8ecf6b32e8697f0d2ce28a"
+          },
+          {
+            "name": "मीठ",
+            "description": "डिशच्या चवींना वाढवते.",
+            "_id": "6a8ecf6b32e8697f0d2ce28b"
+          }
+        ],
+        "cookingSteps": [
+          "काकडी किसून त्यातील अतिरिक्त पाणी निघून द्या.",
+          "एका वाड्यात कमी फॅटचा दही चांगला फेटा.",
+          "किसलेली काकडी दह्यात घाला.",
+          "एका पातेल्यात जिरे भाजून त्याला पावडर करा.",
+          "भाजलेली जिरे पावडर आणि मीठ दही मिश्रणात घाला.",
+          "चांगले मिसळा आणि थंड करून सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "Curd",
+    "category": "Indian",
+    "cuisine": "Indian",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 5,
+    "cookingTime": 20,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "bowl"
+    },
+    "ingredients": [
+      {
+        "name": "Low-fat milk",
+        "quantity": 250,
+        "unit": "ml",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Base for making low-fat curd, rich in calcium and protein.",
+        "isScalable": true
+      },
+      {
+        "name": "Curd culture",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Starter culture to ferment the milk into curd.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Heat the low-fat milk until it is warm but not boiling.",
+      "Allow the milk to cool to a lukewarm temperature.",
+      "Add the curd culture to the milk and mix well.",
+      "Cover the bowl and let it sit in a warm place for 6-8 hours or until the curd sets.",
+      "Refrigerate the curd before serving."
+    ],
+    "nutrition": {
+      "calories": 150,
+      "protein": 8,
+      "carbs": 12,
+      "fats": 5,
+      "fiber": 0
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "दही",
+        "description": "कम वसा वाले दही का एक साधारण, ताज़गी भरा कटोरा, जो दोपहर के खाने के लिए एक साइड डिश के रूप में परफेक्ट है। यह साधारण दही भारतीय व्यंजनों में एक मुख्य सामग्री है, जो मसालेदार व्यंजनों के लिए एक ठंडा संयोजन प्रदान करता है।",
+        "ingredients": [
+          {
+            "name": "कम वसा वाला दूध",
+            "description": "कम वसा वाले दही बनाने के लिए आधार, कैल्शियम और प्रोटीन में समृद्ध।",
+            "_id": "6a8ecf7732e8697f0d2ce296"
+          },
+          {
+            "name": "दही कल्चर",
+            "description": "दूध को दही में किण्वित करने के लिए स्टार्टर कल्चर।",
+            "_id": "6a8ecf7732e8697f0d2ce297"
+          }
+        ],
+        "cookingSteps": [
+          "कम वसा वाले दूध को गर्म करें जब तक कि यह गर्म न हो जाए लेकिन उबलना नहीं चाहिए।",
+          "दूध को हल्का गर्म होने तक ठंडा होने दें।",
+          "दूध में दही कल्चर डालें और अच्छी तरह मिलाएं।",
+          "कटोरे को ढक दें और इसे 6-8 घंटे या जब तक दही सेट न हो जाए, गर्म स्थान पर छोड़ दें।",
+          "सेवा करने से पहले दही को फ्रिज में रखें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "दही",
+        "description": "एक साधा, ताजगी देणारा कमी चरबीचा दही, जे लंचसाठी साइड डिश म्हणून उत्तम आहे. हा साधा दही भारतीय खाद्यपदार्थांमध्ये एक मुख्य घटक आहे, जो तिखट पदार्थांना थंडावा देतो.",
+        "ingredients": [
+          {
+            "name": "कमी चरबीचे दूध",
+            "description": "कमी चरबीचा दही बनवण्यासाठी आधार, कॅल्शियम आणि प्रथिनांनी समृद्ध.",
+            "_id": "6a8ecf7732e8697f0d2ce299"
+          },
+          {
+            "name": "दही संस्कृती",
+            "description": "दुधाला दहीमध्ये रूपांतरित करण्यासाठी प्रारंभिक संस्कृती.",
+            "_id": "6a8ecf7732e8697f0d2ce29a"
+          }
+        ],
+        "cookingSteps": [
+          "कमी चरबीचे दूध गरम करा जोपर्यंत ते उकळत नाही.",
+          "दूधाला थोडं थंड होऊ द्या.",
+          "दुधात दही संस्कृती घाला आणि चांगलं मिसळा.",
+          "बाउल झाकून ठेवा आणि 6-8 तास किंवा दही सेट होईपर्यंत उबदार ठिकाणी ठेवा.",
+          "सर्व्ह करण्यापूर्वी दही फ्रिजमध्ये ठेवा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "Whole Wheat Toast",
+    "category": "Continental",
+    "cuisine": "Western",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 10,
+    "cookingTime": 5,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "piece"
+    },
+    "ingredients": [
+      {
+        "name": "Whole Wheat Bread",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Grain",
+        "priceLevel": "₹",
+        "description": "Rich in fiber and nutrients, whole wheat bread is a healthier choice than white bread.",
+        "isScalable": true
+      },
+      {
+        "name": "Butter",
+        "quantity": 5,
+        "unit": "g",
+        "category": "Dairy",
+        "priceLevel": "₹",
+        "description": "Provides a light, creamy flavor and a small amount of healthy fats.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Preheat a toaster or a pan on medium heat.",
+      "Place the whole wheat bread slice in the toaster or on the pan.",
+      "Toast the bread until it is golden brown and crispy, about 2-3 minutes.",
+      "Remove the toast and lightly spread 5g of butter on one side while it's still warm.",
+      "Serve immediately as a side dish."
+    ],
+    "nutrition": {
+      "calories": 120,
+      "protein": 3,
+      "carbs": 18,
+      "fats": 4,
+      "fiber": 2
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "साबुत गेहूं का टोस्ट",
+        "description": "एक सरल और स्वस्थ साबुत गेहूं का टोस्ट, हल्का मक्खन लगाकर, दोपहर के खाने के लिए एकदम सही।",
+        "ingredients": [
+          {
+            "name": "साबुत गेहूं की ब्रेड",
+            "description": "फाइबर और पोषक तत्वों से भरपूर, साबुत गेहूं की ब्रेड सफेद ब्रेड की तुलना में एक स्वस्थ विकल्प है।",
+            "_id": "6a8ed1713bc8fac95666ae29"
+          },
+          {
+            "name": "मक्खन",
+            "description": "हल्का, मलाईदार स्वाद और स्वस्थ वसा की थोड़ी मात्रा प्रदान करता है।",
+            "_id": "6a8ed1713bc8fac95666ae2a"
+          }
+        ],
+        "cookingSteps": [
+          "टोस्टर या पैन को मध्यम आंच पर पहले से गरम करें।",
+          "साबुत गेहूं की ब्रेड का टुकड़ा टोस्टर या पैन में रखें।",
+          "ब्रेड को सुनहरा भूरा और कुरकुरा होने तक टोस्ट करें, लगभग 2-3 मिनट।",
+          "टोस्ट को निकालें और एक तरफ हल्का 5g मक्खन लगाएं जब यह अभी भी गर्म हो।",
+          "तुरंत एक साइड डिश के रूप में परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "पूर्ण गहू टोस्ट",
+        "description": "एक साधा आणि आरोग्यदायी पूर्ण गहू टोस्ट, हलक्या लोणीने लावलेला, जे लंचसाठी एक उत्तम साइड आहे.",
+        "ingredients": [
+          {
+            "name": "पूर्ण गहू ब्रेड",
+            "description": "फायबर आणि पोषण तत्वांनी समृद्ध, पूर्ण गहू ब्रेड पांढऱ्या ब्रेडपेक्षा अधिक आरोग्यदायी पर्याय आहे.",
+            "_id": "6a8ed1713bc8fac95666ae2c"
+          },
+          {
+            "name": "लोणी",
+            "description": "हलका, क्रीमयुक्त स्वाद आणि थोडीशी आरोग्यदायी चरबी प्रदान करते.",
+            "_id": "6a8ed1713bc8fac95666ae2d"
+          }
+        ],
+        "cookingSteps": [
+          "टोस्टर किंवा पॅन मध्यम आचेवर गरम करा.",
+          "पूर्ण गहू ब्रेडचा तुकडा टोस्टरमध्ये किंवा पॅनवर ठेवा.",
+          "ब्रेड सोनेरी तपकिरी आणि कुरकुरीत होईपर्यंत टोस्ट करा, सुमारे 2-3 मिनिटे.",
+          "टोस्ट काढा आणि अजूनही गरम असताना एका बाजूला 5g लोणी हलक्या हाताने लावा.",
+          "तत्काळ साइड डिश म्हणून सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "Sambar",
+    "category": "Indian",
+    "cuisine": "South Indian",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 15,
+    "cookingTime": 30,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "bowl"
+    },
+    "ingredients": [
+      {
+        "name": "Toor Dal",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Rich in protein and fiber, essential for a hearty stew.",
+        "isScalable": true
+      },
+      {
+        "name": "Tomato",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Adds tanginess and richness to the sambar.",
+        "isScalable": true
+      },
+      {
+        "name": "Carrot",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Provides sweetness and texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Onion",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Vegetable",
+        "priceLevel": "₹",
+        "description": "Enhances the flavor with its aromatic quality.",
+        "isScalable": true
+      },
+      {
+        "name": "Tamarind",
+        "quantity": 10,
+        "unit": "g",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Gives the sambar its signature tangy taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Sambar Powder",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Spice",
+        "priceLevel": "₹₹",
+        "description": "A blend of spices that defines the sambar flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Mustard Seeds",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Used for tempering to add a nutty flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Curry Leaves",
+        "quantity": 5,
+        "unit": "piece",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds a distinct aroma and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for tempering the spices.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 500,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to cook the dal and vegetables.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Rinse the toor dal thoroughly and soak it in water for 15 minutes.",
+      "In a pressure cooker, add the soaked toor dal, 250 ml of water, and a pinch of turmeric. Cook until the dal is soft and mushy.",
+      "In a separate pot, heat oil and add mustard seeds. Once they splutter, add curry leaves and chopped onions. Sauté until onions are translucent.",
+      "Add chopped tomatoes and carrots to the pot. Cook for 5 minutes until the vegetables soften.",
+      "Mix in the sambar powder and tamarind paste. Stir well to combine.",
+      "Add the cooked dal to the pot along with 250 ml of water. Bring to a boil and simmer for 10 minutes.",
+      "Season with salt and adjust the consistency with more water if needed.",
+      "Serve hot with rice or as a side dish."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 15,
+      "carbs": 70,
+      "fats": 15,
+      "fiber": 12
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "सांबर",
+        "description": "एक पारंपरिक दक्षिण भारतीय दाल का स्टू जो तूर दाल, मिश्रित सब्जियों और एक स्वादिष्ट इमली के शोरबे के साथ बनाया जाता है, जिसे सांबर पाउडर और सरसों के बीज के तड़के के साथ सीज़न किया जाता है।",
+        "ingredients": [
+          {
+            "name": "तूर दाल",
+            "description": "प्रोटीन और फाइबर में समृद्ध, एक हार्दिक स्टू के लिए आवश्यक।",
+            "_id": "6a8ecfa832e8697f0d2ce2ce"
+          },
+          {
+            "name": "टमाटर",
+            "description": "सांबर में खटास और समृद्धि जोड़ता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2cf"
+          },
+          {
+            "name": "गाजर",
+            "description": "मीठास और बनावट प्रदान करता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d0"
+          },
+          {
+            "name": "प्याज",
+            "description": "अपनी सुगंधित गुणवत्ता के साथ स्वाद बढ़ाता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d1"
+          },
+          {
+            "name": "इमली",
+            "description": "सांबर को इसका विशिष्ट खट्टा स्वाद देता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d2"
+          },
+          {
+            "name": "सांबर पाउडर",
+            "description": "मसालों का मिश्रण जो सांबर के स्वाद को परिभाषित करता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d3"
+          },
+          {
+            "name": "सरसों के बीज",
+            "description": "तड़के के लिए उपयोग किया जाता है ताकि नटी स्वाद जोड़ा जा सके।",
+            "_id": "6a8ecfa832e8697f0d2ce2d4"
+          },
+          {
+            "name": "करी पत्ते",
+            "description": "एक विशिष्ट सुगंध और स्वाद जोड़ता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d5"
+          },
+          {
+            "name": "तेल",
+            "description": "मसालों को तड़का लगाने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d6"
+          },
+          {
+            "name": "नमक",
+            "description": "कुल स्वाद को बढ़ाता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d7"
+          },
+          {
+            "name": "पानी",
+            "description": "दाल और सब्जियों को पकाने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ecfa832e8697f0d2ce2d8"
+          }
+        ],
+        "cookingSteps": [
+          "तूर दाल को अच्छी तरह से धोकर 15 मिनट के लिए पानी में भिगो दें।",
+          "एक प्रेशर कुकर में, भिगोई हुई तूर दाल, 250 मिली पानी और एक चुटकी हल्दी डालें। दाल को नरम और चिपचिपा होने तक पकाएं।",
+          "एक अलग बर्तन में, तेल गरम करें और सरसों के बीज डालें। जब वे चटकने लगे, तो करी पत्ते और कटी हुई प्याज डालें। प्याज के पारदर्शी होने तक भूनें।",
+          "बर्तन में कटी हुई टमाटर और गाजर डालें। सब्जियों के नरम होने तक 5 मिनट तक पकाएं।",
+          "सांबर पाउडर और इमली का पेस्ट मिलाएं। अच्छी तरह से मिलाएं।",
+          "पकाई हुई दाल को बर्तन में 250 मिली पानी के साथ डालें। उबालें और 10 मिनट तक धीमी आंच पर पकने दें।",
+          "नमक डालें और आवश्यकता अनुसार और पानी से स्थिरता को समायोजित करें।",
+          "गरमागरम चावल के साथ या एक साइड डिश के रूप में परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "सांबर",
+        "description": "तूर डाळ, मिश्रित भाज्या आणि चवदार चिंचाच्या रसाने बनवलेला एक पारंपरिक दक्षिण भारतीय डाळीचा स्ट्यू, सांबर पावडर आणि मोहरीच्या तडकेने चवदार केलेला.",
+        "ingredients": [
+          {
+            "name": "तूर डाळ",
+            "description": "प्रथिन आणि फायबरमध्ये समृद्ध, एक भरपूर स्ट्यूसाठी आवश्यक.",
+            "_id": "6a8ecfa832e8697f0d2ce2da"
+          },
+          {
+            "name": "टोमाटो",
+            "description": "सांबरमध्ये तिखटपणा आणि समृद्धता आणतो.",
+            "_id": "6a8ecfa832e8697f0d2ce2db"
+          },
+          {
+            "name": "गाजर",
+            "description": "गोडसरता आणि टेक्स्चर प्रदान करतो.",
+            "_id": "6a8ecfa832e8697f0d2ce2dc"
+          },
+          {
+            "name": "कांदा",
+            "description": "त्याच्या सुगंधित गुणधर्मामुळे चव वाढवतो.",
+            "_id": "6a8ecfa832e8697f0d2ce2dd"
+          },
+          {
+            "name": "चिंच",
+            "description": "सांबरला त्याची खास तिखट चव देते.",
+            "_id": "6a8ecfa832e8697f0d2ce2de"
+          },
+          {
+            "name": "सांबर पावडर",
+            "description": "सांबरच्या चवीचे मिश्रण.",
+            "_id": "6a8ecfa832e8697f0d2ce2df"
+          },
+          {
+            "name": "मोहरीचे बी",
+            "description": "तडकेसाठी वापरले जाते ज्यामुळे नटसर चव येते.",
+            "_id": "6a8ecfa832e8697f0d2ce2e0"
+          },
+          {
+            "name": "कढीपत्ता",
+            "description": "विशिष्ट सुगंध आणि चव वाढवतो.",
+            "_id": "6a8ecfa832e8697f0d2ce2e1"
+          },
+          {
+            "name": "तेल",
+            "description": "मसाले तडकेसाठी वापरले जाते.",
+            "_id": "6a8ecfa832e8697f0d2ce2e2"
+          },
+          {
+            "name": "मीठ",
+            "description": "एकूण चव वाढवतो.",
+            "_id": "6a8ecfa832e8697f0d2ce2e3"
+          },
+          {
+            "name": "पाणी",
+            "description": "डाळ आणि भाज्या शिजवण्यासाठी वापरले जाते.",
+            "_id": "6a8ecfa832e8697f0d2ce2e4"
+          }
+        ],
+        "cookingSteps": [
+          "तूर डाळ व्यवस्थित धुऊन 15 मिनिटे पाण्यात भिजवा.",
+          "प्रेशर कुकरमध्ये भिजवलेली तूर डाळ, 250 ml पाणी, आणि एक चिमूट हळद घाला. डाळ मऊ आणि चिरलेली होईपर्यंत शिजवा.",
+          "एक वेगळ्या पातेल्यात तेल गरम करा आणि मोहरीचे बी घाला. ते तडतडल्यावर कढीपत्ता आणि चिरलेले कांदे घाला. कांदे पारदर्शक होईपर्यंत पराठा करा.",
+          "पातेल्यात चिरलेले टोमाटो आणि गाजर घाला. भाज्या मऊ होईपर्यंत 5 मिनिटे शिजवा.",
+          "सांबर पावडर आणि चिंचाचा पेस्ट मिसळा. चांगले एकत्र करा.",
+          "शिजवलेली डाळ पातेल्यात घाला आणि 250 ml पाणी घाला. उकळा आणि 10 मिनिटे उकळा.",
+          "मीठ घालून चव वाढवा आणि आवश्यक असल्यास आणखी पाण्याने स्थिरता समायोजित करा.",
+          "तांदळासोबत गरमागरम सर्व्ह करा किंवा साइड डिश म्हणून."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "Coconut Chutney",
+    "category": "Indian",
+    "cuisine": "South Indian",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 10,
+    "cookingTime": 5,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "bowl"
+    },
+    "ingredients": [
+      {
+        "name": "Coconut",
+        "quantity": 100,
+        "unit": "g",
+        "category": "Fruit",
+        "priceLevel": "₹₹",
+        "description": "Rich in healthy fats and adds a creamy texture.",
+        "isScalable": true
+      },
+      {
+        "name": "Green Chili",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Roasted Chana Dal",
+        "quantity": 20,
+        "unit": "g",
+        "category": "Legume",
+        "priceLevel": "₹",
+        "description": "Provides a nutty flavor and protein.",
+        "isScalable": true
+      },
+      {
+        "name": "Curry Leaves",
+        "quantity": 5,
+        "unit": "piece",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds a distinct aroma and flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Mustard Seeds",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Used for tempering to add flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances the overall taste.",
+        "isScalable": true
+      },
+      {
+        "name": "Oil",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Oil/Fat",
+        "priceLevel": "₹",
+        "description": "Used for tempering.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 50,
+        "unit": "ml",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Adjusts the consistency of the chutney.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Grate the fresh coconut and set aside.",
+      "In a blender, combine grated coconut, green chili, roasted chana dal, and salt. Add water and blend to a smooth paste.",
+      "Heat oil in a small pan. Add mustard seeds and let them splutter.",
+      "Add curry leaves to the pan and sauté for a few seconds.",
+      "Pour the tempering over the blended coconut mixture and mix well.",
+      "Serve the chutney in a bowl as a side dish."
+    ],
+    "nutrition": {
+      "calories": 480,
+      "protein": 6,
+      "carbs": 20,
+      "fats": 42,
+      "fiber": 8
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "नारियल की चटनी",
+        "description": "एक क्लासिक दक्षिण भारतीय चटनी जो ताजे नारियल, हरी मिर्च और भुने चने की दाल से बनाई जाती है, जिसे सरसों के बीज और करी पत्ते के साथ तड़का दिया जाता है। दोपहर के भोजन के लिए एक साइड डिश के रूप में परफेक्ट।",
+        "ingredients": [
+          {
+            "name": "नारियल",
+            "description": "स्वस्थ वसा में समृद्ध और क्रीमी बनावट जोड़ता है।",
+            "_id": "6a8ecfb932e8697f0d2ce303"
+          },
+          {
+            "name": "हरी मिर्च",
+            "description": "गर्मी और स्वाद जोड़ता है।",
+            "_id": "6a8ecfb932e8697f0d2ce304"
+          },
+          {
+            "name": "भुनी हुई चना दाल",
+            "description": "नटी स्वाद और प्रोटीन प्रदान करता है।",
+            "_id": "6a8ecfb932e8697f0d2ce305"
+          },
+          {
+            "name": "करी पत्ते",
+            "description": "विशिष्ट सुगंध और स्वाद जोड़ता है।",
+            "_id": "6a8ecfb932e8697f0d2ce306"
+          },
+          {
+            "name": "सरसों के बीज",
+            "description": "स्वाद बढ़ाने के लिए तड़के में उपयोग किया जाता है।",
+            "_id": "6a8ecfb932e8697f0d2ce307"
+          },
+          {
+            "name": "नमक",
+            "description": "कुल मिलाकर स्वाद को बढ़ाता है।",
+            "_id": "6a8ecfb932e8697f0d2ce308"
+          },
+          {
+            "name": "तेल",
+            "description": "तड़के के लिए उपयोग किया जाता है।",
+            "_id": "6a8ecfb932e8697f0d2ce309"
+          },
+          {
+            "name": "पानी",
+            "description": "चटनी की स्थिरता को समायोजित करता है।",
+            "_id": "6a8ecfb932e8697f0d2ce30a"
+          }
+        ],
+        "cookingSteps": [
+          "ताजा नारियल को कद्दूकस करें और अलग रख दें।",
+          "एक ब्लेंडर में कद्दूकस किया हुआ नारियल, हरी मिर्च, भुनी चना दाल और नमक मिलाएं। पानी डालें और एक चिकनी पेस्ट बनाने के लिए ब्लेंड करें।",
+          "एक छोटे पैन में तेल गरम करें। सरसों के बीज डालें और उन्हें चटकने दें।",
+          "पैन में करी पत्ते डालें और कुछ सेकंड के लिए भूनें।",
+          "तड़के को ब्लेंड की गई नारियल मिश्रण पर डालें और अच्छी तरह मिलाएं।",
+          "चटनी को एक कटोरे में साइड डिश के रूप में परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "नारळाची चटणी",
+        "description": "ताज्या नारळ, हिरव्या मिरच्यां आणि भाजलेल्या चणा डाळीने बनवलेली एक क्लासिक दक्षिण भारतीय चटणी, मोहरीच्या बीजां आणि कढीपत्त्यांनी तळलेली. लंचसाठी साइड डिश म्हणून परिपूर्ण.",
+        "ingredients": [
+          {
+            "name": "नारळ",
+            "description": "आरोग्यदायी फॅट्सने समृद्ध आणि क्रीमी टेक्सचर देते.",
+            "_id": "6a8ecfb932e8697f0d2ce30c"
+          },
+          {
+            "name": "हिरवी मिरची",
+            "description": "तापमान आणि चव वाढवते.",
+            "_id": "6a8ecfb932e8697f0d2ce30d"
+          },
+          {
+            "name": "भाजलेली चणा डाळ",
+            "description": "नट्टी चव आणि प्रोटीन प्रदान करते.",
+            "_id": "6a8ecfb932e8697f0d2ce30e"
+          },
+          {
+            "name": "कढीपत्ता",
+            "description": "विशिष्ट सुगंध आणि चव वाढवतो.",
+            "_id": "6a8ecfb932e8697f0d2ce30f"
+          },
+          {
+            "name": "मोहरीचे बीज",
+            "description": "चव वाढवण्यासाठी तळण्यासाठी वापरले जाते.",
+            "_id": "6a8ecfb932e8697f0d2ce310"
+          },
+          {
+            "name": "मीठ",
+            "description": "एकूण चव वाढवते.",
+            "_id": "6a8ecfb932e8697f0d2ce311"
+          },
+          {
+            "name": "तेल",
+            "description": "तळण्यासाठी वापरले जाते.",
+            "_id": "6a8ecfb932e8697f0d2ce312"
+          },
+          {
+            "name": "पाणी",
+            "description": "चटणीची स्थिरता समायोजित करते.",
+            "_id": "6a8ecfb932e8697f0d2ce313"
+          }
+        ],
+        "cookingSteps": [
+          "ताजा नारळ किसून बाजूला ठेवा.",
+          "ब्लेंडरमध्ये किसलेला नारळ, हिरवी मिरची, भाजलेली चणा डाळ, आणि मीठ एकत्र करा. पाणी घाला आणि गुळगुळीत पेस्ट बनवा.",
+          "एका लहान पातेल्यात तेल गरम करा. मोहरीचे बीज घाला आणि त्यांना तडतडू द्या.",
+          "पातेल्यात कढीपत्ता घाला आणि काही सेकंद परतून घ्या.",
+          "तळलेले मिश्रण ब्लेंड केलेल्या नारळाच्या मिश्रणावर ओता आणि चांगले मिसळा.",
+          "चटणी एका बाउलमध्ये साइड डिश म्हणून सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  },
+  {
+    "name": "Mint Chutney",
+    "category": "Indian",
+    "cuisine": "North Indian",
+    "tags": [
+      "side"
+    ],
+    "servingTime": "Lunch",
+    "servings": 1,
+    "preparationTime": 10,
+    "cookingTime": 20,
+    "dietaryHabits": {
+      "vegetarian": true,
+      "vegan": false,
+      "jain": false,
+      "nonVegetarian": false,
+      "eggitarian": false
+    },
+    "freeFrom": {
+      "sugar": false,
+      "salt": false,
+      "processedFood": false,
+      "oil": false
+    },
+    "servingSize": {
+      "quantity": 1,
+      "unit": "bowl"
+    },
+    "ingredients": [
+      {
+        "name": "Mint leaves",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Rich in antioxidants and provides a refreshing flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Coriander leaves",
+        "quantity": 30,
+        "unit": "g",
+        "category": "Herb",
+        "priceLevel": "₹",
+        "description": "Adds a fresh, citrusy flavor and is high in vitamins.",
+        "isScalable": true
+      },
+      {
+        "name": "Green chilli",
+        "quantity": 1,
+        "unit": "piece",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Adds heat and is a good source of vitamin C.",
+        "isScalable": true
+      },
+      {
+        "name": "Lemon",
+        "quantity": 0.5,
+        "unit": "piece",
+        "category": "Fruit",
+        "priceLevel": "₹",
+        "description": "Provides acidity and vitamin C.",
+        "isScalable": true
+      },
+      {
+        "name": "Salt",
+        "quantity": 1,
+        "unit": "tsp",
+        "category": "Spice",
+        "priceLevel": "₹",
+        "description": "Enhances flavor.",
+        "isScalable": true
+      },
+      {
+        "name": "Water",
+        "quantity": 2,
+        "unit": "tbsp",
+        "category": "Other",
+        "priceLevel": "₹",
+        "description": "Used to blend the chutney to the right consistency.",
+        "isScalable": true
+      }
+    ],
+    "instructions": [
+      "Wash the mint and coriander leaves thoroughly under running water.",
+      "In a blender, add the mint leaves, coriander leaves, green chilli, and a pinch of salt.",
+      "Squeeze the juice of half a lemon into the blender.",
+      "Add 2 tablespoons of water to help with blending.",
+      "Blend the mixture until smooth, adjusting the consistency with more water if needed.",
+      "Taste and adjust salt or lemon juice as per preference.",
+      "Serve fresh as a side condiment with your meal."
+    ],
+    "nutrition": {
+      "calories": 50,
+      "protein": 2,
+      "carbs": 10,
+      "fats": 0.5,
+      "fiber": 4
+    },
+    "language": [
+      "English",
+      "Hindi",
+      "Marathi"
+    ],
+    "translations": {
+      "Hindi": {
+        "name": "पुदीना चटनी",
+        "description": "एक ताज़गी भरी भारतीय पुदीना-धनिया चटनी, जो दोपहर के भोजन के लिए एक साइड कंडिमेंट के रूप में परफेक्ट है, ताज़े पुदीने और धनिया की पत्तियों, हरी मिर्च और नींबू के रस के साथ बनाई जाती है।",
+        "ingredients": [
+          {
+            "name": "पुदीने की पत्तियाँ",
+            "description": "एंटीऑक्सीडेंट्स से भरपूर और ताज़गी भरा स्वाद प्रदान करती हैं।",
+            "_id": "6a8ecfc832e8697f0d2ce328"
+          },
+          {
+            "name": "धनिया की पत्तियाँ",
+            "description": "ताज़ा, खट्टा स्वाद जोड़ती हैं और विटामिन्स में उच्च होती हैं।",
+            "_id": "6a8ecfc832e8697f0d2ce329"
+          },
+          {
+            "name": "हरी मिर्च",
+            "description": "गरमी जोड़ती है और विटामिन C का अच्छा स्रोत है।",
+            "_id": "6a8ecfc832e8697f0d2ce32a"
+          },
+          {
+            "name": "नींबू",
+            "description": "खट्टापन और विटामिन C प्रदान करता है।",
+            "_id": "6a8ecfc832e8697f0d2ce32b"
+          },
+          {
+            "name": "नमक",
+            "description": "स्वाद को बढ़ाता है।",
+            "_id": "6a8ecfc832e8697f0d2ce32c"
+          },
+          {
+            "name": "पानी",
+            "description": "चटनी को सही स्थिरता में मिलाने के लिए उपयोग किया जाता है।",
+            "_id": "6a8ecfc832e8697f0d2ce32d"
+          }
+        ],
+        "cookingSteps": [
+          "पुदीने और धनिया की पत्तियों को अच्छी तरह से बहते पानी के नीचे धो लें।",
+          "एक ब्लेंडर में, पुदीने की पत्तियाँ, धनिया की पत्तियाँ, हरी मिर्च और एक चुटकी नमक डालें।",
+          "ब्लेंडर में आधे नींबू का रस निचोड़ें।",
+          "ब्लेंडिंग में मदद के लिए 2 टेबलस्पून पानी डालें।",
+          "मिश्रण को चिकना होने तक ब्लेंड करें, यदि आवश्यक हो तो अधिक पानी से स्थिरता को समायोजित करें।",
+          "स्वाद लें और पसंद के अनुसार नमक या नींबू का रस समायोजित करें।",
+          "अपने भोजन के साथ एक साइड कंडिमेंट के रूप में ताज़ा परोसें।"
+        ],
+        "warnings": []
+      },
+      "Marathi": {
+        "name": "पुदिना चटणी",
+        "description": "ताज्या पुदिन्याच्या आणि कोथिंबीरच्या पानांनी बनवलेली एक ताजगीदायक भारतीय पुदिना-कोथिंबीर चटणी, जे लंचसाठी साइड कंडिमेंट म्हणून उत्तम आहे.",
+        "ingredients": [
+          {
+            "name": "पुदिना पानं",
+            "description": "अँटिऑक्सिडंट्समध्ये समृद्ध आणि ताजगीदायक चव देते.",
+            "_id": "6a8ecfc832e8697f0d2ce32f"
+          },
+          {
+            "name": "कोथिंबीर",
+            "description": "ताजगी आणि सिट्रस चव देते आणि व्हिटॅमिन्समध्ये उच्च आहे.",
+            "_id": "6a8ecfc832e8697f0d2ce330"
+          },
+          {
+            "name": "हिरवी मिरची",
+            "description": "तिखटपणा वाढवते आणि व्हिटॅमिन C चा चांगला स्रोत आहे.",
+            "_id": "6a8ecfc832e8697f0d2ce331"
+          },
+          {
+            "name": "लिंबू",
+            "description": "आसिडिटी आणि व्हिटॅमिन C प्रदान करते.",
+            "_id": "6a8ecfc832e8697f0d2ce332"
+          },
+          {
+            "name": "मीठ",
+            "description": "चव वाढवते.",
+            "_id": "6a8ecfc832e8697f0d2ce333"
+          },
+          {
+            "name": "पाणी",
+            "description": "चटणी योग्य स्थिरतेसाठी मिसळण्यासाठी वापरले जाते.",
+            "_id": "6a8ecfc832e8697f0d2ce334"
+          }
+        ],
+        "cookingSteps": [
+          "पुदिना आणि कोथिंबीरची पानं चांगल्या प्रकारे धुवा.",
+          "ब्लेंडरमध्ये पुदिना पानं, कोथिंबीर, हिरवी मिरची आणि एक चिमूटभर मीठ घाला.",
+          "ब्लेंडरमध्ये अर्ध्या लिंबाचा रस निचरा.",
+          "ब्लेंडिंगसाठी 2 टेबलस्पून पाणी घाला.",
+          "संपूर्ण मिश्रण गुळगुळीत होईपर्यंत ब्लेंड करा, आवश्यक असल्यास अधिक पाण्याने स्थिरता समायोजित करा.",
+          "चव चाखा आणि आवडीनुसार मीठ किंवा लिंबाचा रस समायोजित करा.",
+          "ताज्या चटणीला तुमच्या जेवणासोबत साइड कंडिमेंट म्हणून सर्व्ह करा."
+        ],
+        "warnings": []
+      }
+    }
+  }
+]
