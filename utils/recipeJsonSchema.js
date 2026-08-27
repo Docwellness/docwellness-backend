@@ -102,7 +102,8 @@ const RECIPE_JSON_SCHEMA = {
       type: 'array',
       items: componentSchema,
       minItems: 1,
-      description: 'Every independently-servable/countable part of ONE serving of this dish, each in its own natural real-world unit - not force-converted to grams. A simple dish (e.g. Oats Porridge) has exactly one entry.',
+      maxItems: 3,
+      description: 'Every independently-servable/countable part of ONE serving of this dish, each in its own natural real-world unit - not force-converted to grams. A simple dish (e.g. Oats Porridge, or any single sabji/dal/curry/bhurji) has exactly one entry - NEVER decompose a dish into its individual ingredients (onion, spices, oil, garnish are not separate components). Only use more than one entry when the dish is genuinely served as several separate, independently-servable dishes on the same plate (e.g. Idli + Sambar + Chutney).',
     },
     nutrition: {
       type: 'object',
