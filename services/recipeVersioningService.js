@@ -31,6 +31,7 @@ const FoodItem = require('../models/FoodItem');
 const PlanItem = require('../models/PlanItem');
 const { normalize } = require('../utils/ingredientLibrary');
 const { rewriteRecipeStepsForIngredients } = require('../utils/openaiClient');
+const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../utils/coreIngredientHeuristic');
 
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
 
@@ -122,6 +123,10 @@ async function syncV1FromRecipe(recipe) {
               rawQuantity: ingredient.quantity,
               unit: ingredient.unit,
               preparation: null,
+              // recipe-core-ingredient-scaling: carry the master Recipe's
+              // per-ingredient role forward - see models/RecipeVersion.js's
+              // own comment on this field.
+              role: ingredient.role,
             }
           : null;
       })
@@ -233,12 +238,100 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
   const latest = await RecipeVersion.findOne({ parentRecipeId: original.parentRecipeId }).sort({ versionNumber: -1 });
   const nextVersionNumber = (latest?.versionNumber || original.versionNumber) + 1;
 
-  const foodItemIds = updatedIngredients.map((ingredient) => ingredient.foodItemId);
+  // Also fetch FoodItems for original's own ingredients (not just the
+  // submitted list) - needed to resolve a core ingredient's PREVIOUS grams
+  // even in the edge case where the dietician's submission drops it
+  // entirely (see the core-group recompute below, which treats a missing
+  // core entry as 0 new grams rather than bailing out).
+  const foodItemIds = [
+    ...updatedIngredients.map((ingredient) => ingredient.foodItemId),
+    ...original.ingredients.map((ingredient) => ingredient.foodItemId),
+  ];
   const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } });
   const foodItemsById = new Map(foodItems.map((foodItem) => [String(foodItem._id), foodItem]));
 
+  // recipe-core-ingredient-scaling: when the core ingredient group's total
+  // weight (grams, via resolveGramsForIngredient) changed from `original`
+  // to what was submitted, every `role: 'sub'` ingredient's quantity is
+  // recomputed in that same proportion - overriding whatever was submitted
+  // for it - rather than trusting the client's value at face value. See
+  // openspec/changes/recipe-core-ingredient-scaling/design.md's Decisions
+  // for the full rationale (this mirrors the existing componentScaleRatio
+  // pattern just below, but keyed off the core group's weight instead of
+  // the whole recipe's calorie change).
+  //
+  // "Inert" (no recompute) whenever: there's no role:'core' ingredient at
+  // all (legacy, not-yet-migrated recipe), a core ingredient's grams can't
+  // be resolved on either side (unknown unit conversion), or the total
+  // simply didn't change beyond floating-point noise - in every one of
+  // those cases `updatedIngredients` is used exactly as submitted, byte-
+  // for-byte identical to this function's pre-existing behavior.
+  const originalCoreIngredients = original.ingredients.filter((ingredient) => ingredient.role === 'core');
+  const updatedIngredientsByFoodItemId = new Map(
+    updatedIngredients.map((ingredient) => [String(ingredient.foodItemId), ingredient])
+  );
+
+  let coreWeightRatio = null;
+  if (originalCoreIngredients.length > 0) {
+    let previousCoreGrams = 0;
+    let newCoreGrams = 0;
+    let resolvable = true;
+
+    for (const coreIngredient of originalCoreIngredients) {
+      const foodItem = foodItemsById.get(String(coreIngredient.foodItemId));
+      const previousGrams = resolveGramsForIngredient(foodItem, coreIngredient.rawQuantity, coreIngredient.unit);
+      if (previousGrams === null) {
+        resolvable = false;
+        break;
+      }
+      previousCoreGrams += previousGrams;
+
+      // A core ingredient the dietician's submission dropped entirely
+      // contributes 0 new grams (a real, resolvable data point - the group
+      // genuinely shrank), not an "unresolvable" bail-out.
+      const submitted = updatedIngredientsByFoodItemId.get(String(coreIngredient.foodItemId));
+      if (!submitted) continue;
+      const newGrams = resolveGramsForIngredient(foodItem, submitted.rawQuantity, submitted.unit);
+      if (newGrams === null) {
+        resolvable = false;
+        break;
+      }
+      newCoreGrams += newGrams;
+    }
+
+    if (resolvable && previousCoreGrams > 0) {
+      const ratio = newCoreGrams / previousCoreGrams;
+      // Skip a no-op rewrite for a ratio that's 1 up to floating-point noise.
+      if (Math.abs(ratio - 1) > 1e-9) coreWeightRatio = ratio;
+    }
+  }
+
+  const originalByFoodItemId = new Map(
+    original.ingredients.map((ingredient) => [String(ingredient.foodItemId), ingredient])
+  );
+  // Every saved ingredient carries `role` forward from `original` (matched
+  // by foodItemId) regardless of whether a recompute fired - the client
+  // never submits `role` itself (see this function's own doc comment on
+  // updatedIngredients' shape), so it has to come from here or every V2+
+  // would silently lose it. An ingredient with no match in `original` (the
+  // dietician added a brand-new one via this edit) defaults to 'sub',
+  // matching this feature's schema default and the same "never silently
+  // promote to the more consequential state" convention used elsewhere.
+  const recomputedIngredients = updatedIngredients.map((ingredient) => {
+    const originalMatch = originalByFoodItemId.get(String(ingredient.foodItemId));
+    const role = originalMatch?.role === 'core' ? 'core' : 'sub';
+    if (coreWeightRatio === null || !originalMatch || originalMatch.role !== 'sub') {
+      return { ...ingredient, role };
+    }
+    return {
+      ...ingredient,
+      role,
+      rawQuantity: Math.round(originalMatch.rawQuantity * coreWeightRatio * 100) / 100,
+    };
+  });
+
   const { nutritionPerServing, hasUnresolvedIngredients, unresolvedIngredientNames } = computeNutritionFromIngredients(
-    updatedIngredients,
+    recomputedIngredients,
     foodItemsById
   );
 
@@ -259,7 +352,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
 
   let steps = original.steps;
   if (regenerateSteps && Array.isArray(original.steps) && original.steps.length > 0) {
-    const namedIngredients = updatedIngredients.map((ingredient) => {
+    const namedIngredients = recomputedIngredients.map((ingredient) => {
       const foodItem = foodItemsById.get(String(ingredient.foodItemId));
       return {
         name: foodItem?.name || 'Unknown ingredient',
@@ -278,7 +371,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     baseYield: original.baseYield,
     cookingMethod: original.cookingMethod,
     moistureChangeFactor: original.moistureChangeFactor,
-    ingredients: updatedIngredients,
+    ingredients: recomputedIngredients,
     steps,
     components: scaledComponents,
     nutritionPerServing,
@@ -324,11 +417,35 @@ async function createVersionFromSnapshot(originalVersionId, snapshot, { createdB
   const foodItemsByNormalizedName = new Map(foodItems.map((foodItem) => [foodItem.normalizedName, foodItem]));
   const foodItemsById = new Map(foodItems.map((foodItem) => [String(foodItem._id), foodItem]));
 
-  const versionIngredients = ingredients
+  // recipe-core-ingredient-scaling: role is carried through from the
+  // snapshot's own ingredients when present (generateRecipeWithAI already
+  // assigns it - see updateRecipeFromEdits, this function's only caller's
+  // caller), defaulting via the same deterministic heuristic used
+  // everywhere else when it isn't. Applied on the snapshot's OWN ingredient
+  // objects (which carry `category`, e.g. "Vegetable"/"Grain") rather than
+  // on FoodItem records - FoodItem has no `category` field at all, that
+  // concept only exists on the recipe-authoring side. Deliberately NOT
+  // running createCustomVersion's core-group aggregate-weight recompute
+  // here - this snapshot is a FULL AI regeneration of every ingredient at
+  // once (there's no "previous version's ingredient list" to compare a
+  // core group's weight against; `ingredients` here isn't an incremental
+  // edit to `original`, it replaces it entirely), so there's nothing
+  // meaningful to recompute a ratio from.
+  const roleCorrectedIngredients = hasCoreIngredient(ingredients)
+    ? ingredients
+    : applyCoreIngredientHeuristic(ingredients);
+
+  const versionIngredients = roleCorrectedIngredients
     .map((ingredient) => {
       const foodItem = foodItemsByNormalizedName.get(normalize(ingredient.name));
       return foodItem
-        ? { foodItemId: foodItem._id, rawQuantity: ingredient.quantity, unit: ingredient.unit, preparation: null }
+        ? {
+            foodItemId: foodItem._id,
+            rawQuantity: ingredient.quantity,
+            unit: ingredient.unit,
+            preparation: null,
+            role: ingredient.role === 'core' ? 'core' : 'sub',
+          }
         : null;
     })
     .filter(Boolean);
