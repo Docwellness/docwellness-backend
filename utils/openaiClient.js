@@ -6,6 +6,7 @@ const { DIET_PLAN_JSON_SCHEMA, REQUIRED_SERVING_TIMES } = require('./dietPlanJso
 const { DISH_EXTRACTION_JSON_SCHEMA } = require('./dishExtractionJsonSchema');
 const { EXERCISE_JSON_SCHEMA } = require('./exerciseJsonSchema');
 const { RECIPE_STEPS_REWRITE_JSON_SCHEMA } = require('./recipeStepsRewriteJsonSchema');
+const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('./coreIngredientHeuristic');
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -477,7 +478,8 @@ RESPONSE FORMAT - Return ONLY valid JSON matching this exact schema:
       "category": "Protein Rich" | "Carbohydrate" | "Vegetable" | "Dairy" | "Spice" | "Oil/Fat" | "Sweetener" | "Grain" | "Legume" | "Nut/Seed" | "Fruit" | "Herb" | "Sauce/Condiment" | "Other",
       "priceLevel": "₹" | "₹₹" | "₹₹₹",
       "description": "string - brief nutritional benefit or cooking note",
-      "isScalable": boolean
+      "isScalable": boolean,
+      "role": "core" | "sub"
     }
   ],
   "components": [
@@ -515,6 +517,11 @@ COMPONENTS RULE (this is what the dietician and patient actually see and adjust 
   - A dish that's genuinely a single scoopable/pourable mass with no natural count uses "g" or "ml": "Oats Porridge" -> [{"label":"Oats Porridge","quantity":250,"unit":"g"}], "Buttermilk" -> [{"label":"Buttermilk","quantity":200,"unit":"ml"}].
   - "nos" = a generic countable unit for items with no more specific unit of their own (idli, dumpling, cutlet); "bowl"/"cup"/"piece"/"slice"/"egg"/"tbsp"/"tsp" when they're the natural way that specific item is served/counted; "g"/"ml" only for genuinely unitless masses/liquids.
   - List every component a patient would recognize as a distinct part of the plate (typically 1-3) - not every ingredient (a dal's tempering oil is an ingredient, not its own component). A simple single-part dish still gets exactly one components entry, repeating the dish name as its label.
+
+CORE INGREDIENT RULE (every ingredient's "role" field): mark as "role":"core" every ingredient in whichever single category is BOTH present in this dish AND highest in this priority order: Grain, Carbohydrate, Protein Rich, Legume (highest) > Dairy, Vegetable, Fruit, Nut/Seed > Spice, Oil/Fat, Sweetener, Herb, Sauce/Condiment, Other (lowest). Mark every other ingredient "role":"sub". This is a GROUP rule, not a single-ingredient pick: if multiple ingredients share that one highest-priority category present, ALL of them are core together, not just one.
+  - Single-anchor example: "Chapati" has one Carbohydrate ingredient (Whole Wheat Flour) and no higher-priority category present -> Whole Wheat Flour is "core", Water/Salt/Ghee are "sub".
+  - Group example: "Mixed Vegetable" has four Vegetable ingredients (Carrot, Beans, Peas, Cauliflower) and no Grain/Carbohydrate/Protein Rich/Legume ingredient present -> ALL FOUR are "core" together, Oil/Salt/Spices are "sub".
+  - Every recipe MUST have at least one "core" ingredient (never mark every ingredient "sub") - there is no upper limit on how many.
 
 QUANTITY OVERRIDE RULE (highest priority - overrides "Include 5-15 ingredients" and all nutritional-balance guidance below): If the dietician's Custom Ingredients/Preferences or Custom Notes text states an explicit quantity and/or unit for a specific ingredient (e.g., "½ cup chickpeas", "1 cup quinoa", "1½ tbs mustard"), treat that stated amount as the PER-SERVING quantity for that ingredient - do not convert cup/tbsp/tsp to grams, do not round to a "typical" serving size, do not substitute a different amount for nutritional-balance reasons. Represent fractional amounts as decimals (½ → 0.5, 1½ → 1.5). Only ingredients NOT given an explicit quantity in the note should have their per-serving quantity determined by you, using the PORTION CALIBRATION below. If the note uses an informal measure with no schema-compatible unit (e.g., "handful of kale", "salt" with no amount), choose the closest reasonable quantity/unit yourself - this rule only binds you when the dietician gave an explicit numeric quantity+unit.
 
@@ -710,9 +717,29 @@ TASK: Generate a complete, healthy ${name} recipe suitable for ${servingTime}.
       priceLevel: ing.priceLevel || '₹₹',
       description: ing.description || '',
       isScalable: ing.isScalable !== false,
+      // recipe-core-ingredient-scaling: defaults to 'sub' (not 'core') on
+      // any unrecognized value, same "never silently promote to the more
+      // consequential state" caution as isScalable defaulting to true only
+      // on an explicit true - see the hasCoreIngredient check just below
+      // for the real backstop against a response with zero core ingredients.
+      role: ing.role === 'core' ? 'core' : 'sub',
     }))
     : [];
-  const scaledIngredients = perServingIngredients.map((ing) => (
+  // Deterministic backstop: guarantee every generateRecipeWithAI response
+  // has at least one core ingredient, even though the model is only ever
+  // given the category-priority heuristic as prompt guidance (see the
+  // CORE INGREDIENT RULE in systemPrompt) rather than a mechanically
+  // enforced one - a strict schema requires the "role" field to be
+  // present on every ingredient, but can't guarantee at least one of them
+  // says "core". Never overrides a non-zero result - the model's own
+  // judgment about which ingredients are core is trusted even when it
+  // doesn't match a purely mechanical same-category grouping (see
+  // openspec/changes/recipe-core-ingredient-scaling/design.md's
+  // Decisions for why).
+  const coreCorrectedIngredients = hasCoreIngredient(perServingIngredients)
+    ? perServingIngredients
+    : applyCoreIngredientHeuristic(perServingIngredients);
+  const scaledIngredients = coreCorrectedIngredients.map((ing) => (
     ing.isScalable ? { ...ing, quantity: ing.quantity * servings } : ing
   ));
 

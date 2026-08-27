@@ -32,6 +32,14 @@ const INGREDIENT_CATEGORIES = [
   'Sauce/Condiment', 'Other',
 ];
 
+// recipe-core-ingredient-scaling: 'core' = the clinically/portion-meaningful
+// ingredient(s) a dietician actually adjusts (a whole category group for a
+// combo dish, e.g. every vegetable in Mixed Vegetable - not capped at one),
+// 'sub' = everything only meaningful relative to that group (water/salt/
+// oil/spices). Keep in sync with models/Recipe.js's/RecipeVersion.js's
+// `role` field enum.
+const INGREDIENT_ROLES = ['core', 'sub'];
+
 // Canonical price-level convention: rupee symbols (matches the app's Indian
 // cuisine context). Keep in sync with models/Recipe.js's `priceLevel` default.
 const PRICE_LEVELS = ['₹', '₹₹', '₹₹₹'];
@@ -39,7 +47,7 @@ const PRICE_LEVELS = ['₹', '₹₹', '₹₹₹'];
 const ingredientSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'quantity', 'unit', 'category', 'priceLevel', 'description', 'isScalable'],
+  required: ['name', 'quantity', 'unit', 'category', 'priceLevel', 'description', 'isScalable', 'role'],
   properties: {
     name: { type: 'string', description: 'The RAW GROCERY ITEM a person would buy at a store, e.g. "Lemon" not "Lemon Juice".' },
     // Never 0 or a placeholder - see the NO ZERO/PLACEHOLDER QUANTITIES RULE
@@ -52,6 +60,12 @@ const ingredientSchema = {
     priceLevel: { type: 'string', enum: PRICE_LEVELS },
     description: { type: 'string', description: 'Brief nutritional benefit or cooking note.' },
     isScalable: { type: 'boolean' },
+    role: {
+      type: 'string',
+      enum: INGREDIENT_ROLES,
+      description:
+        'core = this ingredient (or, for a combo/mixed dish, every ingredient sharing its category) is the clinically/portion-meaningful one a dietician actually adjusts - see the CORE INGREDIENT RULE below. sub = everything else, only meaningful relative to the core ingredient(s).',
+    },
   },
 };
 
@@ -112,6 +126,7 @@ module.exports = {
   INGREDIENT_UNITS,
   COMPONENT_UNITS,
   INGREDIENT_CATEGORIES,
+  INGREDIENT_ROLES,
   PRICE_LEVELS,
   RECIPE_JSON_SCHEMA,
 };

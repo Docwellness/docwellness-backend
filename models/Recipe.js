@@ -179,6 +179,24 @@ const recipeSchema = new mongoose.Schema(
         // resolving names to FoodItems when generating this recipe's V1
         // RecipeVersion - never read by any days-array-system code.
         foodItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem', default: null },
+        // recipe-core-ingredient-scaling: which ingredient(s) are the
+        // clinically/portion-meaningful ones a dietician actually adjusts
+        // ('core' - e.g. Chapati's Whole Wheat Flour, or every vegetable in
+        // a Mixed Vegetable dish together) vs. ones only meaningful
+        // relative to that group ('sub' - water/salt/oil/spices). A recipe
+        // should have at least one 'core' ingredient, no upper bound - this
+        // is an application-level invariant (enforced by createRecipe/
+        // updateRecipe/generateRecipeWithAI's output validation, same
+        // convention as dietaryHabits/freeFrom conflict checks in
+        // utils/dietaryConstraintValidator.js), not a schema-level
+        // constraint, so existing recipes with every ingredient defaulted
+        // to 'sub' remain valid documents (see recipe-ingredient-scaling
+        // capability for the resulting "not yet migrated" fallback
+        // behavior in services/recipeVersioningService.js's
+        // createCustomVersion). Never conflate with isScalable above - that
+        // is a different, pre-existing concept (serving-multiplier
+        // participation at read time, see utils/dietPlanReadDispatch.js).
+        role: { type: String, enum: ['core', 'sub'], default: 'sub' },
       },
     ],
     instructions: [
