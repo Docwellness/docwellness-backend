@@ -18,7 +18,8 @@ const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
-const { COMPONENT_UNITS } = require('../../utils/recipeJsonSchema');
+const { COMPONENT_UNITS, INGREDIENT_ROLES } = require('../../utils/recipeJsonSchema');
+const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../../utils/coreIngredientHeuristic');
 const fs = require('fs');
 
 const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
@@ -446,6 +447,17 @@ const parseQuantity = (val) => {
  * the whole recipe doc and a blank/zero quantity never reaches the database
  * untouched. Shared by createRecipe and updateRecipe - the two handlers
  * that actually persist a recipe.
+ *
+ * recipe-core-ingredient-scaling: also sanitizes `role` (invalid/missing ->
+ * 'sub', same convention as unit/priceLevel/category above) and, if the
+ * dietician's submitted list ends up with zero ingredients marked 'core'
+ * (never specified any `role` at all, or every explicit value happened to
+ * be 'sub'), deterministically applies the category-priority heuristic
+ * rather than saving a recipe with no core ingredient designated - see
+ * models/Recipe.js's `role` field comment. Marking one or more ingredients
+ * 'core' explicitly is always honored as-is; this only fills in the gap
+ * when the dietician didn't engage with the field at all.
+ *
  * Returns { ingredients, warnings }.
  */
 function sanitizeRecipeIngredients(ingredients) {
@@ -456,11 +468,15 @@ function sanitizeRecipeIngredients(ingredients) {
       unit: VALID_UNITS.includes(ing.unit) ? ing.unit : 'g',
       priceLevel: VALID_PRICE_LEVELS.includes(ing.priceLevel) ? ing.priceLevel : '₹₹',
       category: VALID_INGREDIENT_CATEGORIES.includes(ing.category) ? ing.category : 'Other',
+      role: INGREDIENT_ROLES.includes(ing.role) ? ing.role : 'sub',
     }))
     : [];
+  const coreCorrectedIngredients = hasCoreIngredient(rawSafeIngredients)
+    ? rawSafeIngredients
+    : applyCoreIngredientHeuristic(rawSafeIngredients);
 
   const { ingredients: safeIngredients, corrections: quantityCorrections } =
-    enforceFiniteIngredientQuantities(rawSafeIngredients);
+    enforceFiniteIngredientQuantities(coreCorrectedIngredients);
   const warnings = quantityCorrections.map(
     (c) => `Quantity for "${c.ingredient}" wasn't specified - defaulted to ${c.to.quantity}${c.to.unit}, please verify.`
   );
@@ -702,6 +718,11 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
       description: ing.description || '',
       isScalable: ing.isScalable !== false,
       image: ing.image || null,
+      // recipe-core-ingredient-scaling: preserve role through the preview
+      // response - services/recipeVersioningService.js's
+      // createVersionFromSnapshot (the "Update Existing" apply path this
+      // preview feeds into) reads it from here.
+      role: ing.role === 'core' ? 'core' : 'sub',
     });
 
     const finalIngredients =
