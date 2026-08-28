@@ -31,6 +31,35 @@ afterAll(async () => {
   await disconnectTestDb();
 });
 
+// A countable-serving recipe: Chapati, served in pieces, one core
+// ingredient (flour). ~200 cal at 50g flour + 5g ghee.
+async function makeCountableVersion({ flourQty = 50, gheeQty = 5, pieces = 1 } = {}) {
+  const flour = await FoodItem.findOneAndUpdate(
+    { normalizedName: 'wholewheatflour' },
+    { $setOnInsert: { name: 'Whole Wheat Flour', normalizedName: 'wholewheatflour', nutritionPer100g: { calories: 340, protein: 13, carbs: 72, fats: 2, fiber: 11 } } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  const ghee = await FoodItem.findOneAndUpdate(
+    { normalizedName: 'ghee' },
+    { $setOnInsert: { name: 'Ghee', normalizedName: 'ghee', nutritionPer100g: { calories: 900, protein: 0, carbs: 0, fats: 100, fiber: 0 } } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  const calories = (flourQty / 100) * 340 + (gheeQty / 100) * 900;
+  const version = await RecipeVersion.create({
+    name: 'Chapati',
+    parentRecipeId: new mongoose.Types.ObjectId(),
+    versionNumber: 1,
+    ingredients: [
+      { foodItemId: flour._id, rawQuantity: flourQty, unit: 'g', role: 'core' },
+      { foodItemId: ghee._id, rawQuantity: gheeQty, unit: 'g', role: 'sub' },
+    ],
+    components: [{ label: 'Chapati', quantity: pieces, unit: 'piece' }],
+    nutritionPerServing: { calories, protein: null, carbs: null, fats: null, fiber: null },
+    status: 'Active',
+  });
+  return { version, flour, ghee };
+}
+
 async function makeVersion({ oatsQty = 40, milkQty = 200 } = {}) {
   // Real-world: one global 'Oats' FoodItem, not one per RecipeVersion -
   // upsert so multiple calls in the same test share the same document
@@ -102,6 +131,35 @@ describe('autoBalanceIngredients', () => {
     const newVersion = await autoBalanceIngredients(version._id, 479.2); // exactly 2x, within bound
 
     expect(newVersion._wasScaleClamped).toBe(false);
+  });
+
+  test('floors a countable serving at 1 piece instead of scaling it down to a fraction', async () => {
+    const { version } = await makeCountableVersion({ flourQty: 50, gheeQty: 5 }); // 170 + 45 = 215 cal, 1 piece
+    // Target ~0.58x current would naively give ~0.58 piece.
+    const newVersion = await autoBalanceIngredients(version._id, 215 * 0.58);
+
+    expect(newVersion.components[0].quantity).toBeCloseTo(1, 1);
+    expect(newVersion._flooredTo).toBe(1);
+    // Ingredients moved by the floored ratio (1/1), not the requested 0.58.
+    const flourIngredient = newVersion.ingredients.find((i) => i.role === 'core');
+    expect(flourIngredient.rawQuantity).toBeCloseTo(50, 0);
+  });
+
+  test('snaps a countable serving to a 0.5 step when scaling up', async () => {
+    const { version } = await makeCountableVersion({ flourQty: 50, gheeQty: 5 }); // 215 cal, 1 piece
+    // ~1.7x current -> naive 1.7 piece -> snaps to 1.5.
+    const newVersion = await autoBalanceIngredients(version._id, 215 * 1.7);
+
+    expect(newVersion.components[0].quantity).toBeCloseTo(1.5, 1);
+    expect(newVersion._flooredTo).toBe(1.5);
+  });
+
+  test('leaves a continuous serving free to scale to any fraction', async () => {
+    const { version } = await makeVersion({ oatsQty: 40, milkQty: 200 }); // 239.6 cal, no components
+    const newVersion = await autoBalanceIngredients(version._id, 239.6 * 0.6);
+
+    expect(newVersion._flooredTo).toBeNull();
+    expect(newVersion.nutritionPerServing.calories).toBeCloseTo(239.6 * 0.6, 0);
   });
 
   test('throws when the version has no positive current calories', async () => {
@@ -186,5 +244,81 @@ describe('autoBalanceDay / autoBalanceWeek', () => {
 
     const dayGroups = results.map((r) => r.dayGroup).sort();
     expect(dayGroups).toEqual(['Monday', 'Tuesday']);
+  });
+
+  test('skips pinned items entirely, rebalancing the rest around them', async () => {
+    const { dayPlan, breakfastItem, lunchItem } = await makeDayWithTwoItems();
+    breakfastItem.pinned = true;
+    await breakfastItem.save();
+    const pinnedVersionId = String(breakfastItem.recipeVersionId);
+
+    await autoBalanceDay(dayPlan._id, 1437.6);
+
+    const breakfastAfter = await PlanItem.findById(breakfastItem._id);
+    expect(String(breakfastAfter.recipeVersionId)).toBe(pinnedVersionId); // untouched
+    const lunchAfter = await PlanItem.findById(lunchItem._id);
+    expect(String(lunchAfter.recipeVersionId)).not.toBe(String(lunchItem.recipeVersionId)); // rebalanced
+    // lunch should absorb the whole remaining budget: 1437.6 - 239.6 = 1198
+    expect(lunchAfter.calculatedNutrition.calories).toBeCloseTo(1198, -1);
+  });
+
+  describe('countable/continuous partition (portion realism)', () => {
+    async function makeDayWithChapatiAndTwoDals() {
+      const patientId = new mongoose.Types.ObjectId();
+      const dieticianId = new mongoose.Types.ObjectId();
+      const dietPlan = await DietPlan.create({ patientId, dieticianId, dataModel: 'plan-item' });
+      const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId, week: 1, dayGroup: 'Monday' });
+      const lunchSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Lunch' });
+      const dinnerSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Dinner' });
+
+      const { version: chapati } = await makeCountableVersion({ flourQty: 50, gheeQty: 5 }); // ~215 cal, 1 piece
+      const { version: dal1 } = await makeVersion({ oatsQty: 60, milkQty: 100 }); // continuous
+      const { version: dal2 } = await makeVersion({ oatsQty: 60, milkQty: 100 });
+
+      const chapatiItem = await PlanItem.create({ mealSlotId: lunchSlot._id, recipeVersionId: chapati._id, calculatedNutrition: chapati.nutritionPerServing });
+      const dal1Item = await PlanItem.create({ mealSlotId: lunchSlot._id, recipeVersionId: dal1._id, calculatedNutrition: dal1.nutritionPerServing });
+      const dal2Item = await PlanItem.create({ mealSlotId: dinnerSlot._id, recipeVersionId: dal2._id, calculatedNutrition: dal2.nutritionPerServing });
+
+      return { dayPlan, chapatiItem, dal1Item, dal2Item, chapatiCal: chapati.nutritionPerServing.calories };
+    }
+
+    test('floors the Chapati at 1 piece and lets the dals absorb the difference toward target', async () => {
+      const { dayPlan, chapatiItem, dal1Item, dal2Item } = await makeDayWithChapatiAndTwoDals();
+      // Small day target so the Chapati's proportional share would be well under 1 piece.
+      const target = 700;
+
+      await autoBalanceDay(dayPlan._id, target);
+
+      const chapatiAfter = await PlanItem.findById(chapatiItem._id);
+      const chapatiVersion = await RecipeVersion.findById(chapatiAfter.recipeVersionId);
+      expect(chapatiVersion.components[0].quantity).toBeGreaterThanOrEqual(1);
+
+      const dal1After = await PlanItem.findById(dal1Item._id);
+      const dal2After = await PlanItem.findById(dal2Item._id);
+      const dayTotal =
+        chapatiAfter.calculatedNutrition.calories + dal1After.calculatedNutrition.calories + dal2After.calculatedNutrition.calories;
+      // Within ~10% of target - the dals soaked up the floored Chapati calories.
+      expect(Math.abs(dayTotal - target) / target).toBeLessThan(0.1);
+    });
+
+    test('a day of only countable items keeps the snapped portions and does not throw', async () => {
+      const patientId = new mongoose.Types.ObjectId();
+      const dietPlan = await DietPlan.create({ patientId, dieticianId: new mongoose.Types.ObjectId(), dataModel: 'plan-item' });
+      const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId, week: 1, dayGroup: 'Monday' });
+      const lunchSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Lunch' });
+      const { version: chapati1 } = await makeCountableVersion({ flourQty: 50, gheeQty: 5 });
+      const { version: chapati2 } = await makeCountableVersion({ flourQty: 50, gheeQty: 5 });
+      const item1 = await PlanItem.create({ mealSlotId: lunchSlot._id, recipeVersionId: chapati1._id, calculatedNutrition: chapati1.nutritionPerServing });
+      const item2 = await PlanItem.create({ mealSlotId: lunchSlot._id, recipeVersionId: chapati2._id, calculatedNutrition: chapati2.nutritionPerServing });
+
+      await expect(autoBalanceDay(dayPlan._id, 200)).resolves.toBeDefined(); // no throw, no infinite adjust
+
+      for (const id of [item1._id, item2._id]) {
+        const after = await PlanItem.findById(id);
+        const version = await RecipeVersion.findById(after.recipeVersionId);
+        expect(version.components[0].quantity).toBeGreaterThanOrEqual(1);
+        expect(version.components[0].quantity * 2).toBe(Math.round(version.components[0].quantity * 2)); // on a 0.5 step
+      }
+    });
   });
 });

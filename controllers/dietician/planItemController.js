@@ -142,6 +142,10 @@ exports.createCustomRecipeVersion = async (req, res, next) => {
 
     planItem.recipeVersionId = newVersion._id;
     planItem.calculatedNutrition = newVersion.nutritionPerServing;
+    // A hand-edited portion is a deliberate choice - pin it so a later
+    // "Auto Adjust" rebalances the day's OTHER recipes around it instead of
+    // silently re-scaling this one (diet-plan-wizard/refine-portions-pinning).
+    planItem.pinned = true;
     await planItem.save();
 
     if (dietPlan.workflowStatus === 'menu_generated') {
@@ -189,6 +193,9 @@ exports.updateItemRecipeVersion = async (req, res, next) => {
 
     planItem.recipeVersionId = newVersion._id;
     planItem.calculatedNutrition = newVersion.nutritionPerServing;
+    // Applying a regenerated recipe to one plan item is a deliberate edit -
+    // pin it against auto-balance (diet-plan-wizard/refine-portions-pinning).
+    planItem.pinned = true;
     await planItem.save();
 
     if (dietPlan.workflowStatus === 'menu_generated') {
@@ -372,6 +379,7 @@ exports.getWeekPlanItems = async (req, res, next) => {
             recipeVersionId: item.recipeVersionId,
             recipeVersion: recipeVersionById.get(String(item.recipeVersionId)) || null,
             locked: item.locked,
+            pinned: item.pinned,
             calculatedNutrition: item.calculatedNutrition,
             isLinkedComponent: item.isLinkedComponent,
             parentRecipeId: item.parentRecipeId,
@@ -499,6 +507,41 @@ exports.removePlanItem = async (req, res, next) => {
     await PlanItem.deleteOne({ _id: planItemId });
 
     return res.status(200).json({ success: true, data: { removed: true } });
+  } catch (error) {
+    if (error.message === 'PlanItem not found') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+/**
+ * @desc    Set/clear a plan item's `pinned` flag. Saving a hand-edited
+ *          portion pins the item automatically (see createCustomRecipeVersion);
+ *          this is the Refine Portions card's "Edited" badge tapping through
+ *          to unpin, returning the item to "Auto Adjust"'s pool. Does not
+ *          change any portion.
+ * @route   PATCH /api/dietician/patients/:patientId/diet-plans/:dietPlanId/plan-items/:planItemId
+ * @access  Private (Dietician)
+ */
+exports.setPinned = async (req, res, next) => {
+  try {
+    const dietPlan = await loadPlanItemDietPlan(req, res);
+    if (!dietPlan) return;
+
+    const { planItemId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(planItemId)) {
+      return res.status(400).json({ success: false, message: 'planItemId must be a valid id' });
+    }
+    if (typeof req.body?.pinned !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'pinned must be a boolean' });
+    }
+
+    const { planItem } = await loadOwnedPlanItem(dietPlan, planItemId);
+    planItem.pinned = req.body.pinned;
+    await planItem.save();
+
+    return res.status(200).json({ success: true, data: { planItem } });
   } catch (error) {
     if (error.message === 'PlanItem not found') {
       return res.status(404).json({ success: false, message: error.message });
