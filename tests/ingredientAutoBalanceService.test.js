@@ -15,12 +15,13 @@ let PlanItem;
 let autoBalanceIngredients;
 let autoBalanceDay;
 let autoBalanceWeek;
+let autoBalancePlan;
 
 beforeAll(async () => {
   await connectTestDb();
   mongoose = require('mongoose');
   ({ FoodItem, RecipeVersion, DietPlan, DayPlan, MealSlotPlan, PlanItem } = require('../models'));
-  ({ autoBalanceIngredients, autoBalanceDay, autoBalanceWeek } = require('../services/ingredientAutoBalanceService'));
+  ({ autoBalanceIngredients, autoBalanceDay, autoBalanceWeek, autoBalancePlan } = require('../services/ingredientAutoBalanceService'));
 });
 
 afterEach(async () => {
@@ -227,6 +228,25 @@ describe('autoBalanceDay / autoBalanceWeek', () => {
     expect(String(breakfastAfter.recipeVersionId)).toBe(originalVersionId); // untouched
     const lunchAfter = await PlanItem.findById(lunchItem._id);
     expect(String(lunchAfter.recipeVersionId)).not.toBe(String(lunchItem.recipeVersionId)); // rebalanced
+  });
+
+  test('autoBalancePlan balances every generated week, not just one', async () => {
+    // Week 1: one 239.6-cal item. Week 2: one 479.2-cal item. Only week 1
+    // would be touched by autoBalanceWeek(dietPlanId, 1, ...); autoBalancePlan
+    // must bring BOTH weeks toward the target.
+    const { dietPlan } = await makeDayWithTwoItems();
+    const w2day = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: dietPlan.patientId, week: 2, dayGroup: 'Monday' });
+    const w2slot = await MealSlotPlan.create({ dayPlanId: w2day._id, servingTime: 'Breakfast' });
+    const { version: w2v } = await makeVersion({ oatsQty: 40, milkQty: 200 }); // 239.6 cal
+    const w2item = await PlanItem.create({ mealSlotId: w2slot._id, recipeVersionId: w2v._id, calculatedNutrition: w2v.nutritionPerServing });
+
+    const results = await autoBalancePlan(dietPlan._id, 900);
+
+    expect(results.map((r) => r.week).sort()).toEqual([1, 2]);
+    const w2after = await PlanItem.findById(w2item._id);
+    // week 2's item was rebalanced toward 900 (from 239.6), so its version changed
+    expect(String(w2after.recipeVersionId)).not.toBe(String(w2v._id));
+    expect(w2after.calculatedNutrition.calories).toBeGreaterThan(239.6);
   });
 
   test('autoBalanceWeek loops every dayGroup for the given week', async () => {

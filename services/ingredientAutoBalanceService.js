@@ -214,4 +214,24 @@ async function autoBalanceWeek(dietPlanId, week, targetDailyCalories) {
   return results;
 }
 
-module.exports = { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek };
+/**
+ * Auto-balances every generated week of a DietPlan, not just one. The
+ * wizard's Refine Portions step is single-week UI, but a Silver-tier plan
+ * has all 4 weeks generated up front (see
+ * generation_step_controller.dart's _initialWeeksForTier) and
+ * services/planActivationService.js's finalize gate validates EVERY week -
+ * so the entry balance has to cover them all or weeks 2-4 stay at raw V1
+ * portions and block activation ("N day(s) outside +/-5% tolerance").
+ */
+async function autoBalancePlan(dietPlanId, targetDailyCalories) {
+  const dayPlans = await DayPlan.find({ dietPlanId }).select('week');
+  const weeks = [...new Set(dayPlans.map((dayPlan) => dayPlan.week))].sort((a, b) => a - b);
+  const results = [];
+  for (const week of weeks) {
+    const weekResults = await autoBalanceWeek(dietPlanId, week, targetDailyCalories);
+    results.push({ week, days: weekResults });
+  }
+  return results;
+}
+
+module.exports = { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek, autoBalancePlan };
