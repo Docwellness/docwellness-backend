@@ -32,6 +32,7 @@ const PlanItem = require('../models/PlanItem');
 const { normalize } = require('../utils/ingredientLibrary');
 const { rewriteRecipeStepsForIngredients } = require('../utils/openaiClient');
 const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../utils/coreIngredientHeuristic');
+const { isCountableServing, snapHalfStep } = require('../utils/servingUnits');
 
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
 
@@ -364,11 +365,21 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
   const originalCalories = original.nutritionPerServing?.calories;
   const newCalories = nutritionPerServing?.calories;
   const componentScaleRatio = originalCalories > 0 && newCalories > 0 ? newCalories / originalCalories : 1;
-  const scaledComponents = (original.components || []).map((component) => ({
-    label: component.label,
-    quantity: Math.round(component.quantity * componentScaleRatio * 100) / 100,
-    unit: component.unit,
-  }));
+  // A single countable serving (roti/idli/egg) snaps to a clean 0.5 step so
+  // "Makes (on the plate)" reads as "1 piece" / "1½ piece", never "1.13
+  // piece" - diet-plan-wizard/portion-realism. No lower floor here (unlike
+  // auto-balance's snapCountablePortion): a dietician editing by hand may
+  // legitimately prescribe half a roti. A multi-component dish is left on
+  // its raw ratio-scaled quantity - there's no single serving to snap.
+  const onlyComponentIsCountable = (original.components || []).length === 1 && isCountableServing(original.components[0]);
+  const scaledComponents = (original.components || []).map((component) => {
+    const scaled = component.quantity * componentScaleRatio;
+    return {
+      label: component.label,
+      quantity: onlyComponentIsCountable ? snapHalfStep(scaled) : Math.round(scaled * 100) / 100,
+      unit: component.unit,
+    };
+  });
 
   let steps = original.steps;
   if (regenerateSteps && Array.isArray(original.steps) && original.steps.length > 0) {

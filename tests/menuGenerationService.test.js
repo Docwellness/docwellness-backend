@@ -167,6 +167,37 @@ describe('generateMenu', () => {
     }
   });
 
+  test('a countable-serving recipe is generated at its authored V1 serving, never a sub-1 fraction', async () => {
+    // Generation does NO scaling - it points a PlanItem at the recipe's V1
+    // verbatim (see menuGenerationService.js's header). So a countable
+    // serving can only ever be a fraction here if the recipe was AUTHORED
+    // that way; a normally-authored "1 piece" roti stays "1 piece". The
+    // wizard's entry auto-balance is the backstop that floors anything the
+    // proportional solve would push below 1 (see ingredientAutoBalanceService).
+    const dieticianId = new mongoose.Types.ObjectId();
+    const patientId = new mongoose.Types.ObjectId();
+    const dietPlan = await DietPlan.create({ patientId, dieticianId, dataModel: 'plan-item' });
+    const flour = await makeFoodItem('Wheat Flour', 340);
+    const recipe = await Recipe.create({
+      dieticianId,
+      name: 'Chapati',
+      servingTime: 'Lunch',
+      components: [{ label: 'Chapati', quantity: 1, unit: 'piece' }],
+      ingredients: [{ name: 'Wheat Flour', quantity: 40, unit: 'g' }],
+      nutrition: { calories: 136, protein: 5, carbs: 29, fats: 1, fiber: 4 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const { createdPlanItemIds } = await generateMenu({ dietPlanId: dietPlan._id, patientId, dieticianId, weekNumbers: [1] });
+    const items = await PlanItem.find({ _id: { $in: createdPlanItemIds } });
+    for (const item of items) {
+      const version = await RecipeVersion.findById(item.recipeVersionId);
+      const countable = (version.components || []).find((c) => ['piece', 'nos', 'roti', 'slice', 'egg'].includes(c.unit));
+      if (countable) expect(countable.quantity).toBeGreaterThanOrEqual(1);
+    }
+    expect(items.length).toBeGreaterThan(0);
+  });
+
   test('an empty pool for a slot is reported as unfillable, not silently skipped', async () => {
     const dieticianId = new mongoose.Types.ObjectId();
     const patientId = new mongoose.Types.ObjectId();

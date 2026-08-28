@@ -145,6 +145,17 @@ describe('POST .../create-custom-version', () => {
     const savedPlan = await DietPlan.findById(dietPlan._id);
     expect(savedPlan.workflowStatus).toBe('portions_refined');
   });
+
+  test('pins the plan item so a later auto-balance leaves its portion alone', async () => {
+    const { patient, dietPlan, planItem, oats } = await setup();
+
+    await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/create-custom-version`)
+    ).send({ planItemId: planItem._id.toString(), ingredients: [{ foodItemId: oats._id.toString(), rawQuantity: 200, unit: 'g' }] });
+
+    const saved = await PlanItem.findById(planItem._id);
+    expect(saved.pinned).toBe(true);
+  });
 });
 
 describe('POST .../update-item-recipe-version', () => {
@@ -169,6 +180,9 @@ describe('POST .../update-item-recipe-version', () => {
 
     const savedPlan = await DietPlan.findById(dietPlan._id);
     expect(savedPlan.workflowStatus).toBe('portions_refined');
+
+    const savedItem = await PlanItem.findById(planItem._id);
+    expect(savedItem.pinned).toBe(true);
   });
 
   test('400s when no ingredient matches a known food item', async () => {
@@ -473,5 +487,64 @@ describe('DELETE .../plan-items/:planItemId (remove)', () => {
 
     expect(res.status).toBe(404);
     expect(await PlanItem.findById(other.planItem._id)).not.toBeNull(); // untouched
+  });
+});
+
+describe('PATCH .../plan-items/:planItemId (set pinned)', () => {
+  test('unpinning clears the flag without changing the portion', async () => {
+    const { patient, dietPlan, planItem } = await setup();
+    planItem.pinned = true;
+    await planItem.save();
+    const originalVersionId = String(planItem.recipeVersionId);
+
+    const res = await auth(
+      request(app).patch(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${planItem._id}`)
+    ).send({ pinned: false });
+
+    expect(res.status).toBe(200);
+    const saved = await PlanItem.findById(planItem._id);
+    expect(saved.pinned).toBe(false);
+    expect(String(saved.recipeVersionId)).toBe(originalVersionId);
+  });
+
+  test('400s when pinned is not a boolean', async () => {
+    const { patient, dietPlan, planItem } = await setup();
+    const res = await auth(
+      request(app).patch(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${planItem._id}`)
+    ).send({ pinned: 'yes' });
+    expect(res.status).toBe(400);
+  });
+
+  test('404s for a planItemId belonging to a different diet plan', async () => {
+    const { patient, dietPlan } = await setup();
+    const other = await setup();
+    const res = await auth(
+      request(app).patch(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/plan-items/${other.planItem._id}`)
+    ).send({ pinned: true });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST .../auto-balance skips pinned items', () => {
+  test('scope:day leaves a pinned item untouched and rebalances the rest', async () => {
+    const { dietician, patient, dietPlan, dayPlan, mealSlot, planItem, oats } = await setup();
+    // Second item in the same day so there's something to rebalance.
+    const { v1: secondV1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Poha', servingTime: 'Lunch', foodItem: oats });
+    const lunchSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Lunch' });
+    const secondItem = await PlanItem.create({ mealSlotId: lunchSlot._id, recipeVersionId: secondV1._id, calculatedNutrition: secondV1.nutritionPerServing });
+
+    planItem.pinned = true;
+    await planItem.save();
+    const pinnedVersionId = String(planItem.recipeVersionId);
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/auto-balance`)
+    ).send({ scope: 'day', dayPlanId: dayPlan._id.toString(), targetDailyCalories: 2000 });
+
+    expect(res.status).toBe(200);
+    const pinnedAfter = await PlanItem.findById(planItem._id);
+    expect(String(pinnedAfter.recipeVersionId)).toBe(pinnedVersionId);
+    const secondAfter = await PlanItem.findById(secondItem._id);
+    expect(String(secondAfter.recipeVersionId)).not.toBe(String(secondV1._id));
   });
 });

@@ -27,6 +27,19 @@ const planItemSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Also skipped by services/ingredientAutoBalanceService.js's auto-balance,
+    // but a WEAKER state than `locked`: set true whenever a dietician saves
+    // a hand-edited portion (ingredient quantities or "Makes on the plate")
+    // via the ingredient editor, so a later "Auto Adjust" solves the day's
+    // calorie gap with the OTHER recipes instead of silently re-scaling this
+    // deliberate choice. Unlike `locked`, a pinned item can still be swapped
+    // or removed. Cleared from the Refine Portions card's "Edited" badge.
+    // See openspec change diet-wizard-portions-and-polish
+    // (diet-plan-wizard/refine-portions-pinning).
+    pinned: {
+      type: Boolean,
+      default: false,
+    },
     // Cached from recipeVersionId's nutritionPerServing at assignment time
     // so reads never re-join RecipeVersion just to show calories/macros -
     // same "cache so reads never re-join" convention as the old model's

@@ -28,6 +28,7 @@ const PlanItem = require('../models/PlanItem');
 const MealSlotPlan = require('../models/MealSlotPlan');
 const DayPlan = require('../models/DayPlan');
 const { createCustomVersion } = require('./recipeVersioningService');
+const { isCountableServing, snapCountablePortion } = require('../utils/servingUnits');
 
 // A target requiring more than a 3x scale-up or scale-down of an ingredient's
 // current amount is treated as unreachable via uniform scaling - e.g. "1.3
@@ -62,7 +63,30 @@ async function autoBalanceIngredients(recipeVersionId, targetCalories) {
   }
 
   const requestedRatio = targetCalories / currentCalories;
-  const ratio = Math.min(MAX_SCALE_RATIO, Math.max(MIN_SCALE_RATIO, requestedRatio));
+  let ratio = Math.min(MAX_SCALE_RATIO, Math.max(MIN_SCALE_RATIO, requestedRatio));
+
+  // Serving-size realism (diet-plan-wizard/portion-realism): a countable
+  // serving (roti/idli/egg/slice) must not be scaled below 1, and lands on
+  // a 0.5 step. We re-derive the scale ratio from the SNAPPED serving
+  // quantity so the new version's ingredients, calories, and "Makes"
+  // component all stay in sync (createCustomVersion rescales the component
+  // off the resulting calorie ratio - moving the ingredients by
+  // effectiveRatio is what lands that component on snappedQty). A dish with
+  // no component, or more than one, is continuous and untouched here.
+  let flooredTo = null;
+  const servingComponent =
+    Array.isArray(currentVersion.components) && currentVersion.components.length === 1
+      ? currentVersion.components[0]
+      : null;
+  if (isCountableServing(servingComponent) && servingComponent.quantity > 0) {
+    const projectedQuantity = servingComponent.quantity * ratio;
+    const snappedQuantity = snapCountablePortion(projectedQuantity);
+    if (Math.abs(snappedQuantity - projectedQuantity) > 1e-9) {
+      ratio = Math.min(MAX_SCALE_RATIO, Math.max(MIN_SCALE_RATIO, snappedQuantity / servingComponent.quantity));
+      flooredTo = snappedQuantity;
+    }
+  }
+
   const updatedIngredients = currentVersion.ingredients.map((ingredient) => ({
     foodItemId: ingredient.foodItemId,
     rawQuantity: Math.round(ingredient.rawQuantity * ratio * 100) / 100,
@@ -71,58 +95,111 @@ async function autoBalanceIngredients(recipeVersionId, targetCalories) {
   }));
 
   const newVersion = await createCustomVersion(recipeVersionId, updatedIngredients);
-  // In-memory annotation only (not a schema path, never persisted) - lets an
+  // In-memory annotations only (not schema paths, never persisted) - let an
   // immediate caller (autoBalanceDay below) see that the target couldn't be
   // fully reached without inspecting ratios itself.
   newVersion._wasScaleClamped = ratio !== requestedRatio;
+  newVersion._flooredTo = flooredTo;
   return newVersion;
 }
 
 /**
- * Auto-balances every UNLOCKED PlanItem in one DayPlan to collectively hit
- * targetDailyCalories - each unlocked item's individual target is its
- * proportional share of (targetDailyCalories - locked items' calories),
- * weighted by that item's current calorie share among unlocked items, so
- * relative meal-to-meal proportions are roughly preserved rather than every
- * item being pushed to the same absolute number. Locked items and items
- * with no current calorie figure (unresolved ingredients) are skipped
- * entirely - same "locked items are never touched" convention as the old
- * dietPlanAutoBalanceService.js/weekTweakService.js.
+ * Auto-balances the adjustable PlanItems in one DayPlan to collectively hit
+ * targetDailyCalories, roughly preserving relative meal-to-meal proportions
+ * rather than pushing every item to the same absolute number.
+ *
+ * Skipped entirely (never rescaled; their calories are a fixed baseline the
+ * rest of the day balances around):
+ *   - `locked` items (dietician pinned the portion AND blocked swap/remove)
+ *   - `pinned` items (dietician hand-edited the portion; still swappable) -
+ *     diet-plan-wizard/refine-portions-pinning
+ *   - items with no current calorie figure (unresolved ingredients)
+ *
+ * Two-pass partition (diet-plan-wizard/portion-realism): countable-serving
+ * items (roti/idli/egg) are solved first - flooring/snapping in
+ * autoBalanceIngredients can move them off their proportional share - then
+ * the continuous items (dal in grams, a drink in ml) absorb whatever budget
+ * is left. If there are no continuous items to absorb the difference, the
+ * countable results stand and the day may be left outside tolerance for the
+ * dietician to resolve (surfaced by the finalize activation check), rather
+ * than an implausible fractional serving being forced.
  */
 async function autoBalanceDay(dayPlanId, targetDailyCalories) {
   const mealSlots = await MealSlotPlan.find({ dayPlanId });
   const mealSlotIds = mealSlots.map((slot) => slot._id);
   const planItems = await PlanItem.find({ mealSlotId: { $in: mealSlotIds } });
 
-  const lockedCalories = planItems
-    .filter((item) => item.locked)
+  const fixedCalories = planItems
+    .filter((item) => item.locked || item.pinned)
     .reduce((sum, item) => sum + (item.calculatedNutrition?.calories || 0), 0);
-  const unlockedItems = planItems.filter((item) => !item.locked && (item.calculatedNutrition?.calories || 0) > 0);
-  const unlockedCalories = unlockedItems.reduce((sum, item) => sum + item.calculatedNutrition.calories, 0);
-
-  if (unlockedItems.length === 0 || unlockedCalories <= 0) {
+  const adjustableItems = planItems.filter(
+    (item) => !item.locked && !item.pinned && (item.calculatedNutrition?.calories || 0) > 0
+  );
+  if (adjustableItems.length === 0) {
     return [];
   }
 
-  const remainingTarget = targetDailyCalories - lockedCalories;
-  const results = [];
-  for (const item of unlockedItems) {
-    const itemShare = item.calculatedNutrition.calories / unlockedCalories;
-    const itemTargetCalories = remainingTarget * itemShare;
-    if (!(itemTargetCalories > 0)) continue; // locked items already exceed the day's target - nothing sane to solve for
+  // Classify each adjustable item by its serving component - needs the
+  // RecipeVersion, so batch-fetch rather than one findById per item.
+  const versionsById = new Map(
+    (await RecipeVersion.find({ _id: { $in: adjustableItems.map((item) => item.recipeVersionId) } })).map((version) => [
+      String(version._id),
+      version,
+    ])
+  );
+  const isItemCountable = (item) => {
+    const version = versionsById.get(String(item.recipeVersionId));
+    const component =
+      version && Array.isArray(version.components) && version.components.length === 1 ? version.components[0] : null;
+    return isCountableServing(component);
+  };
+  const countableItems = adjustableItems.filter(isItemCountable);
+  const continuousItems = adjustableItems.filter((item) => !isItemCountable(item));
 
+  const adjustableCalories = adjustableItems.reduce((sum, item) => sum + item.calculatedNutrition.calories, 0);
+  const results = [];
+
+  const applyToItem = async (item, itemTargetCalories) => {
+    if (!(itemTargetCalories > 0)) return null;
     const newVersion = await autoBalanceIngredients(item.recipeVersionId, itemTargetCalories);
     item.recipeVersionId = newVersion._id;
     item.calculatedNutrition = newVersion.nutritionPerServing;
     await item.save();
-    results.push({
+    const result = {
       planItemId: item._id,
       newVersionId: newVersion._id,
       targetCalories: itemTargetCalories,
       achievedCalories: newVersion.nutritionPerServing.calories,
       wasClamped: !!newVersion._wasScaleClamped,
-    });
+      flooredTo: newVersion._flooredTo ?? null,
+    };
+    results.push(result);
+    return result;
+  };
+
+  // Pass 1: countable items take their proportional share of the budget,
+  // but flooring/snapping may push them off it - record what they actually
+  // achieved so pass 2 knows how much budget is really left.
+  let countableAchieved = 0;
+  for (const item of countableItems) {
+    const share = item.calculatedNutrition.calories / adjustableCalories;
+    const itemTarget = (targetDailyCalories - fixedCalories) * share;
+    const before = item.calculatedNutrition.calories;
+    const result = await applyToItem(item, itemTarget);
+    countableAchieved += result ? result.achievedCalories : before;
   }
+
+  // Pass 2: continuous items absorb the remaining budget, proportional to
+  // their current calories.
+  const remainingForContinuous = targetDailyCalories - fixedCalories - countableAchieved;
+  const continuousCalories = continuousItems.reduce((sum, item) => sum + item.calculatedNutrition.calories, 0);
+  if (continuousItems.length > 0 && remainingForContinuous > 0 && continuousCalories > 0) {
+    for (const item of continuousItems) {
+      const share = item.calculatedNutrition.calories / continuousCalories;
+      await applyToItem(item, remainingForContinuous * share);
+    }
+  }
+
   return results;
 }
 

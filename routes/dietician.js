@@ -375,6 +375,12 @@ router.delete(
   planItemController.removePlanItem
 );
 
+router.patch(
+  '/patients/:patientId/diet-plans/:dietPlanId/plan-items/:planItemId',
+  dieticianOnlyMiddleware,
+  planItemController.setPinned
+);
+
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/weeks/:week/plan-items',
   dieticianOnlyMiddleware,
