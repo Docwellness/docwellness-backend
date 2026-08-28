@@ -18,7 +18,7 @@ const { COMPONENT_UNITS } = require('../../utils/recipeJsonSchema');
 const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
 const { createCustomVersion, resolveGramsForIngredient, createVersionFromSnapshot } = require('../../services/recipeVersioningService');
-const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek } = require('../../services/ingredientAutoBalanceService');
+const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek, autoBalancePlan } = require('../../services/ingredientAutoBalanceService');
 const { validatePlanForActivation } = require('../../services/planActivationService');
 const { swapToRecipe } = require('../../services/recipeVersionSwapService');
 
@@ -264,7 +264,15 @@ exports.autoBalance = async (req, res, next) => {
       return res.status(200).json({ success: true, data: { results } });
     }
 
-    return res.status(400).json({ success: false, message: "scope must be 'item', 'day', or 'week'" });
+    if (scope === 'plan') {
+      if (!(targetDailyCalories > 0)) {
+        return res.status(400).json({ success: false, message: 'a positive targetDailyCalories is required for scope:plan' });
+      }
+      const results = await autoBalancePlan(dietPlan._id, targetDailyCalories);
+      return res.status(200).json({ success: true, data: { results } });
+    }
+
+    return res.status(400).json({ success: false, message: "scope must be 'item', 'day', 'week', or 'plan'" });
   } catch (error) {
     if (error.message === 'PlanItem not found') {
       return res.status(404).json({ success: false, message: error.message });

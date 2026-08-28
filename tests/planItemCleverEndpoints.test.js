@@ -218,6 +218,33 @@ describe('POST .../auto-balance', () => {
     ).send({ scope: 'planet' });
     expect(res.status).toBe(400);
   });
+
+  test('scope:plan balances every generated week', async () => {
+    const { dietician, patient, dietPlan, dayPlan, mealSlot, v1, oats } = await setup();
+    // setup() gives week 1 one item; add a week-2 DayPlan with its own item.
+    const { v1: w2v1 } = await makeResolvedRecipe({ dieticianId: dietician._id, name: 'Poha', servingTime: 'Lunch', foodItem: oats });
+    const w2day = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: patient._id, week: 2, dayGroup: 'Monday' });
+    const w2slot = await MealSlotPlan.create({ dayPlanId: w2day._id, servingTime: 'Lunch' });
+    const w2item = await PlanItem.create({ mealSlotId: w2slot._id, recipeVersionId: w2v1._id, calculatedNutrition: w2v1.nutritionPerServing });
+
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/auto-balance`)
+    ).send({ scope: 'plan', targetDailyCalories: v1.nutritionPerServing.calories * 2 });
+
+    expect(res.status).toBe(200);
+    const weeks = res.body.data.results.map((r) => r.week).sort();
+    expect(weeks).toEqual([1, 2]);
+    const w2after = await PlanItem.findById(w2item._id);
+    expect(String(w2after.recipeVersionId)).not.toBe(String(w2v1._id)); // week 2 rebalanced too
+  });
+
+  test('scope:plan 400s without a positive targetDailyCalories', async () => {
+    const { patient, dietPlan } = await setup();
+    const res = await auth(
+      request(app).post(`/api/dietician/patients/${patient._id}/diet-plans/${dietPlan._id}/auto-balance`)
+    ).send({ scope: 'plan' });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('GET .../weeks/:week/plan-items', () => {
