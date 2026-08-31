@@ -10,6 +10,10 @@ const {
   MealLog,
   GenerationLog,
   Notification,
+  DayPlan,
+  MealSlotPlan,
+  PlanItem,
+  SupplementItem,
 } = require('../../models');
 const { sendPushToTokens } = require('../../utils/push');
 const config = require('../../config/environment');
@@ -1137,6 +1141,31 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engin
 }
 
 /**
+ * Permanently removes a still-Draft diet plan and everything hanging off
+ * it (DayPlan -> MealSlotPlan -> PlanItem / SupplementItem). Used when a
+ * dietician abandons the wizard and starts over: the half-built draft
+ * would otherwise linger as an orphan and its cycleNumber would wrongly
+ * bump the next real plan into "cycle 2". Only ever called for status
+ * 'Draft' - a Finalized/Active plan is never touched here.
+ */
+async function deleteDraftDietPlanTree(dietPlanId) {
+  const dayPlans = await DayPlan.find({ dietPlanId }).select('_id').lean();
+  const dayPlanIds = dayPlans.map((d) => d._id);
+  const mealSlots = dayPlanIds.length
+    ? await MealSlotPlan.find({ dayPlanId: { $in: dayPlanIds } }).select('_id').lean()
+    : [];
+  const mealSlotIds = mealSlots.map((m) => m._id);
+
+  await Promise.all([
+    mealSlotIds.length ? PlanItem.deleteMany({ mealSlotId: { $in: mealSlotIds } }) : null,
+    mealSlotIds.length ? SupplementItem.deleteMany({ mealSlotId: { $in: mealSlotIds } }) : null,
+  ]);
+  await MealSlotPlan.deleteMany({ dayPlanId: { $in: dayPlanIds } });
+  await DayPlan.deleteMany({ dietPlanId });
+  await DietPlan.deleteOne({ _id: dietPlanId });
+}
+
+/**
  * @desc    Create a diet plan and immediately generate AI content
  * @route   POST /api/dietician/patients/:patientId/diet-plans/generate
  * @access  Private (Dietician)
@@ -1240,14 +1269,26 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
     // completely unchanged for a renewal vs. a first-time plan.
     const previousPlan = await DietPlan.findOne({ patientId, request: resolvedRequestId })
       .sort({ cycleNumber: -1 })
-      .select('cycleNumber status')
+      .select('_id cycleNumber status')
       .lean();
-    const cycleNumber = previousPlan ? (previousPlan.cycleNumber || 1) + 1 : 1;
-    if (previousPlan && previousPlan.status === 'Active') {
-      await DietPlan.updateMany(
-        { patientId, request: resolvedRequestId, status: 'Active' },
-        { $set: { status: 'Completed' } }
-      );
+
+    let cycleNumber;
+    if (previousPlan && previousPlan.status === 'Draft') {
+      // The dietician started the wizard before, never finished it, and is
+      // starting over (the app re-shows "Create Diet Plan" while the plan
+      // is still Draft). Wipe the abandoned draft + its half-generated
+      // week structure and reuse its cycle number rather than leaving an
+      // orphan and bumping this into a phantom "cycle 2".
+      await deleteDraftDietPlanTree(previousPlan._id);
+      cycleNumber = previousPlan.cycleNumber || 1;
+    } else {
+      cycleNumber = previousPlan ? (previousPlan.cycleNumber || 1) + 1 : 1;
+      if (previousPlan && previousPlan.status === 'Active') {
+        await DietPlan.updateMany(
+          { patientId, request: resolvedRequestId, status: 'Active' },
+          { $set: { status: 'Completed' } }
+        );
+      }
     }
 
     const dietPlan = new DietPlan({
