@@ -34,10 +34,18 @@ async function runBackfill() {
   const recipes = await Recipe.find({ category: { $ne: 'Supplements' } });
   console.log(`Found ${recipes.length} non-Supplement recipe(s).`);
 
+  const { normalize } = require('../utils/ingredientLibrary');
+
   let created = 0;
   let updated = 0;
   let unresolved = 0;
   let skippedNoIngredients = 0;
+  // ingredient name (as authored on the recipe) -> how many recipes it
+  // leaves unresolved. This is the actionable output: every entry is either
+  // a FoodItem that needs adding, or an ingredient name on the recipe that
+  // needs correcting to match an existing FoodItem's name.
+  const unresolvedNameCounts = new Map();
+  const unresolvedByRecipe = [];
 
   for (const recipe of recipes) {
     if (!recipe.ingredients?.length) {
@@ -45,31 +53,48 @@ async function runBackfill() {
       continue;
     }
     const before = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
-    if (!EXECUTE) {
-      // Dry run: report what WOULD happen without calling syncV1FromRecipe
-      // (which writes), by resolving names the same way it does.
-      const { normalize } = require('../utils/ingredientLibrary');
-      const normalizedNames = recipe.ingredients.map((i) => normalize(i.name));
-      const foodItems = await FoodItem.find({ normalizedName: { $in: normalizedNames } });
-      const matchedNames = new Set(foodItems.map((f) => f.normalizedName));
-      const anyUnmatched = recipe.ingredients.some((i) => !matchedNames.has(normalize(i.name)));
-      if (anyUnmatched) unresolved += 1;
-      if (before) updated += 1;
-      else created += 1;
-      continue;
+
+    // Resolve names the same way syncV1FromRecipe does, so the report is
+    // accurate in both dry-run and execute mode.
+    const normalizedNames = recipe.ingredients.map((i) => normalize(i.name));
+    const foodItems = await FoodItem.find({ normalizedName: { $in: normalizedNames } });
+    const matchedNames = new Set(foodItems.map((f) => f.normalizedName));
+    const unmatched = recipe.ingredients
+      .filter((i) => !matchedNames.has(normalize(i.name)))
+      .map((i) => i.name);
+
+    if (unmatched.length > 0) {
+      unresolved += 1;
+      unresolvedByRecipe.push({ recipe: recipe.name, ingredients: unmatched.join(', ') });
+      for (const n of unmatched) {
+        unresolvedNameCounts.set(n, (unresolvedNameCounts.get(n) || 0) + 1);
+      }
     }
-    const result = await syncV1FromRecipe(recipe);
-    if (!result) continue;
+
+    if (EXECUTE) {
+      const result = await syncV1FromRecipe(recipe);
+      if (!result) continue;
+    }
     if (before) updated += 1;
     else created += 1;
-    if (result.hasUnresolvedIngredients) unresolved += 1;
   }
 
   console.log(EXECUTE ? '\n=== EXECUTED ===' : '\n=== DRY RUN (pass --execute to write) ===');
   console.log(`RecipeVersion V1 created: ${created}`);
   console.log(`RecipeVersion V1 updated/refreshed: ${updated}`);
-  console.log(`Recipes with unresolved ingredients (needs FoodItem data): ${unresolved}`);
   console.log(`Recipes skipped (no ingredients array): ${skippedNoIngredients}`);
+  console.log(`Recipes with unresolved ingredients (needs FoodItem data): ${unresolved}`);
+
+  if (unresolvedNameCounts.size > 0) {
+    console.log('\n=== UNRESOLVED INGREDIENT NAMES (add a FoodItem, or fix the name on the recipe) ===');
+    console.table(
+      [...unresolvedNameCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ ingredient: name, recipesAffected: count }))
+    );
+    console.log('\n=== BY RECIPE ===');
+    console.table(unresolvedByRecipe);
+  }
 }
 
 async function runVerify() {
