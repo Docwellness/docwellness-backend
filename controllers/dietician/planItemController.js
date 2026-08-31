@@ -297,15 +297,20 @@ exports.getWeekPlanItems = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'week must be an integer between 1 and 4' });
     }
 
-    const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id, week });
-    const dayPlanById = new Map(dayPlans.map((dp) => [String(dp._id), dp]));
-    const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } });
-    const mealSlotById = new Map(mealSlots.map((ms) => [String(ms._id), ms]));
-    const planItems = await PlanItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } });
-    const supplementItems = await SupplementItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } });
+    // Every read here is display data joined into one response - lean()
+    // throughout: no doc method or setter is ever called on these, and for
+    // a full week (~4 day-groups x 7 slots x up to ~4 items, each with a
+    // RecipeVersion carrying embedded ingredients/steps/components)
+    // hydrating Mongoose documents + calling .toObject() on each was the
+    // dominant cost of this endpoint, which the wizard re-hits after every
+    // add / remove / swap.
+    const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id, week }).lean();
+    const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } }).lean();
+    const planItems = await PlanItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } }).lean();
+    const supplementItems = await SupplementItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } }).lean();
 
     const recipeVersionIds = planItems.map((item) => item.recipeVersionId);
-    const recipeVersions = await RecipeVersion.find({ _id: { $in: recipeVersionIds } });
+    const recipeVersions = await RecipeVersion.find({ _id: { $in: recipeVersionIds } }).lean();
 
     // Join each ingredient's foodItemName/nutritionPer100g in -
     // RecipeVersion.ingredients[] only stores foodItemId, and the Ingredient
@@ -339,8 +344,17 @@ exports.getWeekPlanItems = async (req, res, next) => {
     // resolvedGramsPerUnit) - a unit missing from the map means "still
     // unresolvable for this ingredient", exactly like resolvedGramsPerUnit
     // being null does today.
-    const foodItemIds = recipeVersions.flatMap((v) => v.ingredients.map((ing) => ing.foodItemId));
-    const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } }).select('name nutritionPer100g unitConversions density');
+    const foodItemIds = [
+      ...new Map(
+        recipeVersions
+          .flatMap((v) => (v.ingredients || []).map((ing) => ing.foodItemId))
+          .filter(Boolean)
+          .map((id) => [String(id), id])
+      ).values(),
+    ];
+    const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } })
+      .select('name nutritionPer100g unitConversions density')
+      .lean();
     const foodItemById = new Map(foodItems.map((f) => [String(f._id), f]));
     const gramsPerUnitMapFor = (foodItem) => {
       const map = {};
@@ -353,23 +367,25 @@ exports.getWeekPlanItems = async (req, res, next) => {
 
     const recipeVersionById = new Map(
       recipeVersions.map((v) => {
-        const plain = v.toObject();
-        plain.ingredients = plain.ingredients.map((ing) => {
-          const foodItem = foodItemById.get(String(ing.foodItemId));
-          return {
-            ...ing,
-            foodItemName: foodItem?.name || null,
-            nutritionPer100g: foodItem?.nutritionPer100g || null,
-            resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
-            gramsPerUnitByUnit: foodItem ? gramsPerUnitMapFor(foodItem) : {},
-          };
-        });
+        const plain = {
+          ...v,
+          ingredients: (v.ingredients || []).map((ing) => {
+            const foodItem = foodItemById.get(String(ing.foodItemId));
+            return {
+              ...ing,
+              foodItemName: foodItem?.name || null,
+              nutritionPer100g: foodItem?.nutritionPer100g || null,
+              resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
+              gramsPerUnitByUnit: foodItem ? gramsPerUnitMapFor(foodItem) : {},
+            };
+          }),
+        };
         return [String(v._id), plain];
       })
     );
 
     const supplementRecipeIds = supplementItems.map((s) => s.supplementRecipeId);
-    const supplementRecipes = await Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name');
+    const supplementRecipes = await Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name').lean();
     const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
 
     const days = DAY_GROUPS.map((dayGroup) => {
