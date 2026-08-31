@@ -3,6 +3,7 @@ const { FirstConsultation, User, Notification } = require('../../models');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getChatIO } = require('../../chat');
+const { sendPushToTokens } = require('../../utils/push');
 
 // Only the patient can set these, via the patient-facing submitConsent
 // endpoint - a dietician's save must never be able to write them, and any
@@ -133,31 +134,61 @@ exports.upsertFirstConsultation = async (req, res, next) => {
     await User.findByIdAndUpdate(patientId, { $set: statusUpdate });
     console.log('Updated patient status with firstConsultationId:', consultation._id.toString());
 
-    if (hadConsent) {
-      try {
-        const notif = await Notification.create({
-          userId: patientId,
-          title: 'Your first consultation was updated',
-          message:
-            'Your dietician updated your first consultation. Please review it again and re-submit your consent.',
-          type: 'consultation',
-          referenceId: consultation._id,
-          referenceModel: 'FirstConsultation',
+    // Whenever a dietician saves the first consultation, the patient has to
+    // (re-)review it and submit consent before a diet or exercise plan can
+    // be created for them - so nudge them every save, not only on the
+    // consent-invalidation case. A dietician can never write the consent
+    // answers, so a save never leaves the patient consented; `hadConsent`
+    // only picks the wording (first review vs. re-review). In-app
+    // Notification + socket push always; real FCM push is best-effort and
+    // never blocks or fails the save (same convention as activateDietPlan).
+    try {
+      const notif = await Notification.create({
+        userId: patientId,
+        title: hadConsent
+          ? 'Your first consultation was updated'
+          : 'Review your first consultation',
+        message: hadConsent
+          ? 'Your dietician updated your first consultation. Please review it again and re-submit your consent.'
+          : 'Your dietician has completed your first consultation. Please review it and provide your consent to continue.',
+        type: 'consultation',
+        referenceId: consultation._id,
+        referenceModel: 'FirstConsultation',
+      });
+
+      const ioRef = getChatIO();
+      if (ioRef) {
+        ioRef.to(`user:${patientId}`).emit('notification.new', {
+          id: notif._id,
+          title: notif.title,
+          message: notif.message,
+          type: notif.type,
+          referenceId: notif.referenceId?.toString(),
+          createdAt: notif.createdAt,
         });
-        const ioRef = getChatIO();
-        if (ioRef) {
-          ioRef.to(`user:${patientId}`).emit('notification.new', {
-            id: notif._id,
-            title: notif.title,
-            message: notif.message,
-            type: notif.type,
-            referenceId: notif.referenceId?.toString(),
-            createdAt: notif.createdAt,
-          });
-        }
-      } catch (notifError) {
-        console.error('Consent-invalidation notification error:', notifError);
       }
+
+      const patientDoc = await User.findById(patientId).select('deviceTokens').lean();
+      const tokens = (patientDoc?.deviceTokens || []).map((t) => t.token);
+      await sendPushToTokens(
+        tokens,
+        {
+          title: notif.title,
+          body: notif.message,
+          data: {
+            deepLink: 'docwellness://consultation',
+            firstConsultationId: String(consultation._id),
+          },
+        },
+        (deadToken) => {
+          User.updateOne(
+            { _id: patientId },
+            { $pull: { deviceTokens: { token: deadToken } } }
+          ).catch(() => {});
+        }
+      );
+    } catch (notifError) {
+      console.error('First-consultation review notification error:', notifError);
     }
 
     res.status(200).json({
