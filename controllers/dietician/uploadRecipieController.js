@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const Recipe = require('../../models/Recipe');
+const RecipeVersion = require('../../models/RecipeVersion');
 const GenerationLog = require('../../models/GenerationLog');
 const config = require('../../config/environment');
 const { generateRecipeWithAI } = require('../../utils/openaiClient');
@@ -1081,21 +1082,48 @@ exports.listRecipes = async (req, res, next) => {
         .lean(),
     ]);
 
+    // A recipe can only be added to / swapped into a diet plan once it has
+    // an Active V1 RecipeVersion with every ingredient resolved to a
+    // FoodItem - the exact gate planItemController.addPlanItem enforces.
+    // Surface it per row so the recipe picker can disable un-addable
+    // recipes with a reason, instead of letting the tap fail with a silent
+    // 404. One query for the whole page.
+    const v1s = await RecipeVersion.find({
+      parentRecipeId: { $in: recipes.map((r) => r._id) },
+      versionNumber: 1,
+      status: 'Active',
+    })
+      .select('parentRecipeId hasUnresolvedIngredients')
+      .lean();
+    const v1ByRecipe = new Map(v1s.map((v) => [String(v.parentRecipeId), v]));
+
     // Transform response
-    const data = recipes.map((recipe) => ({
-      id: recipe._id,
-      name: recipe.name || '',
-      image: recipe.image || null,
-      category: recipe.category || 'Other',
-      cuisine: recipe.cuisine || '',
-      servingTime: recipe.servingTime || '',
-      servings: recipe.servings || 1,
-      ingredientsCount: Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0,
-      calories: recipe.nutrition?.calories ?? null,
-      description: recipe.description || '',
-      createdAt: recipe.createdAt,
-      tags: Array.isArray(recipe.tags) ? recipe.tags : [],
-    }));
+    const data = recipes.map((recipe) => {
+      const v1 = v1ByRecipe.get(String(recipe._id));
+      const addable = Boolean(v1) && !v1.hasUnresolvedIngredients;
+      let unaddableReason = null;
+      if (!addable) {
+        unaddableReason = !v1
+          ? 'This recipe has no finished version yet.'
+          : 'This recipe has unresolved ingredients and can\'t be added yet.';
+      }
+      return {
+        id: recipe._id,
+        name: recipe.name || '',
+        image: recipe.image || null,
+        category: recipe.category || 'Other',
+        cuisine: recipe.cuisine || '',
+        servingTime: recipe.servingTime || '',
+        servings: recipe.servings || 1,
+        ingredientsCount: Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0,
+        calories: recipe.nutrition?.calories ?? null,
+        description: recipe.description || '',
+        createdAt: recipe.createdAt,
+        tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+        addable,
+        unaddableReason,
+      };
+    });
 
     return res.status(200).json({
       success: true,
