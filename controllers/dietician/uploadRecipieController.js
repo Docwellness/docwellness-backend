@@ -7,6 +7,7 @@ const { generateRecipeWithAI } = require('../../utils/openaiClient');
 const {
   validateRecipeConstraints,
   validateGeneratedIngredients,
+  inferAllergenCategoriesFromIngredientNames,
 } = require('../../utils/dietaryConstraintValidator');
 const {
   applyAiNoteQuantityOverrides,
@@ -1177,6 +1178,13 @@ exports.updateRecipe = async (req, res, next) => {
     if (Object.prototype.hasOwnProperty.call(body, 'ingredients')) {
       const { ingredients: safeIngredients } = sanitizeRecipeIngredients(body.ingredients);
       updates.ingredients = safeIngredients;
+      // Recipe.js's pre-save hook recomputes this from ingredient names on
+      // .save() - findOneAndUpdate skips it, so a nut recipe edited here
+      // would keep stale/empty allergens and slip past allergen-conflict
+      // checks. Recompute it inline.
+      updates.allergens = inferAllergenCategoriesFromIngredientNames(
+        safeIngredients.map((i) => i?.name)
+      );
     }
     if (Object.prototype.hasOwnProperty.call(body, 'components')) {
       const safeComponents = sanitizeRecipeComponents(body.components);
@@ -1230,6 +1238,24 @@ exports.updateRecipe = async (req, res, next) => {
         success: false,
         message: 'Recipe not found',
       });
+    }
+
+    // findOneAndUpdate bypasses Recipe.js's post-save hook, so the V1
+    // RecipeVersion (what diet-plan generation + the recipe picker's
+    // "addable" gate actually read) would go stale after an ingredient
+    // edit made here - its old ingredient list and stuck
+    // hasUnresolvedIngredients flag surviving unchanged. Re-run the same
+    // sync the hook does whenever the edit could have touched what the
+    // version mirrors. Awaited (unlike the fire-and-forget hook) so the
+    // picker reflects a freshly-fixed recipe on the very next fetch, but
+    // never allowed to fail the edit.
+    if (updates.ingredients || updates.components || updates.instructions || updates.nutrition) {
+      try {
+        const { syncV1FromRecipe } = require('../../services/recipeVersioningService');
+        await syncV1FromRecipe(recipe);
+      } catch (syncErr) {
+        console.error(`updateRecipe: V1 RecipeVersion re-sync failed (non-blocking) for ${recipe._id}:`, syncErr.message);
+      }
     }
 
     return res.status(200).json({
