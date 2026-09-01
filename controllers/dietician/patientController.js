@@ -181,7 +181,7 @@ exports.getPatientProfile = async (req, res, next) => {
     let dietPlanForSummary = null;
     if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
       dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
-        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
+        .select('_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
         .lean();
     }
     if (!dietPlanForSummary) {
@@ -190,7 +190,7 @@ exports.getPatientProfile = async (req, res, next) => {
         status: { $in: ['Finalized', 'Active'] },
       })
         .sort({ createdAt: -1 })
-        .select('_id status weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
+        .select('_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
         .lean();
     }
 
@@ -253,6 +253,12 @@ exports.getPatientProfile = async (req, res, next) => {
           // now - 'Finalized' means it needs Confirm & Activate,
           // 'Active' means it's already live.
           activeDietPlanStatus: dietPlanForSummary?.status || null,
+          // How far the build wizard got on a still-Draft plan
+          // (targets_set -> menu_generated -> portions_refined ->
+          // finalized) plus its data model - lets the dietician app resume
+          // the wizard at the right step instead of restarting from Targets.
+          activeDietPlanWorkflowStatus: dietPlanForSummary?.workflowStatus || null,
+          activeDietPlanDataModel: dietPlanForSummary?.dataModel || null,
           // Which renewal cycle dietPlanForSummary belongs to (1 = first
           // plan ever built for this patient, incremented per renewal) -
           // combines with weeklyDietPlans/generatedWeekNumbers' internal
