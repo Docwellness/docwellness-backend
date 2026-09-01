@@ -14,6 +14,7 @@ const {
   MealSlotPlan,
   PlanItem,
   SupplementItem,
+  ExercisePlan,
 } = require('../../models');
 const { sendPushToTokens } = require('../../utils/push');
 const config = require('../../config/environment');
@@ -1599,6 +1600,77 @@ exports.updateWeekScheduleDate = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: { dietPlanId: dietPlan._id, weekSchedule: dietPlan.weekSchedule },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Move the whole diet's start date - the single field in Basic
+ *          Information a dietician can edit (the patient sets it at request
+ *          time). Updates the DietPlanRequest, then cascades:
+ *          - the active DietPlan's weekSchedule (week 1 -> new date, weeks
+ *            2-4 follow, via cascadeWeekScheduleFrom) if a plan exists
+ *          - the patient's ExercisePlan startDate if one exists
+ *          Nothing is required to exist beyond the request itself - the
+ *          cascades are best-effort.
+ * @route   PATCH /api/dietician/patients/:patientId/diet-start-date
+ * @access  Private (Dietician)
+ */
+exports.updateDietStartDate = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const dieticianId = req.user._id;
+    const { startDate } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(400).json({ success: false, message: 'Invalid patient id' });
+    }
+
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    if (!parsedStartDate || Number.isNaN(parsedStartDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'startDate is required and must be a valid date' });
+    }
+    parsedStartDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsedStartDate < today) {
+      return res.status(400).json({ success: false, message: 'The diet start date cannot be in the past.' });
+    }
+
+    const request = await DietPlanRequest.findOne({ patient: patientId, dieticianId }).sort({ createdAt: -1 });
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'No diet plan request found for this patient' });
+    }
+    request.startDateForDiet = parsedStartDate;
+    await request.save();
+
+    // Cascade to the active/most-recent diet plan's week schedule, if one exists.
+    const dietPlan = await DietPlan.findOne({ patientId, dieticianId }).sort({ createdAt: -1 });
+    if (dietPlan) {
+      dietPlan.weekSchedule =
+        Array.isArray(dietPlan.weekSchedule) && dietPlan.weekSchedule.length > 0
+          ? cascadeWeekScheduleFrom(dietPlan.weekSchedule, 1, parsedStartDate)
+          : buildWeekSchedule(parsedStartDate);
+      await dietPlan.save();
+    }
+
+    // Cascade to the exercise plan's start date, if one exists.
+    const exercisePlan = await ExercisePlan.findOne({ patientId, dieticianId }).sort({ createdAt: -1 });
+    if (exercisePlan) {
+      exercisePlan.startDate = parsedStartDate;
+      await exercisePlan.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        startDateForDiet: request.startDateForDiet,
+        dietPlanUpdated: Boolean(dietPlan),
+        exercisePlanUpdated: Boolean(exercisePlan),
+      },
     });
   } catch (error) {
     next(error);
