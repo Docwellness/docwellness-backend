@@ -229,6 +229,30 @@ exports.generateMenu = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'weekNumbers must be integers between 1 and 4' });
     }
 
+    // "Regenerate Plan" with changed targets: the dietician re-picked a
+    // calorie / macro strategy on the Targets step, so persist it before
+    // building the new menu (generateMenu below reads the plan's own
+    // calorieBudget). A plain re-run sends neither and the plan's existing
+    // targets stand. Only the fields the schema knows are copied through.
+    const { calorieStrategy, macroStrategy } = req.body || {};
+    if (calorieStrategy && typeof calorieStrategy === 'object' && Number(calorieStrategy.calorieBudget) > 0) {
+      dietPlan.calorieStrategy = {
+        name: calorieStrategy.name,
+        calorieBudget: Number(calorieStrategy.calorieBudget),
+        calorieDeficit: calorieStrategy.calorieDeficit,
+        durationWeeks: calorieStrategy.durationWeeks,
+      };
+    }
+    if (macroStrategy && typeof macroStrategy === 'object') {
+      dietPlan.macroStrategy = {
+        name: macroStrategy.name,
+        fatPercent: macroStrategy.fatPercent,
+        carbsPercent: macroStrategy.carbsPercent,
+        proteinPercent: macroStrategy.proteinPercent,
+        fiberGrams: macroStrategy.fiberGrams,
+      };
+    }
+
     const allergies = dietPlan.targetProfile?.allergies || [];
     const totalCalories = dietPlan.calorieStrategy?.calorieBudget || null;
     const mealDistribution = dietPlan.targetProfile?.mealDistribution;
