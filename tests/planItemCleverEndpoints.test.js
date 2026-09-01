@@ -111,6 +111,15 @@ describe('POST .../generate-menu', () => {
     expect(res.body.data.unfillableSlots).toEqual([]);
     expect(res.body.data.workflowStatus).toBe('menu_generated');
 
+    // Returns the review week's plan items inline so the client skips a
+    // separate GET .../plan-items right after generation.
+    expect(res.body.data.weekPlanItems.week).toBe(1);
+    const mondayBreakfast = res.body.data.weekPlanItems.days
+      .find((d) => d.dayGroup === 'Monday')
+      .meals.find((m) => m.servingTime === 'Breakfast');
+    expect(mondayBreakfast.items.length).toBeGreaterThan(0);
+    expect(mondayBreakfast.items[0].recipeVersion).toBeTruthy();
+
     const saved = await DietPlan.findById(dietPlan._id);
     expect(saved.workflowStatus).toBe('menu_generated');
     const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id });

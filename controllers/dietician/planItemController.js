@@ -68,6 +68,151 @@ async function loadOwnedMealSlot(dietPlan, mealSlotId) {
 }
 
 /**
+ * The Step 2/3/5 read model for ONE week: every DayPlan -> MealSlotPlan ->
+ * PlanItem / SupplementItem, with each item's RecipeVersion (and every
+ * ingredient's FoodItem name + per-unit gram resolution) joined in.
+ *
+ * Extracted so generate-menu can return this in its own response - the
+ * wizard needs it to render the Generate review screen, and a separate
+ * GET .../plan-items right after generation was a redundant round-trip
+ * (the heaviest one on that screen). Kept lean() throughout: display data
+ * only, no doc method ever called.
+ */
+async function buildWeekPlanItemsPayload(dietPlan, week) {
+  // Fan out each dependency level in parallel rather than awaiting the
+  // whole chain serially - planItems/supplementItems don't depend on each
+  // other, and neither do recipeVersions/supplementRecipes.
+  const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id, week }).lean();
+  const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } }).lean();
+  const mealSlotIds = mealSlots.map((ms) => ms._id);
+  const [planItems, supplementItems] = await Promise.all([
+    PlanItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
+    SupplementItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
+  ]);
+
+  const recipeVersionIds = planItems.map((item) => item.recipeVersionId);
+  const supplementRecipeIds = supplementItems.map((s) => s.supplementRecipeId);
+  const [recipeVersions, supplementRecipes] = await Promise.all([
+    RecipeVersion.find({ _id: { $in: recipeVersionIds } }).lean(),
+    Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name').lean(),
+  ]);
+  const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
+
+  // Join each ingredient's foodItemName/nutritionPer100g in -
+  // RecipeVersion.ingredients[] only stores foodItemId, and the Ingredient
+  // Editor UI needs a real name plus per-100g nutrition for its client-side
+  // live calorie preview. resolvedGramsPerUnit / gramsPerUnitByUnit are the
+  // grams-equivalent of one unit, resolved server-side the same way
+  // createCustomVersion does (recipeVersioningService.js), so the client
+  // can show a live figure for any unit, not just 'g'. Null / absent when
+  // genuinely unresolvable - the client treats that as "-", never a guess.
+  const foodItemIds = [
+    ...new Map(
+      recipeVersions
+        .flatMap((v) => (v.ingredients || []).map((ing) => ing.foodItemId))
+        .filter(Boolean)
+        .map((id) => [String(id), id])
+    ).values(),
+  ];
+  const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } })
+    .select('name nutritionPer100g unitConversions density')
+    .lean();
+  const foodItemById = new Map(foodItems.map((f) => [String(f._id), f]));
+  const gramsPerUnitMapFor = (foodItem) => {
+    const map = {};
+    for (const unit of COMPONENT_UNITS) {
+      const grams = resolveGramsForIngredient(foodItem, 1, unit);
+      if (grams !== null) map[unit] = grams;
+    }
+    return map;
+  };
+
+  const recipeVersionById = new Map(
+    recipeVersions.map((v) => {
+      const plain = {
+        ...v,
+        ingredients: (v.ingredients || []).map((ing) => {
+          const foodItem = foodItemById.get(String(ing.foodItemId));
+          return {
+            ...ing,
+            foodItemName: foodItem?.name || null,
+            nutritionPer100g: foodItem?.nutritionPer100g || null,
+            resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
+            gramsPerUnitByUnit: foodItem ? gramsPerUnitMapFor(foodItem) : {},
+          };
+        }),
+      };
+      return [String(v._id), plain];
+    })
+  );
+
+  // Index the flat result sets once instead of re-scanning them inside the
+  // 4-day x 7-slot render loop below.
+  const dayPlanByGroup = new Map(dayPlans.map((dp) => [dp.dayGroup, dp]));
+  const mealSlotByDayAndTime = new Map(
+    mealSlots.map((ms) => [`${String(ms.dayPlanId)}|${ms.servingTime}`, ms])
+  );
+  const planItemsBySlot = new Map();
+  for (const item of planItems) {
+    const key = String(item.mealSlotId);
+    if (!planItemsBySlot.has(key)) planItemsBySlot.set(key, []);
+    planItemsBySlot.get(key).push(item);
+  }
+  const supplementItemsBySlot = new Map();
+  for (const s of supplementItems) {
+    const key = String(s.mealSlotId);
+    if (!supplementItemsBySlot.has(key)) supplementItemsBySlot.set(key, []);
+    supplementItemsBySlot.get(key).push(s);
+  }
+
+  const days = DAY_GROUPS.map((dayGroup) => {
+    const dayPlan = dayPlanByGroup.get(dayGroup);
+    if (!dayPlan) return { dayGroup, meals: [] };
+
+    const meals = REQUIRED_SERVING_TIMES.map((servingTime) => {
+      const mealSlot = mealSlotByDayAndTime.get(`${String(dayPlan._id)}|${servingTime}`);
+      if (!mealSlot) return { servingTime, items: [], supplements: [] };
+
+      const items = (planItemsBySlot.get(String(mealSlot._id)) || []).map((item) => ({
+        _id: item._id,
+        recipeVersionId: item.recipeVersionId,
+        recipeVersion: recipeVersionById.get(String(item.recipeVersionId)) || null,
+        locked: item.locked,
+        pinned: item.pinned,
+        calculatedNutrition: item.calculatedNutrition,
+        isLinkedComponent: item.isLinkedComponent,
+        parentRecipeId: item.parentRecipeId,
+      }));
+
+      const supplements = (supplementItemsBySlot.get(String(mealSlot._id)) || []).map((s) => ({
+        _id: s._id,
+        supplementRecipeId: s.supplementRecipeId,
+        supplementName: supplementRecipeById.get(String(s.supplementRecipeId))?.name || null,
+        dosage: s.dosage,
+        instructions: s.instructions,
+        timingAnchor: s.timingAnchor,
+        locked: s.locked,
+        excludeFromCalories: s.excludeFromCalories,
+      }));
+
+      return { servingTime, mealSlotId: mealSlot._id, items, supplements };
+    });
+
+    return { dayGroup, dayPlanId: dayPlan._id, meals };
+  });
+
+  return {
+    week,
+    workflowStatus: dietPlan.workflowStatus,
+    // The plan's own Step-1 calorie budget - so Refine's auto-balance and
+    // Finalize's +/-5% gate have a target even when the wizard is resumed
+    // straight to a later step (Targets never ran that session).
+    calorieTarget: dietPlan.calorieStrategy?.calorieBudget ?? null,
+    days,
+  };
+}
+
+/**
  * @desc    Step 2: fill every slot for the given week(s) with a PlanItem
  *          pointing at a recipe's V1 RecipeVersion - no scaling, see
  *          services/menuGenerationService.js's header.
@@ -102,9 +247,20 @@ exports.generateMenu = async (req, res, next) => {
     dietPlan.workflowStatus = 'menu_generated';
     await dietPlan.save();
 
+    // Return the review week's plan items in this same response - the
+    // Generate review screen renders straight from it, instead of firing a
+    // second (heavy) GET .../plan-items round-trip right after this one.
+    const reviewWeek = weekNumbers[0];
+    const weekPlanItems = await buildWeekPlanItemsPayload(dietPlan, reviewWeek);
+
     return res.status(200).json({
       success: true,
-      data: { createdPlanItemCount: createdPlanItemIds.length, unfillableSlots, workflowStatus: dietPlan.workflowStatus },
+      data: {
+        createdPlanItemCount: createdPlanItemIds.length,
+        unfillableSlots,
+        workflowStatus: dietPlan.workflowStatus,
+        weekPlanItems,
+      },
     });
   } catch (error) {
     next(error);
@@ -297,173 +453,8 @@ exports.getWeekPlanItems = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'week must be an integer between 1 and 4' });
     }
 
-    // Every read here is display data joined into one response - lean()
-    // throughout: no doc method or setter is ever called on these, and for
-    // a full week (~4 day-groups x 7 slots x up to ~4 items, each with a
-    // RecipeVersion carrying embedded ingredients/steps/components)
-    // hydrating Mongoose documents + calling .toObject() on each was the
-    // dominant cost of this endpoint, which the wizard re-hits after every
-    // add / remove / swap.
-    // Fan out each dependency level in parallel rather than awaiting the
-    // whole 7-query chain serially - planItems/supplementItems don't depend
-    // on each other, and neither do recipeVersions/supplementRecipes.
-    const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id, week }).lean();
-    const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } }).lean();
-    const mealSlotIds = mealSlots.map((ms) => ms._id);
-    const [planItems, supplementItems] = await Promise.all([
-      PlanItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
-      SupplementItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
-    ]);
-
-    const recipeVersionIds = planItems.map((item) => item.recipeVersionId);
-    const supplementRecipeIds = supplementItems.map((s) => s.supplementRecipeId);
-    const [recipeVersions, supplementRecipes] = await Promise.all([
-      RecipeVersion.find({ _id: { $in: recipeVersionIds } }).lean(),
-      Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name').lean(),
-    ]);
-    const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
-
-    // Join each ingredient's foodItemName/nutritionPer100g in -
-    // RecipeVersion.ingredients[] only stores foodItemId, and the Ingredient
-    // Editor UI needs a real name to show/edit plus per-100g nutrition for
-    // its client-side live "Current: X Cal" recompute (the authoritative
-    // recompute still happens server-side in createCustomVersion at Save
-    // time - this is display-only, matching services/recipeVersioningService.js's
-    // own computeNutritionFromIngredients math so the two never diverge).
-    //
-    // resolvedGramsPerUnit is the grams-equivalent of exactly ONE unit of
-    // this ingredient's OWN unit (e.g. 40 for a 'piece' of Chapati, 1.2 for
-    // a 'nos' Almond), computed the same way createCustomVersion resolves
-    // nutrition (services/recipeVersioningService.js's resolveGramsForIngredient) -
-    // still never the raw unitConversions/density map itself. Without this,
-    // the client could only ever show a live calorie figure for a 'g'-unit
-    // ingredient (see ingredient_editor_sheet.dart's own doc comment on
-    // that former limitation) - every other unit showed "-" regardless of
-    // how complete the FoodItem's own nutrition data actually was. Null
-    // when unresolvable (no FoodItem, or no known conversion for this
-    // unit) - the client already treats null as "-", never a guessed number.
-    //
-    // gramsPerUnitByUnit is the SAME figure precomputed for every unit this
-    // ingredient COULD be switched to (not just its current one) - lets the
-    // Ingredient Editor recompute a live calorie figure the instant a
-    // dietician changes an ingredient's unit, instead of the previous
-    // "switching a unit invalidates the calorie figure to '-' until the
-    // version is re-fetched after Save" behavior (reported as "Lemon" only
-    // when switched to 'tsp' - the client had no way to resolve a unit it
-    // hadn't been told about). Only ever includes units that actually
-    // resolve for this FoodItem (never a guessed number, same as
-    // resolvedGramsPerUnit) - a unit missing from the map means "still
-    // unresolvable for this ingredient", exactly like resolvedGramsPerUnit
-    // being null does today.
-    const foodItemIds = [
-      ...new Map(
-        recipeVersions
-          .flatMap((v) => (v.ingredients || []).map((ing) => ing.foodItemId))
-          .filter(Boolean)
-          .map((id) => [String(id), id])
-      ).values(),
-    ];
-    const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } })
-      .select('name nutritionPer100g unitConversions density')
-      .lean();
-    const foodItemById = new Map(foodItems.map((f) => [String(f._id), f]));
-    const gramsPerUnitMapFor = (foodItem) => {
-      const map = {};
-      for (const unit of COMPONENT_UNITS) {
-        const grams = resolveGramsForIngredient(foodItem, 1, unit);
-        if (grams !== null) map[unit] = grams;
-      }
-      return map;
-    };
-
-    const recipeVersionById = new Map(
-      recipeVersions.map((v) => {
-        const plain = {
-          ...v,
-          ingredients: (v.ingredients || []).map((ing) => {
-            const foodItem = foodItemById.get(String(ing.foodItemId));
-            return {
-              ...ing,
-              foodItemName: foodItem?.name || null,
-              nutritionPer100g: foodItem?.nutritionPer100g || null,
-              resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,
-              gramsPerUnitByUnit: foodItem ? gramsPerUnitMapFor(foodItem) : {},
-            };
-          }),
-        };
-        return [String(v._id), plain];
-      })
-    );
-
-    // Index the flat result sets once instead of re-scanning them inside the
-    // 4-day x 7-slot render loop below.
-    const dayPlanByGroup = new Map(dayPlans.map((dp) => [dp.dayGroup, dp]));
-    const mealSlotByDayAndTime = new Map(
-      mealSlots.map((ms) => [`${String(ms.dayPlanId)}|${ms.servingTime}`, ms])
-    );
-    const planItemsBySlot = new Map();
-    for (const item of planItems) {
-      const key = String(item.mealSlotId);
-      if (!planItemsBySlot.has(key)) planItemsBySlot.set(key, []);
-      planItemsBySlot.get(key).push(item);
-    }
-    const supplementItemsBySlot = new Map();
-    for (const s of supplementItems) {
-      const key = String(s.mealSlotId);
-      if (!supplementItemsBySlot.has(key)) supplementItemsBySlot.set(key, []);
-      supplementItemsBySlot.get(key).push(s);
-    }
-
-    const days = DAY_GROUPS.map((dayGroup) => {
-      const dayPlan = dayPlanByGroup.get(dayGroup);
-      if (!dayPlan) return { dayGroup, meals: [] };
-
-      const meals = REQUIRED_SERVING_TIMES.map((servingTime) => {
-        const mealSlot = mealSlotByDayAndTime.get(`${String(dayPlan._id)}|${servingTime}`);
-        if (!mealSlot) return { servingTime, items: [], supplements: [] };
-
-        const items = (planItemsBySlot.get(String(mealSlot._id)) || [])
-          .map((item) => ({
-            _id: item._id,
-            recipeVersionId: item.recipeVersionId,
-            recipeVersion: recipeVersionById.get(String(item.recipeVersionId)) || null,
-            locked: item.locked,
-            pinned: item.pinned,
-            calculatedNutrition: item.calculatedNutrition,
-            isLinkedComponent: item.isLinkedComponent,
-            parentRecipeId: item.parentRecipeId,
-          }));
-
-        const supplements = (supplementItemsBySlot.get(String(mealSlot._id)) || [])
-          .map((s) => ({
-            _id: s._id,
-            supplementRecipeId: s.supplementRecipeId,
-            supplementName: supplementRecipeById.get(String(s.supplementRecipeId))?.name || null,
-            dosage: s.dosage,
-            instructions: s.instructions,
-            timingAnchor: s.timingAnchor,
-            locked: s.locked,
-            excludeFromCalories: s.excludeFromCalories,
-          }));
-
-        return { servingTime, mealSlotId: mealSlot._id, items, supplements };
-      });
-
-      return { dayGroup, dayPlanId: dayPlan._id, meals };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        week,
-        workflowStatus: dietPlan.workflowStatus,
-        // The plan's own Step-1 calorie budget - so Refine's auto-balance
-        // and Finalize's +/-5% gate still have a target when the wizard is
-        // resumed straight to a later step (Targets never ran this session).
-        calorieTarget: dietPlan.calorieStrategy?.calorieBudget ?? null,
-        days,
-      },
-    });
+    const data = await buildWeekPlanItemsPayload(dietPlan, week);
+    return res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
   }
