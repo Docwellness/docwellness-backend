@@ -452,7 +452,18 @@ exports.getWeekPlanItems = async (req, res, next) => {
       return { dayGroup, dayPlanId: dayPlan._id, meals };
     });
 
-    return res.status(200).json({ success: true, data: { week, workflowStatus: dietPlan.workflowStatus, days } });
+    return res.status(200).json({
+      success: true,
+      data: {
+        week,
+        workflowStatus: dietPlan.workflowStatus,
+        // The plan's own Step-1 calorie budget - so Refine's auto-balance
+        // and Finalize's +/-5% gate still have a target when the wizard is
+        // resumed straight to a later step (Targets never ran this session).
+        calorieTarget: dietPlan.calorieStrategy?.calorieBudget ?? null,
+        days,
+      },
+    });
   } catch (error) {
     next(error);
   }
