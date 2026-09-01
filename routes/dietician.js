@@ -255,6 +255,12 @@ router.patch(
   dietPlanController.updateWeekScheduleDate
 );
 
+router.patch(
+  '/patients/:patientId/diet-start-date',
+  dieticianOnlyMiddleware,
+  dietPlanController.updateDietStartDate
+);
+
 router.get(
   '/patients/:patientId/diet-plans/:dietPlanId/details',
   dieticianOnlyMiddleware,
