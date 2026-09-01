@@ -1036,10 +1036,12 @@ exports.listRecipes = async (req, res, next) => {
     const dieticianId = req.user._id;
     const { category, topCategory, servingTime, tag, page = '1', limit = '20' } = req.query || {};
 
-    // Pagination
+    // Pagination. The cap is 500 (not 100) so the dietician app can warm its
+    // whole recipe catalog for the diet-plan wizard's Add / Swap pickers in
+    // a single request instead of one GET per meal slot.
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitParsed = parseInt(limit, 10);
-    const limitNum = Math.min(Math.max(Number.isNaN(limitParsed) ? 20 : limitParsed, 1), 100);
+    const limitNum = Math.min(Math.max(Number.isNaN(limitParsed) ? 20 : limitParsed, 1), 500);
     const skip = (pageNum - 1) * limitNum;
 
     // Build filter
