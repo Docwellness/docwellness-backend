@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const {
   User,
   DietPlan,
+  DayPlan,
   DietPlanRequest,
   FirstConsultation,
   ManualPaymentProof,
@@ -194,7 +195,7 @@ exports.getPatientProfile = async (req, res, next) => {
         .lean();
     }
 
-    const weeklyDietPlans = Array.isArray(dietPlanForSummary?.weeksSummary)
+    let weeklyDietPlans = Array.isArray(dietPlanForSummary?.weeksSummary)
       ? dietPlanForSummary.weeksSummary.map((weekEntry) => ({
         week: weekEntry.week,
         totalCalories: weekEntry.totalCalories,
@@ -214,6 +215,25 @@ exports.getPatientProfile = async (req, res, next) => {
           : [];
       } catch (_) {
         generatedWeekNumbers = [];
+      }
+    }
+
+    // A v4.0 plan-item plan stores nothing in generatedPlan / weeksSummary -
+    // its weeks live as DayPlan documents. Derive the same two signals from
+    // those so the profile's Weekly Diet Plans cards unlock for a plan-item
+    // plan the same way they do for a days-array one: every generated week
+    // is tappable, and once the plan is Finalized/Active every generated
+    // week also counts as finalized (a plan-item plan finalizes as a whole,
+    // not week by week).
+    if (dietPlanForSummary?._id && dietPlanForSummary.dataModel === 'plan-item') {
+      const planItemWeeks = (await DayPlan.distinct('week', { dietPlanId: dietPlanForSummary._id }))
+        .filter((w) => Number.isInteger(w) && w >= 1 && w <= 4)
+        .sort((a, b) => a - b);
+      generatedWeekNumbers = planItemWeeks;
+      const isPlanFinalized = ['Finalized', 'Active', 'Completed'].includes(dietPlanForSummary.status);
+      if (isPlanFinalized) {
+        const perWeekCalories = dietPlanForSummary.calorieStrategy?.calorieBudget || 0;
+        weeklyDietPlans = planItemWeeks.map((week) => ({ week, totalCalories: perWeekCalories }));
       }
     }
 
