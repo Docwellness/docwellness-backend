@@ -304,13 +304,24 @@ exports.getWeekPlanItems = async (req, res, next) => {
     // hydrating Mongoose documents + calling .toObject() on each was the
     // dominant cost of this endpoint, which the wizard re-hits after every
     // add / remove / swap.
+    // Fan out each dependency level in parallel rather than awaiting the
+    // whole 7-query chain serially - planItems/supplementItems don't depend
+    // on each other, and neither do recipeVersions/supplementRecipes.
     const dayPlans = await DayPlan.find({ dietPlanId: dietPlan._id, week }).lean();
     const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } }).lean();
-    const planItems = await PlanItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } }).lean();
-    const supplementItems = await SupplementItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } }).lean();
+    const mealSlotIds = mealSlots.map((ms) => ms._id);
+    const [planItems, supplementItems] = await Promise.all([
+      PlanItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
+      SupplementItem.find({ mealSlotId: { $in: mealSlotIds } }).lean(),
+    ]);
 
     const recipeVersionIds = planItems.map((item) => item.recipeVersionId);
-    const recipeVersions = await RecipeVersion.find({ _id: { $in: recipeVersionIds } }).lean();
+    const supplementRecipeIds = supplementItems.map((s) => s.supplementRecipeId);
+    const [recipeVersions, supplementRecipes] = await Promise.all([
+      RecipeVersion.find({ _id: { $in: recipeVersionIds } }).lean(),
+      Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name').lean(),
+    ]);
+    const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
 
     // Join each ingredient's foodItemName/nutritionPer100g in -
     // RecipeVersion.ingredients[] only stores foodItemId, and the Ingredient
@@ -384,20 +395,34 @@ exports.getWeekPlanItems = async (req, res, next) => {
       })
     );
 
-    const supplementRecipeIds = supplementItems.map((s) => s.supplementRecipeId);
-    const supplementRecipes = await Recipe.find({ _id: { $in: supplementRecipeIds } }).select('name').lean();
-    const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
+    // Index the flat result sets once instead of re-scanning them inside the
+    // 4-day x 7-slot render loop below.
+    const dayPlanByGroup = new Map(dayPlans.map((dp) => [dp.dayGroup, dp]));
+    const mealSlotByDayAndTime = new Map(
+      mealSlots.map((ms) => [`${String(ms.dayPlanId)}|${ms.servingTime}`, ms])
+    );
+    const planItemsBySlot = new Map();
+    for (const item of planItems) {
+      const key = String(item.mealSlotId);
+      if (!planItemsBySlot.has(key)) planItemsBySlot.set(key, []);
+      planItemsBySlot.get(key).push(item);
+    }
+    const supplementItemsBySlot = new Map();
+    for (const s of supplementItems) {
+      const key = String(s.mealSlotId);
+      if (!supplementItemsBySlot.has(key)) supplementItemsBySlot.set(key, []);
+      supplementItemsBySlot.get(key).push(s);
+    }
 
     const days = DAY_GROUPS.map((dayGroup) => {
-      const dayPlan = dayPlans.find((dp) => dp.dayGroup === dayGroup);
+      const dayPlan = dayPlanByGroup.get(dayGroup);
       if (!dayPlan) return { dayGroup, meals: [] };
 
       const meals = REQUIRED_SERVING_TIMES.map((servingTime) => {
-        const mealSlot = mealSlots.find((ms) => String(ms.dayPlanId) === String(dayPlan._id) && ms.servingTime === servingTime);
+        const mealSlot = mealSlotByDayAndTime.get(`${String(dayPlan._id)}|${servingTime}`);
         if (!mealSlot) return { servingTime, items: [], supplements: [] };
 
-        const items = planItems
-          .filter((item) => String(item.mealSlotId) === String(mealSlot._id))
+        const items = (planItemsBySlot.get(String(mealSlot._id)) || [])
           .map((item) => ({
             _id: item._id,
             recipeVersionId: item.recipeVersionId,
@@ -409,8 +434,7 @@ exports.getWeekPlanItems = async (req, res, next) => {
             parentRecipeId: item.parentRecipeId,
           }));
 
-        const supplements = supplementItems
-          .filter((s) => String(s.mealSlotId) === String(mealSlot._id))
+        const supplements = (supplementItemsBySlot.get(String(mealSlot._id)) || [])
           .map((s) => ({
             _id: s._id,
             supplementRecipeId: s.supplementRecipeId,
