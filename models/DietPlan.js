@@ -344,7 +344,11 @@ const dietPlanSchema = new mongoose.Schema(
 // controllers (controllers/patient/dietController.js,
 // controllers/dietician/dietPlanController.js).
 dietPlanSchema.index({ patientId: 1, status: 1 });
-dietPlanSchema.index({ dieticianId: 1, status: 1 });
+// Cross-app performance optimization, Phase 2: the closing-clients dashboard
+// tile filters find({ dieticianId, status: 'Active', endDate: { $lte, $gte } }).
+// This supersedes the former { dieticianId, status } index (a prefix of this
+// one), which still serves getDashboardStats' plain find({ dieticianId, status }).
+dietPlanSchema.index({ dieticianId: 1, status: 1, endDate: 1 });
 // Covers the renewal-cycle lookup: findOne({patientId, request}).sort({cycleNumber:-1}).
 dietPlanSchema.index({ patientId: 1, request: 1, cycleNumber: -1 });
 

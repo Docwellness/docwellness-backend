@@ -115,4 +115,24 @@ const dietPlanRequestSchema = new mongoose.Schema(
   }
 );
 
+// Cross-app performance optimization, Phase 2 (backend query performance).
+// This collection had NO indexes despite being read on nearly every
+// dietician request. Query shapes covered:
+//  - listPatientsForDietician: find/aggregate by dieticianId sorted
+//    createdAt desc, with completedAt + hasActivePlan tab filters
+//  - getDashboardStats / getPerformanceTrends: find({ dieticianId }) and
+//    find({ dieticianId, createdAt: { $gte } })
+//  - getPatientProfile + patient-side lists (getRequestStatus / listRequests):
+//    findOne/find({ patient }).sort({ createdAt })
+//  - assertDieticianOwnsPatient: exists({ patient, dieticianId }) - runs on
+//    every dietician patient action (patient is the selective prefix; the
+//    handful of requests per patient makes the dieticianId residual filter free)
+//  - renewalReminderController sweep: find({ subscriptionExpiresAt,
+//    renewalReminderSentAt, hasActivePlan })
+// Run `node scripts/maintenance/ensure-indexes.js` after deploy.
+dietPlanRequestSchema.index({ dieticianId: 1, createdAt: -1 });
+dietPlanRequestSchema.index({ dieticianId: 1, completedAt: 1, hasActivePlan: 1 });
+dietPlanRequestSchema.index({ patient: 1, createdAt: -1 });
+dietPlanRequestSchema.index({ subscriptionExpiresAt: 1, renewalReminderSentAt: 1, hasActivePlan: 1 });
+
 module.exports = mongoose.model('DietPlanRequest', dietPlanRequestSchema);

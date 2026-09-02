@@ -77,11 +77,13 @@ const manualPaymentProofSchema = new mongoose.Schema(
 
 // AI_EXECUTION_PLAN.md Phase 3, P3-01 - patient+status is the actual query
 // shape used by getManualPaymentProofs (dietician's proof-review list,
-// defaults to status:'Submitted'); request is queried alone (the
-// pay-remaining-balance aggregation in patientController.js's
-// getPatientProfile, dashboardController's revenue aggregations).
+// defaults to status:'Submitted').
 manualPaymentProofSchema.index({ patient: 1, status: 1 });
-manualPaymentProofSchema.index({ request: 1 });
+// Cross-app performance optimization, Phase 2: dashboardController's revenue
+// aggregations match { request: { $in }, status: 'Approved' }; getPatientProfile
+// matches { request } alone (served by this index's prefix). Supersedes the
+// former { request } single-field index.
+manualPaymentProofSchema.index({ request: 1, status: 1 });
 
 manualPaymentProofSchema.pre('save', function () {
   if (typeof this.amountReceived === 'number' && typeof this.amountPending === 'number') {

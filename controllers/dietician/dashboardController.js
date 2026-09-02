@@ -17,16 +17,66 @@ exports.getDashboardStats = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
 
-    // 1. Messages Received — number of patients with unread messages
-    //    Query both ConversationV1 (active system) and legacy Conversation collection.
+    // --- Date boundaries (computed once) ---
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const yesterdayStart = new Date();
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    yesterdayStart.setHours(0, 0, 0, 0);
+    const yesterdayEnd = new Date();
+    yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+
+    const nowTs = new Date();
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    const todayFlag = new Date();
+    todayFlag.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    // --- Tier 1: every read keyed only on dieticianId, issued in parallel.
+    // (Cross-app performance optimization, Phase 2: was ~5 sequential round
+    // trips; the NeedAttentionLog 30-day history read is independent of the
+    // flagged-patient set and moves up here too.)
+    const [
+      conversationsV1,
+      legacyConversations,
+      dieticianRequests,
+      closingPlans,
+      activePlans,
+      historyLogs,
+    ] = await Promise.all([
+      ConversationV1.find({ 'participants.userId': dieticianId }).lean(),
+      Conversation.find({ 'participants.userId': dieticianId })
+        .populate('participants.userId', '_id')
+        .lean(),
+      DietPlanRequest.find({ dieticianId }).select('_id patient').lean(),
+      DietPlan.find({
+        dieticianId,
+        status: 'Active',
+        endDate: { $lte: sevenDaysFromNow, $gte: nowTs },
+      })
+        .select('patientId')
+        .lean(),
+      DietPlan.find({ dieticianId, status: 'Active' })
+        .select('patientId totalCalories calorieStrategy')
+        .lean(),
+      NeedAttentionLog.find({
+        dieticianId,
+        flagDate: { $gte: thirtyDaysAgo, $lt: todayFlag },
+      })
+        .sort({ flagDate: -1 })
+        .lean(),
+    ]);
+
+    // 1. Messages Received — number of patients with unread messages.
     //    V1 unreadCount takes priority when the same patient exists in both.
-
-    // V1 conversations
-    const conversationsV1 = await ConversationV1.find({
-      'participants.userId': dieticianId,
-    }).lean();
-
-    // Build V1 unread map: otherUserId -> unreadCount
     const v1UnreadByUser = {};
     conversationsV1.forEach((conv) => {
       const me = conv.participants.find((p) => p.userId.toString() === dieticianId.toString());
@@ -35,13 +85,6 @@ exports.getDashboardStats = async (req, res, next) => {
         v1UnreadByUser[other.userId.toString()] = me.unreadCount || 0;
       }
     });
-
-    // Legacy conversations
-    const legacyConversations = await Conversation.find({
-      'participants.userId': dieticianId,
-    })
-      .populate('participants.userId', '_id')
-      .lean();
 
     // Merge: track unique patients with unread messages
     const unreadPatientSet = new Set();
@@ -82,80 +125,15 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    let messagesReceived = messagesReceivedPatientIds.length;
+    const messagesReceived = messagesReceivedPatientIds.length;
 
-    // 2. Review Logged Data — patients who logged meals today
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    // Get all patient IDs belonging to this dietician
-    const dieticianRequests = await DietPlanRequest.find({
-      dieticianId,
-    })
-      .select('_id patient')
-      .lean();
-
+    // Id sets derived from Tier 1
     const patientIds = dieticianRequests.map((r) => r.patient);
     const requestIds = dieticianRequests.map((r) => r._id);
-
-    const reviewLoggedDataCount = await MealLog.distinct('patientId', {
-      patientId: { $in: patientIds },
-      date: { $gte: todayStart, $lte: todayEnd },
-    });
-    const reviewLoggedData = reviewLoggedDataCount.length;
-    const reviewLoggedPatientIds = reviewLoggedDataCount;
-
-    // Revenue = sum of amount actually received for approved manual proofs
-    let totalRevenue = 0;
-    if (requestIds.length > 0) {
-      const revenueAgg = await ManualPaymentProof.aggregate([
-        {
-          $match: {
-            request: { $in: requestIds },
-            status: 'Approved',
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalRevenue: { $sum: '$amountReceived' },
-          },
-        },
-      ]);
-
-      totalRevenue = revenueAgg[0]?.totalRevenue || 0;
-    }
-
-    // 3. Clients close to end of membership — active diet plans ending within 7 days
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
-    const closingPlans = await DietPlan.find({
-      dieticianId,
-      status: 'Active',
-      endDate: { $lte: sevenDaysFromNow, $gte: new Date() },
-    }).select('patientId').lean();
     const closingClients = closingPlans.length;
     const closingPatientIds = closingPlans.map((p) => p.patientId);
 
-    // 4. Did extremely well — patients who logged > 80% of planned calories yesterday
-    const yesterdayStart = new Date();
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    yesterdayStart.setHours(0, 0, 0, 0);
-    const yesterdayEnd = new Date();
-    yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
-    yesterdayEnd.setHours(23, 59, 59, 999);
-
-    // Get active plans with calorie budgets
-    const activePlans = await DietPlan.find({
-      dieticianId,
-      status: 'Active',
-    })
-      .select('patientId totalCalories calorieStrategy')
-      .lean();
-
+    // Active-plan calorie budgets (patientId -> budget)
     const activePlanMap = {};
     activePlans.forEach((plan) => {
       const budget = plan.calorieStrategy?.calorieBudget || plan.totalCalories || 0;
@@ -163,22 +141,43 @@ exports.getDashboardStats = async (req, res, next) => {
         activePlanMap[plan.patientId.toString()] = budget;
       }
     });
-
     const activePatientIds = Object.keys(activePlanMap);
 
+    // --- Tier 2: reads keyed on the Tier 1 id sets, issued in parallel. ---
+    const [reviewLoggedPatientIds, revenueAgg, yesterdayLogs] = await Promise.all([
+      // 2. Review Logged Data — this dietician's patients who logged a meal today
+      MealLog.distinct('patientId', {
+        patientId: { $in: patientIds },
+        date: { $gte: todayStart, $lte: todayEnd },
+      }),
+      // Revenue = sum of amount actually received for approved manual proofs
+      requestIds.length > 0
+        ? ManualPaymentProof.aggregate([
+            { $match: { request: { $in: requestIds }, status: 'Approved' } },
+            { $group: { _id: null, totalRevenue: { $sum: '$amountReceived' } } },
+          ])
+        : Promise.resolve([]),
+      // 4/5. Yesterday's meal logs for active-plan patients (calorie ratio buckets)
+      activePatientIds.length > 0
+        ? MealLog.find({
+            patientId: { $in: activePatientIds },
+            date: { $gte: yesterdayStart, $lte: yesterdayEnd },
+          })
+            .select('patientId totalCalories')
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const reviewLoggedData = reviewLoggedPatientIds.length;
+    const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
+
+    // 4. Did extremely well / 5. Need attention — vs planned calories yesterday
     let didExtremelyWell = 0;
     let needAttention = 0;
     const didExtremelyWellIds = [];
     const needAttentionIds = [];
 
     if (activePatientIds.length > 0) {
-      const yesterdayLogs = await MealLog.find({
-        patientId: { $in: activePatientIds },
-        date: { $gte: yesterdayStart, $lte: yesterdayEnd },
-      })
-        .select('patientId totalCalories')
-        .lean();
-
       const loggedMap = {};
       yesterdayLogs.forEach((log) => {
         loggedMap[log.patientId.toString()] = log.totalCalories || 0;
@@ -200,7 +199,7 @@ exports.getDashboardStats = async (req, res, next) => {
         }
       });
 
-      // 5. Need Attention — also count patients with NO log at all yesterday
+      // Also count active-plan patients with NO log at all yesterday
       const patientsWithLogs = new Set(Object.keys(loggedMap));
       activePatientIds.forEach((pid) => {
         if (!patientsWithLogs.has(pid)) {
@@ -210,37 +209,18 @@ exports.getDashboardStats = async (req, res, next) => {
       });
     }
 
-    // Collect all unique patient IDs across categories and fetch names
-    const allPids = new Set([
-      ...messagesReceivedPatientIds.map((id) => id.toString()),
-      ...reviewLoggedPatientIds.map((id) => id.toString()),
-      ...closingPatientIds.map((id) => id.toString()),
-      ...didExtremelyWellIds,
-      ...needAttentionIds,
-    ]);
-
-    // --- Need Attention History ---
-    // Log today's need-attention patients (upsert to avoid duplicates)
-    const todayFlag = new Date();
-    todayFlag.setHours(0, 0, 0, 0);
-
-    if (needAttentionIds.length > 0) {
-      const bulkOps = needAttentionIds.map((pid) => ({
-        updateOne: {
-          filter: { dieticianId, patientId: pid, flagDate: todayFlag },
-          update: { $setOnInsert: { dieticianId, patientId: pid, flagDate: todayFlag } },
-          upsert: true,
-        },
-      }));
-      await NeedAttentionLog.bulkWrite(bulkOps).catch(() => { });
-    }
-
-    // Check which of today's flagged patients have been acknowledged (read)
-    const todayLogs = await NeedAttentionLog.find({
-      dieticianId,
-      flagDate: todayFlag,
-      patientId: { $in: needAttentionIds },
-    }).lean();
+    // --- Tier 3: today's acknowledgement state for the flagged patients. ---
+    // Reads only rows written by earlier calls today; a patient flagged for
+    // the first time this call cannot yet be acknowledged, so the response is
+    // identical whether or not this call's flags have been persisted (they're
+    // written fire-and-forget after the response — see below).
+    const todayLogs = needAttentionIds.length > 0
+      ? await NeedAttentionLog.find({
+          dieticianId,
+          flagDate: todayFlag,
+          patientId: { $in: needAttentionIds },
+        }).lean()
+      : [];
 
     const acknowledgedToday = new Set();
     todayLogs.forEach((log) => {
@@ -251,19 +231,7 @@ exports.getDashboardStats = async (req, res, next) => {
     const presentIds = needAttentionIds.filter((id) => !acknowledgedToday.has(id.toString()));
     const acknowledgedIds = needAttentionIds.filter((id) => acknowledgedToday.has(id.toString()));
 
-    // History = acknowledged today + patients flagged in last 30 days not in current list
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
-
     const currentSet = new Set(needAttentionIds.map((id) => id.toString()));
-
-    const historyLogs = await NeedAttentionLog.find({
-      dieticianId,
-      flagDate: { $gte: thirtyDaysAgo, $lt: todayFlag },
-    })
-      .sort({ flagDate: -1 })
-      .lean();
 
     // Deduplicate: keep only the most recent flag per patient
     const seenHistory = new Set();
@@ -288,8 +256,15 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    // Add history patient IDs to allPids so we fetch their names
-    historyPatientIds.forEach((pid) => allPids.add(pid));
+    // --- Tier 4: patient names for every id referenced in the response ---
+    const allPids = new Set([
+      ...messagesReceivedPatientIds.map((id) => id.toString()),
+      ...reviewLoggedPatientIds.map((id) => id.toString()),
+      ...closingPatientIds.map((id) => id.toString()),
+      ...didExtremelyWellIds,
+      ...needAttentionIds,
+      ...historyPatientIds,
+    ]);
 
     const patientUsers = allPids.size > 0
       ? await User.find({ _id: { $in: [...allPids] } })
@@ -308,7 +283,7 @@ exports.getDashboardStats = async (req, res, next) => {
         patientName: nameMap[id.toString()] || 'Patient',
       }));
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       data: {
         messagesReceived,
@@ -329,6 +304,29 @@ exports.getDashboardStats = async (req, res, next) => {
         totalRevenue,
       },
     });
+
+    // Persist today's need-attention flags AFTER responding. This GET used to
+    // be a writer: it ran this bulkWrite mid-handler and then read the rows
+    // back. The read (todayLogs) only ever needs flags from *earlier* calls
+    // today, so the response is byte-identical whether or not this call's
+    // flags exist yet - which lets the write become fire-and-forget, off the
+    // request's critical path. `$setOnInsert` keeps it idempotent per
+    // (dietician, patient, day); the acknowledge endpoint and the next call's
+    // history read are the only consumers.
+    if (needAttentionIds.length > 0) {
+      NeedAttentionLog.bulkWrite(
+        needAttentionIds.map((pid) => ({
+          updateOne: {
+            filter: { dieticianId, patientId: pid, flagDate: todayFlag },
+            update: { $setOnInsert: { dieticianId, patientId: pid, flagDate: todayFlag } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      ).catch((err) => {
+        console.error('[dashboardStats] need-attention flag write failed (non-fatal):', err.message);
+      });
+    }
   } catch (error) {
     next(error);
   }
@@ -382,23 +380,27 @@ exports.getPerformanceTrends = async (req, res, next) => {
 
     const rangeStart = weekStarts[0];
 
-    // Get all diet plan requests for this dietician created in range
-    const requests = await DietPlanRequest.find({
-      dieticianId,
-      createdAt: { $gte: rangeStart },
-    })
-      .select('patient createdAt _id')
+    // Cross-app performance optimization, Phase 2: this used to issue the
+    // same "this dietician's requests" query THREE times (an in-range find,
+    // a countDocuments, and a find() nested inside an aggregate $match). Now
+    // one query for all of this dietician's requests supplies the total
+    // count, the in-range slice for the weekly buckets, and the id list for
+    // the payment lookups; and one payments query supplies both the all-time
+    // total and the in-range slice. (A dietician's total request count is
+    // bounded - hundreds at most - so filtering the range slice in JS is
+    // cheaper than a second round trip.)
+    const allRequests = await DietPlanRequest.find({ dieticianId })
+      .select('createdAt _id')
       .lean();
 
-    const requestIds = requests.map((r) => r._id);
+    const allRequestIds = allRequests.map((r) => r._id);
+    const inRangeRequests = allRequests.filter((r) => r.createdAt >= rangeStart);
 
-    // Get approved payments in range
-    const payments =
-      requestIds.length > 0
+    const approvedPayments =
+      allRequestIds.length > 0
         ? await ManualPaymentProof.find({
-          request: { $in: requestIds },
+          request: { $in: allRequestIds },
           status: 'Approved',
-          createdAt: { $gte: rangeStart },
         })
           .select('amountReceived createdAt')
           .lean()
@@ -408,32 +410,19 @@ exports.getPerformanceTrends = async (req, res, next) => {
     const patientWeekly = new Array(weeks).fill(0);
     const revenueWeekly = new Array(weeks).fill(0);
 
-    for (const req of requests) {
-      const idx = _weekIndex(req.createdAt, weekStarts);
+    for (const r of inRangeRequests) {
+      const idx = _weekIndex(r.createdAt, weekStarts);
       if (idx >= 0) patientWeekly[idx]++;
     }
 
-    for (const pay of payments) {
-      const idx = _weekIndex(pay.createdAt, weekStarts);
-      if (idx >= 0) revenueWeekly[idx] += pay.amountReceived || 0;
+    let allRevenue = 0;
+    for (const pay of approvedPayments) {
+      allRevenue += pay.amountReceived || 0;
+      if (pay.createdAt >= rangeStart) {
+        const idx = _weekIndex(pay.createdAt, weekStarts);
+        if (idx >= 0) revenueWeekly[idx] += pay.amountReceived || 0;
+      }
     }
-
-    // Cumulative totals up to range start (for overall numbers)
-    const allRequests = await DietPlanRequest.countDocuments({ dieticianId });
-    const allRevenueAgg = await ManualPaymentProof.aggregate([
-      {
-        $match: {
-          request: {
-            $in: (
-              await DietPlanRequest.find({ dieticianId }).select('_id').lean()
-            ).map((r) => r._id),
-          },
-          status: 'Approved',
-        },
-      },
-      { $group: { _id: null, total: { $sum: '$amountReceived' } } },
-    ]);
-    const allRevenue = allRevenueAgg[0]?.total || 0;
 
     // Week-over-week change % (last vs second-to-last week)
     const prevPatients = patientWeekly[weeks - 2] || 0;
@@ -453,7 +442,7 @@ exports.getPerformanceTrends = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: {
-        totalPatients: allRequests,
+        totalPatients: allRequests.length,
         totalRevenue: allRevenue,
         patientsChangePercent: Math.round(patientsChange * 10) / 10,
         revenueChangePercent: Math.round(revenueChange * 10) / 10,
