@@ -36,24 +36,31 @@ async function runRenewalReminderSweep({ now = new Date() } = {}) {
     subscriptionExpiresAt: { $gte: now, $lte: windowEnd },
     renewalReminderSentAt: null,
     hasActivePlan: true,
-  });
+  })
+    .select('patient subscriptionExpiresAt')
+    .lean();
+  if (candidates.length === 0) return { checked: 0, created: 0 };
 
-  let created = 0;
-  for (const request of candidates) {
-    await Notification.create({
+  // Cross-app performance optimization, Phase 2/3: was one Notification.create
+  // + one request.save() per candidate. Batch both.
+  await Notification.insertMany(
+    candidates.map((request) => ({
       userId: request.patient,
       title: 'Your membership is expiring soon',
       message: `Your subscription expires on ${formatDate(request.subscriptionExpiresAt)}. Renew now to keep your diet plan active.`,
       type: 'membership_renewal',
       referenceId: request._id,
       referenceModel: 'DietPlanRequest',
-    });
-    request.renewalReminderSentAt = now;
-    await request.save({ validateBeforeSave: false });
-    created += 1;
-  }
+    })),
+    { ordered: false }
+  );
 
-  return { checked: candidates.length, created };
+  await DietPlanRequest.updateMany(
+    { _id: { $in: candidates.map((r) => r._id) } },
+    { $set: { renewalReminderSentAt: now } }
+  );
+
+  return { checked: candidates.length, created: candidates.length };
 }
 
 module.exports = { runRenewalReminderSweep };
