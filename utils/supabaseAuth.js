@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config/environment');
 const { User } = require('../models');
+const { getCachedUserId, setCachedUserId, invalidateToken } = require('./authCache');
 
 // @supabase/supabase-js's admin API (auth.admin.*) pulls in realtime-js,
 // which expects a native `WebSocket` global - only present in Node 22+.
@@ -53,7 +54,20 @@ async function verifySupabaseToken(token) {
  *                       never completed (no linked Mongo User yet)
  */
 async function getUserFromSupabaseToken(token) {
-  const supabaseUser = await verifySupabaseToken(token);
+  // Fast path: a recent, still-valid (per its own exp) token whose Supabase
+  // identity we've already verified in the last <=90s. We still re-read the
+  // Mongo User every time - role/isActive/profile are never served from
+  // cache (see utils/authCache.js).
+  const cachedUserId = await getCachedUserId(token);
+  if (cachedUserId) {
+    const cachedUser = await User.findOne({ supabaseUserId: cachedUserId });
+    if (cachedUser) return cachedUser;
+    // Cached id no longer resolves to a profile (account deleted, or the
+    // link was severed) - fall through to the full verify path, which will
+    // throw the right error.
+  }
+
+  const supabaseUser = await verifySupabaseToken(token); // network round trip
 
   const user = await User.findOne({ supabaseUserId: supabaseUser.id });
   if (!user) {
@@ -62,6 +76,7 @@ async function getUserFromSupabaseToken(token) {
     throw err;
   }
 
+  await setCachedUserId(token, supabaseUser.id);
   return user;
 }
 
@@ -215,6 +230,13 @@ async function signOutSession(accessToken, scope) {
   const { error } = await getSupabaseAdmin().auth.admin.signOut(accessToken, scope);
   if (error) {
     console.error(`signOutSession (scope=${scope}) failed:`, error.message);
+  }
+  // A real logout ('global') revokes the caller's own token - drop its
+  // token->user cache entry so it can't keep resolving from cache for the
+  // rest of the TTL. 'others' leaves the caller's session (and token)
+  // intact, so nothing to invalidate here for it.
+  if (scope === 'global') {
+    await invalidateToken(accessToken);
   }
 }
 
