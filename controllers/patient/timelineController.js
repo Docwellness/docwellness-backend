@@ -6,6 +6,7 @@ const { computeGoalStats } = require('../../utils/goalAdherence');
 const { buildTimelinePayload, shapeGoal, getDayLogs } = require('../../utils/timelinePayload');
 const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE } = require('../../utils/seedGoalTimeline');
 const { getChatIO } = require('../../chat');
+const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 
 /**
  * @route   GET /api/patient/timeline?from=-14&to=30
@@ -27,8 +28,24 @@ exports.getTimeline = asyncHandler(async (req, res) => {
  * @access  Patient only
  */
 exports.getTimelineSummary = asyncHandler(async (req, res) => {
-  const { goal, stats } = await computeGoalStats(req.user._id);
-  return sendSuccess(res, { data: { goal: goal ? shapeGoal(goal) : null, stats } });
+  // Cross-app performance optimization, task 2.3: this endpoint is
+  // explicitly the "poll after a check-in" one, and computeGoalStats is
+  // heavy - computeGoalStreak walks up to 60 daily milestones and the
+  // week + 30-day adherence rollups each re-run computeTaskDoneMap over
+  // overlapping milestone sets. Cache the shaped result per patient for a
+  // short window; every write that feeds adherence (check-in create/
+  // delete, meal-log, water-log, exercise-log, progress) calls
+  // invalidatePatientStats, and the short TTL is the backstop.
+  const data = await getOrSetPatientStat(
+    String(req.user._id),
+    `pstat:timelinesummary:${req.user._id}`,
+    60,
+    async () => {
+      const { goal, stats } = await computeGoalStats(req.user._id);
+      return { goal: goal ? shapeGoal(goal) : null, stats };
+    }
+  );
+  return sendSuccess(res, { data });
 });
 
 /**
@@ -99,6 +116,7 @@ exports.createCheckIn = asyncHandler(async (req, res) => {
     }
   }
 
+  await invalidatePatientStats(req.user._id);
   const { stats } = await computeGoalStats(req.user._id);
 
   // Best-effort live updates - never block or fail the response on these.
@@ -138,6 +156,7 @@ exports.deleteTodayCheckIn = asyncHandler(async (req, res) => {
   const todayKey = new Date().toISOString().slice(0, 10);
 
   await CheckIn.deleteOne({ taskId, patientId: req.user._id, dateKey: todayKey });
+  await invalidatePatientStats(req.user._id);
 
   return sendSuccess(res, { data: { ok: true } });
 });
