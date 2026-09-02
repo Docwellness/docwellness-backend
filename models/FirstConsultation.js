@@ -90,4 +90,10 @@ const firstConsultationSchema = new mongoose.Schema(
   }
 );
 
+// Cross-app performance optimization, Phase 2: every read is
+// findOne({ patient }).sort({ createdAt }) (both directions) - see
+// firstConsultationController (patient + dietician sides) and
+// patientController.getPatientProfile. Previously unindexed (COLLSCAN).
+firstConsultationSchema.index({ patient: 1, createdAt: 1 });
+
 module.exports = mongoose.model('FirstConsultation', firstConsultationSchema);
