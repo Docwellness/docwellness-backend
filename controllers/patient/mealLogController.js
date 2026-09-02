@@ -251,12 +251,21 @@ exports.getCalorieTrend = async (req, res, next) => {
     startDate.setDate(startDate.getDate() - (daysCount - 1));
     startDate.setHours(0, 0, 0, 0);
 
-    const mealLogs = await MealLog.find({
-      patientId,
-      date: { $gte: startDate },
-    })
-      .sort({ date: 1 })
-      .lean();
+    // Cross-app performance optimization, task 2.3: sum per day in MongoDB
+    // instead of pulling every full MealLog doc (each carries its whole
+    // `meals` array) just to add up `totalCalories`. The JS loop below still
+    // owns the output: it defines the day keys, their order, and 0-fills
+    // days with no log - the pipeline only supplies the per-day sums.
+    const dailyTotals = await MealLog.aggregate([
+      { $match: { patientId, date: { $gte: startDate } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+          calories: { $sum: { $ifNull: ['$totalCalories', 0] } },
+        },
+      },
+    ]);
+    const summedByDate = new Map(dailyTotals.map((d) => [d._id, d.calories]));
 
     // Build a map of date → total calories
     const calorieMap = {};
@@ -264,14 +273,7 @@ exports.getCalorieTrend = async (req, res, next) => {
       const d = new Date(startDate);
       d.setDate(d.getDate() + i);
       const key = d.toISOString().split('T')[0];
-      calorieMap[key] = 0;
-    }
-
-    for (const log of mealLogs) {
-      const key = new Date(log.date).toISOString().split('T')[0];
-      if (calorieMap[key] !== undefined) {
-        calorieMap[key] += log.totalCalories || 0;
-      }
+      calorieMap[key] = summedByDate.get(key) || 0;
     }
 
     const trend = Object.entries(calorieMap).map(([date, calories]) => ({

@@ -1,4 +1,5 @@
 const WaterLog = require('../../models/WaterLog');
+const { invalidatePatientStats } = require('../../utils/patientStatsCache');
 
 /**
  * POST /api/patient/water/log
@@ -70,6 +71,10 @@ exports.logWater = async (req, res) => {
     waterLog.totalAmount = waterLog.entries.reduce((sum, e) => sum + e.amount, 0);
 
     await waterLog.save();
+
+    // Water Intake feeds the Goal Journey timeline's adherence/streak
+    // (task 2.6/2.3) - drop this patient's cached stat windows.
+    await invalidatePatientStats(patientId);
 
     return res.status(200).json({
       success: true,
@@ -180,6 +185,8 @@ exports.updateGoal = async (req, res) => {
       { $set: { goal } },
       { upsert: true, new: true }
     );
+
+    await invalidatePatientStats(patientId);
 
     return res.status(200).json({
       success: true,

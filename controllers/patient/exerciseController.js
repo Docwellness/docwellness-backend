@@ -6,6 +6,7 @@
 const mongoose = require('mongoose');
 const { ExercisePlan, ExerciseLog, Exercise } = require('../../models');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
+const { invalidatePatientStats } = require('../../utils/patientStatsCache');
 const {
   calcCaloriesBurned,
   estimateDurationMinutes,
@@ -300,6 +301,10 @@ exports.submitExerciseLog = async (req, res, next) => {
       log.exercises.reduce((sum, e) => sum + (e.caloriesBurned || 0), 0)
     );
     await log.save();
+
+    // Log Exercise feeds the Goal Journey timeline's adherence/streak
+    // (task 2.6/2.3) - drop this patient's cached stat windows.
+    await invalidatePatientStats(patientId);
 
     return res.status(200).json({
       success: true,
