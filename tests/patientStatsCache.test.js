@@ -70,6 +70,7 @@ let createPatient;
 let createDietician;
 let createActiveDietPlan;
 let MealLog;
+let Progress;
 let getOrSetPatientStat;
 let invalidatePatientStats;
 
@@ -78,7 +79,7 @@ beforeAll(async () => {
   request = require('supertest');
   app = require('../config/createApp')();
   ({ createPatient, createDietician, createActiveDietPlan } = require('./helpers/factories'));
-  ({ MealLog } = require('../models'));
+  ({ MealLog, Progress } = require('../models'));
   ({ getOrSetPatientStat, invalidatePatientStats } = require('../utils/patientStatsCache'));
 });
 
@@ -187,5 +188,34 @@ describe('GET /api/patient/meal-log/today-stats caching', () => {
       .set('Authorization', 'Bearer p');
     expect(r1.status).toBe(404);
     expect(r2.status).toBe(404);
+  });
+});
+
+describe('GET /api/patient/tracking-data caching', () => {
+  test('repeat request is cached; a progress write + invalidation recomputes currentWeight', async () => {
+    const dietician = await createDietician();
+    const patient = await createPatient();
+    await createActiveDietPlan(patient, dietician);
+    registerTestToken('p', patient._id);
+
+    const first = await request(app)
+      .get('/api/patient/tracking-data')
+      .set('Authorization', 'Bearer p');
+    expect(first.status).toBe(200);
+    const baselineWeight = first.body.data.currentWeight;
+
+    await Progress.create({ patientId: patient._id, date: new Date(), weight: baselineWeight + 12 });
+
+    const cached = await request(app)
+      .get('/api/patient/tracking-data')
+      .set('Authorization', 'Bearer p');
+    expect(cached.body.data.currentWeight).toBe(baselineWeight); // still cached
+
+    await invalidatePatientStats(patient._id);
+
+    const fresh = await request(app)
+      .get('/api/patient/tracking-data')
+      .set('Authorization', 'Bearer p');
+    expect(fresh.body.data.currentWeight).toBe(baselineWeight + 12);
   });
 });

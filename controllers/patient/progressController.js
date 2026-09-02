@@ -9,6 +9,7 @@ const { calculateBMI } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelpers');
+const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 
 /**
  * @desc    Create a new progress entry
@@ -93,6 +94,10 @@ exports.createProgress = async (req, res, next) => {
     if (Object.keys(profileUpdate).length > 0) {
       await User.findByIdAndUpdate(req.user._id, profileUpdate);
     }
+
+    // Weight / measurements changed -> the tracking-data charts recompute
+    // from them, so drop this patient's cached stat windows (task 2.6).
+    await invalidatePatientStats(req.user._id);
 
     res.status(201).json({
       success: true,
@@ -362,6 +367,8 @@ exports.updateProgress = async (req, res, next) => {
 
     await progress.save();
 
+    await invalidatePatientStats(req.user._id);
+
     res.status(200).json({
       success: true,
       message: 'Progress updated successfully',
@@ -390,6 +397,8 @@ exports.deleteProgress = async (req, res, next) => {
         message: 'Progress record not found',
       });
     }
+
+    await invalidatePatientStats(req.user._id);
 
     res.status(200).json({
       success: true,
@@ -539,11 +548,39 @@ exports.getTrackingData = async (req, res, next) => {
   try {
     const patientId = req.user._id;
 
+    // Cross-app performance optimization, task 2.6: this handler runs ~10
+    // queries (User, Progress x5, DietPlan, MealLog x2) plus a day-by-day
+    // loop over the whole plan history and an O(n^2) scan of progress
+    // entries - and the patient tracking screen's three charts each
+    // re-request it on every range change. Cached per patient + requested
+    // range for a short window; the patient's own meal-log / progress
+    // writes wipe every window immediately (see invalidatePatientStats
+    // call sites).
+    const rangeKey = `${req.query.startDate || ''}:${req.query.endDate || ''}`;
+    const cacheKey = `pstat:tracking:${patientId}:${rangeKey}`;
+    const data = await getOrSetPatientStat(String(patientId), cacheKey, 120, () =>
+      computeTrackingData(patientId, req.query)
+    );
+
+    if (data && data.notFound) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Body of GET /api/patient/tracking-data, extracted so getTrackingData can
+ * cache it (task 2.6). Returns the `data` payload, or `{ notFound: true }`.
+ */
+async function computeTrackingData(patientId, query) {
     const patient = await User.findById(patientId)
       .select('healthProfile profile.gender profile.dateOfBirth')
       .lean();
     if (!patient) {
-      return res.status(404).json({ success: false, message: 'Patient not found' });
+      return { notFound: true };
     }
 
     const healthProfile = patient.healthProfile || {};
@@ -592,7 +629,7 @@ exports.getTrackingData = async (req, res, next) => {
     // (the patient's whole history so far) and is clamped so a stale/
     // tampered query can't ask for dates before the plan started or after
     // today - no data exists outside that window either way.
-    const { startDate, endDate } = resolveRequestedRange(req.query, resolvedPlanStart, today);
+    const { startDate, endDate } = resolveRequestedRange(query, resolvedPlanStart, today);
 
     // Fetch meal logs
     const mealLogs = await MealLog.find({
@@ -844,35 +881,29 @@ exports.getTrackingData = async (req, res, next) => {
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: {
-        granularity,
-        planStartDate: resolvedPlanStart ? resolvedPlanStart.toISOString() : null,
-        dateRange: { start: formatShortDate(startDate), end: formatShortDate(endDate) },
-        startDate: localDateStr(startDate),
-        endDate: localDateStr(endDate),
-        currentIndex,
-        currentWeight: Math.round(currentWeight * 10) / 10,
-        currentBmi:
-          latestProgressWithWeight?.bmi ||
-          Math.round((currentWeight / (heightInMeters * heightInMeters)) * 10) / 10,
-        targetWeight: targetWeight || 0,
-        activityLevel,
-        healthConcerns: Array.isArray(healthConcerns) ? healthConcerns : [],
-        plannedDailyCalories,
-        tdee: Math.round(tdee),
-        bodyMeasurements,
-        achievements,
-        calorieData,
-        weightTrend,
-        bmiTrend,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+    return {
+      granularity,
+      planStartDate: resolvedPlanStart ? resolvedPlanStart.toISOString() : null,
+      dateRange: { start: formatShortDate(startDate), end: formatShortDate(endDate) },
+      startDate: localDateStr(startDate),
+      endDate: localDateStr(endDate),
+      currentIndex,
+      currentWeight: Math.round(currentWeight * 10) / 10,
+      currentBmi:
+        latestProgressWithWeight?.bmi ||
+        Math.round((currentWeight / (heightInMeters * heightInMeters)) * 10) / 10,
+      targetWeight: targetWeight || 0,
+      activityLevel,
+      healthConcerns: Array.isArray(healthConcerns) ? healthConcerns : [],
+      plannedDailyCalories,
+      tdee: Math.round(tdee),
+      bodyMeasurements,
+      achievements,
+      calorieData,
+      weightTrend,
+      bmiTrend,
+    };
+}
 
 // Helper function to calculate adherence
 async function calculateAdherence(patientId, date) {
