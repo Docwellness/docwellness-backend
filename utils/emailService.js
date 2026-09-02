@@ -9,6 +9,7 @@
 
 const { Resend } = require('resend');
 const config = require('../config/environment');
+const { enqueue } = require('./jobQueue');
 
 // Constructed lazily (not at module load) so a missing RESEND_API_KEY only
 // breaks actual send attempts, not the whole app's startup - this file is
@@ -41,6 +42,37 @@ const sendEmail = async ({ to, subject, text, html, from }) => {
     console.error('Email error:', error);
     throw error;
   }
+};
+
+/**
+ * Cross-app performance optimization, Phase 3 (task 3.3): get an email off
+ * the request's critical path so the triggering action returns without
+ * awaiting Resend.
+ *
+ *  - urgent (OTP codes the user is staring at a screen waiting for): try
+ *    one inline send for the fast happy path; only if that throws, hand it
+ *    to the queue for retry with backoff. Either way this never throws, so
+ *    the request still succeeds and responds - a transient Resend outage
+ *    no longer turns a signup / password-reset into a 500.
+ *  - non-urgent (welcome, notifications): straight onto the queue.
+ *
+ * With no REDIS_URL, `enqueue` runs the send inline itself - identical to
+ * the pre-Phase-3 behavior.
+ * @param {{to,subject,text,html,from}} spec  a fully-rendered email
+ * @param {{ urgent?: boolean }} [opts]
+ */
+const dispatchEmail = async (spec, { urgent = false } = {}) => {
+  if (urgent) {
+    try {
+      return await sendEmail(spec);
+    } catch (err) {
+      console.error('[emailService] urgent send failed, queuing for retry:', err.message);
+      await enqueue('email', spec);
+      return { queued: true };
+    }
+  }
+  await enqueue('email', spec);
+  return { queued: true };
 };
 
 // Brand palette - matches the actual Flutter apps' colors (splash screen,
@@ -141,7 +173,7 @@ const sendWelcomeEmail = async (user) => {
     `,
   });
 
-  return sendEmail({
+  return dispatchEmail({
     to: user.email,
     subject,
     text: `Welcome to DocWellness! Thank you for joining us.`,
@@ -168,12 +200,15 @@ const sendPasswordResetOtp = async (user, otp) => {
     `,
   });
 
-  return sendEmail({
-    to: user.email,
-    subject,
-    text: `Your DocWellness password reset code is: ${otp}`,
-    html,
-  });
+  return dispatchEmail(
+    {
+      to: user.email,
+      subject,
+      text: `Your DocWellness password reset code is: ${otp}`,
+      html,
+    },
+    { urgent: true }
+  );
 };
 
 // Send signup verification code (same OTP-via-Resend pattern as password
@@ -193,13 +228,16 @@ const sendSignupOtp = async (email, otp) => {
     `,
   });
 
-  return sendEmail({
-    to: email,
-    subject,
-    text: `Your DocWellness verification code is: ${otp}`,
-    html,
-    from: config.email.fromAddressPersonal,
-  });
+  return dispatchEmail(
+    {
+      to: email,
+      subject,
+      text: `Your DocWellness verification code is: ${otp}`,
+      html,
+      from: config.email.fromAddressPersonal,
+    },
+    { urgent: true }
+  );
 };
 
 // Send diet plan notification
@@ -229,7 +267,7 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
     `,
   });
 
-  return sendEmail({
+  return dispatchEmail({
     to: user.email,
     subject,
     text: `${actionMessages[action]}. Plan: ${dietPlan.name}`,
@@ -239,6 +277,7 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
 
 module.exports = {
   sendEmail,
+  dispatchEmail,
   sendWelcomeEmail,
   sendPasswordResetOtp,
   sendSignupOtp,

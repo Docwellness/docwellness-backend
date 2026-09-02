@@ -14,6 +14,7 @@ const { runRenewalReminderSweep } = require('../controllers/internal/renewalRemi
 const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeController');
 const { runMealReminderSweep } = require('../controllers/internal/mealReminderController');
 const { runWaterReminderSweep } = require('../controllers/internal/waterReminderController');
+const { drainJobs, stats: jobQueueStats } = require('../utils/jobQueue');
 
 function requireCronSecret(req, res, next) {
   // Two trigger sources need to authenticate here: Vercel Cron (dev), which
@@ -87,5 +88,27 @@ router.post('/cron/water-reminder', requireCronSecret, async (req, res, next) =>
     next(error);
   }
 });
+
+/**
+ * @route   GET|POST /api/internal/cron/drain-jobs?max=25
+ * @desc    Cross-app performance optimization, Phase 3 (task 3.1): drain a
+ *          bounded batch off the async job queue (utils/jobQueue.js) -
+ *          currently outbound emails moved off the request path. Idempotent
+ *          and safe to run on a tight schedule (every minute); a no-op when
+ *          REDIS_URL isn't configured. GET and POST both work so it can be
+ *          driven by a Vercel Cron entry (GET) or a VPS curl (POST).
+ */
+async function drainJobsHandler(req, res, next) {
+  try {
+    const parsed = parseInt(req.query.max, 10);
+    const max = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 100) : undefined;
+    const result = await drainJobs(max ? { max } : {});
+    res.status(200).json({ success: true, data: { ...result, queue: await jobQueueStats() } });
+  } catch (error) {
+    next(error);
+  }
+}
+router.get('/cron/drain-jobs', requireCronSecret, drainJobsHandler);
+router.post('/cron/drain-jobs', requireCronSecret, drainJobsHandler);
 
 module.exports = router;
