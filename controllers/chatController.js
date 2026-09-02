@@ -156,6 +156,51 @@ exports.getConversations = async (req, res, next) => {
   }
 };
 
+// How many messages one page holds when a client asks for pagination but
+// doesn't specify a limit, and the ceiling on what it can ask for.
+const MESSAGES_DEFAULT_LIMIT = 50;
+const MESSAGES_MAX_LIMIT = 100;
+
+/**
+ * Parses the optional pagination controls on GET .../messages.
+ *
+ * Cross-app performance optimization, Phase 2: this endpoint used to load a
+ * conversation's ENTIRE history on every open. Now:
+ *  - `?before=<ISO date>`  -> cursor mode: the newest `limit` messages older
+ *    than that timestamp. Stable under new messages arriving mid-scroll
+ *    (unlike offset), so it's what the updated apps use for "load older".
+ *  - `?page=<n>&limit=<n>`  -> offset mode: kept for the already-shipped
+ *    patient app, which pages by number.
+ *  - neither                -> unpaginated: return everything (back-compat
+ *    for the dietician app until it adopts paging, and any old installs).
+ */
+function parseMessagePagination(query = {}) {
+  const paginated =
+    query.before !== undefined || query.limit !== undefined || query.page !== undefined;
+  if (!paginated) {
+    return { paginated: false, cursorFilter: {}, skip: 0, limit: 0 };
+  }
+
+  const parsedLimit = parseInt(query.limit, 10);
+  const limit = Math.min(
+    Math.max(Number.isNaN(parsedLimit) ? MESSAGES_DEFAULT_LIMIT : parsedLimit, 1),
+    MESSAGES_MAX_LIMIT
+  );
+
+  if (query.before !== undefined) {
+    const beforeDate = new Date(query.before);
+    return {
+      paginated: true,
+      cursorFilter: Number.isNaN(beforeDate.getTime()) ? {} : { createdAt: { $lt: beforeDate } },
+      skip: 0,
+      limit,
+    };
+  }
+
+  const page = Math.max(parseInt(query.page, 10) || 1, 1);
+  return { paginated: true, cursorFilter: {}, skip: (page - 1) * limit, limit };
+}
+
 // Get messages for a specific conversation
 exports.getMessages = async (req, res, next) => {
   try {
@@ -163,6 +208,7 @@ exports.getMessages = async (req, res, next) => {
     const conversationId = req.params.conversationId || req.params.id;
     const userId = req.user._id;
     const userRole = req.user.role; // 'patient' or 'dietician'
+    const { paginated, cursorFilter, skip, limit } = parseMessagePagination(req.query);
 
     console.log('[GET_MESSAGES] Request:', {
       conversationId,
@@ -216,9 +262,14 @@ exports.getMessages = async (req, res, next) => {
     const oppositeRole = userRole === 'patient' ? 'dietician' : 'patient';
 
     if (isV1Conversation) {
-      // Get messages from V1 MessageV1 model
-      const v1Messages = await MessageV1.find({ conversationId: conversation._id })
+      // Get messages from V1 MessageV1 model (newest first, one page when paginated)
+      const v1Messages = await MessageV1.find({
+        conversationId: conversation._id,
+        ...cursorFilter,
+      })
         .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(paginated ? limit : 0)
         .lean();
 
       console.log('[GET_MESSAGES] Found', v1Messages.length, 'V1 messages');
@@ -270,13 +321,15 @@ exports.getMessages = async (req, res, next) => {
         };
       });
     } else {
-      // Get messages from legacy Chat model
-      const rawMessages = await Chat.find({ conversationId })
+      // Get messages from legacy Chat model (newest first, one page when paginated)
+      const rawMessages = await Chat.find({ conversationId, ...cursorFilter })
         .populate({
           path: 'replyTo',
           select: 'message senderId messageType',
         })
         .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(paginated ? limit : 0)
         .lean();
 
       console.log('[GET_MESSAGES] Found', rawMessages.length, 'legacy messages');
@@ -350,10 +403,20 @@ exports.getMessages = async (req, res, next) => {
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      data: messages,
-    });
+    // `messages` is newest-first. When paginated, tell the client whether an
+    // older page exists and hand back the cursor for it (the oldest message's
+    // timestamp) so it can request `?before=<nextBefore>` next.
+    const body = { success: true, data: messages };
+    if (paginated) {
+      const oldest = messages[messages.length - 1];
+      body.pagination = {
+        limit,
+        hasMore: messages.length === limit,
+        nextBefore: oldest ? oldest.createdAt : null,
+      };
+    }
+
+    return res.status(200).json(body);
   } catch (error) {
     next(error);
   }
