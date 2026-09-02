@@ -33,55 +33,88 @@ async function runGoalNudgeSweep({ now = new Date() } = {}) {
     status: 'active',
     endDate: { $lt: now },
     nudgeSentAt: null,
-  });
+  }).lean();
+  if (candidates.length === 0) return { checked: 0, created: 0 };
 
-  let created = 0;
-  for (const goal of candidates) {
-    const latestProgress = await Progress.findOne({ patientId: goal.patientId, weight: { $ne: null } })
-      .sort({ date: -1 })
-      .select('weight');
-    const currentValue = latestProgress?.weight ?? goal.currentValue ?? goal.startValue;
-    const progress = computeProgress(goal.startValue, currentValue, goal.targetValue);
+  // Cross-app performance optimization, Phase 2/3: the latest-Progress lookup
+  // and the device-token lookup were one query per goal inside the loop, and
+  // each goal was saved individually. Batch all three.
+  const patientIds = [...new Set(candidates.map((g) => g.patientId.toString()))];
 
-    if (progress >= 1) {
-      // Reached the target after all (Progress caught up after endDate) -
-      // nothing to nudge about; stop the sweep from reconsidering it daily.
-      goal.nudgeSentAt = now;
-      await goal.save();
-      continue;
-    }
-
-    await Notification.create({
-      userId: goal.patientId,
-      title: "Let's get back on track",
-      message: `You're close to reaching "${goal.title}" - don't stop now. Continue your diet journey and rebook your subscription to keep going.`,
-      type: 'milestone',
-      referenceId: goal._id,
-      referenceModel: 'Goal',
-    });
-
-    const patient = await User.findById(goal.patientId).select('deviceTokens').lean();
-    const tokens = (patient?.deviceTokens || []).map((t) => t.token);
-    await sendPushToTokens(
-      tokens,
-      {
-        title: "Let's get back on track",
-        body: `Continue your diet journey and rebook your subscription to reach "${goal.title}".`,
-        data: { deepLink: 'docwellness://timeline', goalId: String(goal._id) },
-      },
-      (deadToken) => {
-        User.updateOne({ _id: goal.patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
-          () => {}
-        );
-      }
-    ).catch((err) => console.error('[goalNudge] push failed (non-fatal):', err.message));
-
-    goal.nudgeSentAt = now;
-    await goal.save();
-    created += 1;
+  // Latest logged weight per patient (query sorted newest-first, keep the
+  // first row seen for each patient).
+  const progressRows = await Progress.find({
+    patientId: { $in: patientIds },
+    weight: { $ne: null },
+  })
+    .sort({ date: -1 })
+    .select('patientId weight')
+    .lean();
+  const latestWeightByPatient = new Map();
+  for (const row of progressRows) {
+    const key = row.patientId.toString();
+    if (!latestWeightByPatient.has(key)) latestWeightByPatient.set(key, row.weight);
   }
 
-  return { checked: candidates.length, created };
+  const toNudge = candidates.filter((goal) => {
+    const currentValue =
+      latestWeightByPatient.get(goal.patientId.toString()) ??
+      goal.currentValue ??
+      goal.startValue;
+    // progress >= 1 means the target was reached after all (Progress caught
+    // up after endDate) - nothing to nudge about, just stamp it below.
+    return computeProgress(goal.startValue, currentValue, goal.targetValue) < 1;
+  });
+
+  if (toNudge.length > 0) {
+    await Notification.insertMany(
+      toNudge.map((goal) => ({
+        userId: goal.patientId,
+        title: "Let's get back on track",
+        message: `You're close to reaching "${goal.title}" - don't stop now. Continue your diet journey and rebook your subscription to keep going.`,
+        type: 'milestone',
+        referenceId: goal._id,
+        referenceModel: 'Goal',
+      })),
+      { ordered: false }
+    );
+
+    const nudgePatientIds = [...new Set(toNudge.map((g) => g.patientId.toString()))];
+    const patients = await User.find({ _id: { $in: nudgePatientIds } })
+      .select('_id deviceTokens')
+      .lean();
+    const tokensByPatient = new Map(
+      patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
+    );
+
+    for (const goal of toNudge) {
+      const pid = goal.patientId.toString();
+      const tokens = tokensByPatient.get(pid) || [];
+      if (tokens.length === 0) continue;
+      await sendPushToTokens(
+        tokens,
+        {
+          title: "Let's get back on track",
+          body: `Continue your diet journey and rebook your subscription to reach "${goal.title}".`,
+          data: { deepLink: 'docwellness://timeline', goalId: String(goal._id) },
+        },
+        (deadToken) => {
+          User.updateOne(
+            { _id: pid },
+            { $pull: { deviceTokens: { token: deadToken } } }
+          ).catch(() => {});
+        }
+      ).catch((err) => console.error('[goalNudge] push failed (non-fatal):', err.message));
+    }
+  }
+
+  // Stamp every candidate (nudged or already-reached) so none is reconsidered.
+  await Goal.updateMany(
+    { _id: { $in: candidates.map((g) => g._id) } },
+    { $set: { nudgeSentAt: now } }
+  );
+
+  return { checked: candidates.length, created: toNudge.length };
 }
 
 module.exports = { runGoalNudgeSweep, computeProgress };

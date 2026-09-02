@@ -40,50 +40,88 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
     .populate('request', 'startDateForDiet')
     .lean();
 
-  let notified = 0;
+  const title = `Time for ${slot}`;
+  const message = `Don't forget to log your ${slot} once you've had it.`;
+
+  // 1. Pure-JS pass: which active-plan patients actually have `slot` on their
+  //    plan today? De-duped on patientId - a patient could (rarely) hold more
+  //    than one Active plan, and must not be notified twice.
+  const seenPatient = new Set();
+  const scheduledPatientIds = [];
   for (const plan of activePlans) {
+    const pidStr = plan.patientId.toString();
+    if (seenPatient.has(pidStr)) continue;
     const weeks = getFinalizedWeeks(plan);
     const currentWeek = resolveCurrentWeek(plan, today);
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek));
     if (!week) continue;
-
     const hasSlotToday = (week.dailyMeals || []).some(
       (meal) => meal.servingTime === slot && mealMatchesDayGroup(meal, todayDayGroup)
     );
-    if (!hasSlotToday) continue;
+    if (hasSlotToday) {
+      seenPatient.add(pidStr);
+      scheduledPatientIds.push(plan.patientId);
+    }
+  }
+  if (scheduledPatientIds.length === 0) {
+    return { checked: activePlans.length, notified: 0 };
+  }
 
-    const existingLog = await MealLog.findOne({ patientId: plan.patientId, dayKey })
-      .select('meals')
-      .lean();
-    const alreadyLogged = (existingLog?.meals || []).some((m) => m.servingTime === slot);
-    if (alreadyLogged) continue;
+  // Cross-app performance optimization, Phase 2/3: the three per-patient
+  // reads below (today's meal log, the idempotency check, device tokens)
+  // were previously issued one patient at a time inside the loop - ~3N
+  // round trips per sweep, 7 sweeps a day over every active plan. Each is
+  // now a single batched `$in` query.
 
-    const title = `Time for ${slot}`;
-    const message = `Don't forget to log your ${slot} once you've had it.`;
+  // 2. Who already logged this slot today?
+  const logs = await MealLog.find({ patientId: { $in: scheduledPatientIds }, dayKey })
+    .select('patientId meals')
+    .lean();
+  const alreadyLoggedSlot = new Set(
+    logs
+      .filter((l) => (l.meals || []).some((m) => m.servingTime === slot))
+      .map((l) => l.patientId.toString())
+  );
 
-    // Idempotency guard - a manual re-trigger of the same cron route within
-    // the same day/slot must not double-notify (referenceId can't hold a
-    // composite "date:slot" key - it's a strict ObjectId ref - so dedupe on
-    // title+day instead).
-    const already = await Notification.findOne({
-      userId: plan.patientId,
-      type: 'meal_reminder',
-      title,
-      createdAt: { $gte: todayStart, $lt: todayEnd },
-    })
-      .select('_id')
-      .lean();
-    if (already) continue;
+  // 3. Idempotency guard - a manual re-trigger of the same cron route within
+  //    the same day/slot must not double-notify (dedupe on title + day).
+  const notLoggedIds = scheduledPatientIds.filter((id) => !alreadyLoggedSlot.has(id.toString()));
+  const alreadyNotified = new Set(
+    (
+      await Notification.find({
+        userId: { $in: notLoggedIds },
+        type: 'meal_reminder',
+        title,
+        createdAt: { $gte: todayStart, $lt: todayEnd },
+      })
+        .select('userId')
+        .lean()
+    ).map((n) => n.userId.toString())
+  );
 
-    await Notification.create({
-      userId: plan.patientId,
-      title,
-      message,
-      type: 'meal_reminder',
-    });
+  const toNotify = notLoggedIds.filter((id) => !alreadyNotified.has(id.toString()));
+  if (toNotify.length === 0) {
+    return { checked: activePlans.length, notified: 0 };
+  }
 
-    const patient = await User.findById(plan.patientId).select('deviceTokens').lean();
-    const tokens = (patient?.deviceTokens || []).map((t) => t.token);
+  // 4. Write the in-app notifications in one go.
+  await Notification.insertMany(
+    toNotify.map((pid) => ({ userId: pid, title, message, type: 'meal_reminder' })),
+    { ordered: false }
+  );
+
+  // 5. Device tokens for everyone we notified, then best-effort push per
+  //    recipient (the push itself is unavoidably one call per recipient).
+  const patients = await User.find({ _id: { $in: toNotify } })
+    .select('_id deviceTokens')
+    .lean();
+  const tokensByPatient = new Map(
+    patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
+  );
+
+  for (const pid of toNotify) {
+    const tokens = tokensByPatient.get(pid.toString()) || [];
+    if (tokens.length === 0) continue;
     await sendPushToTokens(
       tokens,
       {
@@ -92,16 +130,12 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
         data: { deepLink: 'docwellness://timeline', servingTime: slot },
       },
       (deadToken) => {
-        User.updateOne({ _id: plan.patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
-          () => {}
-        );
+        User.updateOne({ _id: pid }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
       }
     ).catch((err) => console.error('[mealReminder] push failed (non-fatal):', err.message));
-
-    notified += 1;
   }
 
-  return { checked: activePlans.length, notified };
+  return { checked: activePlans.length, notified: toNotify.length };
 }
 
 module.exports = { runMealReminderSweep };

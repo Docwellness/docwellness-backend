@@ -36,53 +36,77 @@ async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
 
   const title = 'Stay hydrated';
 
-  let notified = 0;
+  // Patients still short of today's goal at this checkpoint, keyed to the
+  // message tailored to how much they have left.
+  const shortfall = new Map(); // patientId string -> message
   for (const patientId of activePatientIds) {
     const log = waterLogByPatient.get(patientId.toString());
     const totalAmount = log?.totalAmount || 0;
     const goal = log?.goal || 2500;
     if (totalAmount >= goal) continue;
-
     const remainingLiters = ((goal - totalAmount) / 1000).toFixed(1);
-    const message = `You've got ${remainingLiters}L left to reach today's water goal.`;
+    shortfall.set(
+      patientId.toString(),
+      `You've got ${remainingLiters}L left to reach today's water goal.`
+    );
+  }
+  if (shortfall.size === 0) return { checked: activePatientIds.length, notified: 0 };
 
-    // Dedupe within this checkpoint's own run window - a manual re-trigger
-    // must not double-notify the same patient for the same checkpoint.
-    const already = await Notification.findOne({
-      userId: patientId,
-      type: 'water_reminder',
+  // Cross-app performance optimization, Phase 2/3: the dedupe check and the
+  // device-token lookup were one query per patient inside the loop - batch
+  // both. Dedupe within this checkpoint's own run window so a manual
+  // re-trigger can't double-notify the same patient for the same checkpoint.
+  const shortfallIds = [...shortfall.keys()];
+  const alreadyNotified = new Set(
+    (
+      await Notification.find({
+        userId: { $in: shortfallIds },
+        type: 'water_reminder',
+        title,
+        createdAt: { $gte: dedupeWindowStart },
+      })
+        .select('userId')
+        .lean()
+    ).map((n) => n.userId.toString())
+  );
+
+  const toNotify = shortfallIds.filter((id) => !alreadyNotified.has(id));
+  if (toNotify.length === 0) return { checked: activePatientIds.length, notified: 0 };
+
+  await Notification.insertMany(
+    toNotify.map((pid) => ({
+      userId: pid,
       title,
-      createdAt: { $gte: dedupeWindowStart },
-    })
-      .select('_id')
-      .lean();
-    if (already) continue;
-
-    await Notification.create({
-      userId: patientId,
-      title,
-      message,
+      message: shortfall.get(pid),
       type: 'water_reminder',
-    });
+    })),
+    { ordered: false }
+  );
 
-    const patient = await User.findById(patientId).select('deviceTokens').lean();
-    const tokens = (patient?.deviceTokens || []).map((t) => t.token);
+  const patients = await User.find({ _id: { $in: toNotify } })
+    .select('_id deviceTokens')
+    .lean();
+  const tokensByPatient = new Map(
+    patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
+  );
+
+  for (const pid of toNotify) {
+    const tokens = tokensByPatient.get(pid) || [];
+    if (tokens.length === 0) continue;
     await sendPushToTokens(
       tokens,
       {
         title,
-        body: message,
+        body: shortfall.get(pid),
         data: { deepLink: 'docwellness://timeline', checkpoint: checkpoint || '' },
       },
       (deadToken) => {
-        User.updateOne({ _id: patientId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
+        User.updateOne({ _id: pid }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
       }
     ).catch((err) => console.error('[waterReminder] push failed (non-fatal):', err.message));
-
-    notified += 1;
   }
 
-  return { checked: activePatientIds.length, notified };
+  return { checked: activePatientIds.length, notified: toNotify.length };
 }
 
 module.exports = { runWaterReminderSweep };
