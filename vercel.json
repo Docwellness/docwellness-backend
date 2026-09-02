@@ -24,6 +24,7 @@
     { "path": "/api/internal/cron/water-reminder?checkpoint=1", "schedule": "30 4 * * *" },
     { "path": "/api/internal/cron/water-reminder?checkpoint=2", "schedule": "30 7 * * *" },
     { "path": "/api/internal/cron/water-reminder?checkpoint=3", "schedule": "30 10 * * *" },
-    { "path": "/api/internal/cron/water-reminder?checkpoint=4", "schedule": "30 13 * * *" }
+    { "path": "/api/internal/cron/water-reminder?checkpoint=4", "schedule": "30 13 * * *" },
+    { "path": "/api/internal/cron/drain-jobs", "schedule": "* * * * *" }
   ]
 }
