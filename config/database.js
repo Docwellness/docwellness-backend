@@ -56,6 +56,38 @@ async function dropStaleUsernameIndex(connection) {
   }
 }
 
+// Opt-in, run-once index reconciliation on boot. Mongoose's autoIndex
+// (on by default) already CREATES any schema-declared index that's missing,
+// but it never DROPS one that used to be declared and isn't anymore - e.g.
+// when a narrow index is replaced by a wider compound one
+// ({ dieticianId, status } -> { dieticianId, status, endDate }). Set
+// SYNC_INDEXES_ON_BOOT=true for a single deploy to also drop those stale
+// indexes (Model.syncIndexes() = create missing + drop no-longer-declared,
+// idempotent, index metadata only, never touches documents), then remove
+// the flag. This exists so the cleanup can happen without shell access to
+// the container (scripts/maintenance/ensure-indexes.js does the same thing
+// when a terminal IS available). Detached + best-effort: the server starts
+// serving immediately, exactly as it would with autoIndex alone.
+let syncIndexesAttempted = false;
+function syncIndexesOnBoot() {
+  if (syncIndexesAttempted || process.env.SYNC_INDEXES_ON_BOOT !== 'true') return;
+  syncIndexesAttempted = true;
+  const names = mongoose.modelNames();
+  console.log(`syncIndexesOnBoot: reconciling indexes for ${names.length} model(s)...`);
+  Promise.allSettled(
+    names.map(async (name) => {
+      try {
+        const dropped = await mongoose.model(name).syncIndexes();
+        if (dropped.length > 0) {
+          console.log(`syncIndexesOnBoot: ${name} - dropped stale index(es): ${dropped.join(', ')}`);
+        }
+      } catch (err) {
+        console.error(`syncIndexesOnBoot: ${name} - failed (non-fatal): ${err.message}`);
+      }
+    })
+  ).then(() => console.log('syncIndexesOnBoot: done.'));
+}
+
 // A `mongodb+srv://` URI needs a DNS SRV lookup before the driver can even
 // open a socket - seen intermittently failing with `querySrv ECONNREFUSED`
 // on a freshly-spawned process (Node's bundled c-ares resolver occasionally
@@ -137,6 +169,7 @@ const connectDB = async () => {
   const conn = await connectWithRetry(process.env.MONGODB_URI);
   console.log(`MongoDB Connected: ${conn.connection.host}`);
   await dropStaleUsernameIndex(conn.connection);
+  syncIndexesOnBoot();
   return conn.connection;
 };
 
