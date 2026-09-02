@@ -19,6 +19,12 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const config = require('../../config/environment');
+// Reuse the app's own connect (retry + private-CA TLS handling) rather than
+// a raw mongoose.connect(): prod's self-hosted Mongo is reached over TLS
+// with a private CA (MONGODB_TLS_CA_BASE64 -> tls/tlsCAFile in
+// config/database.js). A bare connect here skips that and dies with a
+// misleading "self-signed certificate in certificate chain".
+const connectDB = require('../../config/database');
 
 // Requiring these registers every model on `mongoose` as a side effect,
 // regardless of whether it's re-exported by models/index.js or
@@ -35,7 +41,7 @@ async function main() {
   }
 
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(config.mongodbUri);
+  await connectDB();
   console.log('Connected.\n');
 
   const modelNames = mongoose.modelNames().sort();
