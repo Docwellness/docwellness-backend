@@ -135,11 +135,32 @@ async function resolveWeightTrend(patientId) {
 exports.listPatientsForDietician = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
-    const { tab = 'new', page = '1', limit = '10' } = req.query || {};
+    const { tab = 'new', page = '1', limit = '10', search = '' } = req.query || {};
 
     const normalizedTab = ['new', 'ongoing', 'past'].includes((tab || '').toLowerCase())
       ? tab.toLowerCase()
       : 'new';
+
+    // Optional server-side name search. Applied inside the aggregation (after
+    // the patient $lookup) so it composes with pagination - a client-side
+    // "contains" filter over one page could never find a match past the
+    // first page. Escaped so a stray regex metacharacter in the query can't
+    // throw or match unexpectedly.
+    const trimmedSearch = String(search || '').trim();
+    const searchStages = trimmedSearch
+      ? [
+          { $lookup: { from: 'users', localField: 'patient', foreignField: '_id', as: '_searchUser' } },
+          { $unwind: { path: '$_searchUser', preserveNullAndEmptyArrays: true } },
+          {
+            $match: {
+              '_searchUser.profile.fullName': {
+                $regex: trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+                $options: 'i',
+              },
+            },
+          },
+        ]
+      : [];
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const limitParsed = parseInt(limit, 10);
@@ -227,6 +248,7 @@ exports.listPatientsForDietician = async (req, res, next) => {
       { $group: { _id: '$patient', doc: { $first: '$$ROOT' } } },
       { $replaceRoot: { newRoot: '$doc' } },
       { $sort: { createdAt: -1 } },
+      ...searchStages,
     ];
 
     const [countResult, requests] = await Promise.all([
