@@ -5,6 +5,7 @@ const DietPlan = require('../../models/DietPlan');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { invalidatePatientStats } = require('../../utils/patientStatsCache');
 const fs = require('fs/promises');
 
 // v1 Chat Integration
@@ -70,6 +71,7 @@ exports.createMealLog = async (req, res, next) => {
       await todayLog.save();
     }
 
+    await invalidatePatientStats(patientId);
     const todayStats = await getTodayStatsInternal(patientId);
 
     await sendMealUpdateToChat(req, patientId, {
@@ -138,6 +140,7 @@ exports.updateMealLog = async (req, res, next) => {
       await mealLog.save();
     }
 
+    await invalidatePatientStats(patientId);
     const todayStats = await getTodayStatsInternal(patientId);
 
     await sendMealUpdateToChat(req, patientId, {
@@ -202,6 +205,7 @@ exports.deleteMealLog = async (req, res, next) => {
     } else {
       await mealLog.deleteOne();
     }
+    await invalidatePatientStats(patientId);
 
     res.status(200).json({ success: true, message: 'Meal deleted' });
   } catch (error) {
@@ -349,6 +353,7 @@ exports.completeMeal = async (req, res, next) => {
       await mealLog.save();
     }
 
+    await invalidatePatientStats(patientId);
     const todayStats = await getTodayStatsInternal(patientId);
 
     await sendMealUpdateToChat(req, patientId, {
