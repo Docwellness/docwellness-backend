@@ -11,6 +11,7 @@ const {
   resolveCurrentWeek,
 } = require('../../utils/dietPlanWeek');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
+const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 const { buildPlanItemPatientView, baseRecipeIdFromKey } = require('../../utils/dietPlanReadDispatch');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
@@ -873,271 +874,293 @@ exports.getTodayMealLogStats = async (req, res, next) => {
     const queryDate = req.query.date;
     const today = queryDate ? normalizeDate(new Date(queryDate)) : normalizeDate(new Date());
 
-    const dietPlan = await DietPlan.findOne({
-      patientId: req.user._id,
-      status: 'Active',
-    })
-      .populate('request', 'startDateForDiet')
-      .lean();
+    // Cross-app performance optimization, task 2.6: this whole computation
+    // (DietPlan + MealLog + Recipe fetch + per-meal ratio math) is cached
+    // per patient + day for a short window. The patient's own meal-log
+    // writes wipe it immediately (see invalidatePatientStats call sites),
+    // so their view is never stale to their own actions; the TTL is the
+    // backstop for dietician-side plan/recipe edits.
+    const dayKey = today.toISOString().slice(0, 10);
+    const cacheKey = `pstat:mealtoday:${req.user._id}:${dayKey}`;
+    const result = await getOrSetPatientStat(
+      String(req.user._id),
+      cacheKey,
+      120,
+      () => computeTodayMealLogStats(req.user._id, today)
+    );
 
-    if (!dietPlan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Active diet plan not found',
-      });
+    if (result && result.noPlan) {
+      return res.status(404).json({ success: false, message: 'Active diet plan not found' });
     }
+    return res.status(200).json({ success: true, data: result.data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * The body of GET /meal-log/today-stats, extracted so getTodayMealLogStats
+ * can cache it (task 2.6). Returns `{ noPlan: true }` or `{ data: {...} }`.
+ */
+async function computeTodayMealLogStats(patientId, today) {
+  const dietPlan = await DietPlan.findOne({
+    patientId,
+    status: 'Active',
+  })
+    .populate('request', 'startDateForDiet')
+    .lean();
+
+  if (!dietPlan) {
+    return { noPlan: true };
+  }
 
     const weeks = getFinalizedWeeks(dietPlan);
 
     const currentWeek = resolveCurrentWeek(dietPlan, today);
 
-    const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
+  const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
 
-    // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
-    // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) bundled
-    // together in dailyMeals - scope "today's plan" down to just the group
-    // `today` falls into, same as getActiveDietPlanForPatient/
-    // getPatientMealLogStats (dietician side) already do. Missing this
-    // filter here summed all 4 groups' meals together, inflating planned
-    // calories ~4x+ over the real daily target.
-    const todayDayGroup = resolveDayGroupForDate(today);
-    const todaysDailyMeals = week
-      ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
-      : [];
+  // Each week now has 4 day-groups (Monday=Friday, Tuesday=Saturday,
+  // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) bundled
+  // together in dailyMeals - scope "today's plan" down to just the group
+  // `today` falls into, same as getActiveDietPlanForPatient/
+  // getPatientMealLogStats (dietician side) already do. Missing this
+  // filter here summed all 4 groups' meals together, inflating planned
+  // calories ~4x+ over the real daily target.
+  const todayDayGroup = resolveDayGroupForDate(today);
+  const todaysDailyMeals = week
+    ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
+    : [];
 
-    const recipeIds = new Set();
-    todaysDailyMeals.forEach((meal) => {
-      if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
-    });
+  const recipeIds = new Set();
+  todaysDailyMeals.forEach((meal) => {
+    if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+  });
 
-    const existingLog = await MealLog.findOne({
-      patientId: req.user._id,
-      date: today,
-    }).lean();
+  const existingLog = await MealLog.findOne({
+    patientId: patientId,
+    date: today,
+  }).lean();
 
-    const loggedMeals = existingLog?.meals || [];
-    // Also fetch recipes for anything already logged, even if it falls
-    // outside today's actual day-group plan (e.g. logged against a stale
-    // assignment) - needed so consumed calories/macros below can always be
-    // recomputed live from the recipe's current data instead of trusting
-    // whatever was frozen into the log at the moment it was submitted.
-    loggedMeals.forEach((m) => {
-      if (m?.recipeId) recipeIds.add(m.recipeId.toString());
-    });
+  const loggedMeals = existingLog?.meals || [];
+  // Also fetch recipes for anything already logged, even if it falls
+  // outside today's actual day-group plan (e.g. logged against a stale
+  // assignment) - needed so consumed calories/macros below can always be
+  // recomputed live from the recipe's current data instead of trusting
+  // whatever was frozen into the log at the moment it was submitted.
+  loggedMeals.forEach((m) => {
+    if (m?.recipeId) recipeIds.add(m.recipeId.toString());
+  });
 
-    const recipeDocs = recipeIds.size
-      ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name image servingSize secondaryComponent components nutrition servingTime')
-        .lean()
-      : [];
+  const recipeDocs = recipeIds.size
+    ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
+      .select('name image servingSize secondaryComponent components nutrition servingTime')
+      .lean()
+    : [];
 
-    const recipes = {};
-    recipeDocs.forEach((recipe) => {
-      const id = recipe._id.toString();
-      recipes[id] = {
-        id,
-        name: recipe.name || null,
-        image: recipe.image || null,
-        servingTime: recipe.servingTime || null,
-        // Raw shape computeMealRatio (utils/weekNutritionSummary.js) needs -
-        // servingSize/secondaryComponent/components as stored, not flattened
-        // to a single baseQuantity. That single-quantity/single-ratio
-        // shortcut (assignedQuantity / baseQuantity, applied uniformly to
-        // the whole recipe) was this endpoint's own reimplementation and
-        // silently ignored componentServings/secondaryServings on any
-        // multi-component recipe (e.g. a fruit + nuts combo where only the
-        // nuts portion was adjusted) - ratio is now computed the same way
-        // everywhere else in the app (the dietician app's own live "Total
-        // Budget" preview, and this same computeMealRatio at finalize time),
-        // instead of a fourth, drifted approximation just for this screen.
-        servingSize: recipe.servingSize || null,
-        secondaryComponent: recipe.secondaryComponent || null,
-        components: recipe.components || null,
-        calories: recipe.nutrition?.calories || 0,
-        protein: recipe.nutrition?.protein || 0,
-        carbs: recipe.nutrition?.carbs || 0,
-        fats: recipe.nutrition?.fats || 0,
-        fiber: recipe.nutrition?.fiber || 0,
-      };
-    });
+  const recipes = {};
+  recipeDocs.forEach((recipe) => {
+    const id = recipe._id.toString();
+    recipes[id] = {
+      id,
+      name: recipe.name || null,
+      image: recipe.image || null,
+      servingTime: recipe.servingTime || null,
+      // Raw shape computeMealRatio (utils/weekNutritionSummary.js) needs -
+      // servingSize/secondaryComponent/components as stored, not flattened
+      // to a single baseQuantity. That single-quantity/single-ratio
+      // shortcut (assignedQuantity / baseQuantity, applied uniformly to
+      // the whole recipe) was this endpoint's own reimplementation and
+      // silently ignored componentServings/secondaryServings on any
+      // multi-component recipe (e.g. a fruit + nuts combo where only the
+      // nuts portion was adjusted) - ratio is now computed the same way
+      // everywhere else in the app (the dietician app's own live "Total
+      // Budget" preview, and this same computeMealRatio at finalize time),
+      // instead of a fourth, drifted approximation just for this screen.
+      servingSize: recipe.servingSize || null,
+      secondaryComponent: recipe.secondaryComponent || null,
+      components: recipe.components || null,
+      calories: recipe.nutrition?.calories || 0,
+      protein: recipe.nutrition?.protein || 0,
+      carbs: recipe.nutrition?.carbs || 0,
+      fats: recipe.nutrition?.fats || 0,
+      fiber: recipe.nutrition?.fiber || 0,
+    };
+  });
 
-    // Ratio of what the dietician actually assigned vs. the recipe's own base
-    // serving(s), keyed by servingTime+recipeId - the single scale factor
-    // that must apply to every calorie/macro number below (planned and
-    // consumed alike) instead of the recipe's raw, unscaled base nutrition.
-    // computeMealRatio averages every component's own (assigned/base) ratio
-    // (falling back to meal.servings/secondaryServings for components 0/1 on
-    // an older meal without componentServings) - the same formula the
-    // dietician app's PatientsController._nutritionScaleRatio and this
-    // backend's own finalize-time weeksSummary already use, so this screen's
-    // numbers can't drift from either of those again.
-    const assignedRatioByKey = {};
+  // Ratio of what the dietician actually assigned vs. the recipe's own base
+  // serving(s), keyed by servingTime+recipeId - the single scale factor
+  // that must apply to every calorie/macro number below (planned and
+  // consumed alike) instead of the recipe's raw, unscaled base nutrition.
+  // computeMealRatio averages every component's own (assigned/base) ratio
+  // (falling back to meal.servings/secondaryServings for components 0/1 on
+  // an older meal without componentServings) - the same formula the
+  // dietician app's PatientsController._nutritionScaleRatio and this
+  // backend's own finalize-time weeksSummary already use, so this screen's
+  // numbers can't drift from either of those again.
+  const assignedRatioByKey = {};
+  todaysDailyMeals.forEach((meal) => {
+    const recipe = recipes[meal.recipeId];
+    if (!recipe) return;
+    const key = `${meal.servingTime}:${recipe.id}`;
+    assignedRatioByKey[key] = computeMealRatio(meal, recipe);
+  });
+
+  // Recomputed live from the recipe's *current* data (fetched by id) each
+  // time, rather than trusting MealLog's frozen caloriesConsumed snapshot -
+  // so if a recipe's nutrition is corrected later (e.g. the Jowar Bhakri/
+  // Bajra Bhakri/Chapati/Steamed Rice fixes), every already-logged meal
+  // using it reflects the correction instead of perpetuating the old wrong
+  // number forever. Falls back to the stored snapshot only when the
+  // recipe/ratio can't be resolved (e.g. a custom "Create My Food" entry
+  // with no matching plan recipe to sync against).
+  const liveCaloriesConsumed = (loggedMeal) => {
+    const recipe = recipes[loggedMeal.recipeId?.toString()];
+    const ratio =
+      assignedRatioByKey[`${loggedMeal.servingTime}:${loggedMeal.recipeId?.toString()}`];
+    if (recipe && ratio !== undefined) {
+      return (recipe.calories || 0) * ratio * (loggedMeal.servings || 1);
+    }
+    return loggedMeal.caloriesConsumed || 0;
+  };
+
+  const plannedMeals = [];
+  const servingTimeOrder = [
+    'Morning Drink',
+    'Breakfast',
+    'Brunch',
+    'Lunch',
+    'Evening Snack',
+    'Dinner',
+    'Night Drink',
+  ];
+
+  if (week) {
     todaysDailyMeals.forEach((meal) => {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
-      const key = `${meal.servingTime}:${recipe.id}`;
-      assignedRatioByKey[key] = computeMealRatio(meal, recipe);
-    });
 
-    // Recomputed live from the recipe's *current* data (fetched by id) each
-    // time, rather than trusting MealLog's frozen caloriesConsumed snapshot -
-    // so if a recipe's nutrition is corrected later (e.g. the Jowar Bhakri/
-    // Bajra Bhakri/Chapati/Steamed Rice fixes), every already-logged meal
-    // using it reflects the correction instead of perpetuating the old wrong
-    // number forever. Falls back to the stored snapshot only when the
-    // recipe/ratio can't be resolved (e.g. a custom "Create My Food" entry
-    // with no matching plan recipe to sync against).
-    const liveCaloriesConsumed = (loggedMeal) => {
-      const recipe = recipes[loggedMeal.recipeId?.toString()];
-      const ratio =
-        assignedRatioByKey[`${loggedMeal.servingTime}:${loggedMeal.recipeId?.toString()}`];
-      if (recipe && ratio !== undefined) {
-        return (recipe.calories || 0) * ratio * (loggedMeal.servings || 1);
-      }
-      return loggedMeal.caloriesConsumed || 0;
-    };
+      const logged = loggedMeals.find(
+        (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === recipe.id
+      );
+      const ratio = assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] ?? 1;
 
-    const plannedMeals = [];
-    const servingTimeOrder = [
-      'Morning Drink',
-      'Breakfast',
-      'Brunch',
-      'Lunch',
-      'Evening Snack',
-      'Dinner',
-      'Night Drink',
-    ];
-
-    if (week) {
-      todaysDailyMeals.forEach((meal) => {
-        const recipe = recipes[meal.recipeId];
-        if (!recipe) return;
-
-        const logged = loggedMeals.find(
-          (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === recipe.id
-        );
-        const ratio = assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] ?? 1;
-
-        plannedMeals.push({
-          recipeId: recipe.id,
-          name: recipe.name,
-          image: recipe.image,
-          servingTime: meal.servingTime,
-          plannedCalories: recipe.calories * ratio,
-          protein: recipe.protein * ratio,
-          carbs: recipe.carbs * ratio,
-          fats: recipe.fats * ratio,
-          fiber: recipe.fiber * ratio,
-          loggedServings: logged?.servings || 0,
-          caloriesConsumed: logged ? liveCaloriesConsumed(logged) : 0,
-          isLogged: !!logged,
-          notes: logged?.notes || '',
-        });
+      plannedMeals.push({
+        recipeId: recipe.id,
+        name: recipe.name,
+        image: recipe.image,
+        servingTime: meal.servingTime,
+        plannedCalories: recipe.calories * ratio,
+        protein: recipe.protein * ratio,
+        carbs: recipe.carbs * ratio,
+        fats: recipe.fats * ratio,
+        fiber: recipe.fiber * ratio,
+        loggedServings: logged?.servings || 0,
+        caloriesConsumed: logged ? liveCaloriesConsumed(logged) : 0,
+        isLogged: !!logged,
+        notes: logged?.notes || '',
       });
-    }
-
-    plannedMeals.sort((a, b) => {
-      return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
     });
-
-    // The real sum of *today's own* assigned meals (plannedMeals is already
-    // scoped to todaysDailyMeals, this day-group only) - not
-    // weekSummary.totalCalories, which is a day-group-weighted 7-day
-    // *average* across all 4 day-groups (see computeWeekSummary), so it
-    // never actually equals any single day's real total and drifted from
-    // what the dietician's own "Selected Calories" shows for that specific
-    // day. Patients need today's real planned total, not a cross-day
-    // average.
-    const totalPlannedCalories = plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
-    // Recomputed live per logged meal (see liveCaloriesConsumed above)
-    // instead of trusting MealLog.totalCalories, a snapshot frozen at
-    // whatever the recipe's calorie count was at the moment each meal was
-    // logged - this is what keeps the displayed "Intake" in sync with the
-    // dietician's current assigned calories rather than stale history.
-    const totalConsumedCalories = Math.round(
-      loggedMeals.reduce((sum, m) => sum + liveCaloriesConsumed(m), 0)
-    );
-    const remainingCalories = totalPlannedCalories - totalConsumedCalories;
-
-    const loggedCount = plannedMeals.filter((m) => m.isLogged).length;
-    const totalMeals = plannedMeals.length;
-
-    // m.servings on a *logged* meal (MealLog.meals) is the patient's portion
-    // multiplier of what was actually assigned (see getMealLogScreenData /
-    // sendLogMeal on the client - "Portion 1" = ate exactly the prescribed
-    // amount), not a multiplier of the recipe's raw base serving - so each
-    // macro must go through the same assignedRatioByKey scale factor used
-    // for plannedMeals above before applying that portion count.
-    // Scaling by assignedRatioByKey (a fraction, e.g. 75g/300g = 0.25) turns
-    // these into non-integer values - round at the API boundary so every
-    // macro field stays a whole-gram number, same as the calorie fields
-    // above. The client casts these `as int` (see HomeController.
-    // fetchTodayStats), which throws on a raw double.
-    const macroConsumed = {
-      protein: Math.round(loggedMeals.reduce((sum, m) => {
-        const recipe = recipes[m.recipeId?.toString()];
-        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
-        return sum + (recipe?.protein || 0) * ratio * (m.servings || 1);
-      }, 0)),
-      carbs: Math.round(loggedMeals.reduce((sum, m) => {
-        const recipe = recipes[m.recipeId?.toString()];
-        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
-        return sum + (recipe?.carbs || 0) * ratio * (m.servings || 1);
-      }, 0)),
-      fats: Math.round(loggedMeals.reduce((sum, m) => {
-        const recipe = recipes[m.recipeId?.toString()];
-        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
-        return sum + (recipe?.fats || 0) * ratio * (m.servings || 1);
-      }, 0)),
-      fiber: Math.round(loggedMeals.reduce((sum, m) => {
-        const recipe = recipes[m.recipeId?.toString()];
-        const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
-        return sum + (recipe?.fiber || 0) * ratio * (m.servings || 1);
-      }, 0)),
-    };
-
-    // Same reasoning as totalPlannedCalories above - today's own meals, not
-    // weekSummary's cross-day-group weighted average.
-    const macroPlanned = {
-      protein: Math.round(plannedMeals.reduce((sum, m) => sum + m.protein, 0)),
-      carbs: Math.round(plannedMeals.reduce((sum, m) => sum + m.carbs, 0)),
-      fats: Math.round(plannedMeals.reduce((sum, m) => sum + m.fats, 0)),
-      fiber: Math.round(plannedMeals.reduce((sum, m) => sum + m.fiber, 0)),
-    };
-
-    const resolvedPlanStartDate = resolvePlanStartDate(dietPlan);
-    const planStartDate = resolvedPlanStartDate ? normalizeDate(resolvedPlanStartDate) : null;
-    const planEndDate = planStartDate
-      ? new Date(planStartDate.getFullYear(), planStartDate.getMonth() + 1, planStartDate.getDate())
-      : null;
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        date: today,
-        currentWeek,
-        planStartDate: planStartDate ? planStartDate.toISOString() : null,
-        planEndDate: planEndDate ? planEndDate.toISOString() : null,
-        summary: {
-          totalPlannedCalories,
-          totalConsumedCalories,
-          remainingCalories,
-          loggedCount,
-          totalMeals,
-          completionPercentage: totalMeals > 0 ? Math.round((loggedCount / totalMeals) * 100) : 0,
-        },
-        macros: {
-          consumed: macroConsumed,
-          planned: macroPlanned,
-        },
-        meals: plannedMeals,
-        canEdit: true,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
-};
+
+  plannedMeals.sort((a, b) => {
+    return servingTimeOrder.indexOf(a.servingTime) - servingTimeOrder.indexOf(b.servingTime);
+  });
+
+  // The real sum of *today's own* assigned meals (plannedMeals is already
+  // scoped to todaysDailyMeals, this day-group only) - not
+  // weekSummary.totalCalories, which is a day-group-weighted 7-day
+  // *average* across all 4 day-groups (see computeWeekSummary), so it
+  // never actually equals any single day's real total and drifted from
+  // what the dietician's own "Selected Calories" shows for that specific
+  // day. Patients need today's real planned total, not a cross-day
+  // average.
+  const totalPlannedCalories = plannedMeals.reduce((sum, m) => sum + m.plannedCalories, 0);
+  // Recomputed live per logged meal (see liveCaloriesConsumed above)
+  // instead of trusting MealLog.totalCalories, a snapshot frozen at
+  // whatever the recipe's calorie count was at the moment each meal was
+  // logged - this is what keeps the displayed "Intake" in sync with the
+  // dietician's current assigned calories rather than stale history.
+  const totalConsumedCalories = Math.round(
+    loggedMeals.reduce((sum, m) => sum + liveCaloriesConsumed(m), 0)
+  );
+  const remainingCalories = totalPlannedCalories - totalConsumedCalories;
+
+  const loggedCount = plannedMeals.filter((m) => m.isLogged).length;
+  const totalMeals = plannedMeals.length;
+
+  // m.servings on a *logged* meal (MealLog.meals) is the patient's portion
+  // multiplier of what was actually assigned (see getMealLogScreenData /
+  // sendLogMeal on the client - "Portion 1" = ate exactly the prescribed
+  // amount), not a multiplier of the recipe's raw base serving - so each
+  // macro must go through the same assignedRatioByKey scale factor used
+  // for plannedMeals above before applying that portion count.
+  // Scaling by assignedRatioByKey (a fraction, e.g. 75g/300g = 0.25) turns
+  // these into non-integer values - round at the API boundary so every
+  // macro field stays a whole-gram number, same as the calorie fields
+  // above. The client casts these `as int` (see HomeController.
+  // fetchTodayStats), which throws on a raw double.
+  const macroConsumed = {
+    protein: Math.round(loggedMeals.reduce((sum, m) => {
+      const recipe = recipes[m.recipeId?.toString()];
+      const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+      return sum + (recipe?.protein || 0) * ratio * (m.servings || 1);
+    }, 0)),
+    carbs: Math.round(loggedMeals.reduce((sum, m) => {
+      const recipe = recipes[m.recipeId?.toString()];
+      const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+      return sum + (recipe?.carbs || 0) * ratio * (m.servings || 1);
+    }, 0)),
+    fats: Math.round(loggedMeals.reduce((sum, m) => {
+      const recipe = recipes[m.recipeId?.toString()];
+      const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+      return sum + (recipe?.fats || 0) * ratio * (m.servings || 1);
+    }, 0)),
+    fiber: Math.round(loggedMeals.reduce((sum, m) => {
+      const recipe = recipes[m.recipeId?.toString()];
+      const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
+      return sum + (recipe?.fiber || 0) * ratio * (m.servings || 1);
+    }, 0)),
+  };
+
+  // Same reasoning as totalPlannedCalories above - today's own meals, not
+  // weekSummary's cross-day-group weighted average.
+  const macroPlanned = {
+    protein: Math.round(plannedMeals.reduce((sum, m) => sum + m.protein, 0)),
+    carbs: Math.round(plannedMeals.reduce((sum, m) => sum + m.carbs, 0)),
+    fats: Math.round(plannedMeals.reduce((sum, m) => sum + m.fats, 0)),
+    fiber: Math.round(plannedMeals.reduce((sum, m) => sum + m.fiber, 0)),
+  };
+
+  const resolvedPlanStartDate = resolvePlanStartDate(dietPlan);
+  const planStartDate = resolvedPlanStartDate ? normalizeDate(resolvedPlanStartDate) : null;
+  const planEndDate = planStartDate
+    ? new Date(planStartDate.getFullYear(), planStartDate.getMonth() + 1, planStartDate.getDate())
+    : null;
+
+  return {
+    data: {
+      date: today,
+      currentWeek,
+      planStartDate: planStartDate ? planStartDate.toISOString() : null,
+      planEndDate: planEndDate ? planEndDate.toISOString() : null,
+      summary: {
+        totalPlannedCalories,
+        totalConsumedCalories,
+        remainingCalories,
+        loggedCount,
+        totalMeals,
+        completionPercentage: totalMeals > 0 ? Math.round((loggedCount / totalMeals) * 100) : 0,
+      },
+      macros: {
+        consumed: macroConsumed,
+        planned: macroPlanned,
+      },
+      meals: plannedMeals,
+      canEdit: true,
+    },
+  };
+}
 
 /**
  * @route   GET /api/patient/meal-log/screen-data
@@ -1414,6 +1437,10 @@ exports.submitMealLog = async (req, res, next) => {
 
     // ✅ Persist changes to DB
     await log.save();
+
+    // The patient's own meal-log changed - drop their cached stat windows so
+    // their Home/Diet screens reflect it immediately (task 2.6).
+    await invalidatePatientStats(req.user._id);
 
     try {
       const io = req.app.get('io');
