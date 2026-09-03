@@ -151,3 +151,41 @@ describe('getUserFromSupabaseToken + token cache', () => {
     expect(mockState.getUserCalls).toBe(2);
   });
 });
+
+describe('deactivated-account gate', () => {
+  test('a user with isActive:false is rejected (cache cold - full verify path)', async () => {
+    await seedUser({ isActive: false });
+    await expect(getUserFromSupabaseToken(token())).rejects.toMatchObject({
+      code: 'account_disabled',
+    });
+  });
+
+  test('deactivating a user takes effect on the next request even on a cache hit', async () => {
+    const user = await seedUser();
+    const t = token();
+
+    // First call warms the token->id cache.
+    await getUserFromSupabaseToken(t);
+    expect(mockState.getUserCalls).toBe(1);
+
+    await User.updateOne({ _id: user._id }, { isActive: false });
+
+    // Cache hit (no extra Supabase call), but the Mongo re-read sees isActive:false.
+    await expect(getUserFromSupabaseToken(t)).rejects.toMatchObject({ code: 'account_disabled' });
+    expect(mockState.getUserCalls).toBe(1);
+
+    // Reactivating restores access, still from cache.
+    await User.updateOne({ _id: user._id }, { isActive: true });
+    const resolved = await getUserFromSupabaseToken(t);
+    expect(resolved._id.toString()).toBe(user._id.toString());
+    expect(mockState.getUserCalls).toBe(1);
+  });
+
+  test("a blocked account's token is not cached", async () => {
+    await seedUser({ isActive: false });
+    const t = token();
+    await expect(getUserFromSupabaseToken(t)).rejects.toMatchObject({ code: 'account_disabled' });
+    // No token->id entry was written (setCachedUserId is skipped before the throw).
+    expect([...mockStore.keys()].some((k) => k.startsWith('authtok:'))).toBe(false);
+  });
+});
