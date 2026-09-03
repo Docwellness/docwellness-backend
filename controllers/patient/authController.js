@@ -33,6 +33,7 @@ const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
 const { isLoginLocked, registerFailedLogin, clearFailedLoginAttempts } = require('../../utils/loginLockout');
 const { dedupedRefresh } = require('../../utils/refreshDedup');
 const { logAuditEvent } = require('../../utils/auditLog');
+const { assertPasswordAcceptable } = require('../../utils/passwordPolicy');
 
 const sessionResponse = (session) => ({
   accessToken: session.access_token,
@@ -43,6 +44,19 @@ const sessionResponse = (session) => ({
 const bearerTokenFrom = (req) => {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer') ? header.split(' ')[1] : null;
+};
+
+// Runs the password policy (utils/passwordPolicy.js) and returns the
+// user-facing rejection message, or null when the password is acceptable.
+// Anything that isn't a policy failure propagates.
+const passwordPolicyError = async (password, context) => {
+  try {
+    await assertPasswordAcceptable(password, context);
+    return null;
+  } catch (err) {
+    if (err.code === 'weak_password') return err.message;
+    throw err;
+  }
 };
 
 /**
@@ -70,6 +84,11 @@ exports.signupRequest = async (req, res, next) => {
     const existingEmail = await User.findOne({ email: email.toLowerCase() });
     if (existingEmail) {
       return res.status(400).json({ success: false, message: 'User already exists with this email' });
+    }
+
+    const pwError = await passwordPolicyError(password, { email });
+    if (pwError) {
+      return res.status(400).json({ success: false, message: pwError, code: 'weak_password' });
     }
 
     let otp;
@@ -329,6 +348,11 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
+    const pwError = await passwordPolicyError(newPassword, { email });
+    if (pwError) {
+      return res.status(400).json({ success: false, message: pwError, code: 'weak_password' });
+    }
+
     try {
       await resetPasswordWithOtp(email, code, newPassword);
     } catch (err) {
@@ -443,6 +467,14 @@ exports.changePassword = async (req, res, next) => {
     const isMatch = await verifyPassword(req.user.email, currentPassword);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    const pwError = await passwordPolicyError(newPassword, {
+      email: req.user.email,
+      name: req.user.profile?.fullName,
+    });
+    if (pwError) {
+      return res.status(400).json({ success: false, message: pwError, code: 'weak_password' });
     }
 
     const { error } = await getSupabaseAdmin().auth.admin.updateUserById(req.user.supabaseUserId, {

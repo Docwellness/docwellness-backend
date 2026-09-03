@@ -96,6 +96,17 @@ async function verifySupabaseToken() {
   );
 }
 
+// Minimal stand-ins for the two admin-API password flows - just enough for
+// tests/passwordPolicyRoutes.test.js to reach the happy path (the policy
+// check runs before these in the controller). The real code goes through
+// Supabase's admin.generateLink / verifyOtp + updateUserById.
+async function generateSignupOtp() {
+  return '123456';
+}
+async function resetPasswordWithOtp() {
+  /* resolves - the OTP is always "valid" in tests */
+}
+
 async function signInWithPassword(email, password) {
   const entry = credentials.get(email.toLowerCase());
   if (!entry || entry.password !== password) {
@@ -123,6 +134,8 @@ module.exports = {
   verifySupabaseToken,
   signInWithPassword,
   refreshSession,
+  generateSignupOtp,
+  resetPasswordWithOtp,
   registerTestToken,
   registerTestCredentials,
   registerTestRefreshToken,
