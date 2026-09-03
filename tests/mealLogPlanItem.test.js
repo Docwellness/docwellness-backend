@@ -21,7 +21,7 @@ const { registerTestToken, clearTestTokens } = require('../utils/supabaseAuth');
 let request;
 let app;
 let createPatient;
-let createDietician;
+let createDefaultDietician;
 let Recipe;
 let FoodItem;
 let RecipeVersion;
@@ -30,14 +30,15 @@ let DayPlan;
 let MealSlotPlan;
 let PlanItem;
 let MealLog;
+let Notification;
 let versionedRecipeKey;
 
 beforeAll(async () => {
   await connectTestDb();
   request = require('supertest');
   app = require('../config/createApp')();
-  ({ createPatient, createDietician } = require('./helpers/factories'));
-  ({ Recipe, FoodItem, RecipeVersion, DietPlan, DayPlan, MealSlotPlan, PlanItem, MealLog } = require('../models'));
+  ({ createPatient, createDefaultDietician } = require('./helpers/factories'));
+  ({ Recipe, FoodItem, RecipeVersion, DietPlan, DayPlan, MealSlotPlan, PlanItem, MealLog, Notification } = require('../models'));
   ({ versionedRecipeKey } = require('../utils/dietPlanReadDispatch'));
 });
 
@@ -53,7 +54,9 @@ afterAll(async () => {
 const DAY_GROUPS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 
 async function seedPlanItemPlan() {
-  const dietician = await createDietician();
+  // the default dietician (id === config.defaultDieticianId) so it's also
+  // the receiver submitMealLog notifies.
+  const dietician = await createDefaultDietician();
   const patient = await createPatient();
 
   await FoodItem.create({
@@ -110,7 +113,7 @@ async function seedPlanItemPlan() {
   }
 
   const versionedId = versionedRecipeKey(recipe._id.toString(), 1);
-  return { patient, recipe, versionedId };
+  return { patient, dietician, recipe, versionedId };
 }
 
 test('screen-data returns the planned meal with its versioned recipeId and real calories', async () => {
@@ -212,4 +215,40 @@ test("today-stats returns the plan-item plan's real planned calories + macro goa
     .set('Authorization', 'Bearer patient-token');
   expect(after.body.data.summary.totalConsumedCalories).toBeGreaterThan(0);
   expect(after.body.data.summary.loggedCount).toBe(1);
+});
+
+test("dietician's Client Logged Data (today-stats) has the plan-item plan's real numbers", async () => {
+  const { patient, dietician, versionedId } = await seedPlanItemPlan();
+  registerTestToken('dietician-token', dietician._id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const res = await request(app)
+    .get(`/api/dietician/patients/${patient._id}/meal-log/today-stats?date=${today}`)
+    .set('Authorization', 'Bearer dietician-token');
+
+  expect(res.status).toBe(200);
+  // 100g oats @ 389 kcal/100g = 389 - the V1 version's real nutrition, not
+  // the base recipe's bogus 999, and not 0 (the pre-fix plan-item value).
+  expect(res.body.data.summary.totalPlannedCalories).toBeCloseTo(389, 0);
+  expect(res.body.data.macros.planned.carbs).toBeCloseTo(66, 0);
+  expect(res.body.data.meals).toHaveLength(1);
+  expect(res.body.data.meals[0]).toMatchObject({ recipeId: versionedId, servingTime: 'Breakfast' });
+});
+
+test('submitMealLog notifies the dietician (bell) when a plan-item patient logs a meal', async () => {
+  const { patient, dietician, versionedId } = await seedPlanItemPlan();
+  registerTestToken('patient-token', patient._id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await request(app)
+    .post('/api/patient/meal-log')
+    .set('Authorization', 'Bearer patient-token')
+    .send({ date: today, items: [{ servingTime: 'Breakfast', recipeId: versionedId, servings: 1, caloriesConsumed: 389 }] })
+    .expect(200);
+
+  const notifs = await Notification.find({ userId: dietician._id }).lean();
+  expect(notifs.length).toBeGreaterThanOrEqual(1);
+  const mealNotif = notifs.find((n) => /logged a meal/i.test(n.title));
+  expect(mealNotif).toBeTruthy();
+  expect(mealNotif.type).toBe('progress');
 });

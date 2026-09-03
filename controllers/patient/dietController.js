@@ -1,5 +1,8 @@
-const { DietPlan, Recipe, Ingredient, MealLog, Chat, Conversation } = require('../../models');
+const {
+  DietPlan, Recipe, Ingredient, MealLog, Chat, Conversation, Notification, User,
+} = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
+const { sendPushToTokens } = require('../../utils/push');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
@@ -1615,6 +1618,56 @@ exports.submitMealLog = async (req, res, next) => {
 
         if (io) {
           io.to(`user:${receiverId}`).emit('newMessage', mealChatMessage);
+        }
+
+        // The dietician gets a real bell notification + best-effort OS push
+        // when a patient logs a meal - the socket 'newMessage'/'meal_log_update'
+        // events above only reach an app that's open on this conversation.
+        // Mirrors chatController.sendMessage's own notify block.
+        try {
+          const patient = await User.findById(senderId).select('profile.fullName deviceTokens').lean();
+          const patientName = patient?.profile?.fullName || 'A patient';
+          const notifTitle = `${patientName} logged a meal`;
+          const notifBody = `${chatText} · ${Math.round(totalCaloriesLogged)} kcal`;
+          const notif = await Notification.create({
+            userId: receiverId,
+            title: notifTitle,
+            message: notifBody,
+            type: 'progress',
+            referenceId: conversation._id,
+            referenceModel: 'Chat',
+          });
+          if (io) {
+            io.to(`user:${receiverId}`).emit('notification.new', {
+              id: notif._id,
+              title: notif.title,
+              message: notif.message,
+              type: notif.type,
+              referenceId: notif.referenceId?.toString(),
+              createdAt: notif.createdAt,
+            });
+          }
+          const dietician = await User.findById(receiverId).select('deviceTokens').lean();
+          const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+          sendPushToTokens(
+            tokens,
+            {
+              title: notifTitle,
+              body: notifBody,
+              data: {
+                deepLink: 'docwellness://logged-data',
+                patientId: String(senderId),
+              },
+            },
+            (deadToken) => {
+              User.updateOne(
+                { _id: receiverId },
+                { $pull: { deviceTokens: { token: deadToken } } }
+              ).catch(() => {});
+            }
+          );
+        } catch (notifErr) {
+          console.error('Meal-log dietician notification error (non-fatal):', notifErr);
         }
       }
 

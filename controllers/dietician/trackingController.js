@@ -2,6 +2,7 @@ const { MealLog, DietPlan, User, Recipe, ExercisePlan, ExerciseLog } = require('
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
+const { buildPlanItemPatientView, baseRecipeIdFromKey } = require('../../utils/dietPlanReadDispatch');
 const {
   localDateStr,
   formatShortDate,
@@ -260,7 +261,20 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       });
     }
 
-    const weeks = getFinalizedWeeks(dietPlan);
+    // v4.0: a 'plan-item' plan has no finalizedPlan blob - synthesize its
+    // weeks the same way the patient-facing endpoints do. Without this the
+    // dietician's "Client Logged Data" screen showed 0 planned calories,
+    // 0/0g macro goals and "No meals planned" for every plan-item patient.
+    const isPlanItem = dietPlan.dataModel === 'plan-item';
+    let weeks;
+    let recipeVersionOverrides = {};
+    if (isPlanItem) {
+      const planItemView = await buildPlanItemPatientView(dietPlan);
+      weeks = planItemView.weeks;
+      recipeVersionOverrides = planItemView.recipeVersionOverrides;
+    } else {
+      weeks = getFinalizedWeeks(dietPlan);
+    }
 
     // weekSchedule-aware (matches controllers/patient/dietController.js's
     // getActiveDietPlanForPatient) - a plain diff-from-activationDate estimate
@@ -281,9 +295,11 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
       : [];
 
+    // baseRecipeIdFromKey resolves a plan-item versioned key ("<id>::v2")
+    // back to the real Recipe._id to fetch (a no-op for a days-array plan).
     const recipeIds = new Set();
     todaysDailyMeals.forEach((meal) => {
-      if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+      if (meal?.recipeId) recipeIds.add(baseRecipeIdFromKey(meal.recipeId.toString()));
     });
 
     const existingLog = await MealLog.findOne({
@@ -337,6 +353,28 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       };
     });
 
+    // v4.0: synthesize a per-version recipes entry (keyed by the versioned
+    // id todaysDailyMeals uses) from the dietician-customized RecipeVersion;
+    // its nutritionPerServing is already the exact prescribed amount, so
+    // plannedMeals reads it with no ratio scaling. No-op for a days-array
+    // plan (recipeVersionOverrides stays {}).
+    Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
+      const base = recipes[override.baseRecipeId];
+      if (!base) return;
+      const n = override.nutritionPerServing || {};
+      recipes[versionedId] = {
+        ...base,
+        id: versionedId,
+        components: override.components || base.components,
+        servingSize: { ...(base.servingSize || {}), quantity: 1 },
+        calories: n.calories ?? base.calories,
+        protein: n.protein ?? base.protein,
+        carbs: n.carbs ?? base.carbs,
+        fats: n.fats ?? base.fats,
+        fiber: n.fiber ?? base.fiber,
+      };
+    });
+
     // Ratio of what the dietician actually assigned vs. the recipe's own base
     // serving(s), keyed by servingTime+recipeId - the single scale factor
     // that must apply to every calorie/macro number below (planned and
@@ -345,8 +383,12 @@ exports.getPatientMealLogStats = async (req, res, next) => {
     todaysDailyMeals.forEach((meal) => {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
-      const key = `${meal.servingTime}:${recipe.id}`;
-      assignedRatioByKey[key] = computeMealRatio(meal, recipe);
+      const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
+      // A plan-item meal's version nutrition is already the exact prescribed
+      // amount (servings is always 1) - ratio 1, no scaling.
+      const ratio = isPlanItem ? 1 : computeMealRatio(meal, recipe);
+      assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] = ratio;
+      assignedRatioByKey[`${meal.servingTime}:${baseId}`] = ratio; // logged meals key on the base id
     });
 
     // Recomputed live from the recipe's *current* data (fetched by id) each
@@ -381,8 +423,11 @@ exports.getPatientMealLogStats = async (req, res, next) => {
         const recipe = recipes[meal.recipeId];
         if (!recipe) return;
 
+        // MealLog stores the real Recipe._id (submitMealLog normalizes the
+        // versioned key), so match logged entries against the base id.
+        const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
         const logged = loggedMeals.find(
-          (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === recipe.id
+          (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === baseId
         );
         const ratio = assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] ?? 1;
 
