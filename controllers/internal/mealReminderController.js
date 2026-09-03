@@ -1,8 +1,8 @@
 const { DietPlan, MealLog, User, Notification } = require('../../models');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
-const { sendPushToTokens } = require('../../utils/push');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
+const { enqueue } = require('../../utils/jobQueue');
 
 const normalizeDate = (dateObj) =>
   new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
@@ -110,8 +110,10 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
     { ordered: false }
   );
 
-  // 5. Device tokens for everyone we notified, then best-effort push per
-  //    recipient (the push itself is unavoidably one call per recipient).
+  // 5. Device tokens for everyone we notified, then hand each recipient's
+  //    push to the async job queue (Phase 3, task 3.4) so the sweep returns
+  //    without waiting on N sequential FCM calls. Without REDIS_URL `enqueue`
+  //    runs the send inline right here - identical to the previous loop.
   const patients = await User.find({ _id: { $in: toNotify } })
     .select('_id deviceTokens')
     .lean();
@@ -119,23 +121,23 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
     patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
   );
 
+  let queued = 0;
   for (const pid of toNotify) {
     const tokens = tokensByPatient.get(pid.toString()) || [];
     if (tokens.length === 0) continue;
-    await sendPushToTokens(
+    await enqueue('push', {
+      patientId: pid.toString(),
       tokens,
-      {
+      notification: {
         title,
         body: message,
         data: { deepLink: 'docwellness://timeline', servingTime: slot },
       },
-      (deadToken) => {
-        User.updateOne({ _id: pid }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
-      }
-    ).catch((err) => console.error('[mealReminder] push failed (non-fatal):', err.message));
+    });
+    queued += 1;
   }
 
-  return { checked: activePlans.length, notified: toNotify.length };
+  return { checked: activePlans.length, notified: toNotify.length, pushQueued: queued };
 }
 
 module.exports = { runMealReminderSweep };

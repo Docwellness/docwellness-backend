@@ -21,6 +21,32 @@ const HANDLERS = {
     const { sendEmail } = require('./emailService');
     await sendEmail(job.payload);
   },
+
+  /**
+   * payload: `{ patientId, tokens: string[], notification: { title, body, data } }`.
+   * One job per recipient (sendPushToTokens already multicasts across that
+   * user's tokens in a single FCM call). sendPushToTokens is itself
+   * best-effort and never throws, so a push job effectively always
+   * "succeeds" from the queue's point of view - individual dead tokens are
+   * pruned from the user doc via the onInvalidToken callback, not retried.
+   * That's deliberate: a stale FCM token is a permanent failure, and the
+   * value here is getting the send off the cron sweep's critical path, not
+   * requeuing pushes.
+   */
+  async push(job) {
+    // eslint-disable-next-line global-require
+    const { sendPushToTokens } = require('./push');
+    // eslint-disable-next-line global-require
+    const { User } = require('../models');
+    const { patientId, tokens, notification } = job.payload || {};
+    await sendPushToTokens(tokens, notification, (deadToken) => {
+      if (!patientId) return;
+      User.updateOne(
+        { _id: patientId },
+        { $pull: { deviceTokens: { token: deadToken } } }
+      ).catch(() => {});
+    });
+  },
 };
 
 async function runJob(job) {
