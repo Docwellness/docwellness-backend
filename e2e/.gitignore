@@ -1,0 +1,6 @@
+artifacts/
+__pycache__/
+*.pyc
+
+# the suite README must ship with the code (root .gitignore ignores *.md)
+!README.md
