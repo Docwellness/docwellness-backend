@@ -1,5 +1,5 @@
 const { Goal, Notification, User, Progress } = require('../../models');
-const { sendPushToTokens } = require('../../utils/push');
+const { enqueue } = require('../../utils/jobQueue');
 
 /**
  * Direction-agnostic 0..1 progress toward a goal's target - matches the
@@ -87,24 +87,21 @@ async function runGoalNudgeSweep({ now = new Date() } = {}) {
       patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
     );
 
+    // Hand each recipient's push to the async job queue (Phase 3, task 3.4).
+    // Without REDIS_URL `enqueue` runs the send inline here - same as before.
     for (const goal of toNudge) {
       const pid = goal.patientId.toString();
       const tokens = tokensByPatient.get(pid) || [];
       if (tokens.length === 0) continue;
-      await sendPushToTokens(
+      await enqueue('push', {
+        patientId: pid,
         tokens,
-        {
+        notification: {
           title: "Let's get back on track",
           body: `Continue your diet journey and rebook your subscription to reach "${goal.title}".`,
           data: { deepLink: 'docwellness://timeline', goalId: String(goal._id) },
         },
-        (deadToken) => {
-          User.updateOne(
-            { _id: pid },
-            { $pull: { deviceTokens: { token: deadToken } } }
-          ).catch(() => {});
-        }
-      ).catch((err) => console.error('[goalNudge] push failed (non-fatal):', err.message));
+      });
     }
   }
 

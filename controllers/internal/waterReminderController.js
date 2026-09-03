@@ -1,6 +1,6 @@
 const { DietPlan, User, Notification } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
-const { sendPushToTokens } = require('../../utils/push');
+const { enqueue } = require('../../utils/jobQueue');
 
 /**
  * Fixed-time water reminder (see vercel.json's 4 checkpoints spread across
@@ -90,23 +90,25 @@ async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
     patients.map((p) => [p._id.toString(), (p.deviceTokens || []).map((t) => t.token)])
   );
 
+  // Hand each recipient's push to the async job queue (Phase 3, task 3.4).
+  // Without REDIS_URL `enqueue` runs the send inline here - same as before.
+  let queued = 0;
   for (const pid of toNotify) {
     const tokens = tokensByPatient.get(pid) || [];
     if (tokens.length === 0) continue;
-    await sendPushToTokens(
+    await enqueue('push', {
+      patientId: pid,
       tokens,
-      {
+      notification: {
         title,
         body: shortfall.get(pid),
         data: { deepLink: 'docwellness://timeline', checkpoint: checkpoint || '' },
       },
-      (deadToken) => {
-        User.updateOne({ _id: pid }, { $pull: { deviceTokens: { token: deadToken } } }).catch(() => {});
-      }
-    ).catch((err) => console.error('[waterReminder] push failed (non-fatal):', err.message));
+    });
+    queued += 1;
   }
 
-  return { checked: activePatientIds.length, notified: toNotify.length };
+  return { checked: activePatientIds.length, notified: toNotify.length, pushQueued: queued };
 }
 
 module.exports = { runWaterReminderSweep };
