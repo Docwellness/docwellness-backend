@@ -17,6 +17,7 @@ const {
   ExercisePlan,
 } = require('../../models');
 const { sendPushToTokens } = require('../../utils/push');
+const { getChatIO } = require('../../chat');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const { generateDietPlanDeterministically } = require('../../services/recipeSelectionEngine');
@@ -701,6 +702,63 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
 };
 
 /**
+ * Notify a patient that their dietician has requested payment for a diet
+ * plan request. In-app Notification + live socket push always; best-effort
+ * FCM push never blocks or fails the caller (same "DB write always happens,
+ * push is independently best-effort" convention as activateDietPlan and the
+ * first-consultation review nudge). Swallows its own errors.
+ */
+async function notifyPatientOfPaymentRequest(patientId, dietPlanRequestId) {
+  const title = 'Payment requested for your diet plan';
+  const message =
+    'Your dietician has requested payment for your diet plan. Tap to review the amount and share your payment details.';
+  try {
+    const notif = await Notification.create({
+      userId: patientId,
+      title,
+      message,
+      type: 'payment',
+      referenceId: dietPlanRequestId,
+      referenceModel: 'DietPlanRequest',
+    });
+
+    const ioRef = getChatIO();
+    if (ioRef) {
+      ioRef.to(`user:${patientId}`).emit('notification.new', {
+        id: notif._id,
+        title: notif.title,
+        message: notif.message,
+        type: notif.type,
+        referenceId: notif.referenceId?.toString(),
+        createdAt: notif.createdAt,
+      });
+    }
+
+    const patientDoc = await User.findById(patientId).select('deviceTokens').lean();
+    const tokens = (patientDoc?.deviceTokens || []).map((t) => t.token);
+    await sendPushToTokens(
+      tokens,
+      {
+        title,
+        body: message,
+        data: {
+          deepLink: 'docwellness://payment',
+          requestId: String(dietPlanRequestId),
+        },
+      },
+      (deadToken) => {
+        User.updateOne(
+          { _id: patientId },
+          { $pull: { deviceTokens: { token: deadToken } } }
+        ).catch(() => {});
+      }
+    );
+  } catch (notifError) {
+    console.error('Payment-request notification error (non-fatal):', notifError);
+  }
+}
+
+/**
  * @desc    Send a manual payment request notification for a diet plan request
  * @route   POST /api/dietician/patients/:patientId/diet-plan-requests/:requestId/payment-request
  * @access  Private (Dietician)
@@ -770,6 +828,8 @@ exports.sendPaymentRequest = async (req, res, next) => {
       },
       { new: false }
     );
+
+    await notifyPatientOfPaymentRequest(patientId, dietPlanRequest._id);
 
     return res.status(200).json({
       success: true,
@@ -2253,6 +2313,8 @@ exports.finalizeWeekPlan = async (req, res, next) => {
             'status.hasPaymentUpdate': false,
           },
         });
+
+        await notifyPatientOfPaymentRequest(patientId, dietPlanRequest._id);
       }
     }
 
