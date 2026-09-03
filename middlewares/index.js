@@ -3,6 +3,7 @@ const supabaseTokenOnly = require('./supabaseTokenOnly');
 const { roleCheck, patientOnly, dieticianOnly, adminOnly } = require('./roleCheck');
 const errorHandler = require('./error');
 const requestLogger = require('./requestLogger');
+const requestMetrics = require('./requestMetrics');
 const sanitizeInput = require('./sanitizeInput');
 const { authLimiter, messageLimiter, aiGenerationLimiter, uploadLimiter } = require('./rateLimiters');
 const {
@@ -21,6 +22,7 @@ module.exports = {
   adminOnly,
   errorHandler,
   requestLogger,
+  requestMetrics,
   sanitizeInput,
   authLimiter,
   messageLimiter,

@@ -34,6 +34,10 @@ const BACKOFF_BASE_MS = 1000; // 1s, 2s, 4s
 const FAILED_LIST_CAP = 200;
 const DEFAULT_DRAIN_MAX = 25;
 
+// Summary of the most recent drain, surfaced by stats() for the metrics
+// endpoint (perf-observability-and-validation task 2.1).
+let lastDrain = null;
+
 function makeJob(type, payload) {
   return {
     id: crypto.randomUUID(),
@@ -126,6 +130,7 @@ async function drainJobs({ max = DEFAULT_DRAIN_MAX } = {}) {
     return { skipped: 'redis-disabled', promoted: 0, processed: 0, succeeded: 0, retried: 0, failed: 0 };
   }
 
+  const drainStart = Date.now();
   const runJob = getRunJob();
   const promoted = await promoteDueDelayedJobs(max);
 
@@ -180,7 +185,9 @@ async function drainJobs({ max = DEFAULT_DRAIN_MAX } = {}) {
     }
   }
 
-  return { promoted, processed, succeeded, retried, failed };
+  const result = { promoted, processed, succeeded, retried, failed };
+  lastDrain = { at: new Date().toISOString(), durationMs: Date.now() - drainStart, ...result };
+  return result;
 }
 
 async function pushFailed(job) {
@@ -210,18 +217,18 @@ function reportFailure(job, err) {
   }
 }
 
-/** For the drain endpoint / ops: current queue depth. Best-effort. */
+/** For the drain / metrics endpoints: current queue depth + last drain. Best-effort. */
 async function stats() {
-  if (!isEnabled) return { enabled: false };
+  if (!isEnabled) return { enabled: false, lastDrain };
   try {
     const [pending, delayed, failed] = await Promise.all([
       client.llen(PENDING_KEY),
       client.zcard(DELAYED_KEY),
       client.llen(FAILED_KEY),
     ]);
-    return { enabled: true, pending, delayed, failed };
+    return { enabled: true, pending, delayed, failed, lastDrain };
   } catch (err) {
-    return { enabled: true, error: err.message };
+    return { enabled: true, error: err.message, lastDrain };
   }
 }
 

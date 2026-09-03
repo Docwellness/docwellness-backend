@@ -35,7 +35,9 @@ let mongod;
 async function connectTestDb() {
   mongod = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongod.getUri();
-  await mongoose.connect(process.env.MONGODB_URI);
+  // monitorCommands mirrors config/database.js so tests can exercise the
+  // request-metrics DB attribution path (utils/requestMetrics.js).
+  await mongoose.connect(process.env.MONGODB_URI, { monitorCommands: true });
 }
 
 async function disconnectTestDb() {

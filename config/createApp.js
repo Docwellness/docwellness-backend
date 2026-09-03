@@ -5,7 +5,7 @@ const compression = require('compression');
 const path = require('path');
 const Sentry = require('@sentry/node');
 const config = require('./environment');
-const { errorHandler, requestLogger, sanitizeInput } = require('../middlewares');
+const { errorHandler, requestLogger, requestMetrics, sanitizeInput } = require('../middlewares');
 
 // v1 Chat Module
 const { chatRoutes } = require('../chat');
@@ -44,6 +44,11 @@ function createApp() {
   // middlewares/requestLogger.js) - registered early so every request gets
   // logged/timed regardless of where it fails.
   app.use(requestLogger);
+
+  // Per-request timing + DB-query attribution (perf-observability-and-
+  // validation task 2.1). Right after the logger so it wraps every route;
+  // purely observational, read back at GET /api/internal/cron/metrics.
+  app.use(requestMetrics);
 
   // CORS configuration. Native mobile apps (Dio/http don't send an Origin
   // header the way browsers do), curl, Postman, and server-to-server calls
