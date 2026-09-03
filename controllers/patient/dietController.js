@@ -1195,13 +1195,29 @@ exports.getMealLogScreenData = async (req, res, next) => {
       });
     }
 
-    const weeks = getFinalizedWeeks(dietPlan);
+    // v4.0: a 'plan-item' plan has no finalizedPlan blob - its weeks are
+    // synthesized from DayPlan/MealSlotPlan/PlanItem/RecipeVersion, same as
+    // getActiveDietPlanForPatient does. Without this branch getFinalizedWeeks
+    // returned [] for a plan-item patient, so `week` below resolved to null
+    // and the Log Meal sheet showed "No meals" on every tab.
+    let weeks;
+    let recipeVersionOverrides = {};
+    if (dietPlan.dataModel === 'plan-item') {
+      const planItemView = await buildPlanItemPatientView(dietPlan);
+      weeks = planItemView.weeks;
+      recipeVersionOverrides = planItemView.recipeVersionOverrides;
+    } else {
+      weeks = getFinalizedWeeks(dietPlan);
+    }
 
+    // A plan-item plan's meal.recipeId is a versioned key ("<id>::v2" - see
+    // utils/dietPlanReadDispatch.js); baseRecipeIdFromKey resolves it back to
+    // the real Recipe._id to fetch (a no-op for a days-array plan's plain id).
     const recipeIds = new Set();
     weeks.forEach((week) => {
       (week?.dailyMeals || []).forEach((meal) => {
         if (meal?.recipeId) {
-          recipeIds.add(meal.recipeId.toString());
+          recipeIds.add(baseRecipeIdFromKey(meal.recipeId.toString()));
         }
       });
     });
@@ -1228,6 +1244,26 @@ exports.getMealLogScreenData = async (req, res, next) => {
         components: recipe.components || null,
         totalWeightUnit: recipe.servingSize?.unit || null,
         baseCalories: recipe.nutrition?.calories || 0,
+      };
+    });
+
+    // v4.0: mirror getActiveDietPlanForPatient - synthesize a per-version
+    // recipes entry (keyed by the same versioned id dailyMeals uses) from the
+    // dietician-customized RecipeVersion, so the sheet shows the exact
+    // prescribed calories and the recipeId it echoes back on submit is the
+    // one the Diet Plan screen already handed the app. The version's
+    // nutritionPerServing is already the final prescribed number (servings is
+    // always 1), so the plannedMeals loop below skips ratio scaling for it.
+    // A no-op for a days-array plan (recipeVersionOverrides stays {}).
+    Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
+      const baseRecipe = recipes[override.baseRecipeId];
+      if (!baseRecipe) return;
+      recipes[versionedId] = {
+        ...baseRecipe,
+        id: versionedId,
+        baseCalories: override.nutritionPerServing?.calories ?? baseRecipe.baseCalories,
+        components: override.components || baseRecipe.components,
+        servingSize: { ...(baseRecipe.servingSize || {}), quantity: 1 },
       };
     });
 
@@ -1275,7 +1311,12 @@ exports.getMealLogScreenData = async (req, res, next) => {
           };
         }
 
-        const key = `${meal.servingTime}:${recipe.id}`;
+        // MealLog stores the real Recipe._id (submitMealLog normalizes the
+        // versioned key on write), so match logged entries against the base
+        // id - a no-op for a days-array plan.
+        const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
+        const isVersioned = baseId !== meal.recipeId.toString();
+        const key = `${meal.servingTime}:${baseId}`;
         const loggedServings = loggedMap[key] || 0; // 0 if not logged yet
 
         // Show what the dietician actually assigned (dailyMeals[].servings,
@@ -1284,11 +1325,15 @@ exports.getMealLogScreenData = async (req, res, next) => {
         // baseQuantity ratio) so a multi-component recipe's secondary/
         // component-level adjustments are reflected too - same formula as
         // getTodayMealLogStats and the dietician app's own live preview.
-        const assignedQuantity = meal.servings ?? recipe.servingSize?.quantity ?? 1;
-        const ratio = computeMealRatio(meal, recipe);
+        // A plan-item meal's version nutrition is already the exact prescribed
+        // amount (servings is always 1) - no further scaling.
+        const assignedQuantity = isVersioned
+          ? (recipe.servingSize?.quantity ?? 1)
+          : (meal.servings ?? recipe.servingSize?.quantity ?? 1);
+        const ratio = isVersioned ? 1 : computeMealRatio(meal, recipe);
 
         servingTimesMap[meal.servingTime].plannedMeals.push({
-          recipeId: recipe.id,
+          recipeId: meal.recipeId.toString(),
           name: recipe.name,
           image: recipe.image,
           totalWeight: assignedQuantity,
@@ -1355,6 +1400,19 @@ exports.submitMealLog = async (req, res, next) => {
         message: 'Items must be a non-empty array',
       });
     }
+
+    // v4.0: a plan-item plan's diet response hands the app *versioned* recipe
+    // keys ("<recipeId>::v2" - see utils/dietPlanReadDispatch.js) as the
+    // opaque recipeId, and that is the only id the app has to send back here.
+    // Resolve each to the real Recipe._id before validation/storage - without
+    // this every log from a plan-item patient failed ObjectId.isValid below
+    // with "Invalid item in items array" ("Could not log this meal" in-app).
+    // A no-op for a days-array plan's already-plain ids.
+    items.forEach((item) => {
+      if (item && item.recipeId != null) {
+        item.recipeId = baseRecipeIdFromKey(String(item.recipeId));
+      }
+    });
 
     for (const item of items) {
       // servings === 0 is a valid, deliberate "un-log this item" signal
