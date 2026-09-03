@@ -15,6 +15,7 @@ const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeControll
 const { runMealReminderSweep } = require('../controllers/internal/mealReminderController');
 const { runWaterReminderSweep } = require('../controllers/internal/waterReminderController');
 const { drainJobs, stats: jobQueueStats } = require('../utils/jobQueue');
+const requestMetrics = require('../utils/requestMetrics');
 
 function requireCronSecret(req, res, next) {
   // Two trigger sources need to authenticate here: Vercel Cron (dev), which
@@ -110,5 +111,28 @@ async function drainJobsHandler(req, res, next) {
 }
 router.get('/cron/drain-jobs', requireCronSecret, drainJobsHandler);
 router.post('/cron/drain-jobs', requireCronSecret, drainJobsHandler);
+
+/**
+ * @route   GET /api/internal/metrics
+ * @desc    perf-observability-and-validation task 2.1: in-process request +
+ *          DB-query metrics (rolling per-route latency p50/p95/p99, average
+ *          DB query count/duration per route, global command counts) plus
+ *          job-queue depth and last-drain summary. Shared-secret guarded,
+ *          same as the cron routes. In-memory and per-instance: read it from
+ *          the persistent prod process, not the ephemeral Vercel one.
+ */
+router.get('/metrics', requireCronSecret, async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        requests: requestMetrics.snapshot(),
+        jobQueue: await jobQueueStats(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router;

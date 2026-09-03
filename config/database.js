@@ -115,9 +115,13 @@ async function connectWithRetry(uri, { attempts = 3, delayMs = 800 } = {}) {
       // VPS/Coolify process - never legitimately needs many concurrent
       // in-flight queries at this scale.
       const tlsCAFile = resolveTlsCAFile();
+      // monitorCommands: emits commandStarted/Succeeded/Failed events the
+      // request-metrics layer (utils/requestMetrics.js, task 2.1) uses to
+      // attribute DB query count/duration per request. Overhead is one
+      // event per command - negligible at this app's query volume.
       const connectOptions = tlsCAFile
-        ? { maxPoolSize: 10, tls: true, tlsCAFile }
-        : { maxPoolSize: 10 };
+        ? { maxPoolSize: 10, monitorCommands: true, tls: true, tlsCAFile }
+        : { maxPoolSize: 10, monitorCommands: true };
       return await mongoose.connect(uri, connectOptions);
     } catch (error) {
       lastError = error;
@@ -154,6 +158,30 @@ async function connectWithRetry(uri, { attempts = 3, delayMs = 800 } = {}) {
   throw lastError;
 }
 
+// Feed utils/requestMetrics from the driver's command-monitoring events
+// (enabled by monitorCommands: true above). Wired once per process. The
+// require is deferred so a one-off script that pulls in config/database
+// doesn't drag the metrics module along.
+let commandMetricsWired = false;
+function wireCommandMetrics(connection) {
+  if (commandMetricsWired) return;
+  commandMetricsWired = true;
+  try {
+    // eslint-disable-next-line global-require
+    const metrics = require('../utils/requestMetrics');
+    const client = connection.getClient();
+    const done = (event, ok) => {
+      if (metrics.TRACKED_COMMANDS.has(event.commandName)) {
+        metrics.recordCommand(event.commandName, event.duration, ok);
+      }
+    };
+    client.on('commandSucceeded', (e) => done(e, true));
+    client.on('commandFailed', (e) => done(e, false));
+  } catch (err) {
+    console.error('wireCommandMetrics: failed (non-fatal):', err.message);
+  }
+}
+
 /**
  * Database connection configuration.
  *
@@ -168,6 +196,7 @@ const connectDB = async () => {
 
   const conn = await connectWithRetry(process.env.MONGODB_URI);
   console.log(`MongoDB Connected: ${conn.connection.host}`);
+  wireCommandMetrics(conn.connection);
   await dropStaleUsernameIndex(conn.connection);
   syncIndexesOnBoot();
   return conn.connection;
@@ -183,5 +212,8 @@ const connectDB = async () => {
 // against prod does without this: a misleading "self-signed certificate in
 // certificate chain" error).
 connectDB.resolveTlsCAFile = resolveTlsCAFile;
+// Exposed so the test harness (which connects directly, not via connectDB)
+// can wire the same command-monitoring listeners.
+connectDB.wireCommandMetrics = wireCommandMetrics;
 
 module.exports = connectDB;
