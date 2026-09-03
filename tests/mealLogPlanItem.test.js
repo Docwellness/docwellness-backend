@@ -72,8 +72,13 @@ async function seedPlanItemPlan() {
     ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
     nutrition: { calories: 999, protein: 999, carbs: 999, fats: 999, fiber: 999 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 60)); // let the post-save V1 sync hook land
-  const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
+  // the post-save V1 sync hook is async and fire-and-forget - poll for it
+  let v1 = null;
+  for (let i = 0; i < 40 && !v1; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
+  }
+  if (!v1) throw new Error('V1 RecipeVersion never synced for the seeded recipe');
 
   const activationDate = new Date();
   const dietPlan = await DietPlan.create({
@@ -173,4 +178,38 @@ test('a logged plan-item meal reads back as logged on the next screen-data fetch
   expect(res.status).toBe(200);
   const breakfast = res.body.data.servingTimes.find((s) => s.servingTime === 'Breakfast');
   expect(breakfast.plannedMeals[0]).toMatchObject({ recipeId: versionedId, portion: 3 });
+});
+
+test("today-stats returns the plan-item plan's real planned calories + macro goals", async () => {
+  const { patient } = await seedPlanItemPlan();
+  registerTestToken('patient-token', patient._id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const res = await request(app)
+    .get(`/api/patient/meal-log/today-stats?date=${today}`)
+    .set('Authorization', 'Bearer patient-token');
+
+  expect(res.status).toBe(200);
+  // 100g oats @ 389 kcal/100g = 389 (the V1 version's real nutrition, not
+  // the base recipe's bogus 999). Was 0 before the plan-item fix.
+  expect(res.body.data.summary.totalPlannedCalories).toBeCloseTo(389, 0);
+  expect(res.body.data.macros.planned.carbs).toBeCloseTo(66, 0);
+  expect(res.body.data.macros.planned.protein).toBeCloseTo(17, 0);
+  expect(res.body.data.meals).toHaveLength(1);
+
+  // and a logged plan-item meal shows up as consumed / counted
+  const versionedId = versionedRecipeKey(
+    res.body.data.meals[0].recipeId.split('::')[0], 1
+  );
+  await request(app)
+    .post('/api/patient/meal-log')
+    .set('Authorization', 'Bearer patient-token')
+    .send({ date: today, items: [{ servingTime: 'Breakfast', recipeId: versionedId, servings: 1, caloriesConsumed: 389 }] })
+    .expect(200);
+
+  const after = await request(app)
+    .get(`/api/patient/meal-log/today-stats?date=${today}`)
+    .set('Authorization', 'Bearer patient-token');
+  expect(after.body.data.summary.totalConsumedCalories).toBeGreaterThan(0);
+  expect(after.body.data.summary.loggedCount).toBe(1);
 });

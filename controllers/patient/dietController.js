@@ -914,7 +914,20 @@ async function computeTodayMealLogStats(patientId, today) {
     return { noPlan: true };
   }
 
-    const weeks = getFinalizedWeeks(dietPlan);
+    // v4.0: a 'plan-item' plan has no finalizedPlan blob - synthesize its
+    // weeks the same way getActiveDietPlanForPatient does. Without this the
+    // Home "Your progress" card showed 0 planned calories and 0/0g macro
+    // goals for every plan-item patient (getFinalizedWeeks returned []).
+    const isPlanItem = dietPlan.dataModel === 'plan-item';
+    let weeks;
+    let recipeVersionOverrides = {};
+    if (isPlanItem) {
+      const planItemView = await buildPlanItemPatientView(dietPlan);
+      weeks = planItemView.weeks;
+      recipeVersionOverrides = planItemView.recipeVersionOverrides;
+    } else {
+      weeks = getFinalizedWeeks(dietPlan);
+    }
 
     const currentWeek = resolveCurrentWeek(dietPlan, today);
 
@@ -932,9 +945,11 @@ async function computeTodayMealLogStats(patientId, today) {
     ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
     : [];
 
+  // A plan-item meal.recipeId is a versioned key ("<id>::v2"); resolve it
+  // back to the real Recipe._id to fetch (a no-op for a days-array plan).
   const recipeIds = new Set();
   todaysDailyMeals.forEach((meal) => {
-    if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+    if (meal?.recipeId) recipeIds.add(baseRecipeIdFromKey(meal.recipeId.toString()));
   });
 
   const existingLog = await MealLog.findOne({
@@ -988,6 +1003,28 @@ async function computeTodayMealLogStats(patientId, today) {
     };
   });
 
+  // v4.0: synthesize a per-version recipes entry (keyed by the versioned id
+  // todaysDailyMeals uses) from the dietician-customized RecipeVersion - its
+  // nutritionPerServing is the exact prescribed amount, so plannedMeals
+  // below reads it straight with no ratio scaling. No-op for a days-array
+  // plan (recipeVersionOverrides stays {}).
+  Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
+    const base = recipes[override.baseRecipeId];
+    if (!base) return;
+    const n = override.nutritionPerServing || {};
+    recipes[versionedId] = {
+      ...base,
+      id: versionedId,
+      components: override.components || base.components,
+      servingSize: { ...(base.servingSize || {}), quantity: 1 },
+      calories: n.calories ?? base.calories,
+      protein: n.protein ?? base.protein,
+      carbs: n.carbs ?? base.carbs,
+      fats: n.fats ?? base.fats,
+      fiber: n.fiber ?? base.fiber,
+    };
+  });
+
   // Ratio of what the dietician actually assigned vs. the recipe's own base
   // serving(s), keyed by servingTime+recipeId - the single scale factor
   // that must apply to every calorie/macro number below (planned and
@@ -1002,8 +1039,13 @@ async function computeTodayMealLogStats(patientId, today) {
   todaysDailyMeals.forEach((meal) => {
     const recipe = recipes[meal.recipeId];
     if (!recipe) return;
-    const key = `${meal.servingTime}:${recipe.id}`;
-    assignedRatioByKey[key] = computeMealRatio(meal, recipe);
+    const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
+    // A plan-item meal's version nutrition is already the exact prescribed
+    // amount (servings is always 1) - ratio 1, no scaling. computeMealRatio
+    // would divide by the version's own component quantities and skew it.
+    const ratio = isPlanItem ? 1 : computeMealRatio(meal, recipe);
+    assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] = ratio;
+    assignedRatioByKey[`${meal.servingTime}:${baseId}`] = ratio;  // logged meals key on the base id
   });
 
   // Recomputed live from the recipe's *current* data (fetched by id) each
@@ -1040,8 +1082,11 @@ async function computeTodayMealLogStats(patientId, today) {
       const recipe = recipes[meal.recipeId];
       if (!recipe) return;
 
+      // MealLog stores the real Recipe._id (submitMealLog normalizes the
+      // versioned key), so match logged entries against the base id.
+      const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
       const logged = loggedMeals.find(
-        (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === recipe.id
+        (m) => m.servingTime === meal.servingTime && m.recipeId?.toString() === baseId
       );
       const ratio = assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] ?? 1;
 
