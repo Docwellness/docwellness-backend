@@ -42,7 +42,13 @@ const initializeChatSocket = (io) => {
       socket.user = user;
       next();
     } catch (error) {
-      next(new Error(error.code === 'no_profile' ? 'Registration not completed' : 'Invalid token'));
+      const reason =
+        error.code === 'no_profile'
+          ? 'Registration not completed'
+          : error.code === 'account_disabled'
+            ? 'Account deactivated'
+            : 'Invalid token';
+      next(new Error(reason));
     }
   });
 

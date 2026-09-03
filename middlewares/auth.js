@@ -27,6 +27,15 @@ const authMiddleware = async (req, res, next) => {
           code: 'no_profile',
         });
       }
+      if (error.code === 'account_disabled') {
+        // 403, not 401: the token is valid, the account is not. `code` lets
+        // the client show the right message / force a logout.
+        return res.status(403).json({
+          success: false,
+          message: 'This account has been deactivated. Please contact your dietician.',
+          code: 'account_disabled',
+        });
+      }
       return res.status(401).json({
         success: false,
         message: 'Not authorized, token invalid',

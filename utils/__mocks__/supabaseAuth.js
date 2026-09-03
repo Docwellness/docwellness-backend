@@ -80,6 +80,13 @@ async function getUserFromSupabaseToken(token) {
     err.code = 'no_profile';
     throw err;
   }
+  // Mirror the real module's deactivated-account gate so integration tests
+  // can register a token for a user and then deactivate them.
+  if (user.isActive === false) {
+    const err = new Error('This account has been deactivated');
+    err.code = 'account_disabled';
+    throw err;
+  }
   return user;
 }
 

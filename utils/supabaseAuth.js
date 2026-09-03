@@ -46,22 +46,44 @@ async function verifySupabaseToken(token) {
 }
 
 /**
+ * A deactivated account (User.isActive === false - set by the dietician's
+ * "deactivate patient" action, togglePatientActive) must not be able to
+ * use a still-valid token. Enforced here rather than per-route so it
+ * covers every HTTP endpoint and both socket gateways at once.
+ *
+ * `isActive` defaults to true and predates some older User documents
+ * (undefined there), so only an explicit `false` is a deactivation -
+ * matching the `isActive !== false` convention already used in
+ * patientController / dietPlanController.
+ */
+function assertActiveAccount(user) {
+  if (user.isActive === false) {
+    const err = new Error('This account has been deactivated');
+    err.code = 'account_disabled';
+    throw err;
+  }
+  return user;
+}
+
+/**
  * Verifies a Supabase access token and returns the linked Mongo `User`
  * document (same shape every controller already expects on req.user).
  * Throws with a distinguishable `.code` on failure:
- *   - 'invalid_token'  the token itself is invalid/expired
- *   - 'no_profile'     the Supabase account exists but registration was
- *                       never completed (no linked Mongo User yet)
+ *   - 'invalid_token'     the token itself is invalid/expired
+ *   - 'no_profile'        the Supabase account exists but registration was
+ *                          never completed (no linked Mongo User yet)
+ *   - 'account_disabled'  the linked User has isActive === false
  */
 async function getUserFromSupabaseToken(token) {
   // Fast path: a recent, still-valid (per its own exp) token whose Supabase
   // identity we've already verified in the last <=90s. We still re-read the
   // Mongo User every time - role/isActive/profile are never served from
-  // cache (see utils/authCache.js).
+  // cache (see utils/authCache.js) - so a deactivation takes effect on the
+  // very next request without any cache purge.
   const cachedUserId = await getCachedUserId(token);
   if (cachedUserId) {
     const cachedUser = await User.findOne({ supabaseUserId: cachedUserId });
-    if (cachedUser) return cachedUser;
+    if (cachedUser) return assertActiveAccount(cachedUser);
     // Cached id no longer resolves to a profile (account deleted, or the
     // link was severed) - fall through to the full verify path, which will
     // throw the right error.
@@ -75,6 +97,8 @@ async function getUserFromSupabaseToken(token) {
     err.code = 'no_profile';
     throw err;
   }
+
+  assertActiveAccount(user); // before caching - don't cache a blocked account's token
 
   await setCachedUserId(token, supabaseUser.id);
   return user;

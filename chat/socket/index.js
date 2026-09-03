@@ -93,7 +93,13 @@ function initializeChatSocketV1(io) {
         reason: error.message,
         latency_ms: Date.now() - startTime,
       });
-      next(new Error(error.code === 'no_profile' ? 'Registration not completed' : 'Invalid token'));
+      const reason =
+        error.code === 'no_profile'
+          ? 'Registration not completed'
+          : error.code === 'account_disabled'
+            ? 'Account deactivated'
+            : 'Invalid token';
+      next(new Error(reason));
     }
   });
 
