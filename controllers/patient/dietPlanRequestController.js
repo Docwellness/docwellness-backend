@@ -207,12 +207,13 @@ exports.createDietPlanRequest = async (req, res, next) => {
     // Reuse the patient's current request rather than piling up duplicate
     // rows on the dietician's list:
     //  - an Unpaid one is an in-flight request being edited ("Update Plan
-    //    Request", or the renewal form before submit) - just overwrite it;
-    //  - a Paid/PartiallyPaid one with an active plan is a RENEWAL: the
-    //    patient re-ran the request flow, so reset its payment fields for
-    //    the new cycle (what the old startRenewal endpoint did) and notify
-    //    the dietician. Nothing here touches the running cycle's DietPlan -
-    //    it stays Active/loggable until the dietician activates the new one.
+    //    Request", or the renewal form before submit) - overwrite it;
+    //  - a Paid/PartiallyPaid one with an active plan is a RENEWAL in
+    //    progress - overwrite the snapshot too, but DON'T reset its
+    //    status/payment here. The renewal only becomes real (status flips
+    //    to Unpaid, dietician notified) once the patient has picked a plan
+    //    and completed the order - see selectMembershipPlan. Nothing about
+    //    the renewal surfaces to the dietician before that.
     let request = await DietPlanRequest.findOne({
       patient: patient._id,
       completedAt: null,
@@ -222,36 +223,28 @@ exports.createDietPlanRequest = async (req, res, next) => {
       ],
     }).sort({ createdAt: -1 });
 
-    const isNewRenewal =
-      request && ['Paid', 'PartiallyPaid'].includes(request.status);
+    // hasActivePlan + a live subscription = a renewal in progress, whatever
+    // the status is right now.
+    const isRenewal = !!(request && request.hasActivePlan === true);
 
-    if (isNewRenewal) {
+    if (isRenewal && request.subscriptionExpiresAt) {
       // The new plan can't start before the current subscription ends, or
-      // the two cycles overlap. subscriptionExpiresAt is left untouched by
-      // the renewal reset below, so it's still the running cycle's expiry.
-      if (request.subscriptionExpiresAt) {
-        const expiry = new Date(request.subscriptionExpiresAt);
-        const expiryDay = new Date(
-          expiry.getFullYear(),
-          expiry.getMonth(),
-          expiry.getDate()
-        );
-        if (parsedDate < expiryDay) {
-          return res.status(400).json({
-            success: false,
-            message: `Your current plan runs until ${expiryDay.toDateString()}. Choose a start date on or after that.`,
-          });
-        }
+      // the two cycles overlap.
+      const expiry = new Date(request.subscriptionExpiresAt);
+      const expiryDay = new Date(
+        expiry.getFullYear(),
+        expiry.getMonth(),
+        expiry.getDate()
+      );
+      if (parsedDate < expiryDay) {
+        return res.status(400).json({
+          success: false,
+          message: `Your current plan runs until ${expiryDay.toDateString()}. Choose a start date on or after that.`,
+        });
       }
-      request.paymentRequested = false;
-      request.paymentRequestedAt = null;
-      request.latestPaymentStatus = null;
-      request.latestPaymentProof = null;
-      request.collectedAmount = 0;
     }
 
     if (request) {
-      request.status = 'Unpaid';
       Object.assign(request, snapshot);
       await request.save();
     } else {
@@ -261,10 +254,6 @@ exports.createDietPlanRequest = async (req, res, next) => {
         status: 'Unpaid',
         ...snapshot,
       });
-    }
-
-    if (isNewRenewal) {
-      await notifyDieticianOfRenewal(request, patient.profile?.fullName);
     }
 
     res.status(201).json({
@@ -315,9 +304,36 @@ exports.selectMembershipPlan = async (req, res, next) => {
       });
     }
 
+    // A renewal only becomes real at this point - the patient has picked a
+    // plan and completed the order. This is where the request flips from
+    // the running cycle's Paid state to a fresh Unpaid renewal cycle and
+    // the dietician is told; createDietPlanRequest deliberately does none
+    // of that so nothing surfaces to the dietician on a half-finished
+    // renewal the patient abandoned at the edit form.
+    const isRenewalConfirmation =
+      request.hasActivePlan === true &&
+      ['Paid', 'PartiallyPaid'].includes(request.status);
+
     request.membershipPlan = membershipPlan;
     request.membershipAmount = amount;
+
+    if (isRenewalConfirmation) {
+      request.status = 'Unpaid';
+      request.paymentRequested = false;
+      request.paymentRequestedAt = null;
+      request.latestPaymentStatus = null;
+      request.latestPaymentProof = null;
+      request.collectedAmount = 0;
+    }
+
     await request.save();
+
+    if (isRenewalConfirmation) {
+      const patient = await User.findById(req.user._id)
+        .select('profile.fullName')
+        .lean();
+      await notifyDieticianOfRenewal(request, patient?.profile?.fullName);
+    }
 
     res.status(200).json({
       success: true,
@@ -325,6 +341,7 @@ exports.selectMembershipPlan = async (req, res, next) => {
         requestId: request._id,
         membershipPlan: request.membershipPlan,
         membershipAmount: request.membershipAmount,
+        status: request.status,
       },
     });
   } catch (error) {
