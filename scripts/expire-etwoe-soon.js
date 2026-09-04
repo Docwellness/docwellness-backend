@@ -12,6 +12,13 @@
  * The original values are written to scripts/.etwoe-expiry-backup.json so
  * `--restore` can put them back.
  *
+ * Connects via connectDB() (config/database.js), not a raw
+ * mongoose.connect() - required against prod's self-hosted Mongo, which
+ * needs the custom TLS CA only connectDB() knows how to resolve (a raw
+ * connect fails with a misleading "self-signed certificate in certificate
+ * chain"). Meant to be run wherever MONGODB_URI already points at the
+ * target DB - e.g. Coolify's Terminal tab for prod.
+ *
  * Usage:
  *   node scripts/expire-etwoe-soon.js              # dry run - shows what it would do
  *   node scripts/expire-etwoe-soon.js --execute    # apply (2 days from now)
@@ -20,8 +27,8 @@
  */
 
 require('dotenv').config();
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
 const mongoose = require('mongoose');
+const connectDB = require('../config/database');
 const fs = require('fs');
 const path = require('path');
 
@@ -35,7 +42,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING ===' : '=== DRY RUN (pass --execute to write) ===');
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(process.env.MONGODB_URI);
+  await connectDB();
   console.log('Connected.\n');
 
   try {
