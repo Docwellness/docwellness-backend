@@ -2699,10 +2699,17 @@ exports.activateDietPlan = async (req, res, next) => {
       { new: false }
     );
 
-    // In-app Notification (always) + best-effort real push (never blocks or
-    // fails activation) - same "DB write always happens, push is
-    // independently best-effort" convention as createNudge/
-    // notifyPatientsOfQuote/runGoalNudgeSweep.
+    // In-app Notification (always) + a live socket push so an app that's
+    // already open (e.g. sitting on Home) resyncs immediately, + best-effort
+    // real push for a backgrounded/killed app (never blocks or fails
+    // activation) - same "DB write always happens, socket/push are
+    // independently best-effort" convention as notifyPatientOfPaymentRequest/
+    // createNudge/notifyPatientsOfQuote/runGoalNudgeSweep. Without the socket
+    // emit, a patient watching Home live has no signal that anything changed
+    // - subscriptionExpiresAt and the request status only refresh on the
+    // next manual pull-to-refresh or app foreground, so the pre-activation
+    // "Request diet plan" button (and stale expiry) can sit there
+    // indefinitely even though the new cycle is already Active server-side.
     Notification.create({
       userId: patientId,
       title: 'Your diet plan is ready',
@@ -2711,7 +2718,18 @@ exports.activateDietPlan = async (req, res, next) => {
       referenceId: dietPlan._id,
       referenceModel: 'DietPlan',
     })
-      .then(async () => {
+      .then(async (notif) => {
+        const ioRef = getChatIO();
+        if (ioRef) {
+          ioRef.to(`user:${patientId}`).emit('notification.new', {
+            id: notif._id,
+            title: notif.title,
+            message: notif.message,
+            type: notif.type,
+            referenceId: notif.referenceId?.toString(),
+            createdAt: notif.createdAt,
+          });
+        }
         const patient = await User.findById(patientId).select('deviceTokens').lean();
         const tokens = (patient?.deviceTokens || []).map((t) => t.token);
         return sendPushToTokens(
