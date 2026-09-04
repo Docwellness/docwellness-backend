@@ -22,6 +22,7 @@ const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const { generateDietPlanDeterministically } = require('../../services/recipeSelectionEngine');
 const { balanceWeek } = require('../../services/dietPlanAutoBalanceService');
+const { scaleNutrition } = require('../../services/nutritionCalculatorService');
 const { seedGoalTimeline } = require('../../utils/seedGoalTimeline');
 const { parsePagination, buildPaginationMeta } = require('../../utils/pagination');
 const {
@@ -2772,6 +2773,24 @@ exports.activateDietPlan = async (req, res, next) => {
 // happens for 'plan-item' plans, via planItemController.js.
 // ==========================================
 
+/**
+ * A recipe's cached `nutritionPerServing` is populated by a pre-save hook
+ * (models/Recipe.js) whenever `nutrition` is set/changed on save - a
+ * recipe created before that hook existed, or written via a path that
+ * bypasses Mongoose save middleware (e.g. insertMany/a seed script), can
+ * have `nutrition` filled in but `nutritionPerServing` still empty. Falls
+ * back to `nutrition` itself (the same numbers, just not through the
+ * cache) rather than silently treating the recipe as having zero
+ * nutrition - see getWeekDays/getPlanExceptions below, both of which used
+ * to read `nutritionPerServing` alone and would show every item's
+ * calories as 0 (a "-100% vs budget" exception on every day) whenever it
+ * was empty.
+ */
+function resolveNutritionPerServing(recipeDoc) {
+  if (recipeDoc?.nutritionPerServing?.calories != null) return recipeDoc.nutritionPerServing;
+  return recipeDoc?.nutrition || null;
+}
+
 async function loadDietPlanForClever(req, res) {
   const { patientId, dietPlanId } = req.params;
   const dieticianId = req.user._id;
@@ -2814,24 +2833,35 @@ exports.getWeekDays = async (req, res, next) => {
       }
     }
     const recipeDocs = recipeIds.size
-      ? await Recipe.find({ _id: { $in: [...recipeIds] } }).select('name').lean()
+      ? await Recipe.find({ _id: { $in: [...recipeIds] } }).select('name nutritionPerServing nutrition').lean()
       : [];
+    const recipesById = new Map(recipeDocs.map((r) => [r._id.toString(), r]));
     const nameById = new Map(recipeDocs.map((r) => [r._id.toString(), r.name]));
 
     const days = weekDays.map((day) => ({
       dayGroup: day.dayGroup,
       meals: (day.meals || []).map((meal) => ({
         servingTime: meal.servingTime,
-        items: (meal.items || []).map((item) => ({
-          itemId: item._id.toString(),
-          recipeId: item.recipeId?.toString(),
-          recipeName: nameById.get(item.recipeId?.toString()) || null,
-          servingMultiplier: item.servingMultiplier,
-          locked: item.locked,
-          isLinkedComponent: item.isLinkedComponent,
-          calculatedNutrition: item.calculatedNutrition,
-          displayText: item.displayText,
-        })),
+        items: (meal.items || []).map((item) => {
+          // Recompute rather than trust the stored subdocument's own
+          // calculatedNutrition - it's only ever refreshed by balanceWeek
+          // (getPlanExceptions, a separate request/document instance) and
+          // is null outright for a days[] entry backfilled from the legacy
+          // finalizedPlan blob (see utils/dietPlanLegacyView.js), which
+          // never computes nutrition at all.
+          const recipe = recipesById.get(item.recipeId?.toString ? item.recipeId.toString() : item.recipeId);
+          const base = resolveNutritionPerServing(recipe);
+          return {
+            itemId: item._id.toString(),
+            recipeId: item.recipeId?.toString(),
+            recipeName: nameById.get(item.recipeId?.toString()) || null,
+            servingMultiplier: item.servingMultiplier,
+            locked: item.locked,
+            isLinkedComponent: item.isLinkedComponent,
+            calculatedNutrition: base ? scaleNutrition(base, item.servingMultiplier ?? 1) : item.calculatedNutrition,
+            displayText: item.displayText,
+          };
+        }),
         supplements: (meal.supplements || []).map((supplement) => ({
           supplementId: supplement.supplementId?.toString(),
           supplementName: nameById.get(supplement.supplementId?.toString()) || null,
@@ -2867,9 +2897,15 @@ exports.getPlanExceptions = async (req, res, next) => {
       ),
     ];
     const recipeDocs = recipeIds.length
-      ? await Recipe.find({ _id: { $in: recipeIds } }).select('nutritionPerServing').lean()
+      ? await Recipe.find({ _id: { $in: recipeIds } }).select('nutritionPerServing nutrition').lean()
       : [];
-    const recipesById = new Map(recipeDocs.map((r) => [r._id.toString(), r]));
+    // balanceWeek reads recipe.nutritionPerServing directly - normalize it
+    // here (rather than change that shared service) so a recipe whose
+    // cache field was never populated still contributes real nutrition
+    // instead of reading as 0 calories (see resolveNutritionPerServing).
+    const recipesById = new Map(
+      recipeDocs.map((r) => [r._id.toString(), { ...r, nutritionPerServing: resolveNutritionPerServing(r) }])
+    );
 
     const dailyCalorieTarget = dietPlan.calorieStrategy?.calorieBudget || dietPlan.totalCalories || null;
     const { warnings, tolerancePercent } = balanceWeek({ dietPlan, week, recipesById, dailyCalorieTarget });
