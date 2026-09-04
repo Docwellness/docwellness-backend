@@ -1343,10 +1343,21 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       });
     }
 
-    // Always resolved (defaults to now), unlike before, since weekSchedule
-    // needs an anchor date regardless of whether the dietician picked one.
-    const rawParsedStartDate = startDate ? new Date(startDate) : new Date();
-    const parsedStartDate = Number.isNaN(rawParsedStartDate.getTime()) ? new Date() : rawParsedStartDate;
+    // Always resolved, since weekSchedule needs an anchor date regardless
+    // of whether the dietician picked one. When they didn't: for a renewal
+    // (hasActivePlan - there's a running cycle) fall back to the start date
+    // the patient chose on the request, which is constrained to be on/after
+    // the current cycle's expiry so the two don't overlap; otherwise "now".
+    const renewalStartFallback =
+      dietPlanRequest?.hasActivePlan &&
+      dietPlanRequest?.startDateForDiet &&
+      new Date(dietPlanRequest.startDateForDiet) > new Date()
+        ? new Date(dietPlanRequest.startDateForDiet)
+        : new Date();
+    const rawParsedStartDate = startDate ? new Date(startDate) : renewalStartFallback;
+    const parsedStartDate = Number.isNaN(rawParsedStartDate.getTime())
+      ? renewalStartFallback
+      : rawParsedStartDate;
 
     // This endpoint doubles as "start a new renewal cycle" whenever it's
     // called for a patient who already has plan history (no separate
