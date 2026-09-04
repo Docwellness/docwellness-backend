@@ -62,6 +62,63 @@ const dateToDayKey = (dateObj) => {
  * queries flip to the new cycle on the right day with no cron. No-op for
  * the normal single-Active-plan case.
  */
+const RECIPE_CARD_SELECT =
+  'name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts';
+
+/** Patient-facing Recipe card (same shape getActiveDietPlanForPatient's main
+ *  block builds inline) - used to merge the next renewal cycle's recipes
+ *  into the continuous Week 1-8 timeline. */
+function toPatientRecipeCard(recipe) {
+  const id = recipe._id.toString();
+  const n = recipe.nutrition || {};
+  const nut = {
+    calories: n.calories ?? 0,
+    protein: n.protein ?? 0,
+    carbs: n.carbs ?? 0,
+    fats: n.fats ?? 0,
+    fiber: n.fiber ?? 0,
+  };
+  return {
+    id,
+    name: recipe.name || null,
+    servingTime: recipe.servingTime || null,
+    image: recipe.image || null,
+    tags:
+      recipe.category === 'Supplements'
+        ? [...(recipe.tags || []), 'supplement']
+        : recipe.tags || [],
+    supplementFacts: recipe.supplementFacts || null,
+    servingSize: {
+      servings: 1,
+      quantity:
+        typeof recipe.servingSize?.quantity === 'number' ? recipe.servingSize.quantity : null,
+      unit: recipe.servingSize?.unit || null,
+    },
+    nutritionPerServing: nut,
+    nutrition: nut,
+    ingredients: Array.isArray(recipe.ingredients)
+      ? recipe.ingredients.map((i) => ({
+        id: i._id ? i._id.toString() : undefined,
+        name: i.name || null,
+        quantity: typeof i.quantity === 'number' ? i.quantity : null,
+        unit: i.unit || null,
+        image: i.image || null,
+        isScalable: typeof i.isScalable === 'boolean' ? i.isScalable : true,
+      }))
+      : [],
+    components: Array.isArray(recipe.components)
+      ? recipe.components.map((c) => ({
+        label: c.label || null,
+        quantity: typeof c.quantity === 'number' ? c.quantity : null,
+        unit: c.unit || null,
+      }))
+      : [],
+    instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+    language: Array.isArray(recipe.language) ? recipe.language : [recipe.language || 'English'],
+    translations: recipe.translations || {},
+  };
+}
+
 async function retireEndedPredecessorPlans(patientId, now = new Date()) {
   const actives = await DietPlan.find({ patientId, status: 'Active' })
     .select('_id cycleNumber weekSchedule')
@@ -412,6 +469,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       // finalizedPlan.weeks + resolving every recipe in the plan, above)
       // already happens on every call regardless of which week was
       // requested, so this is close to free.
+      const thisCycleOffset = (cycleNumber - 1) * 4;
       const allWeeksData = weeks.map((w) => {
         const weekNum = Number(w.week);
         const scheduleEntry =
@@ -419,6 +477,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         const summary = allWeeksSummary.find((s) => Number(s.week) === weekNum) || null;
         return {
           week: weekNum,
+          displayWeek: thisCycleOffset + weekNum,
           weekStartDate: scheduleEntry?.startDate || null,
           weekEndDate: scheduleEntry?.endDate || null,
           weekSummary: summary,
@@ -427,6 +486,81 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         };
       });
 
+      // Continuous timeline across a renewal: once the next cycle is Active
+      // (built + activated, just not started yet), append its weeks so the
+      // patient's Diet tab shows an unbroken Week 1-8 progression instead of
+      // the running cycle abruptly stopping at Week 4. `week` on the
+      // appended entries is offset (5-8) so switchWeek can address them;
+      // their recipes are merged into the same map.
+      let mergedWeeks = allWeeksData;
+      let mergedTotalWeeks = totalWeeks;
+      const nextCycle = await DietPlan.findOne({
+        patientId: req.user._id,
+        status: 'Active',
+        cycleNumber: { $gt: cycleNumber },
+      })
+        .sort({ cycleNumber: 1 })
+        .lean();
+      if (nextCycle) {
+        const ncOffset = ((nextCycle.cycleNumber || cycleNumber + 1) - 1) * 4;
+        let ncWeeks;
+        let ncOverrides = {};
+        if (nextCycle.dataModel === 'plan-item') {
+          const ncView = await buildPlanItemPatientView(nextCycle);
+          ncWeeks = ncView.weeks;
+          ncOverrides = ncView.recipeVersionOverrides || {};
+        } else {
+          ncWeeks = getFinalizedWeeks(nextCycle);
+        }
+        const ncSchedule = Array.isArray(nextCycle.weekSchedule) ? nextCycle.weekSchedule : [];
+        const ncSummary = Array.isArray(nextCycle.weeksSummary) ? nextCycle.weeksSummary : [];
+
+        const ncBaseIds = new Set();
+        ncWeeks.forEach((w) => (w?.dailyMeals || []).forEach((m) => {
+          if (m?.recipeId) ncBaseIds.add(baseRecipeIdFromKey(m.recipeId.toString()));
+        }));
+        const missingIds = [...ncBaseIds].filter((id) => !recipes[id]);
+        if (missingIds.length) {
+          const ncDocs = await Recipe.find({ _id: { $in: missingIds } })
+            .select(RECIPE_CARD_SELECT)
+            .lean();
+          ncDocs.forEach((r) => {
+            recipes[r._id.toString()] = toPatientRecipeCard(r);
+          });
+        }
+        Object.entries(ncOverrides).forEach(([versionedId, override]) => {
+          const base = recipes[override.baseRecipeId];
+          if (!base || recipes[versionedId]) return;
+          recipes[versionedId] = {
+            ...base,
+            id: versionedId,
+            ingredients: override.ingredients,
+            instructions: override.steps,
+            nutritionPerServing: override.nutritionPerServing,
+            nutrition: override.nutritionPerServing,
+            servingSize: { ...base.servingSize, quantity: 1 },
+            components: override.components,
+          };
+        });
+
+        const nextCycleWeeks = ncWeeks.map((w) => {
+          const wn = Number(w.week);
+          const s = ncSchedule.find((e) => Number(e.week) === wn) || null;
+          const sum = ncSummary.find((x) => Number(x.week) === wn) || null;
+          return {
+            week: ncOffset + wn,
+            displayWeek: ncOffset + wn,
+            weekStartDate: s?.startDate || null,
+            weekEndDate: s?.endDate || null,
+            weekSummary: sum,
+            dailyMeals: fixMeals(w.dailyMeals),
+            supplementSchedule: [],
+          };
+        });
+        mergedWeeks = [...allWeeksData, ...nextCycleWeeks];
+        mergedTotalWeeks = mergedWeeks.length;
+      }
+
       return res.status(200).json({
         success: true,
         data: {
@@ -434,7 +568,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           status: dietPlan.status,
           activationDate: dietPlan.activationDate || null,
           currentWeek,
-          totalWeeks,
+          totalWeeks: mergedTotalWeeks,
           // cycleNumber/displayWeek let the app show "Week 5" etc. for a
           // renewed patient's second (or later) cycle, without changing
           // currentWeek's own internal 1-4 meaning (see models/DietPlan.js).
@@ -445,7 +579,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           dayGroup: todayDayGroup,
           weekSummary, // single object for the current week
           week: weekWithFixedMeals, // the current week’s dailyMeals with fixed recipeId
-          weeks: allWeeksData, // every week in the plan, for client-side caching
+          weeks: mergedWeeks, // every week (this cycle + any next renewal cycle), for client-side caching
           recipes, // keep as-is (all recipes map)
         },
       });
