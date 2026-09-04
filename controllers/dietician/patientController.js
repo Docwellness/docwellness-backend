@@ -96,7 +96,7 @@ exports.getPatientProfile = async (req, res, next) => {
         .lean(),
       DietPlanRequest.findOne({ patient: patient._id })
         .sort({ createdAt: -1 })
-        .select('_id status latestPaymentProof startDateForDiet membershipPlan')
+        .select('_id status latestPaymentProof startDateForDiet membershipPlan hasActivePlan')
         .lean(),
     ]);
 
@@ -173,16 +173,67 @@ exports.getPatientProfile = async (req, res, next) => {
 
     const statusSnapshot = patient.status || {};
 
+    const DIET_PLAN_SUMMARY_SELECT =
+      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan';
+
+    // weeklyDietPlans (finalized weeks + their calories) and
+    // generatedWeekNumbers (weeks with AI content ready, pre-finalize) for
+    // one plan - the same derivation for the active cycle and, during a
+    // renewal, the pending next cycle. weeklyDietPlans/weeksSummary only
+    // reflects finalized weeks; generatedWeekNumbers lets the frontend tell
+    // "generated, tap to pick meals" from "not yet generated". A v4.0
+    // plan-item plan stores nothing in generatedPlan/weeksSummary - its
+    // weeks live as DayPlan documents - so both signals are derived from
+    // those instead (finalizes as a whole, not week by week).
+    const deriveWeeksForPlan = async (planDoc) => {
+      let weeklyDietPlans = Array.isArray(planDoc?.weeksSummary)
+        ? planDoc.weeksSummary.map((weekEntry) => ({
+          week: weekEntry.week,
+          totalCalories: weekEntry.totalCalories,
+        }))
+        : [];
+
+      let generatedWeekNumbers = [];
+      if (planDoc?.generatedPlan) {
+        try {
+          const parsed = JSON.parse(planDoc.generatedPlan);
+          generatedWeekNumbers = Array.isArray(parsed?.weeks)
+            ? parsed.weeks.map((w) => w.week)
+            : [];
+        } catch (_) {
+          generatedWeekNumbers = [];
+        }
+      }
+
+      if (planDoc?._id && planDoc.dataModel === 'plan-item') {
+        const planItemWeeks = (await DayPlan.distinct('week', { dietPlanId: planDoc._id }))
+          .filter((w) => Number.isInteger(w) && w >= 1 && w <= 4)
+          .sort((a, b) => a - b);
+        generatedWeekNumbers = planItemWeeks;
+        if (['Finalized', 'Active', 'Completed'].includes(planDoc.status)) {
+          const perWeekCalories = planDoc.calorieStrategy?.calorieBudget || 0;
+          weeklyDietPlans = planItemWeeks.map((week) => ({ week, totalCalories: perWeekCalories }));
+        }
+      }
+
+      const finalizedWeekNumbers = weeklyDietPlans
+        .filter((w) => (w.totalCalories || 0) > 0)
+        .map((w) => w.week);
+
+      return { weeklyDietPlans, generatedWeekNumbers, finalizedWeekNumbers };
+    };
+
     // Prefer the patient's tracked activeDietPlanId - set as soon as any
     // generation happens, even while the plan is still Draft - so weekly
     // card state (which weeks are generated vs. finalized) is visible
-    // before the plan reaches Finalized/Active. Falls back to the newest
-    // Finalized/Active plan for older records predating this being set
-    // unconditionally.
+    // before the plan reaches Finalized/Active. During a renewal this stays
+    // pointed at the *live* cycle (the new build is status.pendingDietPlanId,
+    // handled separately below). Falls back to the newest Finalized/Active
+    // plan for older records predating this being set unconditionally.
     let dietPlanForSummary = null;
     if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
       dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
-        .select('_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
+        .select(DIET_PLAN_SUMMARY_SELECT)
         .lean();
     }
     if (!dietPlanForSummary) {
@@ -191,51 +242,64 @@ exports.getPatientProfile = async (req, res, next) => {
         status: { $in: ['Finalized', 'Active'] },
       })
         .sort({ createdAt: -1 })
-        .select('_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule')
+        .select(DIET_PLAN_SUMMARY_SELECT)
         .lean();
     }
 
-    let weeklyDietPlans = Array.isArray(dietPlanForSummary?.weeksSummary)
-      ? dietPlanForSummary.weeksSummary.map((weekEntry) => ({
-        week: weekEntry.week,
-        totalCalories: weekEntry.totalCalories,
-      }))
-      : [];
+    const activeWeeks = await deriveWeeksForPlan(dietPlanForSummary);
+    const weeklyDietPlans = activeWeeks.weeklyDietPlans;
+    const generatedWeekNumbers = activeWeeks.generatedWeekNumbers;
 
-    // Which weeks have AI-generated content ready for meal selection, even
-    // before finalization (weeklyDietPlans/weeksSummary only reflects
-    // finalized weeks) - lets the frontend distinguish "generated, tap to
-    // pick meals" from "not yet generated" for the tier-gated regeneration UI.
-    let generatedWeekNumbers = [];
-    if (dietPlanForSummary?.generatedPlan) {
-      try {
-        const parsedGeneratedPlan = JSON.parse(dietPlanForSummary.generatedPlan);
-        generatedWeekNumbers = Array.isArray(parsedGeneratedPlan?.weeks)
-          ? parsedGeneratedPlan.weeks.map((w) => w.week)
-          : [];
-      } catch (_) {
-        generatedWeekNumbers = [];
+    // A renewal has been requested (the patient re-ran the request flow -
+    // startRenewal flips the shared request back to unpaid while its
+    // hasActivePlan stays true) but the new cycle isn't paid/activated yet.
+    // True from the moment of the request, before the dietician has built
+    // anything - the entry point to build the next cycle keys off this.
+    const renewalPending =
+      latestRequest?.hasActivePlan === true &&
+      !['Paid', 'PartiallyPaid'].includes(latestRequest?.status);
+
+    // Once the dietician has started building it, the next cycle's plan is
+    // surfaced as its own block (its own week-state signals) so the app can
+    // show "Week 5-8" cards + a Resume button without disturbing the
+    // running cycle's UI. Null until the first generation for the renewal.
+    let pendingCycle = null;
+    if (
+      renewalPending &&
+      statusSnapshot.pendingDietPlanId &&
+      mongoose.Types.ObjectId.isValid(statusSnapshot.pendingDietPlanId)
+    ) {
+      const pendingPlan = await DietPlan.findById(statusSnapshot.pendingDietPlanId)
+        .select(DIET_PLAN_SUMMARY_SELECT)
+        .lean();
+      if (pendingPlan && pendingPlan._id?.toString() !== dietPlanForSummary?._id?.toString()) {
+        const pendingWeeks = await deriveWeeksForPlan(pendingPlan);
+        pendingCycle = {
+          dietPlanId: pendingPlan._id,
+          status: pendingPlan.status || null,
+          workflowStatus: pendingPlan.workflowStatus || null,
+          dataModel: pendingPlan.dataModel || null,
+          cycleNumber: pendingPlan.cycleNumber || 1,
+          weekSchedule: pendingPlan.weekSchedule || [],
+          generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
+          finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
+          activePlanStrategy: {
+            calorieStrategy: pendingPlan.calorieStrategy || null,
+            macroStrategy: pendingPlan.macroStrategy || null,
+          },
+        };
       }
     }
 
-    // A v4.0 plan-item plan stores nothing in generatedPlan / weeksSummary -
-    // its weeks live as DayPlan documents. Derive the same two signals from
-    // those so the profile's Weekly Diet Plans cards unlock for a plan-item
-    // plan the same way they do for a days-array one: every generated week
-    // is tappable, and once the plan is Finalized/Active every generated
-    // week also counts as finalized (a plan-item plan finalizes as a whole,
-    // not week by week).
-    if (dietPlanForSummary?._id && dietPlanForSummary.dataModel === 'plan-item') {
-      const planItemWeeks = (await DayPlan.distinct('week', { dietPlanId: dietPlanForSummary._id }))
-        .filter((w) => Number.isInteger(w) && w >= 1 && w <= 4)
-        .sort((a, b) => a - b);
-      generatedWeekNumbers = planItemWeeks;
-      const isPlanFinalized = ['Finalized', 'Active', 'Completed'].includes(dietPlanForSummary.status);
-      if (isPlanFinalized) {
-        const perWeekCalories = dietPlanForSummary.calorieStrategy?.calorieBudget || 0;
-        weeklyDietPlans = planItemWeeks.map((week) => ({ week, totalCalories: perWeekCalories }));
-      }
-    }
+    // Membership badge / avatar ring on the dietician's patient profile
+    // must reflect the tier the *currently active* cycle was sold as, not
+    // whatever the patient just picked for a pending renewal
+    // (DietPlanRequest.membershipPlan is overwritten in place on renewal).
+    // Prefer the active plan's own snapshot; fall back to the request for
+    // plans created before DietPlan.membershipPlan existed.
+    const activeMembershipPlan =
+      dietPlanForSummary?.membershipPlan || latestRequest?.membershipPlan || null;
+    const pendingMembershipPlan = renewalPending ? latestRequest?.membershipPlan || null : null;
 
     const activeDietPlanId = statusSnapshot.activeDietPlanId || dietPlanForSummary?._id || null;
 
@@ -285,10 +349,18 @@ exports.getPatientProfile = async (req, res, next) => {
           // 1-4 week numbers as (cycleNumber-1)*4 + week to display "Week
           // 5" etc. for a second cycle onward.
           cycleNumber: dietPlanForSummary?.cycleNumber || 1,
-          membershipPlan: latestRequest?.membershipPlan || null,
+          // The tier the currently-active cycle was sold as (snapshot on
+          // the plan, request fallback for legacy plans) - NOT the pending
+          // renewal's pick. Drives the profile badge + avatar ring.
+          membershipPlan: activeMembershipPlan,
           // Normalized 'silver'|'golden'|'platinum'|null so the frontend
           // branches on a clean enum instead of re-parsing the raw string.
-          membershipTier: getMembershipTier(latestRequest?.membershipPlan),
+          membershipTier: getMembershipTier(activeMembershipPlan),
+          // A renewal is being built for this patient - the current cycle
+          // is still live; badge/ring/weekly-plan swap wait for activation.
+          renewalPending,
+          pendingMembershipPlan,
+          pendingMembershipTier: getMembershipTier(pendingMembershipPlan),
           canSendPaymentRequest:
             typeof statusSnapshot.canSendPaymentRequest === 'boolean'
               ? statusSnapshot.canSendPaymentRequest
@@ -318,6 +390,10 @@ exports.getPatientProfile = async (req, res, next) => {
             macroStrategy: dietPlanForSummary.macroStrategy || null,
           }
           : null,
+        // The next cycle being built during a renewal (null otherwise).
+        // Same week-state signals as the active cycle above, for the
+        // "Week 5-8" cards + Create/Resume button under Weekly Diet Plans.
+        pendingCycle,
       },
     });
   } catch (error) {

@@ -60,6 +60,18 @@ const dietPlanSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DietPlanRequest',
     },
+    // Membership plan name this cycle was sold as, snapshotted at creation
+    // (e.g. "Platinum Membership"). DietPlanRequest.membershipPlan is mutated
+    // in place when a patient picks a new tier for a renewal, so it can't be
+    // trusted to say what the *currently active* cycle's tier is - the
+    // dietician's patient profile reads this snapshot for the badge/ring so
+    // they don't flip to the new tier until the new cycle is activated.
+    // Null on plans created before this field existed (fall back to the
+    // request's current value there).
+    membershipPlan: {
+      type: String,
+      default: null,
+    },
     // Which renewal cycle this plan belongs to for this patient+request - 1
     // for the first plan ever built, incremented each time a new DietPlan is
     // created for a patient who already has one (see createAndGenerateDietPlan).

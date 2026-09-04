@@ -340,6 +340,12 @@ exports.listPatientsForDietician = async (req, res, next) => {
           isActive: patient.isActive !== false,
           status: request.status || 'Unpaid',
           membershipPlan: request.membershipPlan || null,
+          // Live plan running + current request cycle not paid = the
+          // patient has requested a renewal the dietician still has to
+          // build. Drives the "New plan requested" pill on the row.
+          renewalPending:
+            request.hasActivePlan === true &&
+            !['Paid', 'PartiallyPaid'].includes(request.status),
         };
       }
 
@@ -1366,13 +1372,22 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       cycleNumber = previousPlan.cycleNumber || 1;
     } else {
       cycleNumber = previousPlan ? (previousPlan.cycleNumber || 1) + 1 : 1;
-      if (previousPlan && previousPlan.status === 'Active') {
-        await DietPlan.updateMany(
-          { patientId, request: resolvedRequestId, status: 'Active' },
-          { $set: { status: 'Completed' } }
-        );
-      }
+      // The previous cycle's plan is deliberately NOT completed here. A
+      // renewal can be started up to 3 days before the current subscription
+      // expires (see docwellness-user's renewalDue), and the patient must
+      // keep logging against the live plan the whole time it's being built -
+      // getActiveDietPlanForPatient reads DietPlan.findOne({status:'Active'}),
+      // so completing it now would blank out the patient's diet mid-cycle.
+      // activateDietPlan completes the old cycle when the new one goes live.
     }
+
+    // A patient who already has a live Active plan is renewing - the new
+    // Draft is the "pending" next cycle, tracked separately so the running
+    // cycle stays the active one until the dietician activates this build.
+    const hasLivePlan = !!(await DietPlan.exists({ patientId, status: 'Active' }));
+    const planIdStatusField = hasLivePlan
+      ? 'status.pendingDietPlanId'
+      : 'status.activeDietPlanId';
 
     const dietPlan = new DietPlan({
       patientId,
@@ -1384,6 +1399,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       status: 'Draft',
       startDate: parsedStartDate,
       cycleNumber,
+      membershipPlan: dietPlanRequest.membershipPlan || null,
       weekSchedule: buildWeekSchedule(parsedStartDate),
       // v4.0: fixed for this plan's whole lifetime at creation time - never
       // re-evaluated later even if the env flag changes, matching the
@@ -1425,7 +1441,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
         $set: {
           'status.requestId': resolvedRequestId.toString(),
           'status.requestStatus': dietPlanRequest.status,
-          'status.activeDietPlanId': dietPlan._id.toString(),
+          [planIdStatusField]: dietPlan._id.toString(),
         },
       });
       return res.status(201).json({
@@ -1455,7 +1471,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       $set: {
         'status.requestId': resolvedRequestId.toString(),
         'status.requestStatus': dietPlanRequest.status,
-        'status.activeDietPlanId': dietPlan._id.toString(),
+        [planIdStatusField]: dietPlan._id.toString(),
       },
     });
 
@@ -2594,6 +2610,16 @@ exports.activateDietPlan = async (req, res, next) => {
       await dietPlan.request.save();
     }
 
+    // Renewal: the previous cycle's plan was deliberately left Active while
+    // this new one was being built (see createAndGenerateDietPlan) so the
+    // patient could keep logging it. Now that the new cycle is going live,
+    // retire the old one(s) - getActiveDietPlanForPatient expects exactly
+    // one Active plan per patient.
+    await DietPlan.updateMany(
+      { patientId, status: 'Active', _id: { $ne: dietPlan._id } },
+      { $set: { status: 'Completed' } }
+    );
+
     dietPlan.status = 'Active';
     dietPlan.isPaid = true;
     dietPlan.activationDate = dietPlan.activationDate || new Date();
@@ -2612,6 +2638,8 @@ exports.activateDietPlan = async (req, res, next) => {
 
     const patientStatusUpdate = {
       'status.activeDietPlanId': dietPlan._id,
+      // This build is no longer "pending" - it's the active cycle now.
+      'status.pendingDietPlanId': null,
       'status.canSendPaymentRequest': false,
       'status.hasPaymentUpdate': false,
       'status.subscriptionExpiresAt': subscriptionExpiresAt,

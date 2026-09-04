@@ -141,6 +141,17 @@ const userSchema = new mongoose.Schema(
         ref: 'DietPlan',
         default: null,
       },
+      // The next cycle's plan while it's being built during a renewal, kept
+      // separate from activeDietPlanId so the currently-running cycle stays
+      // the "active" one (patient keeps logging it, dietician badge/ring
+      // stay on its tier) until the dietician activates the new one - at
+      // which point activateDietPlan moves it to activeDietPlanId and clears
+      // this. Null outside a renewal build.
+      pendingDietPlanId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DietPlan',
+        default: null,
+      },
       requestId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DietPlanRequest',

@@ -1,6 +1,8 @@
-const { DietPlanRequest, User, ManualPaymentProof } = require('../../models');
+const { DietPlanRequest, User, ManualPaymentProof, Notification } = require('../../models');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { parseFlexibleDate } = require('../../utils/dateUtils');
+const { getChatIO } = require('../../chat');
+const { sendPushToTokens } = require('../../utils/push');
 
 /**
  * @desc    Create a diet plan request for the logged-in patient
@@ -278,6 +280,66 @@ exports.startRenewal = async (req, res, next) => {
     request.latestPaymentProof = null;
     request.collectedAmount = 0;
     await request.save();
+
+    // Tell the dietician the patient wants a renewal so they can start
+    // building the next cycle (the current one stays live meanwhile - see
+    // createAndGenerateDietPlan / activateDietPlan). In-app Notification +
+    // socket always; FCM push best-effort - never blocks or fails the
+    // renewal (same convention as activateDietPlan / firstConsultation save).
+    try {
+      const patient = await User.findById(req.user._id)
+        .select('profile.fullName')
+        .lean();
+      const patientName = patient?.profile?.fullName || 'A patient';
+      const notifTitle = `${patientName} requested a plan renewal`;
+      const notifBody = 'Build their next diet & exercise plan when you\'re ready.';
+      const notif = await Notification.create({
+        userId: request.dieticianId,
+        title: notifTitle,
+        message: notifBody,
+        type: 'membership_renewal',
+        referenceId: request._id,
+        referenceModel: 'DietPlanRequest',
+        data: { patientId: String(request.patient) },
+      });
+
+      const io = getChatIO();
+      if (io) {
+        io.to(`user:${request.dieticianId}`).emit('notification.new', {
+          id: notif._id,
+          title: notif.title,
+          message: notif.message,
+          type: notif.type,
+          referenceId: notif.referenceId?.toString(),
+          data: notif.data,
+          createdAt: notif.createdAt,
+        });
+      }
+
+      const dietician = await User.findById(request.dieticianId)
+        .select('deviceTokens')
+        .lean();
+      const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+      await sendPushToTokens(
+        tokens,
+        {
+          title: notifTitle,
+          body: notifBody,
+          data: {
+            deepLink: 'docwellness://patient-profile',
+            patientId: String(request.patient),
+          },
+        },
+        (deadToken) => {
+          User.updateOne(
+            { _id: request.dieticianId },
+            { $pull: { deviceTokens: { token: deadToken } } }
+          ).catch(() => {});
+        }
+      );
+    } catch (notifErr) {
+      console.error('[startRenewal] dietician notify failed (non-fatal):', notifErr.message);
+    }
 
     res.status(200).json({
       success: true,
