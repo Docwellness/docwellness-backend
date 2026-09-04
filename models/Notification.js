@@ -56,6 +56,14 @@ const notificationSchema = new mongoose.Schema(
         'Quote',
       ],
     },
+    // Free-form extras the tapping client needs that don't fit referenceId
+    // (which is a single ObjectId) - e.g. a dietician-facing renewal
+    // notification carries { patientId } so the bell-list tap can open that
+    // patient's profile, not just the referenced DietPlanRequest.
+    data: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,
