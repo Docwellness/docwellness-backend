@@ -30,6 +30,11 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
+// Dual-write days[] alongside the legacy finalizedPlan blob below, same as
+// the real finalizeWeekPlan endpoint does - without it, the dietician app's
+// Exception Review / Finalize step (which reads days[], not finalizedPlan)
+// shows this seeded plan's weeks as blank.
+const { daysFromLegacyWeekPayload } = require('../utils/dietPlanLegacyView');
 
 const EXECUTE = process.argv.includes('--execute');
 function arg(flag, fallback) {
@@ -271,6 +276,7 @@ async function main() {
       generatedPlan: JSON.stringify({ weeks: weeksData }),
       generatedAt: activation,
       finalizedPlan: { weeks: weeksData },
+      days: weeksData.flatMap((w) => daysFromLegacyWeekPayload(w)),
       weeksSummary,
     });
     console.log(`DietPlan: ${dietPlan._id} (Active, cycle 1, 4 weeks finalized)`);
