@@ -259,13 +259,14 @@ exports.getPatientProfile = async (req, res, next) => {
       latestRequest?.hasActivePlan === true &&
       !['Paid', 'PartiallyPaid'].includes(latestRequest?.status);
 
-    // Once the dietician has started building it, the next cycle's plan is
-    // surfaced as its own block (its own week-state signals) so the app can
-    // show "Week 5-8" cards + a Resume button without disturbing the
-    // running cycle's UI. Null until the first generation for the renewal.
+    // The next cycle's plan, surfaced as its own block so the app can show
+    // "Week 5-8" cards continuing the row. Populated once the dietician has
+    // started building the renewal (status.pendingDietPlanId) and stays put
+    // even after that plan is activated, until the running cycle actually
+    // ends and getActiveDietPlanForPatient's sweep hands over. Null in the
+    // normal single-cycle case.
     let pendingCycle = null;
     if (
-      renewalPending &&
       statusSnapshot.pendingDietPlanId &&
       mongoose.Types.ObjectId.isValid(statusSnapshot.pendingDietPlanId)
     ) {
@@ -280,6 +281,7 @@ exports.getPatientProfile = async (req, res, next) => {
           workflowStatus: pendingPlan.workflowStatus || null,
           dataModel: pendingPlan.dataModel || null,
           cycleNumber: pendingPlan.cycleNumber || 1,
+          membershipPlan: pendingPlan.membershipPlan || null,
           weekSchedule: pendingPlan.weekSchedule || [],
           generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
           finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
@@ -299,7 +301,13 @@ exports.getPatientProfile = async (req, res, next) => {
     // plans created before DietPlan.membershipPlan existed.
     const activeMembershipPlan =
       dietPlanForSummary?.membershipPlan || latestRequest?.membershipPlan || null;
-    const pendingMembershipPlan = renewalPending ? latestRequest?.membershipPlan || null : null;
+    // The tier the next cycle was sold as - from its own plan snapshot once
+    // built, else the request's current pick while it's still being chosen.
+    const pendingMembershipPlan = pendingCycle
+      ? pendingCycle.membershipPlan || latestRequest?.membershipPlan || null
+      : renewalPending
+        ? latestRequest?.membershipPlan || null
+        : null;
 
     const activeDietPlanId = statusSnapshot.activeDietPlanId || dietPlanForSummary?._id || null;
 

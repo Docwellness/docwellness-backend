@@ -53,6 +53,37 @@ const dateToDayKey = (dateObj) => {
 };
 
 /**
+ * A renewal cycle can be activated a few days before the running cycle
+ * ends (see docwellness-user's 3-day renewal window). While that overlap
+ * lasts BOTH DietPlans are status:'Active', and the patient is still
+ * living the *older* cycleNumber - so every "the patient's current diet
+ * plan" query in this file sorts cycleNumber ascending. This retires the
+ * older cycle the moment its last scheduled week has ended, so those
+ * queries flip to the new cycle on the right day with no cron. No-op for
+ * the normal single-Active-plan case.
+ */
+async function retireEndedPredecessorPlans(patientId, now = new Date()) {
+  const actives = await DietPlan.find({ patientId, status: 'Active' })
+    .select('_id cycleNumber weekSchedule')
+    .sort({ cycleNumber: 1 })
+    .lean();
+  if (actives.length < 2) return;
+  const maxCycle = actives[actives.length - 1].cycleNumber || 1;
+  const nowMs = now.getTime();
+  const ended = actives
+    .filter((p) => (p.cycleNumber || 1) < maxCycle)
+    .filter((p) => {
+      const ws = p.weekSchedule || [];
+      if (ws.length === 0) return true;
+      return new Date(ws[ws.length - 1].endDate).getTime() < nowMs;
+    })
+    .map((p) => p._id);
+  if (ended.length > 0) {
+    await DietPlan.updateMany({ _id: { $in: ended } }, { $set: { status: 'Completed' } });
+  }
+}
+
+/**
  * @route   GET /api/patient/diet/active/?date=YYYY-MM-DD
  * @desc    Get currently active diet plan with recipes and summaries
  */
@@ -68,10 +99,17 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       }
     }
 
+    await retireEndedPredecessorPlans(req.user._id, referenceDate);
+
+    // Lowest cycleNumber still Active = the cycle the patient is currently
+    // living (a just-activated renewal whose Week 1 hasn't started yet is a
+    // higher cycleNumber and stays out of the way until the sweep above
+    // flips it in).
     const dietPlan = await DietPlan.findOne({
       patientId: req.user._id,
       status: 'Active',
     })
+      .sort({ cycleNumber: 1 })
       .populate('request', 'startDateForDiet')
       .lean();
 
@@ -445,7 +483,9 @@ exports.getWeekCompletion = async (req, res, next) => {
     const dietPlan = await DietPlan.findOne({
       patientId: req.user._id,
       status: 'Active',
-    }).lean();
+    })
+      .sort({ cycleNumber: 1 })
+      .lean();
     if (!dietPlan) {
       return res.status(404).json({
         success: false,
@@ -783,6 +823,7 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
       patientId: req.user._id,
       status: 'Active',
     })
+      .sort({ cycleNumber: 1 })
       .populate('request', 'startDateForDiet')
       .lean();
 
@@ -906,10 +947,12 @@ exports.getTodayMealLogStats = async (req, res, next) => {
  * can cache it (task 2.6). Returns `{ noPlan: true }` or `{ data: {...} }`.
  */
 async function computeTodayMealLogStats(patientId, today) {
+  await retireEndedPredecessorPlans(patientId);
   const dietPlan = await DietPlan.findOne({
     patientId,
     status: 'Active',
   })
+    .sort({ cycleNumber: 1 })
     .populate('request', 'startDateForDiet')
     .lean();
 
@@ -1233,6 +1276,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
       patientId: req.user._id,
       status: 'Active',
     })
+      .sort({ cycleNumber: 1 })
       .populate('request', 'startDateForDiet')
       .lean();
 
@@ -1735,6 +1779,7 @@ exports.createCustomFoodRequest = async (req, res, next) => {
       patientId: req.user._id,
       status: 'Active',
     })
+      .sort({ cycleNumber: 1 })
       .select('dieticianId')
       .lean();
 
