@@ -5,6 +5,66 @@ const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
 
 /**
+ * Tell the dietician a patient wants a renewal so they can start building
+ * the next cycle (the current one stays live meanwhile - see
+ * createAndGenerateDietPlan / activateDietPlan). In-app Notification +
+ * socket always; FCM push best-effort. Never throws - callers wrap it, but
+ * this must not break the request it's attached to.
+ */
+async function notifyDieticianOfRenewal(request, patientName) {
+  try {
+    const title = `${patientName || 'A patient'} requested a plan renewal`;
+    const body = "Build their next diet & exercise plan when you're ready.";
+    const notif = await Notification.create({
+      userId: request.dieticianId,
+      title,
+      message: body,
+      type: 'membership_renewal',
+      referenceId: request._id,
+      referenceModel: 'DietPlanRequest',
+      data: { patientId: String(request.patient) },
+    });
+
+    const io = getChatIO();
+    if (io) {
+      io.to(`user:${request.dieticianId}`).emit('notification.new', {
+        id: notif._id,
+        title: notif.title,
+        message: notif.message,
+        type: notif.type,
+        referenceId: notif.referenceId?.toString(),
+        data: notif.data,
+        createdAt: notif.createdAt,
+      });
+    }
+
+    const dietician = await User.findById(request.dieticianId)
+      .select('deviceTokens')
+      .lean();
+    const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+    await sendPushToTokens(
+      tokens,
+      {
+        title,
+        body,
+        data: {
+          deepLink: 'docwellness://patient-profile',
+          patientId: String(request.patient),
+        },
+      },
+      (deadToken) => {
+        User.updateOne(
+          { _id: request.dieticianId },
+          { $pull: { deviceTokens: { token: deadToken } } }
+        ).catch(() => {});
+      }
+    );
+  } catch (err) {
+    console.error('[notifyDieticianOfRenewal] non-fatal:', err.message);
+  }
+}
+
+/**
  * @desc    Create a diet plan request for the logged-in patient
  * @route   POST /api/patient/diet-plan-requests
  * @access  Private (Patient)
@@ -144,17 +204,54 @@ exports.createDietPlanRequest = async (req, res, next) => {
         : patient.healthProfile.healthConcerns || [],
     };
 
-    // "Update Plan Request" (Order Summary -> edit -> re-submit) re-posts to
-    // this same endpoint - while the request is still Unpaid (no payment
-    // request sent yet), that resubmission should overwrite the existing
-    // request rather than create a new one, or every edit piles up another
-    // duplicate row in the dietician's "All Patient Requests" list.
+    // Reuse the patient's current request rather than piling up duplicate
+    // rows on the dietician's list:
+    //  - an Unpaid one is an in-flight request being edited ("Update Plan
+    //    Request", or the renewal form before submit) - just overwrite it;
+    //  - a Paid/PartiallyPaid one with an active plan is a RENEWAL: the
+    //    patient re-ran the request flow, so reset its payment fields for
+    //    the new cycle (what the old startRenewal endpoint did) and notify
+    //    the dietician. Nothing here touches the running cycle's DietPlan -
+    //    it stays Active/loggable until the dietician activates the new one.
     let request = await DietPlanRequest.findOne({
       patient: patient._id,
-      status: 'Unpaid',
+      completedAt: null,
+      $or: [
+        { status: 'Unpaid' },
+        { status: { $in: ['Paid', 'PartiallyPaid'] }, hasActivePlan: true },
+      ],
     }).sort({ createdAt: -1 });
 
+    const isNewRenewal =
+      request && ['Paid', 'PartiallyPaid'].includes(request.status);
+
+    if (isNewRenewal) {
+      // The new plan can't start before the current subscription ends, or
+      // the two cycles overlap. subscriptionExpiresAt is left untouched by
+      // the renewal reset below, so it's still the running cycle's expiry.
+      if (request.subscriptionExpiresAt) {
+        const expiry = new Date(request.subscriptionExpiresAt);
+        const expiryDay = new Date(
+          expiry.getFullYear(),
+          expiry.getMonth(),
+          expiry.getDate()
+        );
+        if (parsedDate < expiryDay) {
+          return res.status(400).json({
+            success: false,
+            message: `Your current plan runs until ${expiryDay.toDateString()}. Choose a start date on or after that.`,
+          });
+        }
+      }
+      request.paymentRequested = false;
+      request.paymentRequestedAt = null;
+      request.latestPaymentStatus = null;
+      request.latestPaymentProof = null;
+      request.collectedAmount = 0;
+    }
+
     if (request) {
+      request.status = 'Unpaid';
       Object.assign(request, snapshot);
       await request.save();
     } else {
@@ -164,6 +261,10 @@ exports.createDietPlanRequest = async (req, res, next) => {
         status: 'Unpaid',
         ...snapshot,
       });
+    }
+
+    if (isNewRenewal) {
+      await notifyDieticianOfRenewal(request, patient.profile?.fullName);
     }
 
     res.status(201).json({
@@ -281,65 +382,13 @@ exports.startRenewal = async (req, res, next) => {
     request.collectedAmount = 0;
     await request.save();
 
-    // Tell the dietician the patient wants a renewal so they can start
-    // building the next cycle (the current one stays live meanwhile - see
-    // createAndGenerateDietPlan / activateDietPlan). In-app Notification +
-    // socket always; FCM push best-effort - never blocks or fails the
-    // renewal (same convention as activateDietPlan / firstConsultation save).
-    try {
-      const patient = await User.findById(req.user._id)
-        .select('profile.fullName')
-        .lean();
-      const patientName = patient?.profile?.fullName || 'A patient';
-      const notifTitle = `${patientName} requested a plan renewal`;
-      const notifBody = 'Build their next diet & exercise plan when you\'re ready.';
-      const notif = await Notification.create({
-        userId: request.dieticianId,
-        title: notifTitle,
-        message: notifBody,
-        type: 'membership_renewal',
-        referenceId: request._id,
-        referenceModel: 'DietPlanRequest',
-        data: { patientId: String(request.patient) },
-      });
-
-      const io = getChatIO();
-      if (io) {
-        io.to(`user:${request.dieticianId}`).emit('notification.new', {
-          id: notif._id,
-          title: notif.title,
-          message: notif.message,
-          type: notif.type,
-          referenceId: notif.referenceId?.toString(),
-          data: notif.data,
-          createdAt: notif.createdAt,
-        });
-      }
-
-      const dietician = await User.findById(request.dieticianId)
-        .select('deviceTokens')
-        .lean();
-      const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
-      await sendPushToTokens(
-        tokens,
-        {
-          title: notifTitle,
-          body: notifBody,
-          data: {
-            deepLink: 'docwellness://patient-profile',
-            patientId: String(request.patient),
-          },
-        },
-        (deadToken) => {
-          User.updateOne(
-            { _id: request.dieticianId },
-            { $pull: { deviceTokens: { token: deadToken } } }
-          ).catch(() => {});
-        }
-      );
-    } catch (notifErr) {
-      console.error('[startRenewal] dietician notify failed (non-fatal):', notifErr.message);
-    }
+    // Kept for backward-compat / the notification deep-link path. The
+    // normal patient renewal flow no longer calls this - createDietPlanRequest
+    // detects the renewal on submit and notifies there instead.
+    const patient = await User.findById(req.user._id)
+      .select('profile.fullName')
+      .lean();
+    await notifyDieticianOfRenewal(request, patient?.profile?.fullName);
 
     res.status(200).json({
       success: true,
