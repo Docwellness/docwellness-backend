@@ -606,8 +606,10 @@ async function computeTrackingData(patientId, query) {
 
     // Get active diet plan for planned calories
     const { DietPlan } = require('../../models');
+    // Lowest cycleNumber still Active = the cycle the patient is currently
+    // living (renewal-overlap - see dietController.retireEndedPredecessorPlans).
     const activePlan = await DietPlan.findOne({ patientId, status: 'Active' })
-      .sort({ createdAt: -1 })
+      .sort({ cycleNumber: 1 })
       .select('totalCalories weeksSummary activationDate weekSchedule')
       .lean();
 

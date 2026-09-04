@@ -2622,18 +2622,38 @@ exports.activateDietPlan = async (req, res, next) => {
     }
 
     // Renewal: the previous cycle's plan was deliberately left Active while
-    // this new one was being built (see createAndGenerateDietPlan) so the
-    // patient could keep logging it. Now that the new cycle is going live,
-    // retire the old one(s) - getActiveDietPlanForPatient expects exactly
-    // one Active plan per patient.
-    await DietPlan.updateMany(
-      { patientId, status: 'Active', _id: { $ne: dietPlan._id } },
-      { $set: { status: 'Completed' } }
-    );
+    // this new one was built (see createAndGenerateDietPlan) so the patient
+    // could keep logging it. A renewal can be activated a few days BEFORE
+    // the running cycle ends, though - retire the old cycle only once its
+    // last scheduled week has actually finished. Until then both plans are
+    // Active and every "current diet plan" lookup takes the lower
+    // cycleNumber; getActiveDietPlanForPatient's sweep finishes the old one
+    // on the day the new cycle's Week 1 begins.
+    const activationNow = new Date();
+    const priorActive = await DietPlan.find({
+      patientId,
+      status: 'Active',
+      _id: { $ne: dietPlan._id },
+    })
+      .select('_id weekSchedule')
+      .lean();
+    const priorEnded = priorActive
+      .filter((p) => {
+        const ws = p.weekSchedule || [];
+        if (ws.length === 0) return true; // no schedule to wait on
+        return new Date(ws[ws.length - 1].endDate).getTime() < activationNow.getTime();
+      })
+      .map((p) => p._id);
+    if (priorEnded.length > 0) {
+      await DietPlan.updateMany(
+        { _id: { $in: priorEnded } },
+        { $set: { status: 'Completed' } }
+      );
+    }
 
     dietPlan.status = 'Active';
     dietPlan.isPaid = true;
-    dietPlan.activationDate = dietPlan.activationDate || new Date();
+    dietPlan.activationDate = dietPlan.activationDate || activationNow;
     await dietPlan.save();
 
     // Goal Journey Timeline seeding (fire-and-forget - must never fail or
@@ -2647,14 +2667,24 @@ exports.activateDietPlan = async (req, res, next) => {
     // Compute subscription expiry for user status
     const subscriptionExpiresAt = dietPlan.request?.subscriptionExpiresAt || null;
 
+    // If the previous cycle is still running (renewal activated early),
+    // keep activeDietPlanId on it and carry the just-activated cycle as
+    // pendingDietPlanId - the dietician profile then shows the running
+    // cycle's weeks + the next cycle's as "Week 5-8" until the switchover.
+    // Once the old cycle was retired above, this new plan is the active one.
+    const oldStillRunning = priorEnded.length < priorActive.length;
+
     const patientStatusUpdate = {
-      'status.activeDietPlanId': dietPlan._id,
-      // This build is no longer "pending" - it's the active cycle now.
-      'status.pendingDietPlanId': null,
       'status.canSendPaymentRequest': false,
       'status.hasPaymentUpdate': false,
       'status.subscriptionExpiresAt': subscriptionExpiresAt,
     };
+    if (oldStillRunning) {
+      patientStatusUpdate['status.pendingDietPlanId'] = dietPlan._id;
+    } else {
+      patientStatusUpdate['status.activeDietPlanId'] = dietPlan._id;
+      patientStatusUpdate['status.pendingDietPlanId'] = null;
+    }
 
     if (dietPlan.request?._id) {
       patientStatusUpdate['status.requestId'] = dietPlan.request._id;
