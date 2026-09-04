@@ -100,27 +100,56 @@ exports.getPatientProfile = async (req, res, next) => {
         .lean(),
     ]);
 
-    let paymentSummary = null;
-    if (latestRequest?._id) {
-      // A "pay remaining balance" submission creates its own ManualPaymentProof
-      // (see submitManualPaymentProof) that only carries that follow-up
-      // amount and drops the coupon/subscription context - reading just the
-      // latest proof would make an already fully-paid, coupon-discounted
-      // subscription look like a bare, coupon-less ₹400 payment. Aggregate
-      // across every Approved proof for this request instead: the earliest
-      // one (with originalAmount set) is the source of truth for the
-      // coupon/subscription total, the latest one is the source of truth
-      // for what's still outstanding right now.
-      const allProofs = await ManualPaymentProof.find({
-        request: latestRequest._id,
-      })
+    // Payment summary + history across renewal cycles. The DietPlanRequest
+    // is reused across renewals (see createDietPlanRequest/selectMembershipPlan),
+    // so a ManualPaymentProof from an OLD cycle and one from the current
+    // cycle both point at the same `request` id - aggregating "every proof
+    // this request has ever had" (the old behavior) would double-count a
+    // renewed patient's payments. Instead bucket every proof by which
+    // cycle's build window (its DietPlan's createdAt, up to the next
+    // cycle's) it actually falls into - each renewal can only start once
+    // the previous cycle's payment is already fully resolved (Paid +
+    // hasActivePlan), so a cycle's proofs are always created before the
+    // next cycle's DietPlan exists.
+    const allCyclePlans = latestRequest?._id
+      ? await DietPlan.find({ patientId: patient._id, request: latestRequest._id })
+        .select('_id cycleNumber membershipPlan status activationDate createdAt')
+        .sort({ cycleNumber: 1, createdAt: 1 })
+        .lean()
+      : [];
+
+    const allProofsForRequest = latestRequest?._id
+      ? await ManualPaymentProof.find({ request: latestRequest._id })
         .select(
           'amountReceived amountPending totalAmount status couponCode discountPercentage originalAmount pendingPaymentDate reviewedAt createdAt'
         )
         .sort({ createdAt: 1 })
-        .lean();
-      const approvedProofs = allProofs.filter((p) => p.status === 'Approved');
+        .lean()
+      : [];
 
+    const proofsForCycle = (idx) => {
+      const start = allCyclePlans[idx]?.createdAt
+        ? new Date(allCyclePlans[idx].createdAt).getTime()
+        : 0;
+      const end = allCyclePlans[idx + 1]?.createdAt
+        ? new Date(allCyclePlans[idx + 1].createdAt).getTime()
+        : Infinity;
+      return allProofsForRequest.filter((p) => {
+        const t = new Date(p.createdAt).getTime();
+        return t >= start && t < end;
+      });
+    };
+
+    // A "pay remaining balance" submission creates its own ManualPaymentProof
+    // that only carries that follow-up amount and drops the coupon/
+    // subscription context - reading just the latest proof would make an
+    // already fully-paid, coupon-discounted subscription look like a bare,
+    // coupon-less ₹400 payment. Aggregate across every Approved proof in
+    // the cycle's window instead: the earliest one (with originalAmount
+    // set) is the source of truth for the coupon/subscription total, the
+    // latest one is the source of truth for what's still outstanding.
+    const summarizeProofs = (proofs) => {
+      const approvedProofs = proofs.filter((p) => p.status === 'Approved');
       if (approvedProofs.length > 0) {
         const baseProof =
           approvedProofs.find((p) => p.originalAmount != null) || approvedProofs[0];
@@ -133,8 +162,7 @@ exports.getPatientProfile = async (req, res, next) => {
         const hadPriorPending =
           approvedProofs.length > 1 &&
           approvedProofs.slice(0, -1).some((p) => (p.amountPending || 0) > 0);
-
-        paymentSummary = {
+        return {
           amountReceived: cumulativeReceived,
           amountPending: currentPending,
           totalAmount: baseProof.totalAmount ?? cumulativeReceived + currentPending,
@@ -151,11 +179,12 @@ exports.getPatientProfile = async (req, res, next) => {
               ? latestProof.reviewedAt || null
               : null,
         };
-      } else if (allProofs.length > 0) {
+      }
+      if (proofs.length > 0) {
         // Nothing approved yet - show the just-submitted proof's own numbers
-        // as a preview while the dietician reviews it (unchanged from before).
-        const latestProof = allProofs[allProofs.length - 1];
-        paymentSummary = {
+        // as a preview while the dietician reviews it.
+        const latestProof = proofs[proofs.length - 1];
+        return {
           amountReceived: latestProof.amountReceived ?? 0,
           amountPending: latestProof.amountPending ?? 0,
           totalAmount: latestProof.totalAmount ?? 0,
@@ -167,7 +196,35 @@ exports.getPatientProfile = async (req, res, next) => {
           balanceClearedAt: null,
         };
       }
-    }
+      return null;
+    };
+
+    const currentCycleIdx = allCyclePlans.length - 1;
+    // No DietPlan yet at all (pre-first-cycle) - nothing to bucket by, same
+    // as the old "every proof this request has" behavior.
+    const paymentSummary =
+      currentCycleIdx >= 0
+        ? summarizeProofs(proofsForCycle(currentCycleIdx))
+        : summarizeProofs(allProofsForRequest);
+
+    // One entry per renewal cycle (each has its own DietPlan.membershipPlan
+    // snapshot), newest first - lets the dietician profile show "what was
+    // paid for the current cycle" separately from a prior one instead of
+    // the shared request's own fields (overwritten on renewal) losing that
+    // history. Only meaningful once a patient has actually renewed at
+    // least once; the frontend collapses this to nothing for a single cycle.
+    const paymentHistory = allCyclePlans
+      .map((plan, idx) => ({
+        dietPlanId: plan._id,
+        cycleNumber: plan.cycleNumber || idx + 1,
+        membershipPlan: plan.membershipPlan || null,
+        membershipTier: getMembershipTier(plan.membershipPlan),
+        date: plan.activationDate || plan.createdAt,
+        isCurrent: idx === currentCycleIdx,
+        paymentSummary:
+          idx === currentCycleIdx ? paymentSummary : summarizeProofs(proofsForCycle(idx)),
+      }))
+      .sort((a, b) => (b.cycleNumber || 0) - (a.cycleNumber || 0));
 
     const rawTargetWeight = patient.healthProfile?.targetWeight;
 
@@ -402,6 +459,10 @@ exports.getPatientProfile = async (req, res, next) => {
         // Same week-state signals as the active cycle above, for the
         // "Week 5-8" cards + Create/Resume button under Weekly Diet Plans.
         pendingCycle,
+        // One entry per renewal cycle, newest first (see paymentHistory
+        // above) - the Payment Information section renders these as
+        // collapsed, dated rows once there's more than one.
+        paymentHistory,
       },
     });
   } catch (error) {
