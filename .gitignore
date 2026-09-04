@@ -54,6 +54,9 @@ check-*.js
 create-*.js
 fix-*.js
 finalize-*.js
+
+# Runtime backup written by scripts/expire-etwoe-soon.js
+scripts/.etwoe-expiry-backup.json
 .vercel
 .env*
 
