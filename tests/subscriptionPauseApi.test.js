@@ -140,13 +140,35 @@ describe('PATCH / DELETE subscription/pause', () => {
     expect(isoDay(updated.subscriptionExpiresAt)).toBe('2026-10-06');
   });
 
-  test('cancelling a pause undoes the shift', async () => {
+  test('cancelling a pause undoes the shift (with an active goal + milestone)', async () => {
     const { dietician, patient, dpRequest } = await seedActivePlan();
+    // A goal + a still-future milestone - exercises the Milestone shift path
+    // that used to crash on the aggregation-pipeline updateMany.
+    const goal = await models.Goal.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'active',
+      title: 'Lose weight',
+      targetValue: 64,
+      startDate: D('2099-09-01'),
+      endDate: D('2099-10-01'),
+    });
+    await models.Milestone.create({
+      goalId: goal._id,
+      type: 'weekly',
+      title: 'W1',
+      date: D('2099-09-15'),
+      sortOrder: 0,
+    });
     registerTestToken('d', dietician._id);
     await request(app)
       .post(pausePath(patient._id))
       .set(authed('d'))
-      .send({ startDate: '2099-09-08', resumeDate: '2099-09-11' });
+      .send({ startDate: '2099-09-08', resumeDate: '2099-09-11' }); // +3
+
+    // goal + milestone shifted +3
+    expect(isoDay((await models.Goal.findById(goal._id)).endDate)).toBe('2099-10-04');
+    expect(isoDay((await models.Milestone.findOne({ goalId: goal._id })).date)).toBe('2099-09-18');
 
     const res = await request(app).delete(pausePath(patient._id)).set(authed('d'));
     expect(res.status).toBe(200);
@@ -155,6 +177,21 @@ describe('PATCH / DELETE subscription/pause', () => {
     expect(isoDay(updated.subscriptionExpiresAt)).toBe('2026-10-01');
     const plan = await models.DietPlan.findOne({ patientId: patient._id });
     expect(plan.pauses).toHaveLength(0);
+    // shift undone
+    expect(isoDay((await models.Goal.findById(goal._id)).endDate)).toBe('2099-10-01');
+    expect(isoDay((await models.Milestone.findOne({ goalId: goal._id })).date)).toBe('2099-09-15');
+  });
+
+  test('a pause notifies the patient (in-app Notification)', async () => {
+    const { dietician, patient } = await seedActivePlan();
+    registerTestToken('d', dietician._id);
+    await request(app)
+      .post(pausePath(patient._id))
+      .set(authed('d'))
+      .send({ startDate: '2099-09-08', resumeDate: '2099-09-11' });
+    const n = await models.Notification.findOne({ userId: patient._id });
+    expect(n).not.toBeNull();
+    expect(n.type).toBe('subscription_pause');
   });
 });
 
