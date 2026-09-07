@@ -27,6 +27,7 @@ const {
   uploadExerciseController,
   exercisePlanController,
   planItemController,
+  subscriptionPauseController,
 } = require('../controllers/dietician');
 const chatController = require('../controllers/chatController');
 const notificationController = require('../controllers/notificationController');
@@ -220,6 +221,24 @@ router.delete(
   '/patients/:patientId/data',
   dieticianOnlyMiddleware,
   patientController.deletePatientData
+);
+
+// Subscription pause: schedule / edit / cancel a pause window on the
+// patient's active plan (see utils/subscriptionPause.js).
+router.post(
+  '/patients/:patientId/subscription/pause',
+  dieticianOnlyMiddleware,
+  subscriptionPauseController.pauseSubscription
+);
+router.patch(
+  '/patients/:patientId/subscription/pause',
+  dieticianOnlyMiddleware,
+  subscriptionPauseController.updatePause
+);
+router.delete(
+  '/patients/:patientId/subscription/pause',
+  dieticianOnlyMiddleware,
+  subscriptionPauseController.cancelPause
 );
 
 // First consultation form APIs

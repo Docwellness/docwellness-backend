@@ -19,6 +19,7 @@ const reviewController = require('./reviewController');
 const uploadExerciseController = require('./uploadExerciseController');
 const exercisePlanController = require('./exercisePlanController');
 const planItemController = require('./planItemController');
+const subscriptionPauseController = require('./subscriptionPauseController');
 
 module.exports = {
   manualPaymentController,
@@ -42,4 +43,5 @@ module.exports = {
   uploadExerciseController,
   exercisePlanController,
   planItemController,
+  subscriptionPauseController,
 };

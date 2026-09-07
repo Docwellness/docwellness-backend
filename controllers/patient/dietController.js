@@ -7,6 +7,14 @@ const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
+const {
+  normalizePauses,
+  isPausedOn,
+  pauseShiftForDate,
+  effectiveContentDate,
+  currentOrUpcomingPause,
+} = require('../../utils/subscriptionPause');
+const { rejectIfPaused } = require('../../utils/patientPauseGuard');
 const { normalize } = require('../../utils/ingredientLibrary');
 const { componentRatiosByLabel, computeMealRatio } = require('../../utils/weekNutritionSummary');
 const {
@@ -175,6 +183,25 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         success: false,
         message: 'Active diet plan not found',
       });
+    }
+
+    // Subscription pause: translate the real calendar `referenceDate` to the
+    // "effective" content date so every downstream week / day-group
+    // computation lands on the right plan day (pure calendar shift - see
+    // utils/subscriptionPause.js). During a pause window the app locks the
+    // whole tab, so the content it gets back then doesn't matter.
+    const pauses = normalizePauses(dietPlan.pauses);
+    const nowForPause = new Date();
+    const pausedNow = isPausedOn(pauses, nowForPause);
+    const upcomingPause = currentOrUpcomingPause(pauses, nowForPause);
+    const pauseInfo = {
+      isPausedNow: pausedNow,
+      startDate: upcomingPause?.startDate || null,
+      resumeDate: upcomingPause?.resumeDate || null,
+      contentDateOffsetDays: pauseShiftForDate(pauses, nowForPause),
+    };
+    if (pauses.length) {
+      referenceDate = effectiveContentDate(pauses, referenceDate) || normalizeDate(referenceDate);
     }
 
     // v4.0: a 'plan-item' plan has no finalizedPlan blob at all - its
@@ -577,6 +604,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           weekStartDate: currentWeekScheduleEntry?.startDate || null,
           weekEndDate: currentWeekScheduleEntry?.endDate || null,
           dayGroup: todayDayGroup,
+          pause: pauseInfo, // subscription pause window + content date offset
           weekSummary, // single object for the current week
           week: weekWithFixedMeals, // the current week’s dailyMeals with fixed recipeId
           weeks: mergedWeeks, // every week (this cycle + any next renewal cycle), for client-side caching
@@ -1597,6 +1625,8 @@ exports.getMealLogScreenData = async (req, res, next) => {
 exports.submitMealLog = async (req, res, next) => {
   try {
     const { date, items } = req.body;
+
+    if (await rejectIfPaused(res, req.user._id)) return;
 
     // Normalize the date
     const targetDate = normalizeDate(new Date(date));

@@ -97,6 +97,24 @@ const dietPlanSchema = new mongoose.Schema(
         endDate: { type: Date, required: true },
       },
     ],
+    // Dietician-set subscription pause windows [startDate, resumeDate).
+    // During a window the patient can't log and the Diet & Exercise tab is
+    // locked; once it ends, plan content shifts forward by the window
+    // length (a pure calendar shift - see utils/subscriptionPause.js).
+    // Non-overlapping, chronological; multiple windows stack. Content dates
+    // are NOT mutated here - the shift is applied virtually by the read
+    // path. Subscription expiry / goal / exercise-plan end dates ARE
+    // extended (by subscriptionPauseController).
+    pauses: {
+      type: [
+        {
+          startDate: { type: Date, required: true },
+          resumeDate: { type: Date, required: true },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
     firstConsultation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'FirstConsultation',
