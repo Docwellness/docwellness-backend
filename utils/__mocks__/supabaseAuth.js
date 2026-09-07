@@ -15,6 +15,9 @@
  */
 
 const tokenToUserId = new Map();
+// supabaseUserIds passed to getSupabaseAdmin().auth.admin.deleteUser(...) -
+// lets deletion tests assert the Supabase identity was also removed.
+const deletedSupabaseUserIds = [];
 // email -> { password, session } - controls signInWithPassword (P9-B2 tests).
 const credentials = new Map();
 // refreshToken -> session - controls refreshSession (P9-B3 tests).
@@ -56,6 +59,30 @@ function clearTestTokens() {
   credentials.clear();
   refreshTokens.clear();
   refreshCallCount = 0;
+  deletedSupabaseUserIds.length = 0;
+}
+
+/**
+ * Minimal stand-in for the Supabase admin client. Only the one method the
+ * deletion flows use (auth.admin.deleteUser) is implemented; it records the
+ * id so tests can assert on it via getDeletedSupabaseUserIds().
+ */
+function getSupabaseAdmin() {
+  return {
+    auth: {
+      admin: {
+        deleteUser: async (supabaseUserId) => {
+          deletedSupabaseUserIds.push(String(supabaseUserId));
+          return { data: {}, error: null };
+        },
+      },
+    },
+  };
+}
+
+/** supabaseUserIds deleteUser() has been called with since the last clear. */
+function getDeletedSupabaseUserIds() {
+  return [...deletedSupabaseUserIds];
 }
 
 /** How many times the underlying refreshSession() mock actually ran. */
@@ -136,9 +163,11 @@ module.exports = {
   refreshSession,
   generateSignupOtp,
   resetPasswordWithOtp,
+  getSupabaseAdmin,
   registerTestToken,
   registerTestCredentials,
   registerTestRefreshToken,
   clearTestTokens,
   getRefreshCallCount,
+  getDeletedSupabaseUserIds,
 };
