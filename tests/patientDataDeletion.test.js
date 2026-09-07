@@ -201,10 +201,17 @@ describe('DELETE /api/dietician/patients/:patientId/data', () => {
 
     expect(await models.User.findById(patient._id)).toBeNull();
     expect(await models.MealLog.countDocuments({ patientId: patient._id })).toBe(0);
-    expect(await models.Goal.countDocuments({ patientId: patient._id })).toBe(0);
     expect(await models.ExerciseLog.countDocuments({ patientId: patient._id })).toBe(0);
     expect(await models.Chat.countDocuments({ senderId: patient._id })).toBe(0);
     expect(await models.DietPlanRequest.countDocuments({ patient: patient._id })).toBe(0);
+    // the id-chained collections (no direct patientId) are cleared too
+    expect(await models.Goal.countDocuments({ patientId: patient._id })).toBe(0);
+    expect(await models.Milestone.countDocuments({})).toBe(0);
+    expect(await models.MilestoneTask.countDocuments({})).toBe(0);
+    expect(await models.DayPlan.countDocuments({ patientId: patient._id })).toBe(0);
+    expect(await models.MealSlotPlan.countDocuments({})).toBe(0);
+    expect(await models.PlanItem.countDocuments({})).toBe(0);
+    expect(await models.CheckIn.countDocuments({ patientId: patient._id })).toBe(0);
     expect(getDeletedSupabaseUserIds()).toContain(String(patient.supabaseUserId));
   });
 
@@ -269,28 +276,5 @@ describe('DELETE /api/dietician/patients/:patientId/data', () => {
       .send({ confirmEmail: patient.email, categories: [], deleteAccount: false });
 
     expect(res.status).toBe(400);
-  });
-});
-
-describe('DELETE /api/dietician/patients/:patientId (regression - full cascade)', () => {
-  test('now also clears ExerciseLog, the Goal chain and the DayPlan chain', async () => {
-    const { dietician, patient } = await seedOwnedPatient();
-    await seedPatientData(patient, dietician);
-    registerTestToken('d', dietician._id);
-
-    const res = await request(app)
-      .delete(`/api/dietician/patients/${patient._id}`)
-      .set(authed('d'))
-      .send({ confirmEmail: patient.email });
-
-    expect(res.status).toBe(200);
-    expect(await models.User.findById(patient._id)).toBeNull();
-    expect(await models.ExerciseLog.countDocuments({ patientId: patient._id })).toBe(0);
-    expect(await models.Goal.countDocuments({ patientId: patient._id })).toBe(0);
-    expect(await models.Milestone.countDocuments({})).toBe(0);
-    expect(await models.MilestoneTask.countDocuments({})).toBe(0);
-    expect(await models.DayPlan.countDocuments({ patientId: patient._id })).toBe(0);
-    expect(await models.CheckIn.countDocuments({ patientId: patient._id })).toBe(0);
-    expect(getDeletedSupabaseUserIds()).toContain(String(patient.supabaseUserId));
   });
 });
