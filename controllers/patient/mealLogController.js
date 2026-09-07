@@ -6,6 +6,7 @@ const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { invalidatePatientStats } = require('../../utils/patientStatsCache');
+const { rejectIfPaused } = require('../../utils/patientPauseGuard');
 const fs = require('fs/promises');
 
 // v1 Chat Integration
@@ -36,6 +37,7 @@ const getEndOfDay = () => {
 exports.createMealLog = async (req, res, next) => {
   try {
     const patientId = req.user._id;
+    if (await rejectIfPaused(res, patientId)) return;
     const { mealType, recipeId, servings, caloriesConsumed, notes } = req.body;
 
     const startOfDay = getStartOfDay();

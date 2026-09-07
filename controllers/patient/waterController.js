@@ -1,5 +1,6 @@
 const WaterLog = require('../../models/WaterLog');
 const { invalidatePatientStats } = require('../../utils/patientStatsCache');
+const { rejectIfPaused } = require('../../utils/patientPauseGuard');
 
 /**
  * POST /api/patient/water/log
@@ -9,6 +10,7 @@ const { invalidatePatientStats } = require('../../utils/patientStatsCache');
 exports.logWater = async (req, res) => {
   try {
     const patientId = req.user._id;
+    if (await rejectIfPaused(res, patientId)) return;
     const { date, entries, goal } = req.body;
 
     if (!date || !entries || !Array.isArray(entries) || entries.length === 0) {
