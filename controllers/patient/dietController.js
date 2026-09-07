@@ -485,6 +485,9 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 
       const weekWithFixedMeals = {
         ...week,
+        // display-number space, matching `weeks[]` and the response's
+        // `currentWeek` below (see allWeeksData).
+        week: displayWeek,
         dailyMeals: fixMeals(week.dailyMeals),
         supplementSchedule: supplementScheduleByWeek.get(Number(week.week)) || [],
       };
@@ -503,7 +506,12 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           weekScheduleEntries.find((entry) => Number(entry.week) === weekNum) || null;
         const summary = allWeeksSummary.find((s) => Number(s.week) === weekNum) || null;
         return {
-          week: weekNum,
+          // `week` is the display number ((cycle-1)*4 + n) - same space the
+          // prepended past cycles and appended next cycle use - so the app's
+          // week selector / switchWeek never see two entries with the same
+          // `week` after a renewal. For a first cycle the offset is 0, so
+          // this is unchanged (1-4).
+          week: thisCycleOffset + weekNum,
           displayWeek: thisCycleOffset + weekNum,
           weekStartDate: scheduleEntry?.startDate || null,
           weekEndDate: scheduleEntry?.endDate || null,
@@ -612,7 +620,11 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           dietPlanId: dietPlan._id,
           status: dietPlan.status,
           activationDate: dietPlan.activationDate || null,
-          currentWeek,
+          // Display-number space (matches `weeks[]`, `week.week` and
+          // `displayWeek`) so the app's selectedWeek addresses exactly one
+          // entry even across renewal cycles. Equal to the internal 1-4 for
+          // a first cycle.
+          currentWeek: displayWeek,
           totalWeeks: mergedTotalWeeks,
           // cycleNumber/displayWeek let the app show "Week 5" etc. for a
           // renewed patient's second (or later) cycle, without changing
