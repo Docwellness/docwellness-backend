@@ -70,6 +70,19 @@ describe('POST subscription/pause', () => {
 
     const plan = await models.DietPlan.findOne({ patientId: patient._id });
     expect(plan.pauses).toHaveLength(1);
+
+    // The dietician profile must reflect the pause so the app can switch to
+    // "Manage / cancel" instead of trying to schedule another one.
+    await models.User.updateOne(
+      { _id: patient._id },
+      { $set: { 'status.activeDietPlanId': plan._id, 'status.requestStatus': 'Paid' } }
+    );
+    const profile = await request(app)
+      .get(`/api/dietician/patients/${patient._id}/profile`)
+      .set(authed('d'));
+    expect(profile.status).toBe(200);
+    expect(profile.body.data.subscriptionPause.active.resumeDate).toBeTruthy();
+    expect(isoDay(profile.body.data.subscriptionPause.active.resumeDate)).toBe('2099-09-11');
   });
 
   test('rejects a pause that starts in the past', async () => {
