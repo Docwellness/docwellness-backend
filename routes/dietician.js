@@ -220,6 +220,15 @@ router.delete(
   patientController.deletePatient
 );
 
+// Delete selected categories of a patient's data (or, with
+// { deleteAccount: true } in the body, the whole account - see
+// utils/patientDataDeletion.js). Irreversible.
+router.delete(
+  '/patients/:patientId/data',
+  dieticianOnlyMiddleware,
+  patientController.deletePatientData
+);
+
 // First consultation form APIs
 router.get(
   '/patients/:patientId/first-consultation',

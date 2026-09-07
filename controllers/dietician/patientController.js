@@ -6,18 +6,15 @@ const {
   DietPlanRequest,
   FirstConsultation,
   ManualPaymentProof,
-  Progress,
-  Chat,
-  Conversation,
-  MealLog,
-  Notification,
 } = require('../../models');
-const CustomFoodRequest = require('../../models/CustomFoodRequest');
-const JourneyImage = require('../../models/JourneyImage');
-const NeedAttentionLog = require('../../models/NeedAttentionLog');
-const WaterLog = require('../../models/WaterLog');
 const { getMembershipTier } = require('../../utils/membershipTiers');
-const { getSupabaseAdmin } = require('../../utils/supabaseAuth');
+const { logAuditEvent } = require('../../utils/auditLog');
+const {
+  CATEGORY_KEYS,
+  ACCOUNT_ONLY_KEYS,
+  deletePatientData: deletePatientDataCascade,
+  erasePatientCompletely,
+} = require('../../utils/patientDataDeletion');
 
 const formatDate = (value) => {
   if (!value) {
@@ -546,36 +543,117 @@ exports.deletePatient = async (req, res, next) => {
       });
     }
 
-    await Promise.all([
-      DietPlan.deleteMany({ patientId }),
-      DietPlanRequest.deleteMany({ patient: patientId }),
-      FirstConsultation.deleteMany({ patient: patientId }),
-      ManualPaymentProof.deleteMany({ patient: patientId }),
-      Progress.deleteMany({ patientId }),
-      MealLog.deleteMany({ patientId }),
-      Notification.deleteMany({ userId: patientId }),
-      Chat.deleteMany({ $or: [{ senderId: patientId }, { receiverId: patientId }] }),
-      Conversation.deleteMany({ 'participants.userId': patientId }),
-      CustomFoodRequest.deleteMany({ patientId }),
-      JourneyImage.deleteMany({ patientId }),
-      NeedAttentionLog.deleteMany({ patientId }),
-      WaterLog.deleteMany({ patientId }),
-    ]);
-
-    await User.findByIdAndDelete(patientId);
-
-    // Also remove the Supabase identity so no orphaned auth account remains
-    // (mirrors the patient's own self-delete flow in
-    // controllers/patient/profileController.js's deleteAccount).
-    if (patient.supabaseUserId) {
-      await getSupabaseAdmin().auth.admin.deleteUser(patient.supabaseUserId).catch((err) => {
-        console.error('Failed to delete Supabase user during patient deletion:', err.message);
-      });
-    }
+    // The full cascade (every collection referencing this patient + the
+    // Supabase identity) lives in utils/patientDataDeletion.js so this
+    // flow and the prod wipe script never drift - see that file's header.
+    const deleted = await erasePatientCompletely(patient);
+    logAuditEvent('patient_deleted', {
+      dieticianId: String(req.user._id),
+      patientId: String(patientId),
+      deleted,
+    });
 
     res.status(200).json({
       success: true,
       message: 'Patient deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @route   DELETE /api/dietician/patients/:patientId/data
+ * @desc    Delete selected categories of a patient's data (see
+ *          utils/patientDataDeletion.js's PATIENT_DATA_CATEGORIES) while
+ *          keeping the patient account. When `deleteAccount` is true the
+ *          request is treated as a full account deletion instead (same
+ *          effect as DELETE /api/dietician/patients/:patientId).
+ *          Irreversible - `confirmEmail` in the body must match the
+ *          patient's email, re-verified here (not just client-side).
+ * @access  Private (Dietician)
+ */
+exports.deletePatientData = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const { confirmEmail, categories, deleteAccount } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(400).json({ success: false, message: 'Invalid patient id' });
+    }
+
+    const patient = await User.findById(patientId);
+    if (!patient || patient.role !== 'patient') {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    if (!(await assertDieticianOwnsPatient(req.user._id, patient._id))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this patient',
+      });
+    }
+
+    if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== patient.email) {
+      return res.status(400).json({
+        success: false,
+        message: "Typed email does not match this patient's email - deletion cancelled.",
+      });
+    }
+
+    const wantsAccountDelete = deleteAccount === true;
+    const selected = Array.isArray(categories) ? [...new Set(categories)] : [];
+
+    const unknown = selected.filter((k) => !CATEGORY_KEYS.includes(k));
+    if (unknown.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Unknown data category: ${unknown.join(', ')}`,
+      });
+    }
+
+    if (!wantsAccountDelete && selected.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select at least one data category to delete.',
+      });
+    }
+
+    const accountOnly = selected.filter((k) => ACCOUNT_ONLY_KEYS.includes(k));
+    if (!wantsAccountDelete && accountOnly.length) {
+      return res.status(400).json({
+        success: false,
+        message: `The ${accountOnly.join(', ')} record can only be removed together with the account.`,
+      });
+    }
+
+    if (wantsAccountDelete) {
+      const deleted = await erasePatientCompletely(patient);
+      logAuditEvent('patient_deleted', {
+        dieticianId: String(req.user._id),
+        patientId: String(patientId),
+        via: 'deletePatientData',
+        deleted,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Patient and all their data have been deleted.',
+        data: { accountDeleted: true, deleted },
+      });
+    }
+
+    const deleted = await deletePatientDataCascade([patient._id], selected, { execute: true });
+    logAuditEvent('patient_data_deleted', {
+      dieticianId: String(req.user._id),
+      patientId: String(patientId),
+      categories: selected,
+      deleted,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Selected data has been deleted.',
+      data: { accountDeleted: false, deleted },
     });
   } catch (error) {
     next(error);
