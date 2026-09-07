@@ -126,9 +126,9 @@ describe('dietician patient access', () => {
     expect(deactivateRes.status).toBe(403);
 
     const deleteRes = await request(app)
-      .delete(`/api/dietician/patients/${patient._id}`)
+      .delete(`/api/dietician/patients/${patient._id}/data`)
       .set('Authorization', 'Bearer dietician-token')
-      .send({ confirmEmail: patient.email });
+      .send({ confirmEmail: patient.email, categories: ['mealLog'], deleteAccount: false });
     expect(deleteRes.status).toBe(403);
   });
 });

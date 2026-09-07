@@ -213,16 +213,9 @@ router.put(
   patientController.togglePatientActive
 );
 
-// Permanently delete a patient and all their data (irreversible)
-router.delete(
-  '/patients/:patientId',
-  dieticianOnlyMiddleware,
-  patientController.deletePatient
-);
-
 // Delete selected categories of a patient's data (or, with
-// { deleteAccount: true } in the body, the whole account - see
-// utils/patientDataDeletion.js). Irreversible.
+// { deleteAccount: true } in the body, the whole account + Supabase
+// identity - see utils/patientDataDeletion.js). Irreversible.
 router.delete(
   '/patients/:patientId/data',
   dieticianOnlyMiddleware,

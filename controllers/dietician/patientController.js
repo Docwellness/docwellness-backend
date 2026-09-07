@@ -501,76 +501,17 @@ exports.togglePatientActive = async (req, res, next) => {
 };
 
 /**
- * @route   DELETE /api/dietician/patients/:patientId
- * @desc    Permanently delete a patient: their User document, every
- *          collection referencing them (diet plans/requests, first
- *          consultation, payments, chat/conversations, meal/water/progress
- *          logs, journey images, custom food requests, need-attention log,
- *          notifications), and their Supabase auth identity.
- *          Irreversible - requires `confirmEmail` in the body to exactly
- *          match the patient's email. The dietician app's UI already
- *          makes the dietician re-type the email before calling this,
- *          but that's a client-side guard only - re-verified here too,
- *          since a destructive/unrecoverable operation should never rely on
- *          client-side confirmation alone.
- * @access  Private (Dietician)
- */
-exports.deletePatient = async (req, res, next) => {
-  try {
-    const { patientId } = req.params;
-    const { confirmEmail } = req.body || {};
-
-    if (!mongoose.Types.ObjectId.isValid(patientId)) {
-      return res.status(400).json({ success: false, message: 'Invalid patient id' });
-    }
-
-    const patient = await User.findById(patientId);
-    if (!patient || patient.role !== 'patient') {
-      return res.status(404).json({ success: false, message: 'Patient not found' });
-    }
-
-    if (!(await assertDieticianOwnsPatient(req.user._id, patient._id))) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not authorized to access this patient',
-      });
-    }
-
-    if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== patient.email) {
-      return res.status(400).json({
-        success: false,
-        message: "Typed email does not match this patient's email - deletion cancelled.",
-      });
-    }
-
-    // The full cascade (every collection referencing this patient + the
-    // Supabase identity) lives in utils/patientDataDeletion.js so this
-    // flow and the prod wipe script never drift - see that file's header.
-    const deleted = await erasePatientCompletely(patient);
-    logAuditEvent('patient_deleted', {
-      dieticianId: String(req.user._id),
-      patientId: String(patientId),
-      deleted,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Patient deleted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * @route   DELETE /api/dietician/patients/:patientId/data
  * @desc    Delete selected categories of a patient's data (see
  *          utils/patientDataDeletion.js's PATIENT_DATA_CATEGORIES) while
  *          keeping the patient account. When `deleteAccount` is true the
- *          request is treated as a full account deletion instead (same
- *          effect as DELETE /api/dietician/patients/:patientId).
+ *          request is treated as a full account deletion instead: every
+ *          collection referencing the patient, their User document, and
+ *          their Supabase auth identity.
  *          Irreversible - `confirmEmail` in the body must match the
- *          patient's email, re-verified here (not just client-side).
+ *          patient's email. The dietician app makes the dietician re-type
+ *          it, but that's a client-side guard only - re-verified here,
+ *          since an unrecoverable operation must never rely on the client.
  * @access  Private (Dietician)
  */
 exports.deletePatientData = async (req, res, next) => {
