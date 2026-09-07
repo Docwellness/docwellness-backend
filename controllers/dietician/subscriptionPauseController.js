@@ -125,16 +125,32 @@ async function shiftSatelliteDates(patientId, dietPlan, fromDate, deltaDays) {
   }
 }
 
-/** In-app Notification + best-effort push + socket ping. Never throws. */
+/** In-app Notification + live socket event (drives the patient app's Home
+ * refresh - see SocketService's 'notification.new' listener) + best-effort
+ * push. Never throws. */
 async function notifyPatient(patientId, { title, message }) {
+  let notif = null;
   try {
-    await Notification.create({ userId: patientId, title, message, type: 'subscription_pause' });
+    notif = await Notification.create({
+      userId: patientId,
+      title,
+      message,
+      type: 'subscription_pause',
+    });
   } catch (err) {
     console.error('[subscriptionPause] Notification.create failed:', err.message);
   }
   try {
     const io = getChatIO();
-    if (io) io.to(`user:${patientId}`).emit('subscription:pause_changed', { title, message });
+    if (io) {
+      io.to(`user:${patientId}`).emit('notification.new', {
+        id: notif?._id,
+        title,
+        message,
+        type: 'subscription_pause',
+        createdAt: notif?.createdAt || new Date(),
+      });
+    }
   } catch (err) {
     console.error('[subscriptionPause] socket emit failed:', err.message);
   }
