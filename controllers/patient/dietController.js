@@ -1416,16 +1416,35 @@ async function computeTodayMealLogStats(patientId, today) {
   };
 
   const resolvedPlanStartDate = resolvePlanStartDate(dietPlan);
-  const planStartDate = resolvedPlanStartDate ? normalizeDate(resolvedPlanStartDate) : null;
-  const planEndDate = planStartDate
-    ? new Date(planStartDate.getFullYear(), planStartDate.getMonth() + 1, planStartDate.getDate())
+  const activeStart = resolvedPlanStartDate ? normalizeDate(resolvedPlanStartDate) : null;
+  // The Home date-navigator's "how far back" floor is planStartDate. After
+  // a renewal the active cycle's own week 1 is only days ago, which hid the
+  // patient's whole finished cycle - reach back to the earliest cycle's
+  // start instead. planEndDate still tracks the active cycle (+1mo) so
+  // "go forward" isn't affected.
+  let navStartDate = activeStart;
+  const earliestCycle = await DietPlan.findOne({
+    patientId,
+    cycleNumber: { $lt: dietPlan.cycleNumber || 1 },
+    status: { $in: ['Active', 'Completed'] },
+  })
+    .sort({ cycleNumber: 1 })
+    .select('weekSchedule activationDate request')
+    .populate('request', 'startDateForDiet')
+    .lean();
+  if (earliestCycle) {
+    const es = resolvePlanStartDate(earliestCycle);
+    if (es) navStartDate = normalizeDate(es);
+  }
+  const planEndDate = activeStart
+    ? new Date(activeStart.getFullYear(), activeStart.getMonth() + 1, activeStart.getDate())
     : null;
 
   return {
     data: {
       date: today,
       currentWeek,
-      planStartDate: planStartDate ? planStartDate.toISOString() : null,
+      planStartDate: navStartDate ? navStartDate.toISOString() : null,
       planEndDate: planEndDate ? planEndDate.toISOString() : null,
       summary: {
         totalPlannedCalories,
