@@ -8,13 +8,12 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const {
-  normalizePauses,
   isPausedOn,
   pauseShiftForDate,
   effectiveContentDate,
   currentOrUpcomingPause,
 } = require('../../utils/subscriptionPause');
-const { rejectIfPaused } = require('../../utils/patientPauseGuard');
+const { rejectIfPaused, loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { normalize } = require('../../utils/ingredientLibrary');
 const { componentRatiosByLabel, computeMealRatio } = require('../../utils/weekNutritionSummary');
 const {
@@ -190,7 +189,9 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
     // computation lands on the right plan day (pure calendar shift - see
     // utils/subscriptionPause.js). During a pause window the app locks the
     // whole tab, so the content it gets back then doesn't matter.
-    const pauses = normalizePauses(dietPlan.pauses);
+    // Read across every cycle - a pause scheduled before a renewal lives on
+    // the now-retired predecessor plan, not `dietPlan` (see loadPatientPauses).
+    const pauses = await loadPatientPauses(req.user._id);
     const nowForPause = new Date();
     const pausedNow = isPausedOn(pauses, nowForPause);
     const upcomingPause = currentOrUpcomingPause(pauses, nowForPause);
