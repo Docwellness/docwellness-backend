@@ -6,7 +6,7 @@
  * shift - see utils/subscriptionPause.js). This controller additionally
  * extends the single scalar dates a pause should push out: the
  * subscription expiry, the active Goal's end (+ its still-future
- * milestones) and the active ExercisePlan's end.
+ * milestones) and the active ExercisePlan's end, and notifies the patient.
  *
  *   POST   /api/dietician/patients/:patientId/subscription/pause   { startDate, resumeDate }
  *   PATCH  /api/dietician/patients/:patientId/subscription/pause   { startDate?, resumeDate }
@@ -21,6 +21,7 @@ const {
   ExercisePlan,
   Goal,
   Milestone,
+  Notification,
 } = require('../../models');
 const {
   normDate,
@@ -30,11 +31,14 @@ const {
   normalizePauses,
 } = require('../../utils/subscriptionPause');
 const { logAuditEvent } = require('../../utils/auditLog');
+const { sendPushToTokens } = require('../../utils/push');
+const { getChatIO } = require('../../chat');
 
 const assertDieticianOwnsPatient = (dieticianId, patientId) =>
   DietPlanRequest.exists({ patient: patientId, dieticianId });
 
 const bad = (res, message, code = 400) => res.status(code).json({ success: false, message });
+const ymd = (d) => normDate(d).toISOString().slice(0, 10);
 
 async function loadContext(req, res) {
   const { patientId } = req.params;
@@ -64,36 +68,89 @@ async function loadContext(req, res) {
 /**
  * Push the pause's "satellite" dates by `deltaDays` (negative to undo):
  * subscription expiry (+ its User.status mirror), active Goal end + its
- * milestones dated on/after `fromDate`, active ExercisePlan end.
+ * milestones dated on/after `fromDate`, active ExercisePlan end. Each
+ * section is best-effort - a failure logs and is swallowed so it can never
+ * leave the pause itself half-applied.
  */
 async function shiftSatelliteDates(patientId, dietPlan, fromDate, deltaDays) {
   if (deltaDays === 0) return;
+  const from = normDate(fromDate);
 
-  const request = dietPlan.request;
-  if (request && request.subscriptionExpiresAt) {
-    request.subscriptionExpiresAt = addDays(request.subscriptionExpiresAt, deltaDays);
-    request.renewalReminderSentAt = null; // model requires nulling this whenever expiry moves
-    await request.save();
-    await User.updateOne(
-      { _id: patientId },
-      { $set: { 'status.subscriptionExpiresAt': request.subscriptionExpiresAt } }
+  try {
+    const request = dietPlan.request;
+    if (request && request.subscriptionExpiresAt) {
+      request.subscriptionExpiresAt = addDays(request.subscriptionExpiresAt, deltaDays);
+      request.renewalReminderSentAt = null;
+      await request.save();
+      await User.updateOne(
+        { _id: patientId },
+        { $set: { 'status.subscriptionExpiresAt': request.subscriptionExpiresAt } }
+      );
+    }
+  } catch (err) {
+    console.error('[subscriptionPause] subscription expiry shift failed:', err.message);
+  }
+
+  try {
+    const goal = await Goal.findOne({ patientId, status: 'active' });
+    if (goal) {
+      if (goal.endDate) goal.endDate = addDays(goal.endDate, deltaDays);
+      await goal.save();
+      const milestones = await Milestone.find({ goalId: goal._id, date: { $gte: from } })
+        .select('_id date')
+        .lean();
+      if (milestones.length) {
+        await Milestone.bulkWrite(
+          milestones.map((m) => ({
+            updateOne: {
+              filter: { _id: m._id },
+              update: { $set: { date: addDays(m.date, deltaDays) } },
+            },
+          }))
+        );
+      }
+    }
+  } catch (err) {
+    console.error('[subscriptionPause] goal/milestone shift failed:', err.message);
+  }
+
+  try {
+    const exercisePlan = await ExercisePlan.findOne({ patientId, status: 'Active' });
+    if (exercisePlan && exercisePlan.endDate) {
+      exercisePlan.endDate = addDays(exercisePlan.endDate, deltaDays);
+      await exercisePlan.save();
+    }
+  } catch (err) {
+    console.error('[subscriptionPause] exercise plan shift failed:', err.message);
+  }
+}
+
+/** In-app Notification + best-effort push + socket ping. Never throws. */
+async function notifyPatient(patientId, { title, message }) {
+  try {
+    await Notification.create({ userId: patientId, title, message, type: 'subscription_pause' });
+  } catch (err) {
+    console.error('[subscriptionPause] Notification.create failed:', err.message);
+  }
+  try {
+    const io = getChatIO();
+    if (io) io.to(`user:${patientId}`).emit('subscription:pause_changed', { title, message });
+  } catch (err) {
+    console.error('[subscriptionPause] socket emit failed:', err.message);
+  }
+  try {
+    const patient = await User.findById(patientId).select('deviceTokens').lean();
+    const tokens = (patient?.deviceTokens || []).map((t) => t.token);
+    await sendPushToTokens(
+      tokens,
+      { title, body: message, data: { type: 'subscription_pause' } },
+      (dead) =>
+        User.updateOne({ _id: patientId }, { $pull: { deviceTokens: { token: dead } } }).catch(
+          () => {}
+        )
     );
-  }
-
-  const goal = await Goal.findOne({ patientId, status: 'active' });
-  if (goal) {
-    if (goal.endDate) goal.endDate = addDays(goal.endDate, deltaDays);
-    await goal.save();
-    const deltaMs = deltaDays * 24 * 60 * 60 * 1000;
-    await Milestone.updateMany({ goalId: goal._id, date: { $gte: normDate(fromDate) } }, [
-      { $set: { date: { $add: ['$date', deltaMs] } } },
-    ]);
-  }
-
-  const exercisePlan = await ExercisePlan.findOne({ patientId, status: 'Active' });
-  if (exercisePlan && exercisePlan.endDate) {
-    exercisePlan.endDate = addDays(exercisePlan.endDate, deltaDays);
-    await exercisePlan.save();
+  } catch (err) {
+    console.error('[subscriptionPause] push failed:', err.message);
   }
 }
 
@@ -101,10 +158,7 @@ function pauseSummary(dietPlan) {
   const pauses = normalizePauses(dietPlan.pauses);
   const editable = editablePause(pauses);
   return {
-    pauses: pauses.map((p) => ({
-      startDate: p.startDate,
-      resumeDate: p.resumeDate,
-    })),
+    pauses: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
     active: editable
       ? { startDate: editable.startDate, resumeDate: editable.resumeDate }
       : null,
@@ -122,9 +176,7 @@ exports.pauseSubscription = async (req, res, next) => {
     const resumeDate = normDate(req.body?.resumeDate);
     if (!startDate || !resumeDate) return bad(res, 'startDate and resumeDate are required');
     if (resumeDate <= startDate) return bad(res, 'resumeDate must be after startDate');
-
-    const today = normDate(new Date());
-    if (startDate < today) return bad(res, 'A pause cannot start in the past');
+    if (startDate < normDate(new Date())) return bad(res, 'A pause cannot start in the past');
 
     const existing = normalizePauses(dietPlan.pauses);
     if (editablePause(existing)) {
@@ -138,17 +190,21 @@ exports.pauseSubscription = async (req, res, next) => {
       return bad(res, 'A new pause must start after the previous one ends');
     }
 
+    const delta = dayDiff(startDate, resumeDate);
+    // Satellites first so a failure there never leaves pauses[] half-set.
+    await shiftSatelliteDates(patient._id, dietPlan, startDate, delta);
     dietPlan.pauses.push({ startDate, resumeDate });
     await dietPlan.save();
-
-    const delta = dayDiff(startDate, resumeDate);
-    await shiftSatelliteDates(patient._id, dietPlan, startDate, delta);
 
     logAuditEvent('subscription_paused', {
       dieticianId: String(req.user._id),
       patientId: String(patient._id),
-      startDate: startDate.toISOString().slice(0, 10),
-      resumeDate: resumeDate.toISOString().slice(0, 10),
+      startDate: ymd(startDate),
+      resumeDate: ymd(resumeDate),
+    });
+    await notifyPatient(patient._id, {
+      title: 'Your plan is paused',
+      message: `Your dietician has paused your plan from ${ymd(startDate)}. It resumes on ${ymd(resumeDate)} and picks up right where it left off.`,
     });
 
     res.status(200).json({ success: true, data: pauseSummary(dietPlan) });
@@ -163,18 +219,16 @@ exports.updatePause = async (req, res, next) => {
     if (!ctx) return;
     const { patient, dietPlan } = ctx;
 
-    const pauses = normalizePauses(dietPlan.pauses);
-    const editable = editablePause(pauses);
+    const editable = editablePause(normalizePauses(dietPlan.pauses));
     if (!editable) return bad(res, 'No pause is scheduled or running to change', 404);
 
-    // The editable window is always the last entry.
     const idx = dietPlan.pauses.length - 1;
     const current = dietPlan.pauses[idx];
     const today = normDate(new Date());
     const pauseHasStarted = normDate(current.startDate) <= today;
 
     let newStart = normDate(current.startDate);
-    if (req.body?.startDate !== undefined) {
+    if (req.body?.startDate !== undefined && req.body?.startDate !== null) {
       if (pauseHasStarted) return bad(res, "The pause has already started - its start date can't change");
       const s = normDate(req.body.startDate);
       if (!s) return bad(res, 'Invalid startDate');
@@ -190,16 +244,19 @@ exports.updatePause = async (req, res, next) => {
     const oldDelta = dayDiff(normDate(current.startDate), normDate(current.resumeDate));
     const newDelta = dayDiff(newStart, newResume);
 
+    await shiftSatelliteDates(patient._id, dietPlan, newStart, newDelta - oldDelta);
     current.startDate = newStart;
     current.resumeDate = newResume;
     await dietPlan.save();
 
-    await shiftSatelliteDates(patient._id, dietPlan, newStart, newDelta - oldDelta);
-
     logAuditEvent('subscription_pause_updated', {
       dieticianId: String(req.user._id),
       patientId: String(patient._id),
-      resumeDate: newResume.toISOString().slice(0, 10),
+      resumeDate: ymd(newResume),
+    });
+    await notifyPatient(patient._id, {
+      title: 'Pause dates updated',
+      message: `Your plan now resumes on ${ymd(newResume)}.`,
     });
 
     res.status(200).json({ success: true, data: pauseSummary(dietPlan) });
@@ -214,21 +271,24 @@ exports.cancelPause = async (req, res, next) => {
     if (!ctx) return;
     const { patient, dietPlan } = ctx;
 
-    const pauses = normalizePauses(dietPlan.pauses);
-    const editable = editablePause(pauses);
+    const editable = editablePause(normalizePauses(dietPlan.pauses));
     if (!editable) return bad(res, 'No pause is scheduled or running to cancel', 404);
 
     const idx = dietPlan.pauses.length - 1;
     const removed = dietPlan.pauses[idx];
     const delta = dayDiff(normDate(removed.startDate), normDate(removed.resumeDate));
-    dietPlan.pauses.splice(idx, 1);
-    await dietPlan.save();
 
     await shiftSatelliteDates(patient._id, dietPlan, normDate(removed.startDate), -delta);
+    dietPlan.pauses.splice(idx, 1);
+    await dietPlan.save();
 
     logAuditEvent('subscription_pause_cancelled', {
       dieticianId: String(req.user._id),
       patientId: String(patient._id),
+    });
+    await notifyPatient(patient._id, {
+      title: 'Pause cancelled',
+      message: 'Your dietician has cancelled the pause. Your plan continues as normal.',
     });
 
     res.status(200).json({ success: true, data: pauseSummary(dietPlan) });

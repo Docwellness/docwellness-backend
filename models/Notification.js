@@ -31,6 +31,7 @@ const notificationSchema = new mongoose.Schema(
         'quote',
         'meal_reminder',
         'water_reminder',
+        'subscription_pause',
       ],
       default: 'system',
     },
