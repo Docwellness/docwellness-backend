@@ -1,10 +1,10 @@
 /**
  * Single source of truth for "what data belongs to a patient" and how to
  * delete it. Imported by:
- *   - controllers/dietician/patientController.js  (deletePatient, deletePatientData)
+ *   - controllers/dietician/patientController.js  (deletePatientData)
  *   - scripts/delete-all-patients.js              (prod patient wipe)
  *
- * Before this module the cascade lived inline in deletePatient and was
+ * The cascade used to live inline in the dietician controller and was
  * copy-pasted (with drift) into half a dozen reset scripts - some missing
  * ExerciseLog / the Goal->Milestone chain / the DayPlan->PlanItem chain,
  * some using wrong collection names (`chatmessages` vs `chats`). Keep every
@@ -292,8 +292,8 @@ async function deletePatientData(patientIds, categoryKeys = CATEGORY_KEYS, { exe
 
 /**
  * Full erase of one patient: every category, then the User document, then
- * the Supabase auth identity (best-effort - a failure there only logs, as
- * in the original deletePatient). Returns `{ ...collectionCounts, users }`.
+ * the Supabase auth identity (best-effort - a failure there only logs).
+ * Returns `{ ...collectionCounts, users }`.
  */
 async function erasePatientCompletely(patient, { deleteSupabase = true } = {}) {
   const counts = await deletePatientData([patient._id], CATEGORY_KEYS, { execute: true });
