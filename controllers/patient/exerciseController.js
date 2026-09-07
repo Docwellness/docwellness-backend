@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const { ExercisePlan, ExerciseLog, Exercise } = require('../../models');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
 const { invalidatePatientStats } = require('../../utils/patientStatsCache');
+const { rejectIfPaused } = require('../../utils/patientPauseGuard');
 const {
   calcCaloriesBurned,
   estimateDurationMinutes,
@@ -150,6 +151,7 @@ exports.getTodayExerciseStats = async (req, res, next) => {
 exports.submitExerciseLog = async (req, res, next) => {
   try {
     const patientId = req.user._id;
+    if (await rejectIfPaused(res, patientId)) return;
     const { date, exercises } = req.body || {};
 
     const rawDate = date ? new Date(date) : new Date();

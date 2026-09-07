@@ -10,6 +10,11 @@ const {
 const { getMembershipTier } = require('../../utils/membershipTiers');
 const { logAuditEvent } = require('../../utils/auditLog');
 const {
+  normalizePauses,
+  editablePause,
+  isPausedOn,
+} = require('../../utils/subscriptionPause');
+const {
   CATEGORY_KEYS,
   ACCOUNT_ONLY_KEYS,
   deletePatientData: deletePatientDataCascade,
@@ -40,6 +45,23 @@ const formatDate = (value) => {
  */
 const assertDieticianOwnsPatient = (dieticianId, patientId) =>
   DietPlanRequest.exists({ patient: patientId, dieticianId });
+
+/**
+ * Compact subscription-pause state for the dietician app's Patient Settings
+ * sheet: the currently-editable window (running or scheduled), whether a
+ * pause is live right now, and the full history.
+ */
+const buildSubscriptionPauseSummary = (dietPlan) => {
+  const pauses = normalizePauses(dietPlan?.pauses);
+  const editable = editablePause(pauses);
+  return {
+    isPausedNow: isPausedOn(pauses, new Date()),
+    active: editable
+      ? { startDate: editable.startDate, resumeDate: editable.resumeDate }
+      : null,
+    history: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
+  };
+};
 
 const isProfileComplete = (user) => {
   const profile = user.profile || {};
@@ -228,7 +250,7 @@ exports.getPatientProfile = async (req, res, next) => {
     const statusSnapshot = patient.status || {};
 
     const DIET_PLAN_SUMMARY_SELECT =
-      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan';
+      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan pauses';
 
     // weeklyDietPlans (finalized weeks + their calories) and
     // generatedWeekNumbers (weeks with AI content ready, pre-finalize) for
@@ -456,6 +478,10 @@ exports.getPatientProfile = async (req, res, next) => {
         // Same week-state signals as the active cycle above, for the
         // "Week 5-8" cards + Create/Resume button under Weekly Diet Plans.
         pendingCycle,
+        // Subscription pause state for the active cycle (see
+        // utils/subscriptionPause.js) - drives the "Pause / Resume
+        // subscription" control in Patient Settings.
+        subscriptionPause: buildSubscriptionPauseSummary(dietPlanForSummary),
         // One entry per renewal cycle, newest first (see paymentHistory
         // above) - the Payment Information section renders these as
         // collapsed, dated rows once there's more than one.
