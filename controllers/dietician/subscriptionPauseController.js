@@ -31,6 +31,7 @@ const {
   normalizePauses,
 } = require('../../utils/subscriptionPause');
 const { logAuditEvent } = require('../../utils/auditLog');
+const { loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { sendPushToTokens } = require('../../utils/push');
 const { getChatIO } = require('../../chat');
 
@@ -55,9 +56,21 @@ async function loadContext(req, res) {
     bad(res, 'You are not authorized to access this patient', 403);
     return null;
   }
-  const dietPlan = await DietPlan.findOne({ patientId, status: 'Active' })
+  // A pause is stored on whichever cycle was current when it was scheduled.
+  // A renewal sweep can since have retired that cycle, so an edit / cancel
+  // has to find the pause wherever it actually lives - not assume it's on
+  // the lowest-cycleNumber Active plan. Prefer the cycle that already holds
+  // an editable (running or scheduled) window; fall back to the patient's
+  // current live cycle for a brand-new pause.
+  const plansWithPause = await DietPlan.find({ patientId, 'pauses.0': { $exists: true } })
     .sort({ cycleNumber: 1 })
     .populate('request');
+  let dietPlan = plansWithPause.find((p) => editablePause(normalizePauses(p.pauses)));
+  if (!dietPlan) {
+    dietPlan = await DietPlan.findOne({ patientId, status: 'Active' })
+      .sort({ cycleNumber: 1 })
+      .populate('request');
+  }
   if (!dietPlan) {
     bad(res, 'This patient has no active diet plan to pause', 409);
     return null;
@@ -194,7 +207,10 @@ exports.pauseSubscription = async (req, res, next) => {
     if (resumeDate <= startDate) return bad(res, 'resumeDate must be after startDate');
     if (startDate < normDate(new Date())) return bad(res, 'A pause cannot start in the past');
 
-    const existing = normalizePauses(dietPlan.pauses);
+    // Guard against every window on record, across all cycles - not just
+    // this plan's - so a pause on a renewed-away cycle still blocks a
+    // conflicting new one.
+    const existing = await loadPatientPauses(patient._id);
     if (editablePause(existing)) {
       return bad(
         res,

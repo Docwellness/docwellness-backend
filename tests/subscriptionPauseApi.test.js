@@ -229,3 +229,90 @@ describe('patient logging is blocked during a pause', () => {
     expect(res.status).not.toBe(403); // may be 400 on empty items - pause gate passed
   });
 });
+
+describe('a pause survives a renewal (stranded on the predecessor cycle)', () => {
+  // The pause is stored on cycle 1; the renewal makes cycle 2 the plan the
+  // patient reads, and retireEndedPredecessorPlans flips cycle 1 to
+  // Completed. loadPatientPauses reads the union across cycles so the
+  // window keeps applying and the dietician can still edit / cancel it.
+  async function seedRenewedWithPauseOnCycle1() {
+    const dietician = await factories.createDietician();
+    const patient = await factories.createPatient();
+    const dpRequest = await factories.createDietPlanRequest(patient, dietician, {
+      subscriptionExpiresAt: D('2026-10-01'),
+    });
+    const cycle1 = await models.DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'Completed',
+      cycleNumber: 1,
+      startDate: D('2026-08-11'),
+      request: dpRequest._id,
+      weekSchedule: [{ week: 4, startDate: D('2026-09-01'), endDate: D('2026-09-07') }],
+      pauses: [{ startDate: D('2099-09-08'), resumeDate: D('2099-09-12') }],
+    });
+    const cycle2 = await models.DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'Active',
+      cycleNumber: 2,
+      startDate: D('2026-09-08'),
+      request: dpRequest._id,
+      weekSchedule: [{ week: 1, startDate: D('2026-09-08'), endDate: D('2026-09-14') }],
+      pauses: [],
+    });
+    return { dietician, patient, dpRequest, cycle1, cycle2 };
+  }
+
+  test('loadPatientPauses reads the window off the retired predecessor cycle', async () => {
+    const { patient } = await seedRenewedWithPauseOnCycle1();
+    const { loadPatientPauses } = require('../utils/patientPauseGuard');
+
+    const merged = await loadPatientPauses(patient._id);
+
+    expect(merged).toHaveLength(1);
+    expect(isoDay(merged[0].startDate)).toBe('2099-09-08');
+    expect(isoDay(merged[0].resumeDate)).toBe('2099-09-12');
+  });
+
+  test('dietician can edit the resume date of a pause stranded on cycle 1', async () => {
+    const { dietician, patient, cycle1 } = await seedRenewedWithPauseOnCycle1();
+    registerTestToken('d', dietician._id);
+
+    const res = await request(app)
+      .patch(pausePath(patient._id))
+      .set(authed('d'))
+      .send({ resumeDate: '2099-09-15' });
+
+    expect(res.status).toBe(200);
+    expect(isoDay(res.body.data.active.resumeDate)).toBe('2099-09-15');
+
+    const reloaded = await models.DietPlan.findById(cycle1._id).lean();
+    expect(isoDay(reloaded.pauses[0].resumeDate)).toBe('2099-09-15');
+  });
+
+  test('dietician can cancel a pause stranded on cycle 1', async () => {
+    const { dietician, patient, cycle1 } = await seedRenewedWithPauseOnCycle1();
+    registerTestToken('d', dietician._id);
+
+    const res = await request(app)
+      .delete(pausePath(patient._id))
+      .set(authed('d'));
+
+    expect(res.status).toBe(200);
+    const reloaded = await models.DietPlan.findById(cycle1._id).lean();
+    expect(reloaded.pauses).toHaveLength(0);
+  });
+
+  test('a new pause is rejected while one is still live on cycle 1', async () => {
+    const { dietician, patient } = await seedRenewedWithPauseOnCycle1();
+    registerTestToken('d', dietician._id);
+
+    const res = await request(app)
+      .post(pausePath(patient._id))
+      .set(authed('d'))
+      .send({ startDate: '2099-10-01', resumeDate: '2099-10-05' });
+
+    expect(res.status).toBe(409);
+  });
+});
