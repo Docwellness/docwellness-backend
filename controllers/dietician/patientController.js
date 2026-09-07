@@ -326,6 +326,21 @@ exports.getPatientProfile = async (req, res, next) => {
     const weeklyDietPlans = activeWeeks.weeklyDietPlans;
     const generatedWeekNumbers = activeWeeks.generatedWeekNumbers;
 
+    // The subscription pause lives on whichever plan the *patient-facing*
+    // read path (getActiveDietPlanForPatient / patientPauseGuard /
+    // subscriptionPauseController) treats as active - findOne({status:
+    // 'Active'}).sort({cycleNumber:1}) - which isn't always the same
+    // document as dietPlanForSummary (findById(status.activeDietPlanId)).
+    // Read `pauses` from the same query so the dietician sees the pause the
+    // patient actually gets.
+    const activePlanForPause = await DietPlan.findOne({
+      patientId: patient._id,
+      status: 'Active',
+    })
+      .sort({ cycleNumber: 1 })
+      .select('pauses')
+      .lean();
+
     // A renewal has been requested (the patient re-ran the request flow -
     // startRenewal flips the shared request back to unpaid while its
     // hasActivePlan stays true) but the new cycle isn't paid/activated yet.
@@ -481,7 +496,9 @@ exports.getPatientProfile = async (req, res, next) => {
         // Subscription pause state for the active cycle (see
         // utils/subscriptionPause.js) - drives the "Pause / Resume
         // subscription" control in Patient Settings.
-        subscriptionPause: buildSubscriptionPauseSummary(dietPlanForSummary),
+        subscriptionPause: buildSubscriptionPauseSummary(
+          activePlanForPause || dietPlanForSummary
+        ),
         // One entry per renewal cycle, newest first (see paymentHistory
         // above) - the Payment Information section renders these as
         // collapsed, dated rows once there's more than one.
