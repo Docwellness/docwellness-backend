@@ -13,7 +13,9 @@ const {
   normalizePauses,
   editablePause,
   isPausedOn,
+  shiftWeekRangeForPauses,
 } = require('../../utils/subscriptionPause');
+const { loadPatientPauses } = require('../../utils/patientPauseGuard');
 const {
   CATEGORY_KEYS,
   ACCOUNT_ONLY_KEYS,
@@ -51,8 +53,8 @@ const assertDieticianOwnsPatient = (dieticianId, patientId) =>
  * sheet: the currently-editable window (running or scheduled), whether a
  * pause is live right now, and the full history.
  */
-const buildSubscriptionPauseSummary = (dietPlan) => {
-  const pauses = normalizePauses(dietPlan?.pauses);
+const buildSubscriptionPauseSummary = (rawPauses) => {
+  const pauses = normalizePauses(rawPauses);
   const editable = editablePause(pauses);
   return {
     isPausedNow: isPausedOn(pauses, new Date()),
@@ -326,20 +328,22 @@ exports.getPatientProfile = async (req, res, next) => {
     const weeklyDietPlans = activeWeeks.weeklyDietPlans;
     const generatedWeekNumbers = activeWeeks.generatedWeekNumbers;
 
-    // The subscription pause lives on whichever plan the *patient-facing*
-    // read path (getActiveDietPlanForPatient / patientPauseGuard /
-    // subscriptionPauseController) treats as active - findOne({status:
-    // 'Active'}).sort({cycleNumber:1}) - which isn't always the same
-    // document as dietPlanForSummary (findById(status.activeDietPlanId)).
-    // Read `pauses` from the same query so the dietician sees the pause the
-    // patient actually gets.
-    const activePlanForPause = await DietPlan.findOne({
-      patientId: patient._id,
-      status: 'Active',
-    })
-      .sort({ cycleNumber: 1 })
-      .select('pauses')
-      .lean();
+    // The subscription pause can live on any of the patient's diet-plan
+    // cycles - it's stored on whichever was current when the dietician
+    // scheduled it, and a renewal sweep can since have retired that cycle
+    // (see loadPatientPauses). Read the union across every cycle so the
+    // dietician sees exactly the window the patient app gets.
+    const mergedPauses = await loadPatientPauses(patient._id);
+
+    // Weekly Diet Plan cards show each week's date range. A subscription
+    // pause shifts plan content forward (virtual calendar shift - the stored
+    // weekSchedule is untouched), so the cards must show the shifted dates
+    // too. Applied to the response only.
+    const withPauseShift = (weekSchedule) =>
+      (Array.isArray(weekSchedule) ? weekSchedule : []).map((w) => {
+        const shifted = shiftWeekRangeForPauses(mergedPauses, w.startDate, w.endDate);
+        return { ...w, startDate: shifted.startDate, endDate: shifted.endDate };
+      });
 
     // A renewal has been requested (the patient re-ran the request flow -
     // startRenewal flips the shared request back to unpaid while its
@@ -373,7 +377,7 @@ exports.getPatientProfile = async (req, res, next) => {
           dataModel: pendingPlan.dataModel || null,
           cycleNumber: pendingPlan.cycleNumber || 1,
           membershipPlan: pendingPlan.membershipPlan || null,
-          weekSchedule: pendingPlan.weekSchedule || [],
+          weekSchedule: withPauseShift(pendingPlan.weekSchedule),
           generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
           finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
           activePlanStrategy: {
@@ -478,7 +482,7 @@ exports.getPatientProfile = async (req, res, next) => {
         // regardless of generation/finalize progress, since even a locked
         // week needs a displayable date and the finalize-time gate
         // (validateRegenerateRequest) needs a known end-of-week boundary.
-        weekSchedule: dietPlanForSummary?.weekSchedule || [],
+        weekSchedule: withPauseShift(dietPlanForSummary?.weekSchedule),
         // Lets the dietician app re-open an already-generated/finalized
         // week's Create Diet Plan screen with the Calorie/Macro strategy
         // that was actually used pre-selected, instead of showing a blank
@@ -496,9 +500,7 @@ exports.getPatientProfile = async (req, res, next) => {
         // Subscription pause state for the active cycle (see
         // utils/subscriptionPause.js) - drives the "Pause / Resume
         // subscription" control in Patient Settings.
-        subscriptionPause: buildSubscriptionPauseSummary(
-          activePlanForPause || dietPlanForSummary
-        ),
+        subscriptionPause: buildSubscriptionPauseSummary(mergedPauses),
         // One entry per renewal cycle, newest first (see paymentHistory
         // above) - the Payment Information section renders these as
         // collapsed, dated rows once there's more than one.

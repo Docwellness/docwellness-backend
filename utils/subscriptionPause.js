@@ -95,6 +95,28 @@ function currentOrUpcomingPause(pauses, now = new Date()) {
   );
 }
 
+/**
+ * Shift a plan week's [startDate, endDate] FORWARD for display by the pause
+ * windows that affect it - a window whose start is on/before the week's
+ * start pushes the whole week; one that starts mid-week pushes only the
+ * end. The stored weekSchedule is never mutated; this is the same virtual
+ * calendar shift the patient read path applies (effectiveContentDate),
+ * expressed as a forward shift for the dietician's week cards.
+ */
+function shiftWeekRangeForPauses(pauses, startDate, endDate) {
+  const list = normalizePauses(pauses);
+  const ws = normDate(startDate);
+  const we = normDate(endDate);
+  if (!list.length || !ws || !we) return { startDate: ws, endDate: we };
+  const startShift = list
+    .filter((p) => p.startDate <= ws)
+    .reduce((sum, p) => sum + pauseLengthDays(p), 0);
+  const endShift = list
+    .filter((p) => p.startDate <= we)
+    .reduce((sum, p) => sum + pauseLengthDays(p), 0);
+  return { startDate: addDays(ws, startShift), endDate: addDays(we, endShift) };
+}
+
 /** The last window that hasn't finished yet - the only one a dietician may edit/cancel. */
 function editablePause(pauses, now = new Date()) {
   const today = normDate(now);
@@ -115,4 +137,5 @@ module.exports = {
   totalShiftDays,
   currentOrUpcomingPause,
   editablePause,
+  shiftWeekRangeForPauses,
 };
