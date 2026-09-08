@@ -117,6 +117,23 @@ function shiftWeekRangeForPauses(pauses, startDate, endDate) {
   return { startDate: addDays(ws, startShift), endDate: addDays(we, endShift) };
 }
 
+/**
+ * Push a single plan date FORWARD by the pause windows that affect it: a
+ * window whose start is on or before `date` pushes it by that window's
+ * length. Used to translate a stored (original) goal / milestone date into
+ * the date it actually lands on once the pause(s) are accounted for - the
+ * stored value is never mutated, same virtual-shift principle the diet plan
+ * read path uses (effectiveContentDate / shiftWeekRangeForPauses).
+ */
+function shiftDateForPauses(pauses, date) {
+  const d = normDate(date);
+  if (!d) return d;
+  const shift = normalizePauses(pauses)
+    .filter((p) => p.startDate <= d)
+    .reduce((sum, p) => sum + pauseLengthDays(p), 0);
+  return shift === 0 ? d : addDays(d, shift);
+}
+
 /** The last window that hasn't finished yet - the only one a dietician may edit/cancel. */
 function editablePause(pauses, now = new Date()) {
   const today = normDate(now);
@@ -138,4 +155,5 @@ module.exports = {
   currentOrUpcomingPause,
   editablePause,
   shiftWeekRangeForPauses,
+  shiftDateForPauses,
 };

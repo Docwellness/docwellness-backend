@@ -3,10 +3,11 @@
  * [startDate, resumeDate) on the patient's active DietPlan.pauses[]. During
  * it the patient can't log and the Diet & Exercise tab is locked; once it
  * ends, plan content shifts forward by the window length (virtual calendar
- * shift - see utils/subscriptionPause.js). This controller additionally
- * extends the single scalar dates a pause should push out: the
- * subscription expiry, the active Goal's end (+ its still-future
- * milestones) and the active ExercisePlan's end, and notifies the patient.
+ * shift - see utils/subscriptionPause.js). This controller also nudges the
+ * two scalar dates a pause pushes out - the subscription expiry and the
+ * active ExercisePlan end - and notifies the patient. The goal timeline
+ * (Goal end + milestone dates) is derived on read instead (see
+ * utils/timelinePayload + goalAdherence `shiftDateForPauses`).
  *
  *   POST   /api/dietician/patients/:patientId/subscription/pause   { startDate, resumeDate }
  *   PATCH  /api/dietician/patients/:patientId/subscription/pause   { startDate?, resumeDate }
@@ -19,8 +20,6 @@ const {
   DietPlan,
   DietPlanRequest,
   ExercisePlan,
-  Goal,
-  Milestone,
   Notification,
 } = require('../../models');
 const {
@@ -79,15 +78,18 @@ async function loadContext(req, res) {
 }
 
 /**
- * Push the pause's "satellite" dates by `deltaDays` (negative to undo):
- * subscription expiry (+ its User.status mirror), active Goal end + its
- * milestones dated on/after `fromDate`, active ExercisePlan end. Each
- * section is best-effort - a failure logs and is swallowed so it can never
- * leave the pause itself half-applied.
+ * Push the pause's "satellite" scalar dates by `deltaDays` (negative to
+ * undo): subscription expiry (+ its User.status mirror) and the active
+ * ExercisePlan end. Best-effort per section.
+ *
+ * The active Goal end + its milestone dates are DELIBERATELY not touched
+ * here anymore - incremental in-place shifting drifted whenever an edit /
+ * cancel partially failed. Those are now derived on read from the stored
+ * (original) dates + the pause windows (utils/subscriptionPause
+ * `shiftDateForPauses`, applied in utils/timelinePayload + goalAdherence).
  */
 async function shiftSatelliteDates(patientId, dietPlan, fromDate, deltaDays) {
   if (deltaDays === 0) return;
-  const from = normDate(fromDate);
 
   try {
     const request = dietPlan.request;
@@ -102,29 +104,6 @@ async function shiftSatelliteDates(patientId, dietPlan, fromDate, deltaDays) {
     }
   } catch (err) {
     console.error('[subscriptionPause] subscription expiry shift failed:', err.message);
-  }
-
-  try {
-    const goal = await Goal.findOne({ patientId, status: 'active' });
-    if (goal) {
-      if (goal.endDate) goal.endDate = addDays(goal.endDate, deltaDays);
-      await goal.save();
-      const milestones = await Milestone.find({ goalId: goal._id, date: { $gte: from } })
-        .select('_id date')
-        .lean();
-      if (milestones.length) {
-        await Milestone.bulkWrite(
-          milestones.map((m) => ({
-            updateOne: {
-              filter: { _id: m._id },
-              update: { $set: { date: addDays(m.date, deltaDays) } },
-            },
-          }))
-        );
-      }
-    }
-  } catch (err) {
-    console.error('[subscriptionPause] goal/milestone shift failed:', err.message);
   }
 
   try {
