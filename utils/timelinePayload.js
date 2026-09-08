@@ -14,6 +14,20 @@ const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Same "09 Sep"-style label seedGoalTimeline.js stamps onto a daily
+// milestone's `title` at creation. A pause shifts a milestone's real date
+// on read (below), but its stored `title` stays frozen at the original
+// day - so a daily node has to be RE-labelled from its shifted date here,
+// or the client's timeline strip shows the wrong day next to every node
+// after a pause (e.g. the "resumes on" checkpoint still reading "Sep 09").
+function formatDayLabel(date) {
+  return new Date(date).toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
 function shapeGoal(goal, effectiveEndDate) {
   return {
     id: goal._id,
@@ -137,8 +151,16 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     return {
       id: m._id,
       type: m.type,
-      title: m.title,
-      subtitle: m.subtitle,
+      // Daily nodes carry a date-string title (frozen at seed time) - keep
+      // it in sync with the pause-shifted `date`. Weekly / monthly / end
+      // goal titles ("Week 7", "65 kg") are not dates and pass through.
+      title: m.type === 'daily' ? formatDayLabel(m.date) : m.title,
+      // The end-goal node's subtitle embeds its own date ("Goal · 05 Oct
+      // 2026") - re-derive it from the shifted date too.
+      subtitle:
+        m.type === 'end_goal'
+          ? `Goal · ${formatDayLabel(m.date)} ${new Date(m.date).getUTCFullYear()}`
+          : m.subtitle,
       date: m.date,
       status: computeMilestoneStatus(m, adherenceEntry, today),
       adherence: adherenceEntry?.adherence ?? 0,
