@@ -1,37 +1,47 @@
 /**
- * Seeds the 13 Docwellness YouTube Shorts into prod as visible patient
- * videos (the "Videos for you" carousel on the user app's Home).
+ * Seeds the 13 Docwellness YouTube Shorts as visible patient videos (the
+ * "Videos for you" carousel on the user app's Home).
  *
  * Each row becomes a Video document:
  *   - source: 'YouTube'
  *   - youtubeUrl: the /shorts/<id> URL
  *   - thumbnailUrl: https://i.ytimg.com/vi/<id>/oardefault.jpg
  *       ^ YouTube's original-aspect-ratio (9:16) Shorts frame - no 4:3
- *         letterboxing like hqdefault.jpg. The app already prefers an
- *         explicit thumbnailUrl over its hqdefault fallback
- *         (see videos_section.dart _getThumbnail).
+ *         letterboxing like hqdefault.jpg. The app prefers an explicit
+ *         thumbnailUrl over its own fallback (see videoThumb() in
+ *         docwellness-user/lib/app/modules/home/widgets/videos_section.dart).
  *   - visibleToUser: true
- *   - dieticianId: the prod dietician these should belong to
+ *   - dieticianId: the dietician these should belong to
  *
- * Idempotent: a video is skipped if this dietician already has one with the
- * same youtubeUrl (matched by video id, so a /watch?v= vs /shorts/ variant
- * still counts as the same video).
+ * Idempotent: a video is skipped if that dietician already has one with the
+ * same YouTube id (a /watch?v= vs /shorts/ variant still counts as the same).
  *
- * Follows the same prod-connection contract as
- * migrate-dev-catalog-to-prod.js: PROD_MONGODB_URI must be set explicitly
- * (never guessed/defaulted), and the prod TLS CA comes from connectDB's own
- * resolveTlsCAFile.
+ * ── Connection ──────────────────────────────────────────────────────────────
+ * Two modes:
  *
- * Usage:
- *   node scripts/seed-prod-videos.js --dietician-id=<ObjectId>            # dry run
- *   node scripts/seed-prod-videos.js --dietician-id=<ObjectId> --execute  # write
+ *   A. From your machine, against remote prod:
+ *        set PROD_MONGODB_URI in the shell, then:
+ *        node scripts/seed-prod-videos.js --dietician-id=<id> [--execute]
  *
- * If --dietician-id is omitted, PROD_DEFAULT_DIETICIAN_ID is used when set.
+ *   B. Inside the deployed backend container (Coolify "Execute Command" /
+ *      `docker exec`), where MONGODB_URI already points at that env's own DB:
+ *        node scripts/seed-prod-videos.js --use-default-uri --dietician-id=<id> [--execute]
+ *
+ * Either way it is a DRY RUN unless --execute is passed, and it prints the DB
+ * host it connected to first so you can sanity-check before writing.
+ *
+ * Run with no --dietician-id to print candidate dietician ids from the DB.
  */
 
-// Same DNS fix as the other prod scripts - the default system resolver on
-// this machine doesn't handle mongodb+srv:// SRV/TXT lookups.
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+const USE_DEFAULT_URI = process.argv.includes('--use-default-uri');
+
+// mongodb+srv:// needs an SRV lookup the default resolver on a dev machine
+// sometimes drops - force public DNS for the local-run case only. NOT inside
+// a container, where Mongo may be a private/docker-network hostname that
+// public DNS can't resolve.
+if (!USE_DEFAULT_URI) {
+  require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+}
 
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -41,12 +51,12 @@ const EXECUTE = process.argv.includes('--execute');
 const dieticianArg = process.argv.find((a) => a.startsWith('--dietician-id='));
 const DIETICIAN_ID = dieticianArg
   ? dieticianArg.split('=')[1]
-  : process.env.PROD_DEFAULT_DIETICIAN_ID || null;
+  : process.env.SEED_DIETICIAN_ID || null;
 
-// Order here is display order intent (newest-first is how the app sorts, so
-// the first entry is inserted last / ends up on top). Titles are lightly
-// curated - the raw YouTube titles are mostly repeated "Like, Share,
-// Subscribe" CTAs; the dietician can rename any of these from their app.
+// Order here is display-order intent: the patient endpoint sorts newest-first,
+// so array[0] is inserted with the newest createdAt and lands on top. Titles
+// are lightly curated (the raw YouTube titles are mostly repeated "Like,
+// Share, Subscribe" CTAs); the dietician can rename any from their app.
 const VIDEOS = [
   { id: 'WxcuatHGznw', title: '' },
   { id: 'hWKgtxkg7i4', title: '' },
@@ -70,69 +80,90 @@ const ytIdFromUrl = (url = '') => {
   return m ? m[1] : null;
 };
 
-async function main() {
-  if (!process.env.PROD_MONGODB_URI) {
+async function openConnection() {
+  const tlsCAFile = connectDB.resolveTlsCAFile();
+  const tlsOptions = tlsCAFile ? { tls: true, tlsCAFile } : {};
+
+  const uri = USE_DEFAULT_URI
+    ? process.env.MONGODB_URI
+    : process.env.PROD_MONGODB_URI;
+
+  if (!uri) {
     console.error(
-      'PROD_MONGODB_URI must be set (the prod database to seed INTO) - refusing to guess or default this.'
+      USE_DEFAULT_URI
+        ? 'MONGODB_URI is not set in this environment.'
+        : 'PROD_MONGODB_URI must be set (or run inside the deployed container with --use-default-uri).'
     );
     process.exit(1);
   }
 
+  const conn = mongoose.createConnection(uri, tlsOptions);
+  await conn.asPromise();
+  return conn;
+}
+
+async function main() {
   console.log(
     EXECUTE
-      ? '=== EXECUTING prod video seed ==='
+      ? '=== EXECUTING video seed ==='
       : '=== DRY RUN (pass --execute to write) ==='
   );
 
-  console.log('Connecting to prod MongoDB...');
-  const tlsCAFile = connectDB.resolveTlsCAFile();
-  const prodOptions = tlsCAFile ? { tls: true, tlsCAFile } : {};
-  const prodConn = mongoose.createConnection(
-    process.env.PROD_MONGODB_URI,
-    prodOptions
+  const conn = await openConnection();
+  console.log(
+    `Connected to DB "${conn.name}" @ ${conn.host}:${conn.port}` +
+      (USE_DEFAULT_URI ? '  (via MONGODB_URI)' : '  (via PROD_MONGODB_URI)')
   );
-  await prodConn.asPromise();
-  console.log('Connected to prod.');
 
-  const videos = prodConn.collection('videos');
-
-  // No dietician id given (or a bad one): show which ids prod's own data
-  // already points at, so the caller can pick the right one - then stop.
-  if (!DIETICIAN_ID || !mongoose.Types.ObjectId.isValid(DIETICIAN_ID)) {
-    const byDietician = await videos
-      .aggregate([
-        { $group: { _id: '$dieticianId', count: { $sum: 1 }, visible: { $sum: { $cond: ['$visibleToUser', 1, 0] } } } },
-      ])
-      .toArray();
-    const dieticians = await prodConn
-      .collection('users')
-      .find({ role: 'dietician' })
-      .project({ 'profile.fullName': 1, email: 1 })
-      .toArray();
-    console.log('\nNo valid --dietician-id given. Candidates from prod:');
-    console.log('\nDieticians (users.role = "dietician"):');
-    console.table(
-      dieticians.map((d) => ({
-        _id: String(d._id),
-        name: d.profile && d.profile.fullName,
-        email: d.email,
-      }))
-    );
-    console.log('Existing videos grouped by dieticianId:');
-    console.table(
-      byDietician.map((g) => ({ dieticianId: String(g._id), videos: g.count, visible: g.visible }))
-    );
-    console.log(
-      '\nRe-run with:  node scripts/seed-prod-videos.js --dietician-id=<one of the above> [--execute]'
-    );
-    await prodConn.close();
-    process.exit(1);
-  }
-
-  const dieticianId = new mongoose.Types.ObjectId(DIETICIAN_ID);
+  const videos = conn.collection('videos');
 
   try {
-    // What this dietician already has, keyed by youtube video id.
+    // No dietician id given (or a bad one): show which ids the DB's own data
+    // already points at, so the caller can pick the right one - then stop.
+    if (!DIETICIAN_ID || !mongoose.Types.ObjectId.isValid(DIETICIAN_ID)) {
+      const byDietician = await videos
+        .aggregate([
+          {
+            $group: {
+              _id: '$dieticianId',
+              count: { $sum: 1 },
+              visible: { $sum: { $cond: ['$visibleToUser', 1, 0] } },
+            },
+          },
+        ])
+        .toArray();
+      const dieticians = await conn
+        .collection('users')
+        .find({ role: 'dietician' })
+        .project({ 'profile.fullName': 1, email: 1 })
+        .toArray();
+      console.log('\nNo valid --dietician-id given. Candidates from this DB:');
+      console.log('\nDieticians (users.role = "dietician"):');
+      console.table(
+        dieticians.map((d) => ({
+          _id: String(d._id),
+          name: d.profile && d.profile.fullName,
+          email: d.email,
+        }))
+      );
+      console.log('Existing videos grouped by dieticianId:');
+      console.table(
+        byDietician.map((g) => ({
+          dieticianId: String(g._id),
+          videos: g.count,
+          visible: g.visible,
+        }))
+      );
+      console.log(
+        '\nRe-run with:  --dietician-id=<one of the above> [--execute]'
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const dieticianId = new mongoose.Types.ObjectId(DIETICIAN_ID);
+
+    // What this dietician already has, keyed by YouTube video id.
     const existing = await videos
       .find({ dieticianId, source: 'YouTube' })
       .project({ youtubeUrl: 1 })
@@ -145,11 +176,8 @@ async function main() {
     const toInsert = [];
     const summary = [];
 
-    // Iterate in reverse so array[0] gets the newest createdAt and lands on
-    // top of the newest-first list the patient endpoint returns.
     for (let i = VIDEOS.length - 1; i >= 0; i--) {
       const v = VIDEOS[i];
-      const youtubeUrl = `https://www.youtube.com/shorts/${v.id}`;
       const already = existingIds.has(v.id);
       summary.push({
         id: v.id,
@@ -161,7 +189,7 @@ async function main() {
         dieticianId,
         title: v.title || '',
         source: 'YouTube',
-        youtubeUrl,
+        youtubeUrl: `https://www.youtube.com/shorts/${v.id}`,
         thumbnailUrl: `https://i.ytimg.com/vi/${v.id}/oardefault.jpg`,
         bannerImage: '',
         videoFile: '',
@@ -188,10 +216,10 @@ async function main() {
       }  |  Already present: ${VIDEOS.length - toInsert.length}`
     );
     if (!EXECUTE) {
-      console.log('Dry run - no writes. Re-run with --execute to seed prod.');
+      console.log('Dry run - no writes. Re-run with --execute to seed.');
     }
   } finally {
-    await prodConn.close();
+    await conn.close();
   }
 }
 
