@@ -140,10 +140,8 @@ describe('PATCH / DELETE subscription/pause', () => {
     expect(isoDay(updated.subscriptionExpiresAt)).toBe('2026-10-06');
   });
 
-  test('cancelling a pause undoes the shift (with an active goal + milestone)', async () => {
+  test('goal + milestone dates are NEVER mutated - the shift is derived on read', async () => {
     const { dietician, patient, dpRequest } = await seedActivePlan();
-    // A goal + a still-future milestone - exercises the Milestone shift path
-    // that used to crash on the aggregation-pipeline updateMany.
     const goal = await models.Goal.create({
       patientId: patient._id,
       dieticianId: dietician._id,
@@ -164,22 +162,36 @@ describe('PATCH / DELETE subscription/pause', () => {
     await request(app)
       .post(pausePath(patient._id))
       .set(authed('d'))
-      .send({ startDate: '2099-09-08', resumeDate: '2099-09-11' }); // +3
+      .send({ startDate: '2099-09-08', resumeDate: '2099-09-11' }); // 3 days
 
-    // goal + milestone shifted +3
-    expect(isoDay((await models.Goal.findById(goal._id)).endDate)).toBe('2099-10-04');
-    expect(isoDay((await models.Milestone.findOne({ goalId: goal._id })).date)).toBe('2099-09-18');
-
-    const res = await request(app).delete(pausePath(patient._id)).set(authed('d'));
-    expect(res.status).toBe(200);
-
-    const updated = await models.DietPlanRequest.findById(dpRequest._id);
-    expect(isoDay(updated.subscriptionExpiresAt)).toBe('2026-10-01');
-    const plan = await models.DietPlan.findOne({ patientId: patient._id });
-    expect(plan.pauses).toHaveLength(0);
-    // shift undone
+    // The stored docs are untouched - no drift on repeated edits/cancels.
     expect(isoDay((await models.Goal.findById(goal._id)).endDate)).toBe('2099-10-01');
     expect(isoDay((await models.Milestone.findOne({ goalId: goal._id })).date)).toBe('2099-09-15');
+
+    // ...but the read path reports the pause-shifted end (+3) and the
+    // window itself.
+    const { computeGoalStats } = require('../utils/goalAdherence');
+    const { buildTimelinePayload } = require('../utils/timelinePayload');
+    const shifted = await computeGoalStats(patient._id);
+    expect(isoDay(shifted.effectiveEndDate)).toBe('2099-10-04');
+    const payload = await buildTimelinePayload(patient._id, { from: -40000, to: 40000 });
+    expect(isoDay(payload.goal.endDate)).toBe('2099-10-04');
+    expect(payload.pauses).toHaveLength(1);
+    expect(isoDay(payload.pauses[0].startDate)).toBe('2099-09-08');
+    const w1 = payload.milestones.find((m) => m.title === 'W1');
+    expect(isoDay(w1.date)).toBe('2099-09-18'); // 2099-09-15 + 3
+
+    // Cancel -> stored docs still untouched, read path back to originals.
+    const res = await request(app).delete(pausePath(patient._id)).set(authed('d'));
+    expect(res.status).toBe(200);
+    expect(isoDay((await models.DietPlanRequest.findById(dpRequest._id)).subscriptionExpiresAt))
+      .toBe('2026-10-01');
+    expect((await models.DietPlan.findOne({ patientId: patient._id })).pauses).toHaveLength(0);
+    expect(isoDay((await models.Goal.findById(goal._id)).endDate)).toBe('2099-10-01');
+    const after = await buildTimelinePayload(patient._id, { from: -40000, to: 40000 });
+    expect(isoDay(after.goal.endDate)).toBe('2099-10-01');
+    expect(after.pauses).toHaveLength(0);
+    expect(isoDay(after.milestones.find((m) => m.title === 'W1').date)).toBe('2099-09-15');
   });
 
   test('a pause notifies the patient (in-app Notification)', async () => {

@@ -10,10 +10,11 @@ const {
   computeMilestoneStatus,
   computeTaskDoneMap,
 } = require('./goalAdherence');
+const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function shapeGoal(goal) {
+function shapeGoal(goal, effectiveEndDate) {
   return {
     id: goal._id,
     title: goal.title,
@@ -23,7 +24,7 @@ function shapeGoal(goal) {
     targetValue: goal.targetValue,
     unit: goal.unit,
     startDate: goal.startDate,
-    endDate: goal.endDate,
+    endDate: effectiveEndDate || goal.endDate,
     status: goal.status,
   };
 }
@@ -40,8 +41,8 @@ function parseRangeParam(value, fallback) {
  * milestones: [] } when the patient has no active goal yet.
  */
 async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
-  const { goal, stats } = await computeGoalStats(patientId);
-  if (!goal) return { goal: null, stats: null, milestones: [] };
+  const { goal, stats, effectiveEndDate, pauses = [] } = await computeGoalStats(patientId);
+  if (!goal) return { goal: null, stats: null, milestones: [], pauses: [] };
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -50,12 +51,29 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   const rangeStart = new Date(today.getTime() + fromDays * MS_PER_DAY);
   const rangeEnd = new Date(today.getTime() + toDays * MS_PER_DAY);
 
-  const milestones = await Milestone.find({
+  // Milestone dates are stored as originals; a pause pushes the still-future
+  // ones forward by up to totalShiftDays. Fetch a wider original-date window
+  // so nothing that lands inside [rangeStart, rangeEnd] after the shift is
+  // missed, then re-window on the shifted ("display") date below.
+  const shiftPad = totalShiftDays(pauses);
+  const rawMilestones = await Milestone.find({
     goalId: goal._id,
-    date: { $gte: rangeStart, $lte: rangeEnd },
+    date: {
+      $gte: new Date(rangeStart.getTime() - (shiftPad + 1) * MS_PER_DAY),
+      $lte: rangeEnd,
+    },
   })
     .sort({ date: 1, sortOrder: 1 })
     .lean();
+
+  // Replace each milestone's stored (original) date with its pause-shifted
+  // one for the whole payload - adherence / task-done lookups then read the
+  // day the checkpoint actually falls on, status is past/active/future vs
+  // that day, and the client renders the real timeline.
+  const milestones = rawMilestones
+    .map((m) => ({ ...m, date: shiftDateForPauses(pauses, m.date) }))
+    .filter((m) => m.date >= rangeStart && m.date <= rangeEnd)
+    .sort((a, b) => a.date - b.date || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   const milestoneIds = milestones.map((m) => m._id);
   const [adherenceMap, tasks, taskDoneMap] = await Promise.all([
@@ -128,7 +146,14 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     };
   });
 
-  return { goal: shapeGoal(goal), stats, milestones: shapedMilestones };
+  return {
+    goal: shapeGoal(goal, effectiveEndDate),
+    stats,
+    milestones: shapedMilestones,
+    // The pause window(s) that shifted the dates above - so the client can
+    // show them explicitly (e.g. "paused 8-12 Sep").
+    pauses: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
+  };
 }
 
 /**

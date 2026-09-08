@@ -29,6 +29,8 @@ const {
   SUPPLEMENTS_TASK_TITLE,
 } = require('./seedGoalTimeline');
 const { resolveDayGroupForDate } = require('./dayGroups');
+const { loadPatientPauses } = require('./patientPauseGuard');
+const { shiftDateForPauses } = require('./subscriptionPause');
 
 const ADHERENCE_COMPLETE_THRESHOLD = 0.6;
 
@@ -382,6 +384,13 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
   const goal = await Goal.findOne({ patientId, status: 'active' });
   if (!goal) return { goal: null, stats: null };
 
+  // A subscription pause pushes the goal's end date (and every still-future
+  // milestone) forward by the pause length. The stored dates are the
+  // originals - shift on read so daysToGo / totalDays / the shaped goal all
+  // reflect the pause. startDate is before any pause, so it never moves.
+  const pauses = await loadPatientPauses(patientId);
+  const effectiveEnd = shiftDateForPauses(pauses, goal.endDate);
+
   const weekAgo = new Date(today.getTime() - 6 * MS_PER_DAY);
   const thirtyDaysAgo = new Date(today.getTime() - 29 * MS_PER_DAY);
 
@@ -423,22 +432,25 @@ async function computeGoalStats(patientId, today = startOfTodayUTC()) {
       : Math.round((adherenceValues.reduce((s, v) => s + v, 0) / adherenceValues.length) * 100) /
         100;
 
-  const daysToGo = Math.max(0, Math.round((goal.endDate.getTime() - today.getTime()) / MS_PER_DAY));
+  const daysToGo = Math.max(0, Math.round((effectiveEnd.getTime() - today.getTime()) / MS_PER_DAY));
   // Days elapsed since the goal started, clamped to the goal's own total
   // span so a client showing "X completed / Y remaining" never sums to more
   // than the actual goal length (e.g. querying the day the goal starts).
   const totalDays = Math.max(
     1,
-    Math.round((goal.endDate.getTime() - goal.startDate.getTime()) / MS_PER_DAY)
+    Math.round((effectiveEnd.getTime() - goal.startDate.getTime()) / MS_PER_DAY)
   );
   const daysElapsed = Math.min(
     totalDays,
     Math.max(0, Math.round((today.getTime() - goal.startDate.getTime()) / MS_PER_DAY))
   );
-  const onPace = predicted ? predicted <= goal.endDate : null;
+  const onPace = predicted ? predicted <= effectiveEnd : null;
 
   return {
     goal,
+    // The pause-adjusted end date, so shapeGoal / callers show the real one.
+    effectiveEndDate: effectiveEnd,
+    pauses,
     stats: {
       streak: goalStreak,
       weekDone,
