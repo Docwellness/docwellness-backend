@@ -41,8 +41,8 @@ exports.getTimelineSummary = asyncHandler(async (req, res) => {
     `pstat:timelinesummary:${req.user._id}`,
     60,
     async () => {
-      const { goal, stats } = await computeGoalStats(req.user._id);
-      return { goal: goal ? shapeGoal(goal) : null, stats };
+      const { goal, stats, effectiveEndDate } = await computeGoalStats(req.user._id);
+      return { goal: goal ? shapeGoal(goal, effectiveEndDate) : null, stats };
     }
   );
   return sendSuccess(res, { data });
