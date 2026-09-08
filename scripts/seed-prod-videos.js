@@ -35,14 +35,6 @@
 
 const USE_DEFAULT_URI = process.argv.includes('--use-default-uri');
 
-// mongodb+srv:// needs an SRV lookup the default resolver on a dev machine
-// sometimes drops - force public DNS for the local-run case only. NOT inside
-// a container, where Mongo may be a private/docker-network hostname that
-// public DNS can't resolve.
-if (!USE_DEFAULT_URI) {
-  require('dns').setServers(['8.8.8.8', '1.1.1.1']);
-}
-
 require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
@@ -95,6 +87,13 @@ async function openConnection() {
         : 'PROD_MONGODB_URI must be set (or run inside the deployed container with --use-default-uri).'
     );
     process.exit(1);
+  }
+
+  // mongodb+srv:// needs an SRV lookup the default resolver on a dev machine
+  // sometimes drops - force public DNS. Not for plain mongodb:// (prod's
+  // self-hosted host may be private / docker-network only).
+  if (uri.startsWith('mongodb+srv://')) {
+    require('dns').setServers(['8.8.8.8', '1.1.1.1']);
   }
 
   const conn = mongoose.createConnection(uri, tlsOptions);

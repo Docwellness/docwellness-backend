@@ -24,6 +24,15 @@ const videoSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Short (~6s), muted, portrait MP4 used for the inline autoplay preview
+    // in the user app's "Videos for you" rail - played natively via
+    // video_player, far lighter than embedding the YouTube webview.
+    // Populated by scripts/generate-video-previews.js; empty = rail just
+    // shows the static thumbnail for this one.
+    previewClipUrl: {
+      type: String,
+      default: '',
+    },
     bannerImage: {
       type: String,
       default: '',
