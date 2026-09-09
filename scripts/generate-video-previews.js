@@ -59,18 +59,18 @@ const IDS_ARG = argVal('--ids');
 const CLIP_SECONDS = 6;
 const CLOUDINARY_FOLDER = 'docwellness/video-previews';
 
-// The one derivative every clip is delivered through: first 6s, 480w, H.264
-// + AAC. Source is already 9:16 so c_scale keeps the frame whole. Audio is
-// kept so the rail's speaker toggle actually does something - the preview
-// still starts muted. (gravity:auto / crop:fill silently void the eager on
-// video - don't.)
+// The one derivative every clip is delivered through: first 6s, 480w, no
+// audio, H.264. The rail preview is a silent ambient loop (no unmute in the
+// mini view - the fullscreen player on tap has sound), so there's no point
+// carrying an audio track. Source is already 9:16 so c_scale keeps the
+// frame whole. (gravity:auto / crop:fill silently void the eager on video.)
 const CLIP_TX = {
   start_offset: '0',
   end_offset: String(CLIP_SECONDS),
   width: 480,
   crop: 'scale',
   video_codec: 'h264',
-  audio_codec: 'aac',
+  audio_codec: 'none',
   quality: 'auto:eco',
 };
 
@@ -206,14 +206,14 @@ async function openConnection() {
 }
 
 function downloadStream(youtubeUrl, outPattern) {
-  // YouTube Shorts have no progressive (single-file) format any more - only
-  // DASH video-only + audio-only. Merge <=720p H.264 video with M4A audio
-  // into one mp4 (needs ffmpeg on PATH; the container never runs this, only
-  // the --emit box does). Cloudinary then trims / re-encodes to H.264+AAC.
+  // Video-only, <=720p, H.264/mp4 first (most reliable Cloudinary ingest).
+  // No audio stream -> yt-dlp never needs ffmpeg to mux, and the clip is
+  // silent anyway (Cloudinary drops audio in CLIP_TX regardless).
   const fmt = [
-    'bv*[height<=720][ext=mp4][vcodec^=avc1]+ba[ext=m4a]',
-    'bv*[height<=720][ext=mp4]+ba',
-    'bv*[height<=720]+ba',
+    'bv*[height<=720][ext=mp4][vcodec^=avc1]',
+    'bv*[height<=720][ext=mp4]',
+    'bv*[height<=720]',
+    'b[height<=720][ext=mp4]',
     'b[height<=720]',
     'b',
   ].join('/');
@@ -224,8 +224,6 @@ function downloadStream(youtubeUrl, outPattern) {
       '--no-playlist',
       '--no-warnings',
       '--quiet',
-      '--merge-output-format',
-      'mp4',
       '-f',
       fmt,
       '-o',
@@ -386,19 +384,6 @@ async function runGenerate(targets, conn) {
 
   YT_DLP = await resolveYtDlp();
   console.log(`Using yt-dlp: ${[YT_DLP.file, ...YT_DLP.pre].join(' ')}`);
-
-  // Shorts are DASH-only now, so yt-dlp needs ffmpeg on PATH to mux the
-  // video+audio streams into one mp4. Without it the clips would be silent
-  // (and the rail's speaker toggle useless).
-  if (!tryVersion('ffmpeg', [])) {
-    console.error(
-      '\nffmpeg not found on PATH - required to merge the video + audio\n' +
-        'streams. Install it (Windows: `winget install Gyan.FFmpeg`, mac:\n' +
-        '`brew install ffmpeg`) and re-run, or set $FFMPEG_PATH and pass\n' +
-        '--ffmpeg-location. Aborting.'
-    );
-    process.exit(1);
-  }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vidprev-'));
   const emitted = {};
