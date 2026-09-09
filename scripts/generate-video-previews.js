@@ -23,8 +23,10 @@
  *
  * Usage (split - when the container's fs is noexec so yt-dlp can't run there):
  *   laptop  (yt-dlp, no DB):   --emit=clips.json --ids=id1,id2,id3
- *   then copy clips.json into the container, and:
- *   container (DB, no yt-dlp):  --apply=clips.json --use-default-uri --execute
+ *   container (DB, no yt-dlp):  --apply --use-default-uri --execute
+ *     ^ bare --apply reads the Cloudinary preview folder directly and
+ *       rebuilds the delivery URLs - nothing to copy over. (Or point it at
+ *       the emitted file / inline JSON: --apply=clips.json / --apply='{..}')
  */
 
 const USE_DEFAULT_URI = process.argv.includes('--use-default-uri');
@@ -47,14 +49,40 @@ const argVal = (name) => {
 };
 const ONLY_ID = argVal('--id');
 // Split mode for containers where yt-dlp can't run (noexec fs):
-//   laptop:    node scripts/generate-video-previews.js --emit=clips.json --ids=a,b,c
-//   container: node scripts/generate-video-previews.js --apply=clips.json --use-default-uri --execute
+//   laptop:    ... --emit=clips.json --ids=a,b,c        (yt-dlp + Cloudinary)
+//   container: ... --apply --use-default-uri --execute  (bare --apply reads
+//              the Cloudinary folder directly - no file to copy over)
 const EMIT = argVal('--emit');
-const APPLY = argVal('--apply');
+const APPLY = process.argv.includes('--apply') ? (argVal('--apply') ?? '') : null;
 const IDS_ARG = argVal('--ids');
 
 const CLIP_SECONDS = 6;
 const CLOUDINARY_FOLDER = 'docwellness/video-previews';
+
+// The one derivative every clip is delivered through: first 6s, 480w, no
+// audio, H.264. Source is already 9:16 so c_scale keeps the frame whole.
+// (gravity:auto / crop:fill silently void the eager on video - don't.)
+const CLIP_TX = {
+  start_offset: '0',
+  end_offset: String(CLIP_SECONDS),
+  width: 480,
+  crop: 'scale',
+  video_codec: 'h264',
+  audio_codec: 'none',
+  quality: 'auto:eco',
+};
+
+// Deterministic delivery URL for a preview asset - lets --apply rebuild the
+// URLs straight from the Cloudinary folder listing, no file to copy around.
+const clipUrlFor = (publicId) =>
+  cloudinary.url(publicId, {
+    resource_type: 'video',
+    secure: true,
+    format: 'mp4',
+    transformation: [CLIP_TX],
+    force_version: false, // no /v1/ segment - deliver the latest
+    analytics: false, // no ?_a= tracking param
+  });
 
 const ytIdFromUrl = (url = '') => {
   const m = String(url).match(
@@ -212,20 +240,7 @@ async function uploadPreview(localFile, ytId) {
     overwrite: true,
     invalidate: true,
     eager_async: false,
-    eager: [
-      {
-        // Source is already 9:16, so c_scale to 480w keeps the frame whole
-        // (~480x854). so_0/eo_6 = first 6s. ac_none drops audio.
-        // (gravity:auto / crop:fill silently voids the eager on video.)
-        start_offset: '0',
-        end_offset: String(CLIP_SECONDS),
-        width: 480,
-        crop: 'scale',
-        video_codec: 'h264',
-        audio_codec: 'none',
-        quality: 'auto:eco',
-      },
-    ],
+    eager: [CLIP_TX],
   });
   const eager = res.eager && res.eager[0];
   if (!eager || !eager.secure_url) {
@@ -234,10 +249,37 @@ async function uploadPreview(localFile, ytId) {
   return eager.secure_url;
 }
 
-// ── --apply: no yt-dlp, no Cloudinary. Just write a {ytId: url} map (built
-// on a machine that CAN run yt-dlp) into the DB. ────────────────────────────
+// ── --apply: write previewClipUrl into the DB. No yt-dlp. The {ytId: url}
+// map comes from (in priority order): --apply=file.json, --apply={...inline},
+// or - bare --apply - the Cloudinary preview folder itself. ─────────────────
+async function buildApplyMap() {
+  const raw = (APPLY || '').trim();
+  if (raw.startsWith('{')) return JSON.parse(raw);
+  if (raw) return JSON.parse(fs.readFileSync(raw, 'utf8'));
+
+  // Bare --apply: list what generate/emit already uploaded and rebuild URLs.
+  console.log(`Listing Cloudinary folder "${CLOUDINARY_FOLDER}/" ...`);
+  const map = {};
+  let next;
+  do {
+    const page = await cloudinary.api.resources({
+      resource_type: 'video',
+      type: 'upload',
+      prefix: `${CLOUDINARY_FOLDER}/`,
+      max_results: 100,
+      next_cursor: next,
+    });
+    for (const r of page.resources) {
+      const ytId = r.public_id.split('/').pop();
+      if (/^[a-zA-Z0-9_-]{11}$/.test(ytId)) map[ytId] = clipUrlFor(r.public_id);
+    }
+    next = page.next_cursor;
+  } while (next);
+  return map;
+}
+
 async function runApply() {
-  const map = JSON.parse(fs.readFileSync(APPLY, 'utf8'));
+  const map = await buildApplyMap();
   const entries = Object.entries(map).filter(([, u]) => /^https?:\/\//.test(u));
   console.log(
     `${EXECUTE ? '=== APPLYING' : '=== DRY RUN (--apply,'} ${entries.length} clip URL(s) ${EXECUTE ? '===' : ') ==='}`
@@ -269,7 +311,7 @@ async function runApply() {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 async function main() {
-  if (APPLY) return runApply();
+  if (APPLY !== null) return runApply();
 
   if (
     !process.env.CLOUDINARY_CLOUD_NAME ||
