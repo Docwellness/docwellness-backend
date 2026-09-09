@@ -7,9 +7,11 @@ const quoteSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    // Optional now - quotes are text-first (see scripts/seed-quotes.js and
+    // the user app's "Daily wisdom" carousel). An image is still allowed.
     imageUrl: {
       type: String,
-      required: true,
+      default: '',
     },
     cloudinaryPublicId: {
       type: String,
@@ -19,6 +21,16 @@ const quoteSchema = new mongoose.Schema(
       type: String,
       default: '',
       trim: true,
+    },
+    author: {
+      type: String,
+      default: 'DocWellness',
+      trim: true,
+    },
+    category: {
+      type: String,
+      enum: ['Nutrition', 'Wellness', 'Mindfulness'],
+      default: 'Wellness',
     },
     isActive: {
       type: Boolean,
