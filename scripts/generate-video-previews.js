@@ -14,15 +14,17 @@
  * Cloudinary creds come from the env (config/cloudinary.js).
  *
  * ── Connection ──────────────────────────────────────────────────────────────
- *   A. remote:     set PROD_MONGODB_URI, then --execute
- *   B. in-container (Coolify): --use-default-uri   (uses that env's MONGODB_URI)
- * DRY RUN unless --execute. Prints the DB host first.
+ *   set PROD_MONGODB_URI, or --use-default-uri in the deployed container
+ *   (uses that env's MONGODB_URI). DRY RUN unless --execute.
  *
- * Usage:
- *   node scripts/generate-video-previews.js [--use-default-uri]
- *   node scripts/generate-video-previews.js [--use-default-uri] --execute
- *   node scripts/generate-video-previews.js --execute --force        # redo all
- *   node scripts/generate-video-previews.js --execute --id=WxcuatHGznw
+ * Usage (all-in-one - needs yt-dlp AND DB reachable from the same box):
+ *   node scripts/generate-video-previews.js [--use-default-uri] [--execute]
+ *   ... [--force]  (redo all)   [--id=WxcuatHGznw]  (just one)
+ *
+ * Usage (split - when the container's fs is noexec so yt-dlp can't run there):
+ *   laptop  (yt-dlp, no DB):   --emit=clips.json --ids=id1,id2,id3
+ *   then copy clips.json into the container, and:
+ *   container (DB, no yt-dlp):  --apply=clips.json --use-default-uri --execute
  */
 
 const USE_DEFAULT_URI = process.argv.includes('--use-default-uri');
@@ -39,8 +41,17 @@ const cloudinary = require('../config/cloudinary');
 
 const EXECUTE = process.argv.includes('--execute');
 const FORCE = process.argv.includes('--force');
-const idArg = process.argv.find((a) => a.startsWith('--id='));
-const ONLY_ID = idArg ? idArg.split('=')[1] : null;
+const argVal = (name) => {
+  const a = process.argv.find((x) => x.startsWith(`${name}=`));
+  return a ? a.slice(name.length + 1) : null;
+};
+const ONLY_ID = argVal('--id');
+// Split mode for containers where yt-dlp can't run (noexec fs):
+//   laptop:    node scripts/generate-video-previews.js --emit=clips.json --ids=a,b,c
+//   container: node scripts/generate-video-previews.js --apply=clips.json --use-default-uri --execute
+const EMIT = argVal('--emit');
+const APPLY = argVal('--apply');
+const IDS_ARG = argVal('--ids');
 
 const CLIP_SECONDS = 6;
 const CLOUDINARY_FOLDER = 'docwellness/video-previews';
@@ -223,7 +234,43 @@ async function uploadPreview(localFile, ytId) {
   return eager.secure_url;
 }
 
+// ── --apply: no yt-dlp, no Cloudinary. Just write a {ytId: url} map (built
+// on a machine that CAN run yt-dlp) into the DB. ────────────────────────────
+async function runApply() {
+  const map = JSON.parse(fs.readFileSync(APPLY, 'utf8'));
+  const entries = Object.entries(map).filter(([, u]) => /^https?:\/\//.test(u));
+  console.log(
+    `${EXECUTE ? '=== APPLYING' : '=== DRY RUN (--apply,'} ${entries.length} clip URL(s) ${EXECUTE ? '===' : ') ==='}`
+  );
+  const conn = await openConnection();
+  console.log(`Connected to DB "${conn.name}" @ ${conn.host}:${conn.port}`);
+  const videos = conn.collection('videos');
+  let ok = 0;
+  try {
+    for (const [ytId, url] of entries) {
+      const q = { source: 'YouTube', youtubeUrl: new RegExp(escapeRe(ytId)) };
+      if (!EXECUTE) {
+        const n = await videos.countDocuments(q);
+        console.log(`  ${ytId}: matches ${n} doc(s) -> ${url}`);
+        continue;
+      }
+      const r = await videos.updateMany(q, {
+        $set: { previewClipUrl: url, updatedAt: new Date() },
+      });
+      console.log(`  ${ytId}: updated ${r.modifiedCount} -> ${url}`);
+      ok += r.modifiedCount;
+    }
+  } finally {
+    await conn.close();
+  }
+  console.log(`\n${EXECUTE ? `Applied to ${ok} doc(s).` : 'Dry run - re-run with --execute.'}`);
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 async function main() {
+  if (APPLY) return runApply();
+
   if (
     !process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
@@ -234,10 +281,32 @@ async function main() {
   }
 
   console.log(
-    EXECUTE ? '=== EXECUTING preview generation ===' : '=== DRY RUN (pass --execute) ==='
+    EMIT
+      ? `=== EMIT mode -> ${EMIT} (no DB writes) ===`
+      : EXECUTE
+        ? '=== EXECUTING preview generation ==='
+        : '=== DRY RUN (pass --execute) ==='
   );
 
-  const conn = await openConnection();
+  // EMIT with an explicit id list needs no DB (laptop can't reach a private
+  // prod host). Otherwise pull the target list from the DB.
+  let targets;
+  let conn = null;
+  if (EMIT && IDS_ARG) {
+    targets = IDS_ARG.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((ytId) => ({
+        ytId,
+        url: `https://www.youtube.com/shorts/${ytId}`,
+        has: false,
+      }));
+    console.log(`\n${targets.length} id(s) from --ids:`);
+    console.table(targets.map((t) => ({ ytId: t.ytId })));
+    return runGenerate(targets, null);
+  }
+
+  conn = await openConnection();
   console.log(
     `Connected to DB "${conn.name}" @ ${conn.host}:${conn.port}` +
       (USE_DEFAULT_URI ? '  (via MONGODB_URI)' : '  (via PROD_MONGODB_URI)')
@@ -248,23 +317,32 @@ async function main() {
   if (!FORCE) filter.$or = [{ previewClipUrl: { $exists: false } }, { previewClipUrl: '' }];
   const docs = await videos.find(filter).toArray();
 
-  const targets = docs
+  targets = docs
     .map((d) => ({ _id: d._id, ytId: ytIdFromUrl(d.youtubeUrl), url: d.youtubeUrl, has: !!d.previewClipUrl }))
     .filter((t) => t.ytId && (!ONLY_ID || t.ytId === ONLY_ID));
 
   console.log(`\n${targets.length} video(s) to process${FORCE ? ' (--force)' : ''}:`);
   console.table(targets.map((t) => ({ ytId: t.ytId, hadClip: t.has })));
 
-  if (!EXECUTE) {
+  if (!EXECUTE && !EMIT) {
     console.log('\nDry run - nothing downloaded or written. Re-run with --execute.');
     await conn.close();
     return;
   }
 
+  await runGenerate(targets, conn);
+}
+
+// yt-dlp + Cloudinary for each target. Writes previewClipUrl to the DB when
+// `conn` is given, otherwise (EMIT) collects a {ytId: url} map to a file.
+async function runGenerate(targets, conn) {
+  const videos = conn ? conn.collection('videos') : null;
+
   YT_DLP = await resolveYtDlp();
   console.log(`Using yt-dlp: ${[YT_DLP.file, ...YT_DLP.pre].join(' ')}`);
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vidprev-'));
+  const emitted = {};
   let ok = 0;
   let failed = 0;
   try {
@@ -280,10 +358,13 @@ async function main() {
         if (!actual) throw new Error('yt-dlp produced no file');
         process.stdout.write('uploading... ');
         const clipUrl = await uploadPreview(actual, t.ytId);
-        await videos.updateOne(
-          { _id: t._id },
-          { $set: { previewClipUrl: clipUrl, updatedAt: new Date() } }
-        );
+        if (videos) {
+          await videos.updateMany(
+            { source: 'YouTube', youtubeUrl: new RegExp(escapeRe(t.ytId)) },
+            { $set: { previewClipUrl: clipUrl, updatedAt: new Date() } }
+          );
+        }
+        emitted[t.ytId] = clipUrl;
         fs.rmSync(actual, { force: true });
         console.log(`ok -> ${clipUrl}`);
         ok++;
@@ -294,9 +375,17 @@ async function main() {
     }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    await conn.close();
+    if (conn) await conn.close();
   }
 
+  if (EMIT) {
+    fs.writeFileSync(EMIT, JSON.stringify(emitted, null, 2));
+    console.log(`\nWrote ${Object.keys(emitted).length} clip URL(s) to ${EMIT}`);
+    console.log(
+      'Now, in the container:  node scripts/generate-video-previews.js ' +
+        `--apply=${path.basename(EMIT)} --use-default-uri --execute`
+    );
+  }
   console.log(`\nDone. ${ok} generated, ${failed} failed.`);
   if (failed) process.exitCode = 1;
 }
