@@ -124,3 +124,86 @@ test('builds the grocery list (food + supplements) for a finalized plan-item pla
   expect(multivitamin).toBeTruthy();
   expect(multivitamin.name).toBe('Multivitamin Tablet');
 });
+
+test('renewed patient: grocery weeks span both cycles in display-number space, focused on the ongoing week', async () => {
+  const dietician = await createDietician();
+  const patient = await createPatient();
+
+  await FoodItem.create({
+    name: 'Oats',
+    normalizedName: 'oats',
+    nutritionPer100g: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
+  });
+  await Ingredient.create({
+    dieticianId: dietician._id,
+    name: 'Oats',
+    normalizedName: 'oats',
+    category: 'Grains',
+    unitConversions: { g: 1 },
+  });
+  const recipe = await Recipe.create({
+    dieticianId: dietician._id,
+    name: 'Oats Porridge',
+    servingTime: 'Breakfast',
+    components: [{ label: 'Oats Porridge', quantity: 100, unit: 'g' }],
+    ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
+    nutrition: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
+
+  const day = 86400000;
+  const now = new Date();
+
+  // Cycle 1: finished 10 days ago (weeks 1-4 = display weeks 1-4).
+  const c1Start = new Date(now.getTime() - 38 * day);
+  const cycle1 = await DietPlan.create({
+    patientId: patient._id,
+    dieticianId: dietician._id,
+    status: 'Active', // retireEndedPredecessorPlans should flip this to Completed
+    dataModel: 'plan-item',
+    cycleNumber: 1,
+    activationDate: c1Start,
+    weekSchedule: [1, 2, 3, 4].map((w) => ({
+      week: w,
+      startDate: new Date(c1Start.getTime() + (w - 1) * 7 * day),
+      endDate: new Date(c1Start.getTime() + (w * 7 - 1) * day),
+    })),
+  });
+  const c1Day = await DayPlan.create({ dietPlanId: cycle1._id, patientId: patient._id, week: 2, dayGroup: 'Monday' });
+  const c1Slot = await MealSlotPlan.create({ dayPlanId: c1Day._id, servingTime: 'Breakfast' });
+  await PlanItem.create({ mealSlotId: c1Slot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+
+  // Cycle 2: started 10 days ago, currently in its week 2 (= display week 6).
+  const c2Start = new Date(now.getTime() - 10 * day);
+  const cycle2 = await DietPlan.create({
+    patientId: patient._id,
+    dieticianId: dietician._id,
+    status: 'Active',
+    dataModel: 'plan-item',
+    cycleNumber: 2,
+    activationDate: c2Start,
+    weekSchedule: [1, 2, 3, 4].map((w) => ({
+      week: w,
+      startDate: new Date(c2Start.getTime() + (w - 1) * 7 * day),
+      endDate: new Date(c2Start.getTime() + (w * 7 - 1) * day),
+    })),
+  });
+  for (const w of [1, 2]) {
+    const dp = await DayPlan.create({ dietPlanId: cycle2._id, patientId: patient._id, week: w, dayGroup: 'Monday' });
+    const slot = await MealSlotPlan.create({ dayPlanId: dp._id, servingTime: 'Breakfast' });
+    await PlanItem.create({ mealSlotId: slot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+  }
+
+  registerTestToken('patient-token', patient._id);
+  const res = await request(app).get('/api/patient/diet/groceries').set('Authorization', 'Bearer patient-token');
+
+  expect(res.status).toBe(200);
+  const weekNums = res.body.data.weeks.map((w) => w.week).sort((a, b) => a - b);
+  // Cycle 1 week 2 -> display 2; cycle 2 weeks 1,2 -> display 5,6.
+  expect(weekNums).toEqual([2, 5, 6]);
+  // Screen opens on the ongoing week: cycle 2, week 2 -> display 6.
+  expect(res.body.data.currentWeek).toBe(6);
+  // Predecessor cycle was retired.
+  expect((await DietPlan.findById(cycle1._id)).status).toBe('Completed');
+});
