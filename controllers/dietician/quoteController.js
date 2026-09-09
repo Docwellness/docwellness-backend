@@ -89,26 +89,34 @@ async function notifyPatientsOfQuote(dieticianId, quote) {
 exports.addQuote = async (req, res) => {
   try {
     const dieticianId = req.user._id;
-    const { isActive, text } = req.body;
+    const { isActive, text, author, category } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Image is required' });
+    // Text-first now: an image is optional, but a quote needs *something*.
+    if (!req.file && !(text && text.trim())) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'A quote needs text or an image' });
     }
 
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: cloudinaryUserFolder(dieticianId, 'quotes'),
-      transformation: [{ quality: 'auto', fetch_format: 'auto' }],
-    });
-
-    // Remove local temp file
-    fs.unlink(req.file.path, () => {});
+    let imageUrl = '';
+    let cloudinaryPublicId = '';
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: cloudinaryUserFolder(dieticianId, 'quotes'),
+        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      });
+      fs.unlink(req.file.path, () => {});
+      imageUrl = result.secure_url;
+      cloudinaryPublicId = result.public_id;
+    }
 
     const quote = await Quote.create({
       dieticianId,
-      imageUrl: result.secure_url,
-      cloudinaryPublicId: result.public_id,
+      imageUrl,
+      cloudinaryPublicId,
       text: text || '',
+      ...(author !== undefined ? { author } : {}),
+      ...(category !== undefined ? { category } : {}),
       isActive: isActive === true || isActive === 'true',
     });
 
@@ -184,6 +192,12 @@ exports.updateQuote = async (req, res) => {
 
     if (req.body.text !== undefined) {
       quote.text = req.body.text;
+    }
+    if (req.body.author !== undefined) {
+      quote.author = req.body.author;
+    }
+    if (req.body.category !== undefined) {
+      quote.category = req.body.category;
     }
 
     if (isActive !== undefined) {
