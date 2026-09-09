@@ -813,8 +813,16 @@ const addRecipeUsage = (item, recipe, ingredient) => {
  * so getGroceriesForCurrentWeek can call this once per ready week - see that
  * function's own doc comment for why it now aggregates every week, not just
  * the current one, in a single response.
+ *
+ * `exactQuantities` (v4.0 plan-item plans): the recipe's ingredient list IS
+ * the exact prescribed amount for this patient's meal (it came from the
+ * RecipeVersion, see dietPlanReadDispatch.js), and `meal.servings` is always
+ * a placeholder 1 with no componentServings. Running componentRatiosByLabel
+ * on that would divide every ingredient by its component's base quantity
+ * (ratio = 1 / baseQty), silently mis-scaling the whole list - so skip the
+ * component scaling entirely and take the quantities as-is.
  */
-const buildGroceryItemsForWeek = (week, recipes, registry) => {
+const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = false } = {}) => {
   const groceryMap = {};
 
   (week.dailyMeals || []).forEach((meal) => {
@@ -830,7 +838,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry) => {
       // ingredient quantity/unit instead. Unmatched ingredients (no
       // same-named component) fall through at ratio 1, unscaled - same as
       // before this fix.
-      const componentRatios = componentRatiosByLabel(meal, recipe);
+      const componentRatios = exactQuantities ? {} : componentRatiosByLabel(meal, recipe);
 
       recipe.ingredients.forEach((rawIngredient) => {
         const ratioKey = (rawIngredient.name || '').trim().toLowerCase();
@@ -1032,11 +1040,54 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
     // weeks are actually present in finalizedPlan.weeks.
     const currentWeek = resolveCurrentWeek(dietPlan, referenceDate);
 
-    const readyWeeks = getFinalizedWeeks(dietPlan);
+    // v4.0: a 'plan-item' plan has no finalizedPlan blob - getFinalizedWeeks
+    // returns [] for one, so the grocery list showed "isn't ready yet" for
+    // every plan-item patient even with a fully finalized plan. Synthesize
+    // the same {week, dailyMeals} shape from DayPlan/MealSlotPlan/PlanItem
+    // instead (utils/dietPlanReadDispatch.js) - the same model-aware branch
+    // getActiveDietPlanForPatient already uses. `recipeVersionOverrides`
+    // carries the EXACT prescribed ingredient quantities per (recipe,
+    // version); `exactQuantities` below tells buildGroceryItemsForWeek to
+    // take them as-is (no component scaling).
+    const isPlanItem = dietPlan.dataModel === 'plan-item';
+    let readyWeeks;
+    let recipeVersionOverrides = {};
+    let planItemSupplementScheduleByWeek = {};
+    if (isPlanItem) {
+      const planItemView = await buildPlanItemPatientView(dietPlan);
+      readyWeeks = planItemView.weeks;
+      recipeVersionOverrides = planItemView.recipeVersionOverrides || {};
+      planItemSupplementScheduleByWeek = planItemView.supplementScheduleByWeek || {};
+    } else {
+      readyWeeks = getFinalizedWeeks(dietPlan);
+    }
     if (readyWeeks.length === 0) {
       return res.status(200).json({
         success: true,
         data: { currentWeek, weeks: [] },
+      });
+    }
+
+    // v4.0: a plan-item plan keeps its timed supplements in SupplementItem,
+    // not inside dailyMeals the way a days-array plan does - fold each
+    // week's supplement occurrences into that week's dailyMeals as synthetic
+    // entries so buildGroceryItemsForWeek's isSupplement branch picks them
+    // up as line items, exactly as it already does for a days-array plan
+    // (whose supplement recipes ARE in dailyMeals).
+    if (isPlanItem) {
+      readyWeeks.forEach((week) => {
+        const entries = planItemSupplementScheduleByWeek[week.week]
+          || planItemSupplementScheduleByWeek[String(week.week)]
+          || [];
+        entries.forEach((entry) => {
+          if (!entry?.supplementId) return;
+          week.dailyMeals.push({
+            dayGroup: entry.dayGroup,
+            servingTime: entry.servingTime,
+            recipeId: entry.supplementId,
+            servings: 1,
+          });
+        });
       });
     }
 
@@ -1046,7 +1097,11 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
     const recipeIds = new Set();
     readyWeeks.forEach((week) => {
       (week.dailyMeals || []).forEach((meal) => {
-        if (meal?.recipeId) recipeIds.add(meal.recipeId.toString());
+        // A plan-item plan's meal.recipeId is versioned (recipeId::vN, see
+        // dietPlanReadDispatch.js) - resolve to the real Recipe._id to
+        // fetch; a no-op for a days-array plan's plain id and for the
+        // supplement ids injected above.
+        if (meal?.recipeId) recipeIds.add(baseRecipeIdFromKey(meal.recipeId.toString()));
       });
     });
 
@@ -1078,6 +1133,21 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
       };
     });
 
+    // v4.0: clone each base recipe into a versioned entry carrying the EXACT
+    // prescribed ingredients from its RecipeVersion (the same override
+    // getActiveDietPlanForPatient applies). buildGroceryItemsForWeek is
+    // called with exactQuantities:true below so these are summed as-is.
+    // A no-op for a days-array plan (recipeVersionOverrides stays {}).
+    Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
+      const baseRecipe = recipes[override.baseRecipeId];
+      if (!baseRecipe) return;
+      recipes[versionedId] = {
+        ...baseRecipe,
+        id: versionedId,
+        ingredients: Array.isArray(override.ingredients) ? override.ingredients : baseRecipe.ingredients,
+      };
+    });
+
     // Canonical ingredient registry (see models/Ingredient.js,
     // scripts/migrate-canonical-ingredients.js) - loaded once, keyed by
     // normalizedName, so aggregation below is a fast in-memory lookup
@@ -1093,7 +1163,7 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
     const weeksData = readyWeeks
       .map((week) => ({
         week: Number(week.week),
-        items: buildGroceryItemsForWeek(week, recipes, registry),
+        items: buildGroceryItemsForWeek(week, recipes, registry, { exactQuantities: isPlanItem }),
       }))
       .sort((a, b) => a.week - b.week);
 
