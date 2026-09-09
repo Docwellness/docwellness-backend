@@ -3,12 +3,14 @@
  * rail autoplays inline (via native video_player, not the YouTube webview).
  *
  * For each YouTube Video doc missing a previewClipUrl:
- *   1. yt-dlp grabs a <=720p video-only stream (no ffmpeg / no audio merge).
- *   2. Cloudinary trims it to the first ~6s, scales to 480x854, drops audio,
- *      re-encodes H.264 + faststart, returns a CDN mp4 URL.
+ *   1. yt-dlp grabs a <=720p H.264/mp4 video-only stream (no ffmpeg / no
+ *      audio merge). yt-dlp is found via $YT_DLP_PATH, then `python -m
+ *      yt_dlp`, then `yt-dlp` on PATH, and failing all that its standalone
+ *      binary is downloaded to a temp dir (the deployed image is Node-only).
+ *   2. Cloudinary trims to the first ~6s, scales to 480w, drops audio,
+ *      re-encodes H.264, returns a CDN mp4 URL.
  *   3. That URL is written back to Video.previewClipUrl.
  *
- * yt-dlp: `python -m yt_dlp` (pip install yt-dlp) - no PATH entry needed.
  * Cloudinary creds come from the env (config/cloudinary.js).
  *
  * ── Connection ──────────────────────────────────────────────────────────────
@@ -29,6 +31,7 @@ require('dotenv').config();
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const https = require('https');
 const { execFileSync } = require('child_process');
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
@@ -39,8 +42,6 @@ const FORCE = process.argv.includes('--force');
 const idArg = process.argv.find((a) => a.startsWith('--id='));
 const ONLY_ID = idArg ? idArg.split('=')[1] : null;
 
-// yt-dlp invoked as a module so no PATH entry / .exe shim is needed.
-const PYTHON = process.env.PYTHON_BIN || 'python';
 const CLIP_SECONDS = 6;
 const CLOUDINARY_FOLDER = 'docwellness/video-previews';
 
@@ -50,6 +51,78 @@ const ytIdFromUrl = (url = '') => {
   );
   return m ? m[1] : null;
 };
+
+// ── yt-dlp resolver ─────────────────────────────────────────────────────────
+// The deployed backend image is Node-only (no python, no yt-dlp). Rather than
+// bloat it, fall back to fetching yt-dlp's standalone binary into a temp dir
+// on first run. Order: $YT_DLP_PATH, `python -m yt_dlp`, `yt-dlp` on PATH,
+// then download.
+function tryVersion(file, args) {
+  try {
+    execFileSync(file, [...args, '--version'], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+      timeout: 15000,
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function download(url, dest) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'docwellness-script' } }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        return download(res.headers.location, dest).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`GET ${url} -> ${res.statusCode}`));
+      }
+      const out = fs.createWriteStream(dest);
+      res.pipe(out);
+      out.on('finish', () => out.close(resolve));
+      out.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
+
+async function resolveYtDlp() {
+  if (process.env.YT_DLP_PATH) {
+    return { file: process.env.YT_DLP_PATH, pre: [] };
+  }
+  const python = process.env.PYTHON_BIN || 'python';
+  if (tryVersion(python, ['-m', 'yt_dlp'])) return { file: python, pre: ['-m', 'yt_dlp'] };
+  if (tryVersion('yt-dlp', [])) return { file: 'yt-dlp', pre: [] };
+
+  const asset =
+    process.platform === 'win32'
+      ? 'yt-dlp.exe'
+      : process.platform === 'darwin'
+        ? 'yt-dlp_macos'
+        : 'yt-dlp_linux';
+  const cacheDir = path.join(os.tmpdir(), 'docwellness-yt-dlp');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const bin = path.join(cacheDir, asset);
+  if (!fs.existsSync(bin) || fs.statSync(bin).size < 1_000_000) {
+    console.log(`yt-dlp not found - downloading ${asset}...`);
+    await download(
+      `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`,
+      bin
+    );
+    if (process.platform !== 'win32') fs.chmodSync(bin, 0o755);
+  }
+  if (!tryVersion(bin, [])) {
+    throw new Error(
+      `downloaded yt-dlp at ${bin} is not runnable (noexec tmp?). Set YT_DLP_PATH.`
+    );
+  }
+  return { file: bin, pre: [] };
+}
+
+let YT_DLP = null;
 
 async function openConnection() {
   const tlsCAFile = connectDB.resolveTlsCAFile();
@@ -76,23 +149,29 @@ async function openConnection() {
   return conn;
 }
 
-function downloadStream(youtubeUrl, outFile) {
-  // Video-only, <=720p, prefer mp4/h264 - no audio means yt-dlp never needs
-  // ffmpeg to mux. Cloudinary does the trim + transcode afterwards.
-  const fmt =
-    'bv[height<=720][ext=mp4]/bv[height<=720]/b[height<=720][ext=mp4]/b[height<=720]/b';
+function downloadStream(youtubeUrl, outPattern) {
+  // <=720p, H.264-in-mp4 first (what Cloudinary ingests most reliably), then
+  // any mp4, then anything. Video-only where possible so yt-dlp never needs
+  // ffmpeg to mux; Cloudinary does the trim + transcode + audio strip.
+  const fmt = [
+    'bv*[height<=720][ext=mp4][vcodec^=avc1]',
+    'bv*[height<=720][ext=mp4]',
+    'bv*[height<=720]',
+    'b[height<=720][ext=mp4]',
+    'b[height<=720]',
+    'b',
+  ].join('/');
   execFileSync(
-    PYTHON,
+    YT_DLP.file,
     [
-      '-m',
-      'yt_dlp',
+      ...YT_DLP.pre,
       '--no-playlist',
       '--no-warnings',
       '--quiet',
       '-f',
       fmt,
       '-o',
-      outFile,
+      outPattern, // must contain %(ext)s so the file keeps a real extension
       youtubeUrl,
     ],
     { stdio: ['ignore', 'ignore', 'inherit'], timeout: 120000 }
@@ -167,19 +246,22 @@ async function main() {
     return;
   }
 
+  YT_DLP = await resolveYtDlp();
+  console.log(`Using yt-dlp: ${[YT_DLP.file, ...YT_DLP.pre].join(' ')}`);
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vidprev-'));
   let ok = 0;
   let failed = 0;
   try {
     for (const t of targets) {
-      const raw = path.join(tmpDir, `${t.ytId}.src`);
       try {
         process.stdout.write(`  ${t.ytId}: downloading... `);
-        downloadStream(t.url, raw);
-        // yt-dlp may append a container ext - find the actual file.
-        const actual = fs.existsSync(raw)
-          ? raw
-          : fs.readdirSync(tmpDir).map((f) => path.join(tmpDir, f)).find((f) => f.startsWith(raw));
+        downloadStream(t.url, path.join(tmpDir, `${t.ytId}.%(ext)s`));
+        // yt-dlp fills in the real container extension - find that file.
+        const actual = fs
+          .readdirSync(tmpDir)
+          .filter((f) => f.startsWith(`${t.ytId}.`))
+          .map((f) => path.join(tmpDir, f))[0];
         if (!actual) throw new Error('yt-dlp produced no file');
         process.stdout.write('uploading... ');
         const clipUrl = await uploadPreview(actual, t.ytId);
