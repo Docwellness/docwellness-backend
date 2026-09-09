@@ -89,7 +89,7 @@ async function notifyPatientsOfQuote(dieticianId, quote) {
 exports.addQuote = async (req, res) => {
   try {
     const dieticianId = req.user._id;
-    const { isActive, text, author, category } = req.body;
+    const { isActive, text, textHi, textMr, author, category } = req.body;
 
     // Text-first now: an image is optional, but a quote needs *something*.
     if (!req.file && !(text && text.trim())) {
@@ -103,7 +103,7 @@ exports.addQuote = async (req, res) => {
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: cloudinaryUserFolder(dieticianId, 'quotes'),
-        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+        transformation: [{ aspect_ratio: '23:10', crop: 'fill', gravity: 'auto', quality: 'auto', fetch_format: 'auto' }],
       });
       fs.unlink(req.file.path, () => {});
       imageUrl = result.secure_url;
@@ -115,6 +115,8 @@ exports.addQuote = async (req, res) => {
       imageUrl,
       cloudinaryPublicId,
       text: text || '',
+      ...(textHi !== undefined ? { textHi } : {}),
+      ...(textMr !== undefined ? { textMr } : {}),
       ...(author !== undefined ? { author } : {}),
       ...(category !== undefined ? { category } : {}),
       isActive: isActive === true || isActive === 'true',
@@ -181,7 +183,7 @@ exports.updateQuote = async (req, res) => {
 
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: cloudinaryUserFolder(dieticianId, 'quotes'),
-        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+        transformation: [{ aspect_ratio: '23:10', crop: 'fill', gravity: 'auto', quality: 'auto', fetch_format: 'auto' }],
       });
 
       fs.unlink(req.file.path, () => {});
@@ -192,6 +194,12 @@ exports.updateQuote = async (req, res) => {
 
     if (req.body.text !== undefined) {
       quote.text = req.body.text;
+    }
+    if (req.body.textHi !== undefined) {
+      quote.textHi = req.body.textHi;
+    }
+    if (req.body.textMr !== undefined) {
+      quote.textMr = req.body.textMr;
     }
     if (req.body.author !== undefined) {
       quote.author = req.body.author;
