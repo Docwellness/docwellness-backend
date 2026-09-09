@@ -997,17 +997,19 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
 
 /**
  * @route   GET /api/patient/diet/groceries
- * @desc    Grocery list for every week the dietician has actually finalized
- *          (finalizedPlan.weeks - a locked/not-yet-generated future week has
- *          no entry there and is simply omitted, same "is this week ready"
- *          check the endpoint always used internally, now surfaced as the
- *          set of weeks returned instead of silently returning an empty
- *          list for whichever single week `date` fell into). Returns every
- *          ready week's items in ONE response so the app can prefetch all
- *          of them on first load and switch weeks client-side with zero
- *          repeat calls (see GroceryController.switchWeek) - the same
- *          all-weeks-in-one-response pattern getActiveDietPlanForPatient
- *          already uses for the diet plan itself.
+ * @desc    Grocery list for every generated week across the patient's whole
+ *          renewal timeline - each completed/active past cycle, the current
+ *          cycle, and the next renewal cycle, numbered in the same
+ *          display-number space ((cycle-1)*4 + n) the Diet tab uses, so a
+ *          renewed patient sees Weeks 1..N unbroken and the Week selector
+ *          never shows the same number twice. A week the dietician hasn't
+ *          finalized yet (days-array) or generated yet (plan-item) is simply
+ *          absent. `currentWeek` is the ongoing week in that same space, so
+ *          the screen opens focused on the week the patient is actually in.
+ *          Every week's items ship in ONE response so the app can prefetch
+ *          and switch weeks client-side with no repeat calls (see
+ *          GroceryController.switchWeek) - the same all-weeks-in-one-response
+ *          pattern getActiveDietPlanForPatient uses for the plan itself.
  */
 exports.getGroceriesForCurrentWeek = async (req, res, next) => {
   try {
@@ -1019,6 +1021,11 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
         referenceDate = parsedReference;
       }
     }
+
+    // Match getActiveDietPlanForPatient: flip any ended predecessor cycle to
+    // Completed first, so "lowest Active cycleNumber" is the cycle the
+    // patient is actually living now (not a renewal that hasn't started).
+    await retireEndedPredecessorPlans(req.user._id, referenceDate);
 
     const dietPlan = await DietPlan.findOne({
       patientId: req.user._id,
@@ -1035,68 +1042,96 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
       });
     }
 
-    // currentWeek is just a hint for which week the app should default its
-    // selector to - readiness itself is decided per-week below by which
-    // weeks are actually present in finalizedPlan.weeks.
-    const currentWeek = resolveCurrentWeek(dietPlan, referenceDate);
+    const cycleNumber = dietPlan.cycleNumber || 1;
 
-    // v4.0: a 'plan-item' plan has no finalizedPlan blob - getFinalizedWeeks
-    // returns [] for one, so the grocery list showed "isn't ready yet" for
-    // every plan-item patient even with a fully finalized plan. Synthesize
-    // the same {week, dailyMeals} shape from DayPlan/MealSlotPlan/PlanItem
-    // instead (utils/dietPlanReadDispatch.js) - the same model-aware branch
-    // getActiveDietPlanForPatient already uses. `recipeVersionOverrides`
-    // carries the EXACT prescribed ingredient quantities per (recipe,
-    // version); `exactQuantities` below tells buildGroceryItemsForWeek to
-    // take them as-is (no component scaling).
-    const isPlanItem = dietPlan.dataModel === 'plan-item';
-    let readyWeeks;
-    let recipeVersionOverrides = {};
-    let planItemSupplementScheduleByWeek = {};
-    if (isPlanItem) {
-      const planItemView = await buildPlanItemPatientView(dietPlan);
-      readyWeeks = planItemView.weeks;
-      recipeVersionOverrides = planItemView.recipeVersionOverrides || {};
-      planItemSupplementScheduleByWeek = planItemView.supplementScheduleByWeek || {};
-    } else {
-      readyWeeks = getFinalizedWeeks(dietPlan);
+    // The grocery list spans the SAME continuous, cross-renewal week timeline
+    // the Diet tab shows (getActiveDietPlanForPatient's mergedWeeks): every
+    // completed/active past cycle's weeks, this cycle's, and the next renewal
+    // cycle's - all in display-number space ((cycle-1)*4 + n) so the Week
+    // selector never shows two "Week 4"s after a renewal, and a renewed
+    // patient sees Weeks 1..N unbroken. currentWeek is this cycle's ongoing
+    // week mapped into that same space, so the screen opens focused on the
+    // week the patient is actually in.
+    const currentWeek = (cycleNumber - 1) * 4 + resolveCurrentWeek(dietPlan, referenceDate);
+
+    const pastCycles = await DietPlan.find({
+      patientId: req.user._id,
+      cycleNumber: { $lt: cycleNumber },
+      status: { $in: ['Active', 'Completed'] },
+    })
+      .sort({ cycleNumber: 1 })
+      .lean();
+    const nextCycle = await DietPlan.findOne({
+      patientId: req.user._id,
+      status: 'Active',
+      cycleNumber: { $gt: cycleNumber },
+    })
+      .sort({ cycleNumber: 1 })
+      .lean();
+    const cyclePlans = [...pastCycles, dietPlan, ...(nextCycle ? [nextCycle] : [])];
+
+    // Resolve every cycle's weeks up front. A 'plan-item' cycle (v4.0) has no
+    // finalizedPlan blob - getFinalizedWeeks returns [] for one, so the
+    // grocery list showed "isn't ready yet" for every plan-item patient even
+    // with a fully finalized plan; synthesize {week, dailyMeals} from
+    // DayPlan/MealSlotPlan/PlanItem instead (utils/dietPlanReadDispatch.js),
+    // the same model-aware branch getActiveDietPlanForPatient uses.
+    // `recipeVersionOverrides` carries the EXACT prescribed ingredient
+    // quantities per (recipe, version); `exactQuantities` (set per week
+    // below) tells buildGroceryItemsForWeek to take them as-is.
+    const resolvedWeeks = []; // { week: displayWeek, dailyMeals, isPlanItem }
+    const recipeVersionOverrides = {}; // versionedId -> override, merged across cycles
+    for (const cyclePlan of cyclePlans) {
+      const offset = ((cyclePlan.cycleNumber || 1) - 1) * 4;
+      const cycleIsPlanItem = cyclePlan.dataModel === 'plan-item';
+      let cWeeks;
+      if (cycleIsPlanItem) {
+        // eslint-disable-next-line no-await-in-loop
+        const view = await buildPlanItemPatientView(cyclePlan);
+        cWeeks = view.weeks;
+        Object.assign(recipeVersionOverrides, view.recipeVersionOverrides || {});
+        // A plan-item cycle keeps its timed supplements in SupplementItem,
+        // not inside dailyMeals - fold each week's occurrences in as
+        // synthetic entries so buildGroceryItemsForWeek's isSupplement branch
+        // lists them, exactly as it already does for a days-array plan.
+        Object.entries(view.supplementScheduleByWeek || {}).forEach(([wk, entries]) => {
+          const target = cWeeks.find((w) => Number(w.week) === Number(wk));
+          if (!target) return;
+          entries.forEach((entry) => {
+            if (!entry?.supplementId) return;
+            target.dailyMeals.push({
+              dayGroup: entry.dayGroup,
+              servingTime: entry.servingTime,
+              recipeId: entry.supplementId,
+              servings: 1,
+            });
+          });
+        });
+      } else {
+        cWeeks = getFinalizedWeeks(cyclePlan);
+      }
+      cWeeks.forEach((w) => {
+        resolvedWeeks.push({
+          week: offset + Number(w.week),
+          dailyMeals: w.dailyMeals || [],
+          isPlanItem: cycleIsPlanItem,
+        });
+      });
     }
-    if (readyWeeks.length === 0) {
+
+    if (resolvedWeeks.length === 0) {
       return res.status(200).json({
         success: true,
         data: { currentWeek, weeks: [] },
       });
     }
 
-    // v4.0: a plan-item plan keeps its timed supplements in SupplementItem,
-    // not inside dailyMeals the way a days-array plan does - fold each
-    // week's supplement occurrences into that week's dailyMeals as synthetic
-    // entries so buildGroceryItemsForWeek's isSupplement branch picks them
-    // up as line items, exactly as it already does for a days-array plan
-    // (whose supplement recipes ARE in dailyMeals).
-    if (isPlanItem) {
-      readyWeeks.forEach((week) => {
-        const entries = planItemSupplementScheduleByWeek[week.week]
-          || planItemSupplementScheduleByWeek[String(week.week)]
-          || [];
-        entries.forEach((entry) => {
-          if (!entry?.supplementId) return;
-          week.dailyMeals.push({
-            dayGroup: entry.dayGroup,
-            servingTime: entry.servingTime,
-            recipeId: entry.supplementId,
-            servings: 1,
-          });
-        });
-      });
-    }
-
-    // Recipe/registry resolution done once across every ready week's
-    // recipes combined (not once per week) - the same economy of scale
-    // getActiveDietPlanForPatient's all-weeks response already relies on.
+    // Recipe/registry resolution done once across every cycle's weeks
+    // combined - the same economy of scale getActiveDietPlanForPatient's
+    // all-weeks response already relies on.
     const recipeIds = new Set();
-    readyWeeks.forEach((week) => {
-      (week.dailyMeals || []).forEach((meal) => {
+    resolvedWeeks.forEach((week) => {
+      week.dailyMeals.forEach((meal) => {
         // A plan-item plan's meal.recipeId is versioned (recipeId::vN, see
         // dietPlanReadDispatch.js) - resolve to the real Recipe._id to
         // fetch; a no-op for a days-array plan's plain id and for the
@@ -1160,10 +1195,17 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
       registry[doc.normalizedName] = doc;
     });
 
-    const weeksData = readyWeeks
+    // One grocery list per display-week. The (cycle-1)*4 offset guarantees
+    // two cycles never collide on a week number, so this is a straight map.
+    const weeksData = resolvedWeeks
       .map((week) => ({
-        week: Number(week.week),
-        items: buildGroceryItemsForWeek(week, recipes, registry, { exactQuantities: isPlanItem }),
+        week: week.week,
+        items: buildGroceryItemsForWeek(
+          { dailyMeals: week.dailyMeals },
+          recipes,
+          registry,
+          { exactQuantities: week.isPlanItem },
+        ),
       }))
       .sort((a, b) => a.week - b.week);
 
