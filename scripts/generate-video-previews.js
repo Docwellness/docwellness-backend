@@ -96,6 +96,7 @@ async function resolveYtDlp() {
   const python = process.env.PYTHON_BIN || 'python';
   if (tryVersion(python, ['-m', 'yt_dlp'])) return { file: python, pre: ['-m', 'yt_dlp'] };
   if (tryVersion('yt-dlp', [])) return { file: 'yt-dlp', pre: [] };
+  if (tryVersion('yt-dlp_linux', [])) return { file: 'yt-dlp_linux', pre: [] };
 
   const asset =
     process.platform === 'win32'
@@ -103,23 +104,37 @@ async function resolveYtDlp() {
       : process.platform === 'darwin'
         ? 'yt-dlp_macos'
         : 'yt-dlp_linux';
-  const cacheDir = path.join(os.tmpdir(), 'docwellness-yt-dlp');
-  fs.mkdirSync(cacheDir, { recursive: true });
-  const bin = path.join(cacheDir, asset);
-  if (!fs.existsSync(bin) || fs.statSync(bin).size < 1_000_000) {
-    console.log(`yt-dlp not found - downloading ${asset}...`);
-    await download(
-      `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`,
-      bin
-    );
-    if (process.platform !== 'win32') fs.chmodSync(bin, 0o755);
+  const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`;
+
+  // /tmp is often mounted noexec in hardened containers, so try a few places
+  // the binary can actually run from - the app dir first (the overlay fs).
+  const dirs = [
+    process.env.YT_DLP_DIR,
+    path.join(process.cwd(), '.yt-dlp-cache'),
+    path.join(os.homedir() || '', '.cache', 'docwellness-yt-dlp'),
+    path.join(os.tmpdir(), 'docwellness-yt-dlp'),
+  ].filter(Boolean);
+
+  let lastErr;
+  for (const dir of dirs) {
+    const bin = path.join(dir, asset);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(bin) || fs.statSync(bin).size < 1_000_000) {
+        console.log(`yt-dlp not found - downloading ${asset} to ${dir} ...`);
+        await download(url, bin);
+        if (process.platform !== 'win32') fs.chmodSync(bin, 0o755);
+      }
+      if (tryVersion(bin, [])) return { file: bin, pre: [] };
+      lastErr = new Error(`not runnable from ${dir} (noexec?)`);
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  if (!tryVersion(bin, [])) {
-    throw new Error(
-      `downloaded yt-dlp at ${bin} is not runnable (noexec tmp?). Set YT_DLP_PATH.`
-    );
-  }
-  return { file: bin, pre: [] };
+  throw new Error(
+    `could not get a runnable yt-dlp (${lastErr && lastErr.message}). ` +
+      `Install it in the image, or set YT_DLP_PATH / YT_DLP_DIR.`
+  );
 }
 
 let YT_DLP = null;
