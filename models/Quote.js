@@ -17,7 +17,19 @@ const quoteSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Same quote in three languages, all shown on one card in the app.
+    // `text` is English (kept as the canonical field used by notifications).
     text: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    textHi: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    textMr: {
       type: String,
       default: '',
       trim: true,
