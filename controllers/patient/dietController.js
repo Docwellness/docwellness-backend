@@ -23,6 +23,7 @@ const {
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
 const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 const { buildPlanItemPatientView, baseRecipeIdFromKey } = require('../../utils/dietPlanReadDispatch');
+const { resolvePatientDieticianId } = require('../../utils/resolvePatientDieticianId');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 
@@ -1920,8 +1921,13 @@ exports.submitMealLog = async (req, res, next) => {
 
     try {
       const io = req.app.get('io');
-      const receiverId = config.defaultDieticianId;
       const senderId = req.user._id;
+      // Route to the patient's ASSIGNED dietician (the one on their DietPlan),
+      // not the global config.defaultDieticianId - otherwise every meal-log
+      // notification lands on one hard-coded user id regardless of who
+      // actually manages this patient. Falls back to the default for a
+      // patient with no plan yet (see utils/resolvePatientDieticianId.js).
+      const receiverId = await resolvePatientDieticianId(senderId);
 
       // Un-logs (servings === 0, see above) shouldn't read as
       // "Logged"/"Updated" in the dietician-facing chat summary - skip the
@@ -1929,7 +1935,7 @@ exports.submitMealLog = async (req, res, next) => {
       // (nothing was actually added or changed for the dietician to see).
       const loggedItems = items.filter((i) => i.servings > 0);
 
-      if (loggedItems.length > 0) {
+      if (loggedItems.length > 0 && receiverId) {
         const recipeIds = loggedItems.map((i) => i.recipeId);
         const recipesInfo = await Recipe.find({ _id: { $in: recipeIds } })
           .select('name image nutrition')
@@ -2006,6 +2012,11 @@ exports.submitMealLog = async (req, res, next) => {
             type: 'progress',
             referenceId: conversation._id,
             referenceModel: 'Chat',
+            // patientId here (referenceId is the *conversation*) so the
+            // bell-list tap can open this patient's "Client Logged Data"
+            // sheet directly - same pattern as the renewal notification's
+            // { patientId }. See NotificationItem.fromJson in the app.
+            data: { patientId: String(senderId), patientName },
           });
           if (io) {
             io.to(`user:${receiverId}`).emit('notification.new', {
@@ -2014,6 +2025,7 @@ exports.submitMealLog = async (req, res, next) => {
               message: notif.message,
               type: notif.type,
               referenceId: notif.referenceId?.toString(),
+              data: { patientId: String(senderId), patientName },
               createdAt: notif.createdAt,
             });
           }
@@ -2041,7 +2053,7 @@ exports.submitMealLog = async (req, res, next) => {
         }
       }
 
-      if (io) {
+      if (io && receiverId) {
         io.to(`user:${receiverId}`).emit('meal_log_update', {
           patientId: senderId,
           logId: log._id,
@@ -2294,7 +2306,8 @@ exports.addMealNote = async (req, res, next) => {
 
     const today = normalizeDate(new Date());
     const senderId = req.user._id;
-    const receiverId = config.defaultDieticianId;
+    // Assigned dietician (patient's DietPlan), falling back to the default.
+    const receiverId = await resolvePatientDieticianId(senderId);
 
     let imageUrl = null;
     if (file) {
@@ -2309,6 +2322,13 @@ exports.addMealNote = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Please provide a description or image',
+      });
+    }
+
+    if (!receiverId) {
+      return res.status(404).json({
+        success: false,
+        message: 'No assigned dietician found',
       });
     }
 
