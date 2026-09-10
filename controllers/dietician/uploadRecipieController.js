@@ -897,6 +897,9 @@ exports.listRecipesByServingTime = async (req, res, next) => {
       servingTime: recipe.servingTime || null,
       cuisine: recipe.cuisine || null,
       ingredientsCount: Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0,
+      ingredientSummary: Array.isArray(recipe.ingredients)
+        ? recipe.ingredients.map((ing) => `${ing.name} ${ing.quantity}${ing.unit}`)
+        : [],
       calories: recipe.nutrition?.calories ?? null,
       tagline: recipe.tagline || recipe.description || null,
     }));
@@ -1119,6 +1122,9 @@ exports.listRecipes = async (req, res, next) => {
         servingTime: recipe.servingTime || '',
         servings: recipe.servings || 1,
         ingredientsCount: Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0,
+        ingredientSummary: Array.isArray(recipe.ingredients)
+          ? recipe.ingredients.map((ing) => `${ing.name} ${ing.quantity}${ing.unit}`)
+          : [],
         calories: recipe.nutrition?.calories ?? null,
         description: recipe.description || '',
         createdAt: recipe.createdAt,
