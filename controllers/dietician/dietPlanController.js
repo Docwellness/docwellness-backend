@@ -695,6 +695,15 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
         status: request.status,
         totalAmount: request.totalAmount,
         membershipPlan: request.membershipPlan || null,
+        // Lets the dietician Home "New client requests" list show only
+        // clients who still need a diet built (hasActivePlan false, not
+        // completed), and sort newest-first (createdAt was not returned
+        // before, so the app couldn't order by it).
+        hasActivePlan: request.hasActivePlan ?? false,
+        plansCount: request.plansCount ?? 0,
+        completedAt: request.completedAt || null,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
       };
     });
 
