@@ -10,6 +10,7 @@ const { Chat, Conversation, Notification, User } = require('../../models'); // U
 const ChatLogger = require('./ChatLogger');
 const config = require('../../config/environment');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolvePatientDieticianId } = require('../../utils/resolvePatientDieticianId');
 
 const { EVENTS } = ChatLogger;
 
@@ -115,8 +116,10 @@ class MealLogSyncService {
     }
 
     try {
-      // Get or create LEGACY conversation (same one used by patient chat)
-      const dieticianId = config.defaultDieticianId;
+      // Get or create LEGACY conversation (same one used by patient chat).
+      // Route to the patient's ASSIGNED dietician, not the global default.
+      const dieticianId =
+        (await resolvePatientDieticianId(actor_user_id)) || config.defaultDieticianId;
       let conversation = await Conversation.findOne({
         $and: [{ 'participants.userId': actor_user_id }, { 'participants.userId': dieticianId }],
       });
@@ -272,9 +275,10 @@ class MealLogSyncService {
             userId: dieticianId,
             title: 'New meal logged',
             message: newMessage.message,
-            type: 'chat',
+            type: 'progress',
             referenceId: convId,
             referenceModel: 'Chat',
+            data: { patientId: String(actor_user_id) },
           });
 
           if (ioInstance) {
@@ -283,6 +287,8 @@ class MealLogSyncService {
               title: notif.title,
               message: notif.message,
               type: notif.type,
+              referenceId: convId?.toString(),
+              data: { patientId: String(actor_user_id) },
               createdAt: notif.createdAt,
             });
           }

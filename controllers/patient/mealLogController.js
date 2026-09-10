@@ -2,11 +2,11 @@ const MealLog = require('../../models/MealLog');
 const Chat = require('../../models/Chat');
 const Conversation = require('../../models/Conversation');
 const DietPlan = require('../../models/DietPlan');
-const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { invalidatePatientStats } = require('../../utils/patientStatsCache');
 const { rejectIfPaused } = require('../../utils/patientPauseGuard');
+const { resolvePatientDieticianId } = require('../../utils/resolvePatientDieticianId');
 const fs = require('fs/promises');
 
 // v1 Chat Integration
@@ -412,7 +412,7 @@ exports.addMealNote = async (req, res, next) => {
       await fs.unlink(req.file.path).catch(() => {});
     }
 
-    const dieticianId = config.defaultDieticianId;
+    const dieticianId = await resolvePatientDieticianId(patientId);
     let conversation = await Conversation.findOne({
       $and: [{ 'participants.userId': patientId }, { 'participants.userId': dieticianId }],
     });
@@ -458,7 +458,7 @@ exports.addMealNote = async (req, res, next) => {
 };
 
 async function sendMealUpdateToChat(req, patientId, data) {
-  const dieticianId = config.defaultDieticianId;
+  const dieticianId = await resolvePatientDieticianId(patientId);
   let conversation = await Conversation.findOne({
     $and: [{ 'participants.userId': patientId }, { 'participants.userId': dieticianId }],
   });
