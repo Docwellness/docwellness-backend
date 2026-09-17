@@ -815,11 +815,20 @@ const generateTranslations = async (recipe, languages) => {
 
   for (const lang of languages) {
     try {
+      // `components` (the PORTIONS SUMMARY chips, e.g. "Warm Water with
+      // Dates, Figs, Almonds, Walnuts") only need their `label` translated -
+      // quantity/unit stay as-is, same convention as everything else here.
+      // Sent/returned positionally aligned with recipe.components so the
+      // app can zip translations[lang].components[i].label back onto
+      // components[i] with no name-matching needed.
+      const components = Array.isArray(recipe.components) ? recipe.components : [];
+
       const translationPrompt = `Translate the following recipe content to ${lang}. Return ONLY valid JSON.
 
 Recipe Name: ${recipe.name || ''}
 Description: ${recipe.description || ''}
 Ingredients: ${JSON.stringify((recipe.ingredients || []).map((i) => ({ name: i.name, description: i.description })))}
+Components: ${JSON.stringify(components.map((c) => ({ label: c.label })))}
 Cooking Steps: ${JSON.stringify(recipe.cookingSteps || [])}
 Warnings: ${JSON.stringify(recipe.warnings || [])}
 
@@ -828,11 +837,12 @@ Return this exact JSON structure:
   "name": "translated recipe name in ${lang}",
   "description": "translated description in ${lang}",
   "ingredients": [{"name": "translated name", "description": "translated description"}],
+  "components": [{"label": "translated component label"}],
   "cookingSteps": ["translated step 1", "translated step 2", ...],
   "warnings": ["translated warning 1", ...]
 }
 
-IMPORTANT: Translate naturally into ${lang} script. Keep quantities and units in English numerals. NO markdown, ONLY JSON.`;
+IMPORTANT: Translate naturally into ${lang} script. Keep quantities and units in English numerals. "components" must have exactly ${components.length} entries, in the same order as the Components list above - translate each "label" the same way you'd translate that same word/phrase if it appeared as an ingredient name. NO markdown, ONLY JSON.`;
 
       const response = await openai.responses.create({
         model: config.openai.translationModel,
@@ -848,10 +858,20 @@ IMPORTANT: Translate naturally into ${lang} script. Keep quantities and units in
       const parsed = parseJsonFromModelOutput(raw);
 
       if (parsed) {
+        // Positional, not name-matched: a translated components array
+        // shorter than the source (model dropped an entry) would otherwise
+        // silently pair the wrong label with the wrong component - only
+        // trust it when the count actually matches what was sent.
+        const translatedComponents = Array.isArray(parsed.components) &&
+          parsed.components.length === components.length
+          ? parsed.components.map((c) => ({ label: c?.label || '' }))
+          : [];
+
         translations[lang] = {
           name: parsed.name || recipe.name,
           description: parsed.description || recipe.description || '',
           ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
+          components: translatedComponents,
           cookingSteps: Array.isArray(parsed.cookingSteps) ? parsed.cookingSteps : [],
           warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
         };
