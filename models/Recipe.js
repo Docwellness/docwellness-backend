@@ -238,6 +238,15 @@ const recipeSchema = new mongoose.Schema(
             description: { type: String },
           },
         ],
+        // Positionally aligned with the top-level `components` array (the
+        // PORTIONS SUMMARY chips) - only `label` needs translating,
+        // quantity/unit stay as-authored. See utils/openaiClient.js's
+        // generateTranslations.
+        components: [
+          {
+            label: { type: String },
+          },
+        ],
         cookingSteps: [{ type: String }],
         warnings: [{ type: String }],
       },
