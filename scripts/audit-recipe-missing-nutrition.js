@@ -32,7 +32,12 @@ function hasCalories(nutrition) {
 }
 
 async function main() {
-  await mongoose.connect(process.env.MONGODB_URI);
+  // See backfill-recipe-nutrition-from-version.js's matching comment - a
+  // bare mongoose.connect(process.env.MONGODB_URI) fails against prod's
+  // self-hosted instance ("self-signed certificate in certificate chain"),
+  // connectDB already knows how to load its private CA.
+  const connectDB = require('../config/database');
+  await connectDB();
   const Recipe = require('../models/Recipe');
   const RecipeVersion = require('../models/RecipeVersion');
 
