@@ -33,7 +33,15 @@ function hasCalories(nutrition) {
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING nutrition backfill from V1 RecipeVersion ===' : '=== DRY RUN (pass --execute to write) ===');
 
-  await mongoose.connect(process.env.MONGODB_URI);
+  // Plain mongoose.connect(process.env.MONGODB_URI) fails against prod's
+  // self-hosted instance with "self-signed certificate in certificate
+  // chain" - prod connects over TLS to a private CA (see
+  // docs/db-migration-oracle.md) that connectDB already knows how to load;
+  // reusing it here instead of duplicating that TLS setup (or worse,
+  // silently omitting it) is the same fix scripts/migrate-dev-catalog-to-prod.js
+  // applied for the same error.
+  const connectDB = require('../config/database');
+  await connectDB();
   console.log(`Connected: ${mongoose.connection.host} / ${mongoose.connection.name}`);
 
   const Recipe = require('../models/Recipe');
