@@ -52,6 +52,7 @@ async function main() {
   let skippedNoRoleChangeNeeded = 0;
   const changeLog = [];
   const errors = [];
+  const touchedRecipes = [];
 
   for (const recipe of recipes) {
     const bucket = classify(recipe);
@@ -85,13 +86,29 @@ async function main() {
       try {
         // .save() runs Recipe.js's pre-save hook (re-derives
         // components/servingSize/secondaryComponent from the now-updated
-        // ingredients, a no-op here since they already matched) and its
-        // post-save hook (re-syncs the V1 RecipeVersion) automatically -
-        // no separate explicit calls needed, unlike the findOneAndUpdate-
-        // based controller paths.
+        // ingredients, a no-op here since they already matched) synchronously.
+        // Its post-save hook ALSO fires a V1 RecipeVersion re-sync, but that
+        // one is fire-and-forget (by design, for live user-facing saves - see
+        // models/Recipe.js's own comment) and NOT awaited by .save() itself -
+        // a bulk script that disconnects right after this loop can race
+        // ahead of it and sever the connection mid-sync (see the explicit
+        // re-sync below, which is what actually guarantees completion here).
         await recipe.save();
+        touchedRecipes.push(recipe);
       } catch (err) {
         errors.push({ recipe: recipe.name, id: String(recipe._id), error: err.message });
+      }
+    }
+  }
+
+  if (EXECUTE && touchedRecipes.length > 0) {
+    console.log(`\nRe-syncing V1 RecipeVersion for ${touchedRecipes.length} touched recipe(s) (awaited, not fire-and-forget)...`);
+    const { syncV1FromRecipe } = require('../services/recipeVersioningService');
+    for (const recipe of touchedRecipes) {
+      try {
+        await syncV1FromRecipe(recipe);
+      } catch (err) {
+        errors.push({ recipe: recipe.name, id: String(recipe._id), error: `V1 sync: ${err.message}` });
       }
     }
   }
