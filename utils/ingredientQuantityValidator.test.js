@@ -9,7 +9,11 @@
  */
 
 const assert = require('assert');
-const { parseQuantitiesFromNote, applyAiNoteQuantityOverrides } = require('./ingredientQuantityValidator');
+const {
+  parseQuantitiesFromNote,
+  applyAiNoteQuantityOverrides,
+  preserveSubmittedIngredients,
+} = require('./ingredientQuantityValidator');
 
 const results = [];
 
@@ -112,6 +116,85 @@ test('parseQuantitiesFromNote returns empty array for empty/missing note', () =>
   assert.deepStrictEqual(parseQuantitiesFromNote(''), []);
   assert.deepStrictEqual(parseQuantitiesFromNote(null), []);
   assert.deepStrictEqual(parseQuantitiesFromNote(undefined), []);
+});
+
+// Regression coverage for the reported "Amla and Honey Tonic" bug:
+// editing "Amla Juice" from 30ml to 20ml via the structured ingredient
+// editor (not aiNote) came back from Update AI Inputs as "Amla" 2 piece,
+// with "Honey" dropped from the list entirely and category silently
+// changed - because the AI's regenerated `ingredients` replaced the
+// dietician's submitted list wholesale instead of being diffed against it.
+test('preserveSubmittedIngredients: reproduces and fixes the Amla Juice bug', () => {
+  const submitted = [
+    { name: 'Amla Juice', quantity: 20, unit: 'ml', category: 'Other', role: 'core' },
+    { name: 'Water', quantity: 200, unit: 'ml', category: 'Other', role: 'sub' },
+    { name: 'Honey', quantity: 1, unit: 'tsp', category: 'Sweetener', role: 'sub' },
+  ];
+  // What the model actually returned in the real bug report: renamed,
+  // unit-converted, and dropped an ingredient entirely.
+  const aiResponse = [
+    { name: 'Amla', quantity: 2, unit: 'piece', category: 'Fruit', description: 'Rich in Vitamin C and antioxidants.' },
+    { name: 'Water', quantity: 200, unit: 'ml', category: 'Other', description: 'Hydrates and dilutes the tonic.' },
+  ];
+
+  const result = preserveSubmittedIngredients(submitted, aiResponse);
+
+  assert.strictEqual(result.length, 3, 'no ingredient should be silently dropped');
+  const byName = Object.fromEntries(result.map((i) => [i.name, i]));
+  assert.ok(byName['Amla Juice'], 'name must not be silently changed to "Amla"');
+  assert.strictEqual(byName['Amla Juice'].quantity, 20);
+  assert.strictEqual(byName['Amla Juice'].unit, 'ml');
+  assert.strictEqual(byName['Honey'].quantity, 1);
+  assert.strictEqual(byName['Honey'].unit, 'tsp');
+});
+
+test('preserveSubmittedIngredients: inherits AI-filled metadata for a matched ingredient', () => {
+  const submitted = [{ name: 'Water', quantity: 200, unit: 'ml', role: 'sub' }];
+  const aiResponse = [{ name: 'Water', quantity: 999, unit: 'cup', category: 'Other', description: 'Hydrates and dilutes the tonic.' }];
+
+  const [result] = preserveSubmittedIngredients(submitted, aiResponse);
+
+  // quantity/unit stay exactly as submitted, never the model's value...
+  assert.strictEqual(result.quantity, 200);
+  assert.strictEqual(result.unit, 'ml');
+  // ...but descriptive metadata the dietician didn't set is still enriched.
+  assert.strictEqual(result.description, 'Hydrates and dilutes the tonic.');
+});
+
+test('preserveSubmittedIngredients: keeps a genuinely new AI-added ingredient (e.g. from aiNote)', () => {
+  const submitted = [{ name: 'Amla Juice', quantity: 20, unit: 'ml', role: 'core' }];
+  const aiResponse = [
+    { name: 'Amla Juice', quantity: 20, unit: 'ml', category: 'Other' },
+    { name: 'Ginger', quantity: 1, unit: 'tsp', category: 'Spice', role: 'sub' },
+  ];
+
+  const result = preserveSubmittedIngredients(submitted, aiResponse);
+
+  assert.strictEqual(result.length, 2);
+  const ginger = result.find((i) => i.name === 'Ginger');
+  assert.ok(ginger, 'a new ingredient the model added should be kept');
+  assert.strictEqual(ginger.quantity, 1);
+});
+
+test('preserveSubmittedIngredients: role always comes from the submitted value, never the model', () => {
+  const submitted = [{ name: 'Amla Juice', quantity: 20, unit: 'ml', role: 'core' }];
+  const aiResponse = [{ name: 'Amla Juice', quantity: 20, unit: 'ml', role: 'sub' }];
+
+  const [result] = preserveSubmittedIngredients(submitted, aiResponse);
+  assert.strictEqual(result.role, 'core');
+});
+
+test('preserveSubmittedIngredients: handles empty/missing AI response gracefully', () => {
+  const submitted = [{ name: 'Amla Juice', quantity: 20, unit: 'ml', role: 'core' }];
+  assert.deepStrictEqual(
+    preserveSubmittedIngredients(submitted, []).map((i) => i.name),
+    ['Amla Juice']
+  );
+  assert.deepStrictEqual(
+    preserveSubmittedIngredients(submitted, null).map((i) => i.name),
+    ['Amla Juice']
+  );
+  assert.deepStrictEqual(preserveSubmittedIngredients([], null), []);
 });
 
 console.log('='.repeat(60));
