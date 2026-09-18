@@ -112,6 +112,10 @@ async function main() {
   console.log(`Total recipes: ${recipes.length}`);
   console.log(`Recipes with no components at all (skipped): ${recipes.length - Object.values(buckets).flat().length}`);
   console.log(`\nAuto-migratable (every component matches an ingredient): ${buckets['auto-migratable'].length}`);
+  console.log(`  Note: this count reflects name-match quality, not "still needs migration" - it stays`);
+  console.log(`  the same size after a recipe is migrated (role correctly set). To check whether any`);
+  console.log(`  are still PENDING a role fix, run unify-recipe-components-into-ingredients.js in`);
+  console.log(`  dry-run mode and look at its own "would be migrated" count instead.`);
   console.log(`Needs manual review (some but not all match):            ${buckets['needs-manual-review'].length}`);
   console.log(`Composite-exempt (none match / already manually-authored): ${buckets['composite-exempt'].length}`);
 
