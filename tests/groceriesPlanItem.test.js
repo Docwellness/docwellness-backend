@@ -74,7 +74,7 @@ test('builds the grocery list (food + supplements) for a finalized plan-item pla
     ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
     nutrition: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 60)); // V1 sync hook
+  await new Promise((resolve) => setTimeout(resolve, 300)); // V1 sync hook
   const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
   const activationDate = new Date();
@@ -149,7 +149,7 @@ test('renewed patient: grocery weeks span both cycles in display-number space, f
     ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
     nutrition: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 60));
+  await new Promise((resolve) => setTimeout(resolve, 300));
   const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
   const day = 86400000;

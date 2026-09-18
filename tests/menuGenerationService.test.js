@@ -51,7 +51,7 @@ async function makeResolvedRecipe({ dieticianId, name, servingTime, nonVegetaria
     nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
     dietaryHabits: { nonVegetarian, vegetarian: !nonVegetarian },
   });
-  await new Promise((resolve) => setTimeout(resolve, 50)); // let the post-save V1 sync hook land
+  await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
   return recipe;
 }
 

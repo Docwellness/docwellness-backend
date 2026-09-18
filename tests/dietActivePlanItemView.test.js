@@ -71,7 +71,7 @@ test('returns real (not mis-scaled) nutrition, exact ingredients/steps, and the 
     ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
     nutrition: { calories: 999, protein: 999, carbs: 999, fats: 999, fiber: 999 }, // deliberately wrong, must be overridden
   });
-  await new Promise((resolve) => setTimeout(resolve, 60)); // let the post-save V1 sync hook land
+  await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
   const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
   const activationDate = new Date();
@@ -136,7 +136,7 @@ test('two occurrences of the same recipe at different versions render distinct i
     ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
     nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 60));
+  await new Promise((resolve) => setTimeout(resolve, 300));
   const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
   const activationDate = new Date();

@@ -21,7 +21,12 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
 const { COMPONENT_UNITS, INGREDIENT_ROLES } = require('../../utils/recipeJsonSchema');
-const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../../utils/coreIngredientHeuristic');
+const {
+  applyCoreIngredientHeuristic,
+  hasCoreIngredient,
+  deriveComponentsFromIngredients,
+  componentsAreDerivable,
+} = require('../../utils/coreIngredientHeuristic');
 const fs = require('fs');
 
 const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
@@ -317,6 +322,13 @@ exports.generateRecipeWithAI = async (req, res, next) => {
           description: ing.description || '',
           isScalable: ing.isScalable !== false,
           image: null, // To be added by dietician later
+          // recipe-core-ingredient-scaling: this preview response was
+          // silently dropping `role`, unlike the sibling
+          // updateRecipeFromEdits/enhanceIngredient below - meaning a
+          // freshly-AI-generated recipe's core/sub split never reached the
+          // dietician app at all. Found during implementation of
+          // openspec/changes/unify-recipe-ingredients-and-components.
+          role: ing.role === 'core' ? 'core' : 'sub',
         }))
         : [],
       servingSize: modelRecipe.servingSize || {
@@ -419,7 +431,16 @@ const VALID_CATEGORIES = [
   'Supplements', 'Keto', 'Vegan Specials', 'High Protein', 'Low Carb',
   'Detox', 'Other', 'Western',
 ];
-const VALID_UNITS = ['g', 'ml', 'cup', 'tbsp', 'tsp', 'piece'];
+// Was ['g','ml','cup','tbsp','tsp','piece'] - missing 'nos'/'bowl'/'egg'/
+// 'slice', which models/Recipe.js's `ingredients[].unit` schema enum has
+// accepted since it was widened to match `COMPONENT_UNITS` (see that
+// field's own comment). A dietician-submitted ingredient using one of
+// those units was silently downgraded to 'g' by this sanitizer despite
+// being schema-valid - a real, independent contributor to the
+// components/ingredients unit mismatch (e.g. "2 nos" vs "2 g") this
+// change's parent bug report was about. Found during implementation of
+// openspec/changes/unify-recipe-ingredients-and-components.
+const VALID_UNITS = COMPONENT_UNITS;
 const VALID_PRICE_LEVELS = ['$', '$$', '$$$', '₹', '₹₹', '₹₹₹', '£', '££', '£££'];
 const VALID_INGREDIENT_CATEGORIES = [
   'Protein Rich', 'Carbohydrate', 'Vegetable', 'Dairy', 'Spice', 'Oil/Fat',
@@ -505,6 +526,32 @@ function sanitizeRecipeComponents(components) {
     }))
     .filter((c) => c.label && c.quantity > 0);
   return safe.length > 0 ? safe : undefined;
+}
+
+/**
+ * Applies a final `components` value (already classified - see
+ * updateRecipe's two call sites) to a findOneAndUpdate `updates`/`unsets`
+ * pair, keeping the legacy `servingSize`/`secondaryComponent` mirrors in
+ * sync - the same mirroring models/Recipe.js's pre-save hook does for
+ * .save()/.create(), reproduced here since findOneAndUpdate bypasses it.
+ */
+function applyComponentsUpdate(updates, unsets, components) {
+  if (components && components.length > 0) {
+    updates.components = components;
+    updates.servingSize = { quantity: components[0].quantity, unit: components[0].unit };
+    if (components[1]) {
+      updates.secondaryComponent = {
+        label: components[1].label,
+        quantity: components[1].quantity,
+        unit: components[1].unit,
+      };
+    } else {
+      // $set can't reliably clear a field to "absent" - use $unset so a
+      // recipe edited down from 2 components to 1 doesn't keep a stale
+      // secondaryComponent mirror.
+      unsets.secondaryComponent = '';
+    }
+  }
 }
 
 /**
@@ -1183,6 +1230,30 @@ exports.updateRecipe = async (req, res, next) => {
     if (Object.prototype.hasOwnProperty.call(body, 'category')) {
       updates.category = VALID_CATEGORIES.includes(body.category) ? body.category : 'Indian';
     }
+
+    // findOneAndUpdate (below) bypasses Recipe.js's pre-save hook entirely,
+    // so the same derive-`components`-from-`ingredients[].role` logic that
+    // hook does for .save()/.create() has to be reproduced here by hand -
+    // same existing convention as the allergens/V1-sync recomputation
+    // already below. Only fetched when actually needed (ingredients and/or
+    // components present in the request) to avoid an extra query on every
+    // plain single-field update (e.g. just `image`).
+    let existingForClassification = null;
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'ingredients') ||
+      Object.prototype.hasOwnProperty.call(body, 'components')
+    ) {
+      existingForClassification = await Recipe.findOne({ _id: id, dieticianId })
+        .select('ingredients components componentsAuthoredManually')
+        .lean();
+      if (!existingForClassification) {
+        return res.status(404).json({
+          success: false,
+          message: 'Recipe not found',
+        });
+      }
+    }
+
     if (Object.prototype.hasOwnProperty.call(body, 'ingredients')) {
       const { ingredients: safeIngredients } = sanitizeRecipeIngredients(body.ingredients);
       updates.ingredients = safeIngredients;
@@ -1193,31 +1264,42 @@ exports.updateRecipe = async (req, res, next) => {
       updates.allergens = inferAllergenCategoriesFromIngredientNames(
         safeIngredients.map((i) => i?.name)
       );
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'components')) {
+
+      // `components` (the portion-summary chips) - see models/Recipe.js's
+      // pre-save hook for the full rationale, reproduced here since this
+      // update path bypasses it. The component value to classify against is
+      // whatever's also being submitted in this same request if present,
+      // else whatever the recipe already has.
+      const componentsToClassify = Object.prototype.hasOwnProperty.call(body, 'components')
+        ? sanitizeRecipeComponents(body.components)
+        : existingForClassification.components;
+      const authoredManually = existingForClassification.componentsAuthoredManually === true;
+      let finalComponents = componentsToClassify;
+      if (!authoredManually && componentsAreDerivable(componentsToClassify, safeIngredients)) {
+        const derived = deriveComponentsFromIngredients(safeIngredients);
+        if (derived.length > 0) {
+          finalComponents = derived;
+        }
+        // else: zero core ingredients derived (role not migrated yet) -
+        // fall through and keep componentsToClassify as-is, same as the
+        // pre-save hook's own guard against wiping a real value to empty.
+      }
+      applyComponentsUpdate(updates, unsets, finalComponents);
+    } else if (Object.prototype.hasOwnProperty.call(body, 'components')) {
+      // `ingredients` isn't changing here - re-classify the newly submitted
+      // `components` against the recipe's EXISTING ingredients.
       const safeComponents = sanitizeRecipeComponents(body.components);
-      if (safeComponents) {
-        updates.components = safeComponents;
-        // Keep the legacy servingSize/secondaryComponent mirrors in sync
-        // (see models/Recipe.js's doc comment) so consumers not yet reading
-        // `components` directly don't go stale after an edit.
-        updates.servingSize = {
-          quantity: safeComponents[0].quantity,
-          unit: safeComponents[0].unit,
-        };
-        if (safeComponents[1]) {
-          updates.secondaryComponent = {
-            label: safeComponents[1].label,
-            quantity: safeComponents[1].quantity,
-            unit: safeComponents[1].unit,
-          };
-        } else {
-          // $set can't reliably clear a field to "absent" - use $unset so a
-          // recipe edited down from 2 components to 1 doesn't keep a stale
-          // secondaryComponent mirror.
-          unsets.secondaryComponent = '';
+      const authoredManually = existingForClassification.componentsAuthoredManually === true;
+      if (safeComponents && !authoredManually) {
+        if (!componentsAreDerivable(safeComponents, existingForClassification.ingredients)) {
+          // Dietician explicitly authored components that don't match the
+          // ingredient list (e.g. a composite dish) - honor it and mark the
+          // recipe as manually-authored going forward so a later ingredient
+          // edit doesn't silently overwrite this choice.
+          updates.componentsAuthoredManually = true;
         }
       }
+      applyComponentsUpdate(updates, unsets, safeComponents);
     }
     if (Object.prototype.hasOwnProperty.call(body, 'instructions')) {
       updates.instructions = body.instructions;

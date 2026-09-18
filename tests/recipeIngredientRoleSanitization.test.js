@@ -36,6 +36,10 @@ afterAll(async () => {
 
 const auth = (req) => req.set('Authorization', 'Bearer dietician-token');
 
+// Mongoose auto-adds an `_id` to each `components` subdocument - strip it so
+// assertions can compare against plain {label, quantity, unit} fixtures.
+const stripIds = (arr) => (arr || []).map(({ label, quantity, unit }) => ({ label, quantity, unit }));
+
 const chapatiIngredients = () => [
   { name: 'Whole Wheat Flour', quantity: 100, unit: 'g', category: 'Carbohydrate' },
   { name: 'Water', quantity: 60, unit: 'ml', category: 'Other' },
@@ -141,5 +145,115 @@ describe('PATCH /recipes/:id (updateRecipe) - core/sub ingredient role', () => {
     expect(res.status).toBe(200);
     const saved = await Recipe.findById(recipe._id);
     expect(saved.ingredients.every((i) => i.role === undefined || i.role === 'sub')).toBe(true);
+  });
+});
+
+// unify-recipe-ingredients-and-components: updateRecipe's PATCH path uses
+// findOneAndUpdate, which bypasses Recipe.js's pre-save hook entirely - the
+// same components-derivation logic has to work here too, not just on
+// .save()/.create().
+describe('PATCH /recipes/:id (updateRecipe) - components derivation (findOneAndUpdate bypasses the pre-save hook)', () => {
+  test('editing ingredients on a derivable recipe (all components match ingredient names) re-derives components server-side', async () => {
+    const dietician = await createDietician();
+    registerTestToken('dietician-token', dietician._id);
+    const recipe = await Recipe.create({
+      dieticianId: dietician._id,
+      name: 'Warm Water with Dates, Figs, Almonds, Walnuts',
+      servingTime: 'Morning Drink',
+      components: [
+        { label: 'Dates', quantity: 1, unit: 'nos' },
+        { label: 'Figs', quantity: 1, unit: 'nos' },
+      ],
+      ingredients: [
+        { name: 'Dates', quantity: 1, unit: 'nos', role: 'core' },
+        { name: 'Figs', quantity: 1, unit: 'nos', role: 'core' },
+      ],
+    });
+
+    // Dietician edits ingredients via "Update AI Inputs" - adds the
+    // previously-missing Almonds/Walnuts as core, Water as sub - and the
+    // request only sends `ingredients`, no `components` key at all (the
+    // real shape updateRecipeFromEdits's preview response produces).
+    const res = await auth(request(app).patch(`/api/dietician/recipes/${recipe._id}`)).send({
+      ingredients: [
+        { name: 'Dates', quantity: 1, unit: 'nos', role: 'core' },
+        { name: 'Figs', quantity: 1, unit: 'nos', role: 'core' },
+        { name: 'Almonds', quantity: 2, unit: 'nos', role: 'core' },
+        { name: 'Walnuts', quantity: 2, unit: 'nos', role: 'core' },
+        { name: 'Water', quantity: 250, unit: 'ml', role: 'sub' },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    expect(stripIds(res.body.data.components)).toEqual([
+      { label: 'Dates', quantity: 1, unit: 'nos' },
+      { label: 'Figs', quantity: 1, unit: 'nos' },
+      { label: 'Almonds', quantity: 2, unit: 'nos' },
+      { label: 'Walnuts', quantity: 2, unit: 'nos' },
+    ]);
+    const saved = await Recipe.findById(recipe._id).lean();
+    expect(stripIds(saved.components)).toEqual(stripIds(res.body.data.components));
+    expect(saved.servingSize).toEqual({ quantity: 1, unit: 'nos' });
+  });
+
+  test('editing ingredients on a non-derivable recipe (dish-name component) leaves components untouched', async () => {
+    const dietician = await createDietician();
+    registerTestToken('dietician-token', dietician._id);
+    const recipe = await Recipe.create({
+      dieticianId: dietician._id,
+      name: 'Oats Porridge',
+      servingTime: 'Breakfast',
+      components: [{ label: 'Oats Porridge', quantity: 100, unit: 'g' }],
+      ingredients: [{ name: 'Oats', quantity: 100, unit: 'g', role: 'core' }],
+    });
+
+    const res = await auth(request(app).patch(`/api/dietician/recipes/${recipe._id}`)).send({
+      ingredients: [{ name: 'Oats', quantity: 120, unit: 'g', role: 'core' }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(stripIds(res.body.data.components)).toEqual([{ label: 'Oats Porridge', quantity: 100, unit: 'g' }]);
+  });
+
+  test('submitting non-matching components alongside ingredients marks the recipe manually-authored', async () => {
+    const dietician = await createDietician();
+    registerTestToken('dietician-token', dietician._id);
+    const recipe = await Recipe.create({
+      dieticianId: dietician._id,
+      name: 'Pithla Bhakri',
+      servingTime: 'Lunch',
+      ingredients: [
+        { name: 'Besan', quantity: 50, unit: 'g', role: 'core' },
+        { name: 'Jowar Flour', quantity: 80, unit: 'g', role: 'core' },
+      ],
+    });
+
+    const res = await auth(request(app).patch(`/api/dietician/recipes/${recipe._id}`)).send({
+      components: [
+        { label: 'Pithla', quantity: 1, unit: 'bowl' },
+        { label: 'Bhakri', quantity: 2, unit: 'piece' },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    expect(stripIds(res.body.data.components)).toEqual([
+      { label: 'Pithla', quantity: 1, unit: 'bowl' },
+      { label: 'Bhakri', quantity: 2, unit: 'piece' },
+    ]);
+    const saved = await Recipe.findById(recipe._id).lean();
+    expect(saved.componentsAuthoredManually).toBe(true);
+
+    // A later ingredient-only edit must NOT overwrite the manually-authored components.
+    const res2 = await auth(request(app).patch(`/api/dietician/recipes/${recipe._id}`)).send({
+      ingredients: [
+        { name: 'Besan', quantity: 60, unit: 'g', role: 'core' },
+        { name: 'Jowar Flour', quantity: 80, unit: 'g', role: 'core' },
+      ],
+    });
+    expect(res2.status).toBe(200);
+    expect(stripIds(res2.body.data.components)).toEqual([
+      { label: 'Pithla', quantity: 1, unit: 'bowl' },
+      { label: 'Bhakri', quantity: 2, unit: 'piece' },
+    ]);
   });
 });

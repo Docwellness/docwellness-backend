@@ -52,8 +52,55 @@ function hasCoreIngredient(ingredients) {
   return Array.isArray(ingredients) && ingredients.some((ing) => ing?.role === 'core');
 }
 
+/**
+ * Derives a recipe's portion-summary `components` ({label, quantity, unit}[])
+ * straight from its `ingredients[]`. `role: 'core'` ingredients become the
+ * portion summary, in list order; 'sub' ingredients (water/salt/oil/spices -
+ * only meaningful relative to the core ingredients) are excluded. See
+ * openspec/changes/unify-recipe-ingredients-and-components for the full
+ * rationale: for a recipe whose components are derivable (see
+ * componentsAreDerivable below), this replaces a second,
+ * independently-authored `components` array that could (and did) drift from
+ * `ingredients` - untranslated labels, missing entries, mismatched units -
+ * with a value that's mechanically derived every time. NOT used for a
+ * composite/multi-dish recipe (`componentsAuthoredManually: true`) - its
+ * components stay independently authored, since a component like "Pithla"
+ * doesn't correspond to any single ingredient this could derive it from.
+ *
+ * Returns a NEW array (never mutates the input). Empty/non-array input
+ * returns [].
+ */
+function deriveComponentsFromIngredients(ingredients) {
+  if (!Array.isArray(ingredients)) return [];
+  return ingredients
+    .filter((ing) => ing?.role === 'core')
+    .map((ing) => ({ label: ing.name, quantity: ing.quantity, unit: ing.unit }));
+}
+
+/**
+ * True only if EVERY entry in `components` case/whitespace-insensitively
+ * matches some `ingredients[].name` - i.e. this recipe's portion summary is
+ * safely derivable from its ingredients (see deriveComponentsFromIngredients)
+ * rather than a composite/multi-dish recipe whose components name prepared
+ * sub-dishes (e.g. "Pithla", "Bhakri") that aren't raw ingredients at all.
+ *
+ * An empty/missing `components` counts as derivable (nothing to conflict
+ * with) - a brand-new recipe with ingredients but no components yet should
+ * get a freshly-derived portion summary, not be treated as composite.
+ */
+function componentsAreDerivable(components, ingredients) {
+  if (!Array.isArray(components) || components.length === 0) return true;
+  const normalize = (s) => String(s || '').trim().toLowerCase();
+  const ingredientNames = new Set(
+    (Array.isArray(ingredients) ? ingredients : []).map((ing) => normalize(ing?.name))
+  );
+  return components.every((c) => ingredientNames.has(normalize(c?.label)));
+}
+
 module.exports = {
   CORE_CATEGORY_PRIORITY,
   applyCoreIngredientHeuristic,
   hasCoreIngredient,
+  deriveComponentsFromIngredients,
+  componentsAreDerivable,
 };
