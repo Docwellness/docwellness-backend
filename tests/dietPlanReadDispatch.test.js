@@ -69,7 +69,7 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
       ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
       nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
     });
-    await new Promise((resolve) => setTimeout(resolve, 60)); // let the post-save V1 sync hook land
+    await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
     const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
     const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId, week: 1, dayGroup: 'Monday' });

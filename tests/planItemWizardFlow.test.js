@@ -55,7 +55,7 @@ test('Step 1 (targets) -> Step 2 (generate) -> Step 3 (refine) -> Step 4 (supple
       nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
     });
   }
-  await new Promise((resolve) => setTimeout(resolve, 150)); // let all 7 post-save V1 syncs land
+  await new Promise((resolve) => setTimeout(resolve, 600)); // let all 7 post-save V1 syncs land
 
   // Step 1: targets (a real request would go through a Targets step endpoint
   // that isn't part of this v4.0 slice yet - simulate by writing

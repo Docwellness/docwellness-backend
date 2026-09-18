@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { inferAllergenCategoriesFromIngredientNames, ALLERGY_CATEGORY_KEYWORDS } = require('../utils/dietaryConstraintValidator');
+const { deriveComponentsFromIngredients, componentsAreDerivable } = require('../utils/coreIngredientHeuristic');
 
 const recipeSchema = new mongoose.Schema(
   {
@@ -125,6 +126,22 @@ const recipeSchema = new mongoose.Schema(
       ],
       default: undefined,
     },
+    // Explicit override, default false: forces the pre-save hook below to
+    // always leave `components` exactly as authored, skipping even its own
+    // auto-detection. Normally NOT needed - the hook already only derives
+    // `components` from `ingredients.filter(role === 'core')` when every
+    // existing component label matches an ingredient name (see
+    // utils/coreIngredientHeuristic.js's componentsAreDerivable); most
+    // recipes (a composite, multi-dish one - Idli+Sambar+Chutney, or
+    // "Pithla Bhakri" -> components "Pithla"/"Bhakri", neither a raw
+    // ingredient - or even a simple single-ingredient dish named
+    // differently from its ingredient, e.g. "Oats Porridge" made from
+    // "Oats") already fail that check on their own and are left alone
+    // automatically. This flag exists for the rare case a dietician/script
+    // needs to force manual authorship despite an incidental full name
+    // match. See openspec/changes/unify-recipe-ingredients-and-components/
+    // design.md's Decisions.
+    componentsAuthoredManually: { type: Boolean, default: false },
     ingredients: [
       {
         name: { type: String, required: true },
@@ -343,15 +360,70 @@ const recipeSchema = new mongoose.Schema(
   }
 );
 
-// Best-effort, non-blocking: keeps `allergens`/`nutritionPerServing` in sync
-// with `ingredients`/`nutrition` whenever either changes, so callers never
-// have to remember to recompute them by hand. Never throws - a recipe save
-// must never fail because of this bookkeeping.
+// Best-effort, non-blocking: keeps `allergens`/`nutritionPerServing`/
+// `components`/`servingSize`/`secondaryComponent` in sync with
+// `ingredients`/`nutrition` whenever either changes, so callers never have
+// to remember to recompute them by hand. Never throws - a recipe save must
+// never fail because of this bookkeeping.
 recipeSchema.pre('save', function () {
   try {
     if (this.isNew || this.isModified('ingredients')) {
       const names = (this.ingredients || []).map((ingredient) => ingredient?.name);
       this.allergens = inferAllergenCategoriesFromIngredientNames(names);
+    }
+    if (
+      this.isNew ||
+      this.isModified('ingredients') ||
+      this.isModified('components') ||
+      this.isModified('componentsAuthoredManually')
+    ) {
+      // `components` (the portion-summary chips) is server-derived from
+      // `ingredients[].role` ONLY when that's actually safe: every
+      // currently-set component label already matches an ingredient name
+      // (componentsAreDerivable), and the recipe isn't explicitly forced
+      // manual. Most recipes fail that check on their own and are left
+      // exactly as authored - a composite, multi-dish recipe (Idli+Sambar+
+      // Chutney) whose components name prepared sub-dishes, or even an
+      // ordinary single-ingredient dish named differently from its
+      // ingredient ("Oats Porridge" made from "Oats") - matching today's
+      // existing behavior for both. This intentionally does NOT try to
+      // guess/backfill a partially-matching recipe (e.g. 1 of 4 components
+      // present in `ingredients`) - that's genuinely ambiguous between "a
+      // data-entry gap" and "a composite dish with one coincidental name
+      // match," and gets surfaced by scripts/audit-recipe-components-
+      // drift.js for a human to resolve instead. See openspec/changes/
+      // unify-recipe-ingredients-and-components/design.md's Decisions.
+      if (
+        !this.componentsAuthoredManually &&
+        componentsAreDerivable(this.components, this.ingredients)
+      ) {
+        const derivedComponents = deriveComponentsFromIngredients(this.ingredients);
+        if (derivedComponents.length > 0) {
+          this.components = derivedComponents;
+        } else if (!this.components || this.components.length === 0) {
+          this.components = undefined;
+        }
+        // else: derivation found zero `role: 'core'` ingredients (e.g. an
+        // existing recipe whose ingredients haven't been migrated to carry
+        // `role` yet - see scripts/unify-recipe-components-into-
+        // ingredients.js) while `components` already held a real value -
+        // leave it untouched rather than silently wiping a previously
+        // -correct portion summary down to empty.
+      }
+      // `servingSize`/`secondaryComponent` (legacy single/dual-quantity
+      // mirrors, see their own field comments above) always mirror
+      // `components[0]`/`[1]`, whichever way `components` itself got set.
+      const mirrorSource = this.components || [];
+      this.servingSize = mirrorSource[0]
+        ? { quantity: mirrorSource[0].quantity, unit: mirrorSource[0].unit }
+        : { quantity: null, unit: null };
+      this.secondaryComponent = mirrorSource[1]
+        ? {
+          label: mirrorSource[1].label,
+          quantity: mirrorSource[1].quantity,
+          unit: mirrorSource[1].unit,
+        }
+        : undefined;
     }
     if (this.isNew || this.isModified('nutrition')) {
       this.nutritionPerServing = {

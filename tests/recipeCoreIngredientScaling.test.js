@@ -367,7 +367,7 @@ describe('POST .../create-custom-version (HTTP) - core/sub recompute end to end'
       servingTime: 'Lunch',
       ingredients: recipeIngredients,
     });
-    await new Promise((resolve) => setTimeout(resolve, 60)); // let the post-save V1 sync hook land
+    await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
     const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
 
     const dietPlan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id, dataModel: 'plan-item', workflowStatus: 'menu_generated' });

@@ -112,6 +112,7 @@ function toPatientRecipeCard(recipe) {
         unit: i.unit || null,
         image: i.image || null,
         isScalable: typeof i.isScalable === 'boolean' ? i.isScalable : true,
+        role: i.role === 'core' ? 'core' : 'sub',
       }))
       : [],
     components: Array.isArray(recipe.components)
@@ -121,6 +122,7 @@ function toPatientRecipeCard(recipe) {
         unit: c.unit || null,
       }))
       : [],
+    componentsAuthoredManually: recipe.componentsAuthoredManually === true,
     instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
     language: Array.isArray(recipe.language) ? recipe.language : [recipe.language || 'English'],
     translations: recipe.translations || {},
@@ -338,6 +340,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             unit: ingredient.unit || null,
             image: ingredient.image || null,
             isScalable: typeof ingredient.isScalable === 'boolean' ? ingredient.isScalable : true,
+            role: ingredient.role === 'core' ? 'core' : 'sub',
           }))
           : [],
         // Independently-adjustable parts of a compound dish (e.g. Idli:
@@ -352,6 +355,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             unit: component.unit || null,
           }))
           : [],
+        componentsAuthoredManually: recipe.componentsAuthoredManually === true,
         instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
         language: Array.isArray(recipe.language) ? recipe.language : [recipe.language || 'English'],
         translations: recipe.translations || {},

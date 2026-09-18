@@ -63,7 +63,7 @@ async function makeResolvedRecipe({ dieticianId, name, servingTime, foodItem }) 
     ingredients: [{ name: foodItem.name, quantity: 100, unit: 'g' }],
     nutrition: { calories: 300, protein: 10, carbs: 30, fats: 5, fiber: 3 },
   });
-  await new Promise((resolve) => setTimeout(resolve, 60)); // let the post-save V1 sync hook land
+  await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
   const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
   return { recipe, v1 };
 }
