@@ -191,8 +191,98 @@ function enforceFiniteIngredientQuantities(ingredients) {
   return { ingredients: fixedIngredients, corrections };
 }
 
+/**
+ * Deterministic backstop for updateRecipeFromEdits's structured ingredient
+ * editor (add/edit/remove via UpdateAiInputsSheet - distinct from the
+ * free-text aiNote this module's other functions guard). Previously,
+ * `generateRecipeWithAI`'s regenerated `ingredients` array replaced the
+ * dietician's submitted list wholesale - so a single, precise edit (e.g.
+ * "Amla Juice" 30ml -> 20ml) could come back with that ingredient silently
+ * renamed, unit-converted ("2 piece" instead of "20 ml"), or dropped
+ * entirely, because the model re-derives the whole list from the prompt
+ * rather than diffing against what was submitted. A dietician's structural
+ * edit - the ingredient's `name`/`quantity`/`unit` - is not a suggestion for
+ * the model to reinterpret; it's the literal value they just set via the
+ * editor, so it's preserved verbatim here for every submitted ingredient,
+ * matched by name to the model's response only to inherit AI-filled
+ * metadata (category/priceLevel/description/image/isScalable). `role` is
+ * also preserved verbatim - it's set by the dietician's own Core/Sub toggle,
+ * not something the model should second-guess.
+ *
+ * A genuinely NEW ingredient the model added (name doesn't match any
+ * submitted one - e.g. in response to an aiNote like "add ginger for
+ * digestion") is kept as the model returned it. An ingredient never
+ * silently disappears: every submitted ingredient is guaranteed to appear
+ * in the result. (A dietician-requested removal, e.g. "remove the honey" in
+ * aiNote, isn't guarded against here - that's simply not resubmitting that
+ * ingredient in the first place, via the "-" button in the editor.)
+ *
+ * Downstream, applyAiNoteQuantityOverrides still runs on the result and can
+ * still adjust a preserved ingredient's quantity/unit if the dietician's
+ * aiNote text explicitly mentions it - this function only protects against
+ * the model's own unprompted reinterpretation, not an intentional
+ * note-driven change.
+ */
+function preserveSubmittedIngredients(submittedIngredients, aiIngredients) {
+  const submitted = Array.isArray(submittedIngredients) ? submittedIngredients : [];
+  const aiList = Array.isArray(aiIngredients) ? aiIngredients : [];
+
+  // Same lenient collapsed-letter-run containment check
+  // applyAiNoteQuantityOverrides uses (see its own comment) - the model
+  // doesn't just reorder ingredients, it can rename them too (the reported
+  // bug: submitted "Amla Juice" came back as "Amla"), so an exact-string
+  // match would treat that as a brand new, unrelated ingredient rather
+  // than the same one the dietician already specified.
+  const collapse = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+  const findAiMatch = (subName) => {
+    const collapsedSub = collapse(subName);
+    if (!collapsedSub) return null;
+    return aiList.find((ing) => {
+      const collapsedAi = collapse(ing?.name);
+      return (
+        collapsedAi.length > 0 &&
+        (collapsedSub.includes(collapsedAi) || collapsedAi.includes(collapsedSub))
+      );
+    });
+  };
+
+  const matchedAiIngredients = new Set();
+  const merged = submitted.map((sub) => {
+    const aiMatch = findAiMatch(sub?.name);
+    if (aiMatch) matchedAiIngredients.add(aiMatch);
+    return {
+      name: sub.name,
+      quantity: sub.quantity,
+      unit: sub.unit || 'g',
+      category: aiMatch?.category || sub.category || 'Other',
+      priceLevel: aiMatch?.priceLevel || sub.priceLevel || '₹₹',
+      description: (aiMatch?.description ?? sub.description) || '',
+      isScalable: (aiMatch ? aiMatch.isScalable : sub.isScalable) !== false,
+      image: sub.image || aiMatch?.image || null,
+      role: sub.role === 'core' ? 'core' : 'sub',
+    };
+  });
+
+  const addedByModel = aiList
+    .filter((ing) => !matchedAiIngredients.has(ing))
+    .map((ing) => ({
+      name: ing.name,
+      quantity: ing.quantity,
+      unit: ing.unit || 'g',
+      category: ing.category || 'Other',
+      priceLevel: ing.priceLevel || '₹₹',
+      description: ing.description || '',
+      isScalable: ing.isScalable !== false,
+      image: ing.image || null,
+      role: ing.role === 'core' ? 'core' : 'sub',
+    }));
+
+  return [...merged, ...addedByModel];
+}
+
 module.exports = {
   parseQuantitiesFromNote,
   applyAiNoteQuantityOverrides,
   enforceFiniteIngredientQuantities,
+  preserveSubmittedIngredients,
 };

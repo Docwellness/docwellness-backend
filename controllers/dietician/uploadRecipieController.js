@@ -12,6 +12,7 @@ const {
 const {
   applyAiNoteQuantityOverrides,
   enforceFiniteIngredientQuantities,
+  preserveSubmittedIngredients,
 } = require('../../utils/ingredientQuantityValidator');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValidator');
@@ -324,10 +325,10 @@ exports.generateRecipeWithAI = async (req, res, next) => {
           image: null, // To be added by dietician later
           // recipe-core-ingredient-scaling: this preview response was
           // silently dropping `role`, unlike the sibling
-          // updateRecipeFromEdits/enhanceIngredient below - meaning a
-          // freshly-AI-generated recipe's core/sub split never reached the
-          // dietician app at all. Found during implementation of
-          // openspec/changes/unify-recipe-ingredients-and-components.
+          // updateRecipeFromEdits/preserveSubmittedIngredients below -
+          // meaning a freshly-AI-generated recipe's core/sub split never
+          // reached the dietician app at all. Found during implementation
+          // of openspec/changes/unify-recipe-ingredients-and-components.
           role: ing.role === 'core' ? 'core' : 'sub',
         }))
         : [],
@@ -757,27 +758,15 @@ exports.updateRecipeFromEdits = async (req, res, next) => {
     }
 
     // Build final response: preserve immutable fields, use AI-refined values for mutable fields with fallbacks
-    // Ensure enhanced ingredient format with category, priceLevel, and description
-    const enhanceIngredient = (ing) => ({
-      name: ing.name,
-      quantity: ing.quantity,
-      unit: ing.unit || 'g',
-      category: ing.category || 'Other',
-      priceLevel: ing.priceLevel || '₹₹',
-      description: ing.description || '',
-      isScalable: ing.isScalable !== false,
-      image: ing.image || null,
-      // recipe-core-ingredient-scaling: preserve role through the preview
-      // response - services/recipeVersioningService.js's
-      // createVersionFromSnapshot (the "Update Existing" apply path this
-      // preview feeds into) reads it from here.
-      role: ing.role === 'core' ? 'core' : 'sub',
-    });
-
-    const finalIngredients =
-      Array.isArray(updatedRecipe.ingredients) && updatedRecipe.ingredients.length > 0
-        ? updatedRecipe.ingredients.map(enhanceIngredient)
-        : (ingredients || []).map(enhanceIngredient);
+    // Every submitted ingredient's name/quantity/unit/role is the
+    // dietician's own literal structural edit, not a suggestion for the
+    // model to reinterpret - preserveSubmittedIngredients guarantees it
+    // survives verbatim (only AI-filled metadata like category/description
+    // is taken from the model's response), instead of the model's
+    // regenerated list silently replacing it wholesale. See that function's
+    // doc comment for the "Amla Juice 30ml -> 2 piece, Honey dropped" bug
+    // this exists to prevent.
+    const finalIngredients = preserveSubmittedIngredients(ingredients, updatedRecipe.ingredients);
 
     const finalNutrition = updatedRecipe.nutrition ||
       nutrition || {
