@@ -1049,6 +1049,15 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
 
     const cycleNumber = dietPlan.cycleNumber || 1;
 
+    // Subscription pause: same shift getActiveDietPlanForPatient/
+    // getMealLogScreenData apply - without it, a patient whose plan was
+    // ever paused-and-resumed got a grocery list for a *different* week
+    // than the Diet Plan screen was actually showing for the same date.
+    // referenceDate itself (retireEndedPredecessorPlans above) stays the
+    // real calendar date - only week resolution uses the shifted one.
+    const pauses = await loadPatientPauses(req.user._id);
+    const effectiveDate = effectiveContentDate(pauses, referenceDate) || referenceDate;
+
     // The grocery list spans the SAME continuous, cross-renewal week timeline
     // the Diet tab shows (getActiveDietPlanForPatient's mergedWeeks): every
     // completed/active past cycle's weeks, this cycle's, and the next renewal
@@ -1057,7 +1066,7 @@ exports.getGroceriesForCurrentWeek = async (req, res, next) => {
     // patient sees Weeks 1..N unbroken. currentWeek is this cycle's ongoing
     // week mapped into that same space, so the screen opens focused on the
     // week the patient is actually in.
-    const currentWeek = (cycleNumber - 1) * 4 + resolveCurrentWeek(dietPlan, referenceDate);
+    const currentWeek = (cycleNumber - 1) * 4 + resolveCurrentWeek(dietPlan, effectiveDate);
 
     const pastCycles = await DietPlan.find({
       patientId: req.user._id,
