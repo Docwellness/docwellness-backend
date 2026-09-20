@@ -203,6 +203,14 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       startDate: upcomingPause?.startDate || null,
       resumeDate: upcomingPause?.resumeDate || null,
       contentDateOffsetDays: pauseShiftForDate(pauses, nowForPause),
+      // Every pause window on record, not just the current-or-upcoming one
+      // above - currentOrUpcomingPause returns null once real "now" is past
+      // every window's resumeDate, which made a pause the patient browses
+      // BACK to via the Diet tab's day strip (one that already fully
+      // resumed) invisible to the app's isDatePaused check, even though its
+      // shift is still correctly applied to plan content via
+      // effectiveContentDate below.
+      windows: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
     };
     if (pauses.length) {
       referenceDate = effectiveContentDate(pauses, referenceDate) || normalizeDate(referenceDate);
