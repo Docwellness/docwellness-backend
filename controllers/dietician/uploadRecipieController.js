@@ -16,7 +16,7 @@ const {
 } = require('../../utils/ingredientQuantityValidator');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValidator');
-const { resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
+const { resolveTopCategoryFilter, intersectCategoryFilter } = require('../../utils/recipeCategoryGroups');
 const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
@@ -1006,11 +1006,12 @@ exports.getRecipeCategories = async (req, res, next) => {
 
 /**
  * @desc    Real recipe counts per serving-time slot, optionally scoped to a
- *          top-level category group, plus the Supplements total - powers
- *          the "Recipes & Supplements" landing grid's per-card counts.
+ *          top-level category, plus the Supplements/Sides/Salad shortcut
+ *          totals - powers the "Recipes & Supplements" landing grid's
+ *          per-card counts.
  * @route   GET /api/dietician/recipes/serving-time-summary
  * @access  Private (Dietician)
- * @query   topCategory (optional: All/Indian/Continental/Western/Supplements)
+ * @query   topCategory (optional: All or any real Recipe.category value)
  */
 exports.getServingTimeSummary = async (req, res, next) => {
   try {
@@ -1021,7 +1022,8 @@ exports.getServingTimeSummary = async (req, res, next) => {
       'Morning Drink', 'Breakfast', 'Brunch', 'Lunch', 'Evening Snack', 'Dinner', 'Night Drink',
     ];
 
-    const scopedFilter = { dieticianId, ...resolveTopCategoryFilter(topCategory) };
+    const categoryFilter = resolveTopCategoryFilter(topCategory);
+    const scopedFilter = { dieticianId, ...categoryFilter };
 
     // Supplements are counted separately below (supplementsCount) and must
     // not also inflate the per-servingTime meal-time buckets, unless the
@@ -1036,12 +1038,16 @@ exports.getServingTimeSummary = async (req, res, next) => {
     ]);
     const countByServingTime = new Map(counts.map((c) => [c._id, c.count]));
 
-    // Supplements/Sides/Salad are fixed shortcut cards regardless of the
-    // selected top category, since none of them are tied to one cuisine.
+    // Sides/Salad are tags independent of a recipe's category (e.g. an
+    // Indian recipe can be tagged 'side'), and Supplements is itself a
+    // single-valued, mutually-exclusive category - so all three shortcut
+    // counts scope to the same selected top category as the meal-time
+    // buckets above, instead of always showing the dietician's full total
+    // regardless of which chip is selected.
     const [supplementsCount, sidesCount, saladCount] = await Promise.all([
-      Recipe.countDocuments({ dieticianId, category: 'Supplements' }),
-      Recipe.countDocuments({ dieticianId, tags: 'side' }),
-      Recipe.countDocuments({ dieticianId, tags: 'salad' }),
+      Recipe.countDocuments({ dieticianId, ...intersectCategoryFilter(categoryFilter, 'Supplements') }),
+      Recipe.countDocuments({ dieticianId, tags: 'side', ...categoryFilter }),
+      Recipe.countDocuments({ dieticianId, tags: 'salad', ...categoryFilter }),
     ]);
 
     return res.status(200).json({
@@ -1065,10 +1071,11 @@ exports.getServingTimeSummary = async (req, res, next) => {
  * @desc    List all recipes with optional category filter
  * @route   GET /api/dietician/recipes
  * @access  Private (Dietician)
- * @query   category (optional exact match), topCategory (optional group:
- *          All/Indian/Continental/Western/Supplements), servingTime
- *          (optional), tag (optional: side/salad, matches if the recipe's
- *          tags array contains it), page (default 1), limit (default 20)
+ * @query   category (optional exact match, intersects with topCategory),
+ *          topCategory (optional: All or any real Recipe.category value),
+ *          servingTime (optional), tag (optional: side/salad, matches if
+ *          the recipe's tags array contains it), page (default 1), limit
+ *          (default 20)
  */
 exports.listRecipes = async (req, res, next) => {
   try {
@@ -1083,11 +1090,16 @@ exports.listRecipes = async (req, res, next) => {
     const limitNum = Math.min(Math.max(Number.isNaN(limitParsed) ? 20 : limitParsed, 1), 500);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build filter
-    const filter = { dieticianId, ...resolveTopCategoryFilter(topCategory) };
-    if (category && category !== 'All') {
-      filter.category = category;
-    }
+    // Build filter. An exact `category` and a `topCategory` group both
+    // constrain the same single-valued field, so they intersect rather than
+    // one overriding the other (see intersectCategoryFilter's doc comment).
+    const filter = {
+      dieticianId,
+      ...intersectCategoryFilter(
+        resolveTopCategoryFilter(topCategory),
+        category && category !== 'All' ? category : undefined
+      ),
+    };
     if (tag) {
       filter.tags = tag;
     } else if (servingTime && SIDE_SALAD_ELIGIBLE_SLOTS.has(servingTime)) {

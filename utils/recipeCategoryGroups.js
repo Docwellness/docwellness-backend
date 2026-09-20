@@ -29,4 +29,23 @@ function resolveTopCategoryFilter(topCategory) {
   return { category: topCategory };
 }
 
-module.exports = { WESTERN_CATEGORIES, resolveTopCategoryFilter };
+/**
+ * Combines a top-level category filter (from resolveTopCategoryFilter) with
+ * a second, more specific category constraint - an exact category a caller
+ * wants to require regardless of which top-level filter is active (e.g. the
+ * Supplements shortcut card always means "category is exactly Supplements",
+ * on top of whatever cuisine chip is selected). Recipe.category is a single
+ * value, so this is an intersection, not an override: if the two constraints
+ * disagree, no recipe can satisfy both and the result must match nothing.
+ */
+function intersectCategoryFilter(topCategoryFilter, exactCategory) {
+  if (!exactCategory || exactCategory === 'All') return topCategoryFilter;
+  if (!topCategoryFilter || !topCategoryFilter.category) return { category: exactCategory };
+  const allowed = topCategoryFilter.category;
+  const satisfiable = typeof allowed === 'string'
+    ? allowed === exactCategory
+    : Array.isArray(allowed.$in) && allowed.$in.includes(exactCategory);
+  return { category: satisfiable ? exactCategory : { $in: [] } };
+}
+
+module.exports = { WESTERN_CATEGORIES, resolveTopCategoryFilter, intersectCategoryFilter };
