@@ -16,7 +16,7 @@ const {
 } = require('../../utils/ingredientQuantityValidator');
 const { checkTextSafety } = require('../../utils/inputGuardrails');
 const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValidator');
-const { TOP_CATEGORIES, resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
+const { resolveTopCategoryFilter } = require('../../utils/recipeCategoryGroups');
 const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');

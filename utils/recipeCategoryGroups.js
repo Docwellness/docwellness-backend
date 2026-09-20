@@ -1,12 +1,10 @@
-// The "Recipes & Supplements" screen browses recipes through a simplified
-// 4-bucket top-level grouping (All / Indian / Continental / Western /
-// Supplements) layered ON TOP of the existing, unchanged 24-value
-// Recipe.category enum - no data migration, no loss of the finer-grained
-// categories (American, Detox, Keto, etc.), which stay exactly as stored.
-// "Western" is a UI/query-level grouping over several existing category
-// values, not a rename of them.
-
-const TOP_CATEGORIES = ['All', 'Indian', 'Continental', 'Western', 'Supplements'];
+// The dietician app's "Recipes & Supplements" / Diet & Exercise tab offers
+// every real Recipe.category value the dietician has recipes in as its own
+// selectable top-level chip (see GET /recipes/categories), each expecting
+// per-serving-time summary/grid behavior scoped to an exact category match.
+// "Western" is kept as a legacy UI/query-level grouping over several
+// existing category values (not a rename of them) for any caller that still
+// passes it explicitly.
 
 // Every category value NOT explicitly "Indian", "Continental", or
 // "Supplements" that should surface under the "Western" bucket. Deliberately
@@ -20,17 +18,15 @@ const WESTERN_CATEGORIES = [
 ];
 
 /**
- * Resolves a top-level category (one of TOP_CATEGORIES) into a Mongo filter
- * fragment to merge into a Recipe query. Returns null for 'All'/unrecognized
- * (no filtering).
+ * Resolves a top-level category into a Mongo filter fragment to merge into
+ * a Recipe query. Returns null for 'All' (no filtering). Any value that
+ * isn't the legacy "Western" grouping falls back to an exact category
+ * match, so every real Recipe.category value works as a topCategory.
  */
 function resolveTopCategoryFilter(topCategory) {
   if (!topCategory || topCategory === 'All') return null;
-  if (topCategory === 'Indian') return { category: 'Indian' };
-  if (topCategory === 'Continental') return { category: 'Continental' };
-  if (topCategory === 'Supplements') return { category: 'Supplements' };
   if (topCategory === 'Western') return { category: { $in: WESTERN_CATEGORIES } };
-  return null;
+  return { category: topCategory };
 }
 
-module.exports = { TOP_CATEGORIES, WESTERN_CATEGORIES, resolveTopCategoryFilter };
+module.exports = { WESTERN_CATEGORIES, resolveTopCategoryFilter };
