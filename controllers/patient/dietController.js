@@ -1285,7 +1285,18 @@ async function computeTodayMealLogStats(patientId, today) {
       weeks = getFinalizedWeeks(dietPlan);
     }
 
-    const currentWeek = resolveCurrentWeek(dietPlan, today);
+    // Subscription pause: same shift getActiveDietPlanForPatient/
+    // getMealLogScreenData apply - without it, a patient whose plan was
+    // ever paused-and-resumed got a *different* week/day-group here than
+    // what the Diet Plan screen actually showed/logged against, so this
+    // endpoint's "today's plan" (and therefore loggedCount/isLogged/
+    // completionPercentage below) silently disagreed with what was really
+    // logged. `today` itself (the MealLog lookup below) stays the real
+    // calendar date - only week/day-group resolution uses the shifted one.
+    const pauses = await loadPatientPauses(patientId);
+    const effectiveToday = effectiveContentDate(pauses, today) || today;
+
+    const currentWeek = resolveCurrentWeek(dietPlan, effectiveToday);
 
   const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
 
@@ -1295,8 +1306,9 @@ async function computeTodayMealLogStats(patientId, today) {
   // `today` falls into, same as getActiveDietPlanForPatient/
   // getPatientMealLogStats (dietician side) already do. Missing this
   // filter here summed all 4 groups' meals together, inflating planned
-  // calories ~4x+ over the real daily target.
-  const todayDayGroup = resolveDayGroupForDate(today);
+  // calories ~4x+ over the real daily target. Uses effectiveToday, not
+  // today - see the pause-shift comment above.
+  const todayDayGroup = resolveDayGroupForDate(effectiveToday);
   const todaysDailyMeals = week
     ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
     : [];
@@ -1616,6 +1628,21 @@ exports.getMealLogScreenData = async (req, res, next) => {
       });
     }
 
+    // Subscription pause: translate the real calendar targetDate to the
+    // "effective" content date before resolving the week/day-group below -
+    // same shift getActiveDietPlanForPatient applies (see
+    // utils/subscriptionPause.js). Without this, a patient whose plan was
+    // ever paused-and-resumed got a *different* week/day-group here than
+    // the Diet Plan screen showed for the same date, so this endpoint's
+    // plannedMeals listed different recipes than what the patient actually
+    // saw and logged against - Quick Log/the Log Meal sheet always POSTed
+    // successfully, but isRecipeLogged/the "already logged" check could
+    // never find a matching entry. targetDate itself (used below for the
+    // MealLog lookup and isPresentDate) stays the real calendar date -
+    // only week/day-group resolution use the shifted one.
+    const pauses = await loadPatientPauses(req.user._id);
+    const effectiveDate = effectiveContentDate(pauses, targetDate) || targetDate;
+
     // v4.0: a 'plan-item' plan has no finalizedPlan blob - its weeks are
     // synthesized from DayPlan/MealSlotPlan/PlanItem/RecipeVersion, same as
     // getActiveDietPlanForPatient does. Without this branch getFinalizedWeeks
@@ -1688,7 +1715,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
       };
     });
 
-    const currentWeek = resolveCurrentWeek(dietPlan, targetDate);
+    const currentWeek = resolveCurrentWeek(dietPlan, effectiveDate);
 
     const week =
       typeof currentWeek === 'number'
@@ -1719,8 +1746,9 @@ exports.getMealLogScreenData = async (req, res, next) => {
       // Meal showed every day-group's recipes for a slot at once (e.g.
       // Monday's AND Tuesday's AND Wednesday's AND Thursday's Lunch combos
       // all together) instead of just what the dietician actually assigned
-      // for targetDate's specific day.
-      const targetDayGroup = resolveDayGroupForDate(targetDate);
+      // for targetDate's specific day. Uses effectiveDate, not targetDate -
+      // see the pause-shift comment above.
+      const targetDayGroup = resolveDayGroupForDate(effectiveDate);
       (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, targetDayGroup)).forEach((meal) => {
         const recipe = recipes[meal.recipeId];
         if (!recipe) return;
