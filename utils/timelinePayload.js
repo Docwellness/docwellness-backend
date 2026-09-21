@@ -11,6 +11,7 @@ const {
   computeTaskDoneMap,
 } = require('./goalAdherence');
 const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
+const { formatDayLabel, formatMonthLabel } = require('./seedGoalTimeline');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -134,11 +135,28 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   const shapedMilestones = milestones.map((m) => {
     const adherenceEntry =
       m.type === 'weekly' ? weeklyAdherenceEntry(m) : adherenceMap.get(m._id.toString());
+    // Daily/monthly titles are just a formatted version of the milestone's
+    // own date (formatDayLabel/formatMonthLabel, see seedGoalTimeline.js),
+    // baked into `title` once at seed time from the ORIGINAL date. m.date
+    // above is already pause-shifted, so a milestone seeded as "Sep 09"
+    // that a pause pushes to display on Sep 12 must read "Sep 12", not the
+    // stale stored title - recompute instead of trusting it.
+    let title = m.title;
+    if (m.type === 'daily') title = formatDayLabel(m.date);
+    else if (m.type === 'monthly') title = formatMonthLabel(m.date);
+    // Same staleness for the end-goal node's subtitle, which embeds the
+    // goal's target date as of seed time - use the pause-adjusted
+    // effectiveEndDate (already computed above) instead.
+    let subtitle = m.subtitle;
+    if (m.type === 'end_goal') {
+      const targetDate = effectiveEndDate || m.date;
+      subtitle = `Goal · ${formatDayLabel(targetDate)} ${targetDate.getUTCFullYear()}`;
+    }
     return {
       id: m._id,
       type: m.type,
-      title: m.title,
-      subtitle: m.subtitle,
+      title,
+      subtitle,
       date: m.date,
       status: computeMilestoneStatus(m, adherenceEntry, today),
       adherence: adherenceEntry?.adherence ?? 0,
