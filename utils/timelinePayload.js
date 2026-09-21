@@ -10,7 +10,7 @@ const {
   computeMilestoneStatus,
   computeTaskDoneMap,
 } = require('./goalAdherence');
-const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
+const { shiftDateForPauses, totalShiftDays, isPausedOn } = require('./subscriptionPause');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -140,7 +140,14 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       title: m.title,
       subtitle: m.subtitle,
       date: m.date,
-      status: computeMilestoneStatus(m, adherenceEntry, today),
+      // A day inside a pause window has no possible tasks to log - the
+      // dietician disabled it deliberately - so it must never read as
+      // 'missed' (computeMilestoneStatus has no pause awareness and would
+      // call it exactly that: tasksDone stays 0 all day, same as a day the
+      // patient genuinely skipped). Checked against m.date, the already
+      // pause-shifted display date, so it matches whichever day the dot
+      // actually renders on.
+      status: isPausedOn(pauses, m.date) ? 'paused' : computeMilestoneStatus(m, adherenceEntry, today),
       adherence: adherenceEntry?.adherence ?? 0,
       tasks: tasksByMilestone.get(m._id.toString()) || [],
     };
