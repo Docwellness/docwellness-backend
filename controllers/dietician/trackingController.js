@@ -14,6 +14,8 @@ const {
 } = require('../../utils/trackingBuckets');
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
 const { computeMealRatio } = require('../../utils/weekNutritionSummary');
+const { loadPatientPauses } = require('../../utils/patientPauseGuard');
+const { effectiveContentDate } = require('../../utils/subscriptionPause');
 
 /**
  * GET /patients/:patientId/tracking-data?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
@@ -276,13 +278,23 @@ exports.getPatientMealLogStats = async (req, res, next) => {
       weeks = getFinalizedWeeks(dietPlan);
     }
 
+    // Subscription pause: same content-date shift the patient-facing
+    // endpoints apply (utils/subscriptionPause.js) - without it, this
+    // endpoint picked a different week/day-group than what the patient's
+    // own app actually showed/logged against for a date whose pause had
+    // since resumed, so the dietician's "Client Logged Data" screen
+    // disagreed with what the patient saw. `today` itself (the MealLog
+    // lookup below) stays the real calendar date.
+    const pauses = await loadPatientPauses(patientId);
+    const effectiveToday = effectiveContentDate(pauses, today) || today;
+
     // weekSchedule-aware (matches controllers/patient/dietController.js's
     // getActiveDietPlanForPatient) - a plain diff-from-activationDate estimate
     // here previously ignored weekSchedule entirely, so a week that had been
     // individually rescheduled (see utils/weekSchedule.js) made this endpoint
     // pick the wrong week's dailyMeals while the patient app picked the right
     // one, and the two apps' calorie rings disagreed for the same day.
-    const currentWeek = resolveCurrentWeek(dietPlan, today);
+    const currentWeek = resolveCurrentWeek(dietPlan, effectiveToday);
 
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek)) || null;
 
@@ -290,7 +302,7 @@ exports.getPatientMealLogStats = async (req, res, next) => {
     // Wednesday=Sunday, Thursday unique - see utils/dayGroups.js) - scope
     // "today's plan" down to just the group `today` falls into, same as
     // the patient-facing getActiveDietPlanForPatient does.
-    const todayDayGroup = resolveDayGroupForDate(today);
+    const todayDayGroup = resolveDayGroupForDate(effectiveToday);
     const todaysDailyMeals = week
       ? (week.dailyMeals || []).filter((meal) => mealMatchesDayGroup(meal, todayDayGroup))
       : [];
@@ -534,6 +546,15 @@ exports.getPatientMealLogStats = async (req, res, next) => {
           planned: macroPlanned,
         },
         meals: plannedMeals,
+        // Lets the dietician's "Client Logged Data" screen show a paused
+        // notice instead of this day's (possibly all-zero) numbers when the
+        // *viewed* date falls in any pause window - check membership by
+        // date, not "right now", since the dietician can browse to any past
+        // day. Same shape as controllers/patient/dietController.js's
+        // getActiveDietPlanForPatient uses on the patient side.
+        pause: {
+          windows: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
+        },
       },
     });
   } catch (error) {
@@ -575,7 +596,11 @@ exports.getPatientExerciseStats = async (req, res, next) => {
     const { patientId } = req.params;
     const queryDate = req.query.date;
     const today = queryDate ? new Date(queryDate) : new Date();
-    const todayDayGroup = resolveDayGroupForDate(today);
+    // Subscription pause: same content-date shift getPatientMealLogStats
+    // above applies - see its comment for why.
+    const pauses = await loadPatientPauses(patientId);
+    const effectiveToday = effectiveContentDate(pauses, today) || today;
+    const todayDayGroup = resolveDayGroupForDate(effectiveToday);
 
     const plan = await ExercisePlan.findOne({ patientId, status: 'Active' }).lean();
     const todaysPlanned = (plan?.dailyExercises || []).filter(
@@ -606,6 +631,9 @@ exports.getPatientExerciseStats = async (req, res, next) => {
         totalCaloriesBurned,
         completedCount,
         totalExercises: todaysPlanned.length,
+        pause: {
+          windows: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
+        },
       },
     });
   } catch (error) {

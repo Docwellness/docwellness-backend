@@ -10,7 +10,6 @@ const { rejectIfPaused } = require('../../utils/patientPauseGuard');
 exports.logWater = async (req, res) => {
   try {
     const patientId = req.user._id;
-    if (await rejectIfPaused(res, patientId)) return;
     const { date, entries, goal } = req.body;
 
     if (!date || !entries || !Array.isArray(entries) || entries.length === 0) {
@@ -19,6 +18,8 @@ exports.logWater = async (req, res) => {
         message: 'date and entries[] are required',
       });
     }
+
+    if (await rejectIfPaused(res, patientId, new Date(date))) return;
 
     // Find or create the log for this date
     let waterLog = await WaterLog.findOne({ patientId, date });

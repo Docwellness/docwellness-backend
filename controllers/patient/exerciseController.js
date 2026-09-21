@@ -151,7 +151,6 @@ exports.getTodayExerciseStats = async (req, res, next) => {
 exports.submitExerciseLog = async (req, res, next) => {
   try {
     const patientId = req.user._id;
-    if (await rejectIfPaused(res, patientId)) return;
     const { date, exercises } = req.body || {};
 
     const rawDate = date ? new Date(date) : new Date();
@@ -160,6 +159,8 @@ exports.submitExerciseLog = async (req, res, next) => {
     }
     const targetDate = normalizeDate(rawDate);
     const today = normalizeDate(new Date());
+
+    if (await rejectIfPaused(res, patientId, targetDate)) return;
     // Reject only a future date - a patient logs exercise they *did*, which
     // can only ever be today or an earlier day (mirrors dietController.js's
     // submitMealLog day-strip logging). This used to reject the opposite

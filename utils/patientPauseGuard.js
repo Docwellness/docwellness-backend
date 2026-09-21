@@ -53,14 +53,22 @@ async function getPauseStateForLogging(patientId, when = new Date()) {
 /**
  * Express helper: if paused, sends a 403 and returns true (caller should
  * `return`); otherwise returns false.
+ *
+ * `when` should be the date the write actually targets (e.g. the `date` in
+ * the request body), not left to default to real "now" - a patient logging
+ * against today (or any other non-paused day) must not be rejected just
+ * because a *different* day is currently inside an active pause window.
+ * Every call site used to omit it, so while any pause was active in real
+ * time, every log attempt failed with this 403 regardless of which
+ * (possibly unpaused) date it actually targeted.
  */
-async function rejectIfPaused(res, patientId) {
-  const { paused, resumeDate } = await getPauseStateForLogging(patientId);
+async function rejectIfPaused(res, patientId, when = new Date()) {
+  const { paused, resumeDate } = await getPauseStateForLogging(patientId, when);
   if (!paused) return false;
-  const when = resumeDate ? ` It resumes on ${resumeDate.toISOString().slice(0, 10)}.` : '';
+  const whenMsg = resumeDate ? ` It resumes on ${resumeDate.toISOString().slice(0, 10)}.` : '';
   res.status(403).json({
     success: false,
-    message: `Your plan is paused right now, so logging is disabled.${when}`,
+    message: `Your plan is paused for this day, so logging is disabled.${whenMsg}`,
     code: 'PLAN_PAUSED',
     resumeDate: resumeDate || null,
   });

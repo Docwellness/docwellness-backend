@@ -1838,11 +1838,11 @@ exports.submitMealLog = async (req, res, next) => {
   try {
     const { date, items } = req.body;
 
-    if (await rejectIfPaused(res, req.user._id)) return;
-
     // Normalize the date
     const targetDate = normalizeDate(new Date(date));
     const today = normalizeDate(new Date());
+
+    if (await rejectIfPaused(res, req.user._id, targetDate)) return;
 
     // Reject only if the target date is in the future - a patient logs what
     // they *did* eat, which can only ever be today or an earlier day (see
