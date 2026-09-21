@@ -10,7 +10,7 @@ const {
   computeMilestoneStatus,
   computeTaskDoneMap,
 } = require('./goalAdherence');
-const { shiftDateForPauses, totalShiftDays, isPausedOn } = require('./subscriptionPause');
+const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -140,23 +140,51 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       title: m.title,
       subtitle: m.subtitle,
       date: m.date,
-      // A day inside a pause window has no possible tasks to log - the
-      // dietician disabled it deliberately - so it must never read as
-      // 'missed' (computeMilestoneStatus has no pause awareness and would
-      // call it exactly that: tasksDone stays 0 all day, same as a day the
-      // patient genuinely skipped). Checked against m.date, the already
-      // pause-shifted display date, so it matches whichever day the dot
-      // actually renders on.
-      status: isPausedOn(pauses, m.date) ? 'paused' : computeMilestoneStatus(m, adherenceEntry, today),
+      status: computeMilestoneStatus(m, adherenceEntry, today),
       adherence: adherenceEntry?.adherence ?? 0,
       tasks: tasksByMilestone.get(m._id.toString()) || [],
     };
   });
 
+  // Explicit 'paused' placeholders for each frozen calendar day inside a
+  // pause window. A real milestone can never end up representing one of
+  // these days: shiftDateForPauses only ever moves a raw date whose
+  // original date is on/after the window's start forward to on/after the
+  // window's end (that's the whole point - the frozen days have no real
+  // content), so by construction no *shifted* date ever lands back inside
+  // the window it was shifted out of. Without these, the frozen days
+  // simply had nothing rendered on them at all (not wrong, but not a
+  // pause indicator either) - synthesized here instead of tied to any
+  // Milestone document, not counted in adherence/streak.
+  const pausedPlaceholders = [];
+  for (const p of pauses) {
+    for (
+      let t = new Date(p.startDate).getTime();
+      t < new Date(p.resumeDate).getTime();
+      t += MS_PER_DAY
+    ) {
+      const day = new Date(t);
+      if (day < rangeStart || day > rangeEnd) continue;
+      pausedPlaceholders.push({
+        id: `paused-${day.toISOString().slice(0, 10)}`,
+        type: 'daily',
+        title: 'Paused',
+        subtitle: 'Subscription paused',
+        date: day,
+        status: 'paused',
+        adherence: 0,
+        tasks: [],
+      });
+    }
+  }
+  const allMilestones = [...shapedMilestones, ...pausedPlaceholders].sort(
+    (a, b) => a.date - b.date
+  );
+
   return {
     goal: shapeGoal(goal, effectiveEndDate),
     stats,
-    milestones: shapedMilestones,
+    milestones: allMilestones,
     // The pause window(s) that shifted the dates above - so the client can
     // show them explicitly (e.g. "paused 8-12 Sep").
     pauses: pauses.map((p) => ({ startDate: p.startDate, resumeDate: p.resumeDate })),
