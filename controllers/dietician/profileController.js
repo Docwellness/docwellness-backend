@@ -34,6 +34,7 @@ exports.getDoctorProfile = async (req, res, next) => {
         experience: user.dieticianProfile?.experience || 0,
         qualification: user.dieticianProfile?.qualification || '',
         bio: user.dieticianProfile?.bio || '',
+        pullQuote: user.dieticianProfile?.pullQuote || '',
         galleryImages: (user.dieticianProfile?.galleryImages || []).map((g) => ({
           id: g._id,
           url: g.url,
@@ -52,8 +53,16 @@ exports.getDoctorProfile = async (req, res, next) => {
  */
 exports.updateDoctorProfile = async (req, res, next) => {
   try {
-    const { fullName, dateOfBirth, gender, specialization, experience, qualification, bio } =
-      req.body;
+    const {
+      fullName,
+      dateOfBirth,
+      gender,
+      specialization,
+      experience,
+      qualification,
+      bio,
+      pullQuote,
+    } = req.body;
 
     const updateData = {};
 
@@ -68,6 +77,7 @@ exports.updateDoctorProfile = async (req, res, next) => {
     if (experience !== undefined) updateData['dieticianProfile.experience'] = Number(experience);
     if (qualification !== undefined) updateData['dieticianProfile.qualification'] = qualification;
     if (bio !== undefined) updateData['dieticianProfile.bio'] = bio;
+    if (pullQuote !== undefined) updateData['dieticianProfile.pullQuote'] = pullQuote;
 
     const user = await User.findByIdAndUpdate(req.user._id, updateData, {
       new: true,
@@ -88,6 +98,7 @@ exports.updateDoctorProfile = async (req, res, next) => {
         experience: user.dieticianProfile?.experience || 0,
         qualification: user.dieticianProfile?.qualification || '',
         bio: user.dieticianProfile?.bio || '',
+        pullQuote: user.dieticianProfile?.pullQuote || '',
         galleryImages: (user.dieticianProfile?.galleryImages || []).map((g) => ({
           id: g._id,
           url: g.url,
@@ -172,6 +183,7 @@ exports.getAssignedDoctorProfile = async (req, res, next) => {
         experience: doctor.dieticianProfile?.experience || 0,
         qualification: doctor.dieticianProfile?.qualification || '',
         bio: doctor.dieticianProfile?.bio || '',
+        pullQuote: doctor.dieticianProfile?.pullQuote || '',
         galleryImages: (doctor.dieticianProfile?.galleryImages || []).map((g) => ({
           id: g._id,
           url: g.url,

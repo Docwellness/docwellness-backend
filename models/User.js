@@ -190,6 +190,10 @@ const userSchema = new mongoose.Schema(
       experience: { type: Number }, // in years
       qualification: { type: String },
       bio: { type: String },
+      // Short first-person philosophy line shown as the pull-quote highlight
+      // on the patient app's About Doctor page (see doctor_detail_view.dart).
+      // Falls back to a warm placeholder there until she fills this in.
+      pullQuote: { type: String },
       isApproved: { type: Boolean, default: false },
       // Photos shown in the auto-scrolling carousel at the top of the
       // patient app's About Doctor page (see doctor_detail_view.dart).
