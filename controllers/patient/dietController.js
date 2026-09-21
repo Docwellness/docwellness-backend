@@ -12,6 +12,7 @@ const {
   pauseShiftForDate,
   effectiveContentDate,
   currentOrUpcomingPause,
+  shiftWeekRangeForPauses,
 } = require('../../utils/subscriptionPause');
 const { rejectIfPaused, loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { normalize } = require('../../utils/ingredientLibrary');
@@ -463,6 +464,13 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       typeof currentWeek === 'number'
         ? weekScheduleEntries.find((entry) => Number(entry.week) === Number(currentWeek)) || null
         : null;
+    const currentWeekShiftedRange = currentWeekScheduleEntry
+      ? shiftWeekRangeForPauses(
+          pauses,
+          currentWeekScheduleEntry.startDate,
+          currentWeekScheduleEntry.endDate,
+        )
+      : null;
 
     const allWeeksSummary = Array.isArray(dietPlan.weeksSummary) ? dietPlan.weeksSummary : [];
 
@@ -519,6 +527,14 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         const scheduleEntry =
           weekScheduleEntries.find((entry) => Number(entry.week) === weekNum) || null;
         const summary = allWeeksSummary.find((s) => Number(s.week) === weekNum) || null;
+        // Widen the raw 7-day schedule range by whatever pause(s) touch it -
+        // same virtual shift the dietician app's week cards already apply
+        // (see controllers/dietician/patientController.js) - so a paused
+        // week's day strip shows every frozen day plus the days it resumed
+        // into, instead of the un-shifted original 7 days.
+        const shiftedRange = scheduleEntry
+          ? shiftWeekRangeForPauses(pauses, scheduleEntry.startDate, scheduleEntry.endDate)
+          : null;
         return {
           // `week` is the display number ((cycle-1)*4 + n) - same space the
           // prepended past cycles and appended next cycle use - so the app's
@@ -527,8 +543,8 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           // this is unchanged (1-4).
           week: thisCycleOffset + weekNum,
           displayWeek: thisCycleOffset + weekNum,
-          weekStartDate: scheduleEntry?.startDate || null,
-          weekEndDate: scheduleEntry?.endDate || null,
+          weekStartDate: shiftedRange?.startDate || null,
+          weekEndDate: shiftedRange?.endDate || null,
           weekSummary: summary,
           dailyMeals: fixMeals(w.dailyMeals),
           supplementSchedule: supplementScheduleByWeek.get(weekNum) || [],
@@ -588,11 +604,12 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           const wn = Number(w.week);
           const s = schedule.find((e) => Number(e.week) === wn) || null;
           const sum = summary.find((x) => Number(x.week) === wn) || null;
+          const shiftedRange = s ? shiftWeekRangeForPauses(pauses, s.startDate, s.endDate) : null;
           return {
             week: offset + wn,
             displayWeek: offset + wn,
-            weekStartDate: s?.startDate || null,
-            weekEndDate: s?.endDate || null,
+            weekStartDate: shiftedRange?.startDate || null,
+            weekEndDate: shiftedRange?.endDate || null,
             weekSummary: sum,
             dailyMeals: fixMeals(w.dailyMeals),
             supplementSchedule: [],
@@ -645,8 +662,8 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           // currentWeek's own internal 1-4 meaning (see models/DietPlan.js).
           cycleNumber,
           displayWeek,
-          weekStartDate: currentWeekScheduleEntry?.startDate || null,
-          weekEndDate: currentWeekScheduleEntry?.endDate || null,
+          weekStartDate: currentWeekShiftedRange?.startDate || null,
+          weekEndDate: currentWeekShiftedRange?.endDate || null,
           dayGroup: todayDayGroup,
           pause: pauseInfo, // subscription pause window + content date offset
           weekSummary, // single object for the current week
