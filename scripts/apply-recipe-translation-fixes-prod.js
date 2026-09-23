@@ -292,6 +292,7 @@ async function main() {
   let touched = 0;
   let failed = 0;
   for (const name of names) {
+   try {
     const matches = await Recipe.find({ name }).lean();
     if (matches.length !== 1) {
       console.log(`\n!! ${name}: expected 1 recipe, found ${matches.length} - skipped`);
@@ -312,32 +313,40 @@ async function main() {
       let changed = false;
 
       for (const op of ops) {
-        if (op.replaceAll) {
-          const [find, repl] = op.replaceAll;
-          for (const [label, get, set] of stringFields(t)) {
-            const v = get();
-            if (v && v.includes(find)) {
-              const nv = v.split(find).join(repl);
-              set(nv);
+        // One op failing (e.g. a path that doesn't exist because prod's
+        // document shape differs slightly from dev's) must not abort the
+        // whole batch - record it against this recipe/lang and move on to
+        // the next op/recipe instead.
+        try {
+          if (op.replaceAll) {
+            const [find, repl] = op.replaceAll;
+            for (const [label, get, set] of stringFields(t)) {
+              const v = get();
+              if (v && v.includes(find)) {
+                const nv = v.split(find).join(repl);
+                set(nv);
+                changed = true;
+                log.push(`  [${lang}] ${label}\n      - ${v}\n      + ${nv}`);
+              }
+            }
+          } else if (op.set) {
+            const before = setPath(t, op.set, op.value);
+            if (before !== op.value) {
               changed = true;
-              log.push(`  [${lang}] ${label}\n      - ${v}\n      + ${nv}`);
+              log.push(`  [${lang}] ${op.set}\n      - ${before}\n      + ${op.value}`);
+            }
+          } else if (op.insert) {
+            const arr = t[op.insert] || (t[op.insert] = []);
+            const enLen = op.insert === 'ingredients' ? recipe.ingredients.length : recipe.instructions.length;
+            if (arr.length < enLen) {
+              arr.splice(op.index, 0, op.value);
+              changed = true;
+              const shown = typeof op.value === 'string' ? op.value : `${op.value.name} | ${op.value.description}`;
+              log.push(`  [${lang}] INSERT ${op.insert}[${op.index}]\n      + ${shown}`);
             }
           }
-        } else if (op.set) {
-          const before = setPath(t, op.set, op.value);
-          if (before !== op.value) {
-            changed = true;
-            log.push(`  [${lang}] ${op.set}\n      - ${before}\n      + ${op.value}`);
-          }
-        } else if (op.insert) {
-          const arr = t[op.insert] || (t[op.insert] = []);
-          const enLen = op.insert === 'ingredients' ? recipe.ingredients.length : recipe.instructions.length;
-          if (arr.length < enLen) {
-            arr.splice(op.index, 0, op.value);
-            changed = true;
-            const shown = typeof op.value === 'string' ? op.value : `${op.value.name} | ${op.value.description}`;
-            log.push(`  [${lang}] INSERT ${op.insert}[${op.index}]\n      + ${shown}`);
-          }
+        } catch (opErr) {
+          errors.push(`${lang}: op ${JSON.stringify(op)} failed: ${opErr.message}`);
         }
       }
 
@@ -361,6 +370,12 @@ async function main() {
       const res = await Recipe.updateOne({ _id: recipe._id }, { $set: updates });
       console.log(`  -> written (matched ${res.matchedCount}, modified ${res.modifiedCount})`);
     }
+   } catch (err) {
+     // Defense in depth on top of the per-op try/catch above - nothing
+     // about one recipe should ever be able to abort the whole batch.
+     console.log(`\n!! ${name}: unexpected error, skipped: ${err.message}`);
+     failed++;
+   }
   }
 
   console.log('\n--- summary ---');
