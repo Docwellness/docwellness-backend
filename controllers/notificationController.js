@@ -92,3 +92,17 @@ exports.markAllAsRead = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+/**
+ * DELETE /api/dietician/notifications/clear-all
+ * Permanently delete every notification for the current user.
+ */
+exports.clearAll = async (req, res) => {
+  try {
+    const result = await Notification.deleteMany({ userId: req.user._id });
+    return res.json({ success: true, message: 'All notifications cleared', data: { deletedCount: result.deletedCount } });
+  } catch (err) {
+    console.error('clearAll error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

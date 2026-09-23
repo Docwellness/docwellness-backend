@@ -997,6 +997,16 @@ router.put(
 );
 
 /**
+ * @route   DELETE /api/dietician/notifications/clear-all
+ * @desc    Permanently delete every notification for the current user
+ */
+router.delete(
+  '/notifications/clear-all',
+  dieticianOnlyMiddleware,
+  notificationController.clearAll
+);
+
+/**
  * @route   PUT /api/dietician/notifications/:id/read
  * @desc    Mark a single notification as read
  */
