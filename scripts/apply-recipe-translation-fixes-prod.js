@@ -38,6 +38,12 @@
  */
 require('dotenv').config({ quiet: true });
 const mongoose = require('mongoose');
+// Reuses the real app's own connection setup (config/database.js) instead of
+// a bare mongoose.connect(uri) - prod's self-hosted Mongo needs its private
+// CA (MONGODB_TLS_CA_BASE64) passed as tlsCAFile, which only connectDB knows
+// how to resolve. A bare connect() fails with "self-signed certificate in
+// certificate chain".
+const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice('--only='.length) || null;
@@ -279,7 +285,7 @@ function validate(t, recipe, lang) {
 async function main() {
   console.log(EXECUTE ? '=== EXECUTING ===' : '=== DRY RUN (pass --execute to write) ===');
   console.log(`DB: ${(process.env.MONGODB_URI || '').replace(/\/\/[^@]+@/, '//<redacted>@')}`);
-  await mongoose.connect(process.env.MONGODB_URI);
+  await connectDB();
   const Recipe = require('../models/Recipe');
 
   const names = Object.keys(FIXES).filter((n) => !ONLY || n === ONLY);
