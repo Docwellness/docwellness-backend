@@ -109,7 +109,17 @@ async function decideArtDirection(recipe) {
 function buildPrompt(recipe, { style, heroLabel }) {
   const framing = STYLE_FRAMING[style] || STYLE_FRAMING.plated_main;
   const cuisineClause = recipe.cuisine ? `, a ${recipe.cuisine} dish` : '';
-  return `Professional food photography of ${recipe.name}${cuisineClause}: ${heroLabel} as the visual centerpiece, ${framing}, ${HOUSE_STYLE_SUFFIX}`;
+  const ingredientNames = (recipe.ingredients || [])
+    .map((i) => (i.name || '').trim())
+    .filter(Boolean);
+  // Without this, the model tends to invent a plausible-looking garnish or
+  // side (a lemon wedge, a sprig of herb, a second dish in the background)
+  // that isn't actually in the recipe - accurate for a stock photo, wrong
+  // for a specific prescribed dish a patient will look for on their plate.
+  const ingredientsClause = ingredientNames.length
+    ? ` The dish is made only from these ingredients: ${ingredientNames.join(', ')}. Do not add, show, or imply any other ingredient, garnish, side dish, or food item that isn't in that list.`
+    : '';
+  return `Professional food photography of ${recipe.name}${cuisineClause}: ${heroLabel} as the visual centerpiece, ${framing}, ${HOUSE_STYLE_SUFFIX}.${ingredientsClause}`;
 }
 
 /**
