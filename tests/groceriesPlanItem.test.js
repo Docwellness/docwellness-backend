@@ -207,3 +207,71 @@ test('renewed patient: grocery weeks span both cycles in display-number space, f
   // Predecessor cycle was retired.
   expect((await DietPlan.findById(cycle1._id)).status).toBe('Completed');
 });
+
+test('grocery "bought" ticks persist via PATCH /diet/groceries/checked and merge into GET /diet/groceries', async () => {
+  const dietician = await createDietician();
+  const patient = await createPatient();
+
+  await FoodItem.create({
+    name: 'Oats',
+    normalizedName: 'oats',
+    nutritionPer100g: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
+  });
+  await Ingredient.create({
+    dieticianId: dietician._id,
+    name: 'Oats',
+    normalizedName: 'oats',
+    category: 'Grains',
+    unitConversions: { g: 1 },
+  });
+  const recipe = await Recipe.create({
+    dieticianId: dietician._id,
+    name: 'Oats Porridge',
+    servingTime: 'Breakfast',
+    components: [{ label: 'Oats Porridge', quantity: 100, unit: 'g' }],
+    ingredients: [{ name: 'Oats', quantity: 100, unit: 'g' }],
+    nutrition: { calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10 },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
+
+  const activationDate = new Date();
+  const dietPlan = await DietPlan.create({
+    patientId: patient._id,
+    dieticianId: dietician._id,
+    status: 'Active',
+    dataModel: 'plan-item',
+    activationDate,
+    weekSchedule: [{ week: 1, startDate: activationDate, endDate: new Date(activationDate.getTime() + 6 * 86400000) }],
+  });
+  const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId: patient._id, week: 1, dayGroup: 'Monday' });
+  const mealSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Breakfast' });
+  await PlanItem.create({ mealSlotId: mealSlot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+
+  registerTestToken('patient-token', patient._id);
+  const auth = (req) => req.set('Authorization', 'Bearer patient-token');
+
+  const before = await auth(request(app).get('/api/patient/diet/groceries'));
+  const oats = before.body.data.weeks[0].items.find((i) => /oats/i.test(i.name));
+  expect(oats.key).toBeTruthy();
+  expect(oats.purchased).toBe(false);
+
+  const tick = await auth(request(app).patch('/api/patient/diet/groceries/checked'))
+    .send({ week: 1, items: [{ key: oats.key, purchased: true }] });
+  expect(tick.status).toBe(200);
+  expect(tick.body.data).toEqual({ week: 1, checkedKeys: [oats.key] });
+
+  const after = await auth(request(app).get('/api/patient/diet/groceries'));
+  expect(after.body.data.weeks[0].items.find((i) => i.key === oats.key).purchased).toBe(true);
+
+  const raw = await auth(request(app).get('/api/patient/diet/groceries/checked?week=1'));
+  expect(raw.body.data.weeks).toEqual([{ week: 1, checkedKeys: [oats.key] }]);
+
+  const untick = await auth(request(app).patch('/api/patient/diet/groceries/checked'))
+    .send({ week: 1, items: [{ key: oats.key, purchased: false }] });
+  expect(untick.body.data.checkedKeys).toEqual([]);
+
+  const bad = await auth(request(app).patch('/api/patient/diet/groceries/checked'))
+    .send({ week: 0, items: [] });
+  expect(bad.status).toBe(400);
+});

@@ -32,6 +32,13 @@ const participantSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Same per-participant archive as the legacy Conversation model (see
+    // its own participants.archivedAt comment) - kept independently on
+    // each schema since a conversation can live in either one.
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { _id: false }
 );

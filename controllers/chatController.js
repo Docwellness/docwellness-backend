@@ -22,9 +22,17 @@ exports.getConversations = async (req, res, next) => {
     const userId = req.user._id;
     const userRole = req.user.role; // 'patient' or 'dietician'
 
+    // ?archived=true switches this from "my normal chat list" to "my
+    // archived chats" - archivedAt is per-participant (see the Conversation/
+    // ConversationV1 models), so $elemMatch pins both conditions to the
+    // SAME participant subdocument (this user's own), not just any
+    // participant in the array.
+    const wantArchived = req.query.archived === 'true';
+    const archivedCondition = wantArchived ? { $ne: null } : null;
+
     // Performance optimization: Added lean() for faster query execution
     const conversations = await Conversation.find({
-      'participants.userId': userId,
+      participants: { $elemMatch: { userId, archivedAt: archivedCondition } },
     })
       .populate('participants.userId', 'profile.fullName profile.avatarUrl role isOnline lastSeen')
       .sort({ lastMessageAt: -1 })
@@ -32,7 +40,7 @@ exports.getConversations = async (req, res, next) => {
 
     // Also get V1 conversations (for meal logs)
     const v1Conversations = await ConversationV1.find({
-      'participants.userId': userId,
+      participants: { $elemMatch: { userId, archivedAt: archivedCondition } },
     }).lean();
 
     // Get user info for V1 conversations
@@ -734,6 +742,61 @@ exports.markAsRead = async (req, res, next) => {
     }
 
     res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Shared by archiveConversation/unarchiveConversation - sets (or clears)
+// archivedAt on the calling user's own participant subdocument, trying the
+// legacy Conversation model first and falling back to ConversationV1, same
+// "try both" pattern getMessages already uses (a conversation only ever
+// lives in one of the two).
+const setArchivedAt = async (conversationId, userId, archivedAt) => {
+  const legacyResult = await Conversation.updateOne(
+    { _id: conversationId, 'participants.userId': userId },
+    { $set: { 'participants.$.archivedAt': archivedAt } }
+  );
+  if (legacyResult.matchedCount > 0) return true;
+
+  const v1Result = await ConversationV1.updateOne(
+    { _id: conversationId, 'participants.userId': userId },
+    { $set: { 'participants.$.archivedAt': archivedAt } }
+  );
+  return v1Result.matchedCount > 0;
+};
+
+// PATCH .../conversations/:id/archive - hides this conversation from the
+// caller's own chat list (getConversations) without affecting the other
+// participant's view of it at all.
+exports.archiveConversation = async (req, res, next) => {
+  try {
+    const conversationId = req.params.conversationId || req.params.id;
+    const found = await setArchivedAt(conversationId, req.user._id, new Date());
+    if (!found) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found or you are not a participant',
+      });
+    }
+    res.status(200).json({ success: true, message: 'Conversation archived' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PATCH .../conversations/:id/unarchive - reverses archiveConversation.
+exports.unarchiveConversation = async (req, res, next) => {
+  try {
+    const conversationId = req.params.conversationId || req.params.id;
+    const found = await setArchivedAt(conversationId, req.user._id, null);
+    if (!found) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found or you are not a participant',
+      });
+    }
+    res.status(200).json({ success: true, message: 'Conversation unarchived' });
   } catch (error) {
     next(error);
   }

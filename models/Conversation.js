@@ -6,6 +6,11 @@ const conversationSchema = new mongoose.Schema(
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         unreadCount: { type: Number, default: 0 },
+        // Set when this participant archives the chat from their own chat
+        // list (getConversations excludes it for them while set) - purely
+        // per-participant, so one side archiving never hides the
+        // conversation for the other. null/unset means not archived.
+        archivedAt: { type: Date, default: null },
       },
     ],
     lastMessage: {

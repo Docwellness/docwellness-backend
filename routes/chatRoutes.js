@@ -24,4 +24,8 @@ router.post('/message/:receiverId', upload.single('image'), chatController.sendM
 // Mark all messages in a conversation as read
 router.post('/conversations/:id/read', chatController.markAsRead);
 
+// Archive/unarchive a conversation from the caller's own chat list
+router.patch('/conversations/:id/archive', chatController.archiveConversation);
+router.patch('/conversations/:id/unarchive', chatController.unarchiveConversation);
+
 module.exports = router;

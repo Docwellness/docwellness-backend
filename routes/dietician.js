@@ -682,6 +682,26 @@ router.post(
   chatController.markAsRead
 );
 
+/**
+ * @route   PATCH /api/dietician/chat/conversations/:conversationId/archive
+ * @desc    Archive a conversation from this dietician's own chat list
+ */
+router.patch(
+  '/chat/conversations/:conversationId/archive',
+  dieticianOnlyMiddleware,
+  chatController.archiveConversation
+);
+
+/**
+ * @route   PATCH /api/dietician/chat/conversations/:conversationId/unarchive
+ * @desc    Unarchive a conversation back into this dietician's chat list
+ */
+router.patch(
+  '/chat/conversations/:conversationId/unarchive',
+  dieticianOnlyMiddleware,
+  chatController.unarchiveConversation
+);
+
 // ==========================================
 // Doctor Notes Routes
 // ==========================================

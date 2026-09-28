@@ -36,6 +36,7 @@ const DayPlan = require('./DayPlan');
 const MealSlotPlan = require('./MealSlotPlan');
 const PlanItem = require('./PlanItem');
 const SupplementItem = require('./SupplementItem');
+const GroceryChecklist = require('./GroceryChecklist');
 
 module.exports = {
   User,
@@ -76,4 +77,5 @@ module.exports = {
   MealSlotPlan,
   PlanItem,
   SupplementItem,
+  GroceryChecklist,
 };

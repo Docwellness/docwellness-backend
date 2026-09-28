@@ -48,6 +48,7 @@ const {
   MealSlotPlan,
   PlanItem,
   SupplementItem,
+  GroceryChecklist,
 } = require('../models');
 const { getSupabaseAdmin } = require('./supabaseAuth');
 
@@ -200,6 +201,13 @@ async function specsForCategory(key, ids) {
       { coll: 'mealslotplans', Model: MealSlotPlan, filter: { dayPlanId: { $in: dayPlanIds } } },
       { coll: 'dayplans', Model: DayPlan, filter: { _id: { $in: dayPlanIds } } },
       { coll: 'dietplans', Model: DietPlan, filter: { patientId: { $in: ids } } },
+      // Grocery-list ticks are keyed to the plan's weeks - meaningless once
+      // the plans themselves are gone.
+      {
+        coll: 'grocerychecklists',
+        Model: GroceryChecklist,
+        filter: { patientId: { $in: ids } },
+      },
     ];
   }
 

@@ -389,6 +389,18 @@ router.get('/diet/week-completion', patientOnly, dietController.getWeekCompletio
 router.get('/diet/groceries', patientOnly, dietController.getGroceriesForCurrentWeek);
 
 /**
+ * @route   GET /api/patient/diet/groceries/checked
+ * @desc    Persisted grocery "bought" ticks (all weeks, or ?week=N)
+ */
+router.get('/diet/groceries/checked', patientOnly, dietController.getGroceryChecklist);
+
+/**
+ * @route   PATCH /api/patient/diet/groceries/checked
+ * @desc    Tick/untick grocery items: { week, items: [{ key, purchased }] }
+ */
+router.patch('/diet/groceries/checked', patientOnly, dietController.updateGroceryChecklist);
+
+/**
  * @route   POST /api/patient/payments/manual-proof
  * @desc    Submit manual payment proof (image + amount details)
  */
@@ -464,6 +476,18 @@ router.post('/chat/upload-image', patientOnly, uploadLimiter, upload.single('fil
  * @desc    Mark conversation messages as read
  */
 router.post('/chat/conversations/:id/read', patientOnly, chatController.markAsRead);
+
+/**
+ * @route   PATCH /api/patient/chat/conversations/:id/archive
+ * @desc    Archive a conversation from this patient's own chat list
+ */
+router.patch('/chat/conversations/:id/archive', patientOnly, chatController.archiveConversation);
+
+/**
+ * @route   PATCH /api/patient/chat/conversations/:id/unarchive
+ * @desc    Unarchive a conversation back into this patient's chat list
+ */
+router.patch('/chat/conversations/:id/unarchive', patientOnly, chatController.unarchiveConversation);
 
 // ==========================================
 // Doctor Notes Routes (Patient App)
