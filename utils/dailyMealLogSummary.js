@@ -159,6 +159,11 @@ async function computeDailyMealLogSummary(patientId, today) {
   // that applies to every calorie/macro number below (planned and consumed
   // alike) instead of the recipe's raw, unscaled base nutrition.
   const assignedRatioByKey = {};
+  // Keyed identically to assignedRatioByKey's base-id entries, but holds the
+  // actual recipe object (not just a ratio) - see resolveConsumedRecipe
+  // below for why a logged meal needs this rather than the plain `recipes`
+  // map.
+  const plannedRecipeByKey = {};
   todaysDailyMeals.forEach((meal) => {
     const recipe = recipes[meal.recipeId];
     if (!recipe) return;
@@ -168,7 +173,27 @@ async function computeDailyMealLogSummary(patientId, today) {
     const ratio = isPlanItem ? 1 : computeMealRatio(meal, recipe);
     assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] = ratio;
     assignedRatioByKey[`${meal.servingTime}:${baseId}`] = ratio; // logged meals key on the base id
+    plannedRecipeByKey[`${meal.servingTime}:${baseId}`] = recipe;
   });
+
+  // A *logged* meal (MealLog.meals) only ever carries the base, unversioned
+  // Recipe._id (submitMealLog strips the plan-item version key at log time)
+  // - looking that id up directly in `recipes` returns the base Recipe's own
+  // generic nutrition fields, not the specific RecipeVersion actually
+  // prescribed on the plan (only indexed in `recipes` under the versioned
+  // key, via recipeVersionOverrides). The base Recipe.nutrition is an old,
+  // coarse, manually-entered estimate that predates per-version nutrition
+  // and can diverge sharply from what was prescribed - this drove
+  // totalConsumedCalories to ~46% over plan for a patient who logged exactly
+  // her prescribed portions (see the "fix-plan-item-consumed-calories-
+  // recipe-version" OpenSpec change for the incident). Prefer the prescribed
+  // version via plannedRecipeByKey; fall back to the base `recipes` lookup
+  // for an off-plan/custom log (no prescribed version exists) or a
+  // days-array plan (no versioning at all - both maps resolve identically).
+  const resolveConsumedRecipe = (loggedMeal) => {
+    const key = `${loggedMeal.servingTime}:${loggedMeal.recipeId?.toString()}`;
+    return plannedRecipeByKey[key] || recipes[loggedMeal.recipeId?.toString()];
+  };
 
   // Recomputed live from the recipe's *current* data each time, rather than
   // trusting MealLog's frozen caloriesConsumed snapshot - so a later recipe
@@ -176,7 +201,7 @@ async function computeDailyMealLogSummary(patientId, today) {
   // Falls back to the stored snapshot only when the recipe/ratio can't be
   // resolved (e.g. a custom "Create My Food" entry).
   const liveCaloriesConsumed = (loggedMeal) => {
-    const recipe = recipes[loggedMeal.recipeId?.toString()];
+    const recipe = resolveConsumedRecipe(loggedMeal);
     const ratio = assignedRatioByKey[`${loggedMeal.servingTime}:${loggedMeal.recipeId?.toString()}`];
     if (recipe && ratio !== undefined) {
       return (recipe.calories || 0) * ratio * (loggedMeal.servings || 1);
@@ -251,22 +276,22 @@ async function computeDailyMealLogSummary(patientId, today) {
   // field stays a whole-gram number, same as the calorie fields above.
   const macroConsumed = {
     protein: Math.round(loggedMeals.reduce((sum, m) => {
-      const recipe = recipes[m.recipeId?.toString()];
+      const recipe = resolveConsumedRecipe(m);
       const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
       return sum + (recipe?.protein || 0) * ratio * (m.servings || 1);
     }, 0)),
     carbs: Math.round(loggedMeals.reduce((sum, m) => {
-      const recipe = recipes[m.recipeId?.toString()];
+      const recipe = resolveConsumedRecipe(m);
       const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
       return sum + (recipe?.carbs || 0) * ratio * (m.servings || 1);
     }, 0)),
     fats: Math.round(loggedMeals.reduce((sum, m) => {
-      const recipe = recipes[m.recipeId?.toString()];
+      const recipe = resolveConsumedRecipe(m);
       const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
       return sum + (recipe?.fats || 0) * ratio * (m.servings || 1);
     }, 0)),
     fiber: Math.round(loggedMeals.reduce((sum, m) => {
-      const recipe = recipes[m.recipeId?.toString()];
+      const recipe = resolveConsumedRecipe(m);
       const ratio = assignedRatioByKey[`${m.servingTime}:${m.recipeId?.toString()}`] ?? 1;
       return sum + (recipe?.fiber || 0) * ratio * (m.servings || 1);
     }, 0)),
