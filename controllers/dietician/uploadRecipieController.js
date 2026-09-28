@@ -21,6 +21,7 @@ const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
+const { generateAndStoreRecipeImage } = require('../../utils/recipeImageGenerator');
 const { COMPONENT_UNITS, INGREDIENT_ROLES } = require('../../utils/recipeJsonSchema');
 const {
   applyCoreIngredientHeuristic,
@@ -190,6 +191,35 @@ exports.updateIngredientImage = async (req, res, next) => {
     }
 
     return res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Generate (or regenerate) this recipe's main dish photo with AI -
+ *          Jev picks a photography style + hero ingredient from the
+ *          recipe's own data, OpenAI renders it, the result is stored in
+ *          Cloudinary and persisted onto the recipe (imageSource:
+ *          'ai-generated'). Can be tapped repeatedly ("refresh") to get a
+ *          different result, same as fetchIngredientImageFromWeb above -
+ *          each call is a fresh generation, never cached.
+ * @route   POST /api/dietician/recipes/:id/generate-image
+ * @access  Private (Dietician)
+ */
+exports.generateRecipeImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await generateAndStoreRecipeImage({ recipeId: id, dieticianId: req.user._id });
+
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, message: result.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { url: result.url, imageSource: 'ai-generated' },
+    });
   } catch (error) {
     next(error);
   }
@@ -1227,6 +1257,17 @@ exports.updateRecipe = async (req, res, next) => {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         updates[key] = body[key];
       }
+    }
+    // Setting `image` through this general-purpose edit path is always a
+    // dietician's own choice (manual upload, or re-picking a URL) - mark it
+    // as such so it's distinguishable from generateRecipeImage's
+    // 'ai-generated' writes (Recipe.js's imageSource field). Only when the
+    // caller hasn't already said otherwise.
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'image') &&
+      !Object.prototype.hasOwnProperty.call(body, 'imageSource')
+    ) {
+      updates.imageSource = 'dietician-uploaded';
     }
     if (Object.prototype.hasOwnProperty.call(body, 'category')) {
       updates.category = VALID_CATEGORIES.includes(body.category) ? body.category : 'Indian';

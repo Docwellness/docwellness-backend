@@ -71,6 +71,17 @@ module.exports = {
     recipeModel: process.env.OPENAI_MODEL_RECIPE || 'gpt-4o',
     translationModel: process.env.OPENAI_MODEL_TRANSLATION || 'gpt-4o-mini',
     dietPlanModel: process.env.OPENAI_MODEL_DIET_PLAN || 'gpt-4o',
+    // Recipe photo generation (utils/recipeImageGenerator.js) - a separate,
+    // pinnable model slot from the JSON-generation ones above since image
+    // models version independently.
+    recipeImageModel: process.env.OPENAI_MODEL_RECIPE_IMAGE || 'gpt-image-1',
+  },
+  // TypeSafe's Jev (System One) - fast, cheap art-direction judgments (which
+  // photography style, which ingredient to feature) that keep AI-generated
+  // recipe photos visually consistent across the catalog without a human
+  // authoring per-recipe prompt rules. See utils/jevClient.js.
+  typesafe: {
+    apiKey: process.env.TYPESAFE_API_KEY,
   },
   // Which engine services/dietPlanGenerationService.js uses to build new
   // diet-plan weeks: 'ai' (default, current OpenAI pipeline) or

@@ -616,6 +616,14 @@ router.post(
   uploadRecipieController.fetchIngredientImageFromWeb
 );
 
+// Generate (or regenerate) this recipe's main dish photo with AI + Jev art
+// direction - JSON body-less (recipe id in the URL), no multer needed.
+router.post(
+  '/recipes/:id/generate-image',
+  dieticianOnlyMiddleware,
+  uploadRecipieController.generateRecipeImage
+);
+
 // ==========================================
 // Chat Routes (Dietician App Only)
 // ==========================================

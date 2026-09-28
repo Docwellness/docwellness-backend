@@ -237,6 +237,15 @@ const recipeSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    // Which path this recipe's current `image` came from - lets the app
+    // show "AI-generated, tap to refresh or replace" vs a dietician's own
+    // upload without guessing from the URL. Unset (null) for recipes that
+    // predate this field or whose image was never explicitly attributed.
+    imageSource: {
+      type: String,
+      enum: ['dietician-uploaded', 'ai-generated'],
+      default: null,
+    },
     language: {
       type: [String],
       enum: ['Hindi', 'English', 'Marathi'],
