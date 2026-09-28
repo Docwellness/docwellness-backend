@@ -3,7 +3,8 @@
 // guard style (return null on bad input rather than throwing or silently
 // producing NaN).
 
-const { Progress, User } = require('../models');
+const { Progress, User, ExerciseLog } = require('../models');
+const { normalizeDate } = require('./dietPlanWeek');
 
 /**
  * caloriesBurned = MET * weightKg * durationHours - the standard exercise-
@@ -100,4 +101,31 @@ async function resolvePatientWeightKg(patientId) {
   return null;
 }
 
-module.exports = { calcCaloriesBurned, estimateDurationMinutes, resolvePatientWeightKg, DEFAULT_FALLBACK_WEIGHT_KG };
+/**
+ * A patient's total logged exercise calorie burn for one calendar date -
+ * the same day-range query and reduce previously duplicated inline in
+ * controllers/patient/exerciseController.js::getTodayExerciseStats and
+ * controllers/dietician/trackingController.js's exercise-stats handler
+ * (and now also relied on by utils/dailyMealLogSummary.js to fold exercise
+ * into remainingCalories). UTC-based via normalizeDate, matching how dates
+ * travel between client/server as plain "yyyy-MM-dd" strings - not
+ * setHours(0,0,0,0), which drifts by the server's local UTC offset.
+ */
+async function sumCaloriesBurnedForDate(patientId, date) {
+  const startOfDay = normalizeDate(new Date(date));
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const log = await ExerciseLog.findOne({
+    patientId,
+    date: { $gte: startOfDay, $lte: endOfDay },
+  }).lean();
+  const loggedExercises = log?.exercises || [];
+  return Math.round(loggedExercises.reduce((sum, e) => sum + (e.caloriesBurned || 0), 0));
+}
+
+module.exports = {
+  calcCaloriesBurned,
+  estimateDurationMinutes,
+  resolvePatientWeightKg,
+  DEFAULT_FALLBACK_WEIGHT_KG,
+  sumCaloriesBurnedForDate,
+};
