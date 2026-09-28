@@ -1,7 +1,8 @@
-const { MealLog, DietPlan, User, ExercisePlan, ExerciseLog } = require('../../models');
+const { MealLog, DietPlan, User, Goal, Progress, ExercisePlan, ExerciseLog } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
 const {
+  MS_PER_DAY,
   localDateStr,
   formatShortDate,
   sumMealCalories,
@@ -40,7 +41,18 @@ exports.getPatientTrackingData = async (req, res, next) => {
     }
 
     const healthProfile = patient.healthProfile || {};
-    const currentWeight = healthProfile.weight || 70; // kg
+    // The patient's latest real weigh-in, not the (possibly long-stale)
+    // profile field - matches controllers/patient/progressController.js's
+    // own getTrackingData so the dietician's view of a patient never shows
+    // a different "current weight" than the patient sees themselves.
+    const latestProgressWithWeight = await Progress.findOne({
+      patientId,
+      weight: { $exists: true, $ne: null },
+    })
+      .sort({ date: -1 })
+      .select('weight')
+      .lean();
+    const currentWeight = latestProgressWithWeight?.weight || healthProfile.weight || 70; // kg
     // Validate height: if < 100cm it's likely bad data (wrong unit or typo)
     const rawHeight = healthProfile.height || 170;
     const height = rawHeight >= 100 ? rawHeight : 170; // cm, fallback to 170 if bad data
@@ -117,34 +129,73 @@ exports.getPatientTrackingData = async (req, res, next) => {
       };
     });
 
-    // 7. Calculate weight trend (auto-calculated from calorie surplus/
-    // deficit, ~7700 calories = 1 kg) - cumulative from the plan's real
-    // start (not just the visible range's start) so a bucket partway
-    // through the plan still reflects the real trajectory.
-    const CALORIES_PER_KG = 7700;
+    // 7. Weight trend, anchored to the goal - mirrors
+    // controllers/patient/progressController.js's getTrackingData exactly
+    // (see its comment for the full reasoning): a day the patient actually
+    // logged a weight on always wins outright and re-anchors the
+    // projection from there; any day without a real log is projected from
+    // the most recent anchor at the goal's own overall pace (startValue ->
+    // targetValue across its full duration), so a weight-loss goal's
+    // projection dips and a weight-gain goal's climbs, instead of the old
+    // calorie-surplus simulation that anchored the whole history to
+    // today's currentWeight and drifted every time meal logs changed.
     const cumulativeStart = resolvedPlanStart || startDate;
-    const allLogs = await MealLog.find({
+    const activeGoal = await Goal.findOne({ patientId, status: 'active' })
+      .select('startValue targetValue startDate endDate')
+      .lean();
+    const rawTargetWeight = healthProfile.targetWeight;
+    const targetWeight =
+      typeof rawTargetWeight === 'number'
+        ? rawTargetWeight
+        : parseFloat(String(rawTargetWeight || '').replace(/[^0-9.-]/g, '')) || 0;
+    const goalStartWeight = activeGoal?.startValue ?? currentWeight;
+    const goalTargetWeight = activeGoal?.targetValue ?? (targetWeight || goalStartWeight);
+    const planSpanDays =
+      activeGoal?.startDate && activeGoal?.endDate
+        ? Math.max(
+            1,
+            Math.round(
+              (new Date(activeGoal.endDate) - new Date(activeGoal.startDate)) / MS_PER_DAY
+            )
+          )
+        : 84; // ~12 weeks - only hit when the patient has no active goal yet.
+    // Positive for a gain goal, negative for a loss goal, ~0 for maintain.
+    const dailyRate = (goalTargetWeight - goalStartWeight) / planSpanDays;
+
+    const realLogs = await Progress.find({
       patientId,
+      weight: { $exists: true, $ne: null },
       date: { $gte: cumulativeStart, $lte: endDate },
     })
       .sort({ date: 1 })
-      .select('date totalCalories meals')
+      .select('date weight')
       .lean();
+    // One entry per calendar day - a same-day resubmission (editing that
+    // week's log) keeps only the latest write for that day.
+    const loggedByDay = new Map();
+    for (const log of realLogs) {
+      loggedByDay.set(localDateStr(log.date), log.weight);
+    }
 
     const dailyWeights = {};
-    let cumulativeWeight = currentWeight;
+    let anchorWeight = goalStartWeight;
+    let anchorDate = new Date(cumulativeStart);
+    anchorDate.setHours(0, 0, 0, 0);
     let currentDate = new Date(cumulativeStart);
     currentDate.setHours(0, 0, 0, 0);
 
     while (currentDate <= endDate) {
       const dateStr = localDateStr(currentDate);
-      const dayLog = allLogs.find((log) => localDateStr(log.date) === dateStr);
-      if (dayLog) {
-        const consumed = dayLog.totalCalories || sumMealCalories(dayLog.meals);
-        const surplus = consumed - tdee;
-        cumulativeWeight += surplus / CALORIES_PER_KG;
+      if (loggedByDay.has(dateStr)) {
+        // Real data always wins - snap the projection to it and re-anchor
+        // going forward from here.
+        anchorWeight = loggedByDay.get(dateStr);
+        anchorDate = new Date(currentDate);
+        dailyWeights[dateStr] = Math.round(anchorWeight * 10) / 10;
+      } else {
+        const daysSinceAnchor = Math.round((currentDate - anchorDate) / MS_PER_DAY);
+        dailyWeights[dateStr] = Math.round((anchorWeight + dailyRate * daysSinceAnchor) * 10) / 10;
       }
-      dailyWeights[dateStr] = Math.round(cumulativeWeight * 10) / 10;
       currentDate = addDays(currentDate, 1);
     }
 

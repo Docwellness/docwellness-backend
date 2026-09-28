@@ -1,4 +1,4 @@
-const { MilestoneTask, Milestone, Goal, CheckIn } = require('../../models');
+const { MilestoneTask, Milestone, Goal, CheckIn, Progress } = require('../../models');
 const asyncHandler = require('../../utils/async-handler');
 const ApiError = require('../../utils/api-error');
 const { sendSuccess } = require('../../utils/api-response');
@@ -42,7 +42,17 @@ exports.getTimelineSummary = asyncHandler(async (req, res) => {
     60,
     async () => {
       const { goal, stats, effectiveEndDate } = await computeGoalStats(req.user._id);
-      return { goal: goal ? shapeGoal(goal, effectiveEndDate) : null, stats };
+      if (!goal) return { goal: null, stats };
+      // See shapeGoal's comment (utils/timelinePayload.js) - goal.currentValue
+      // is a write-once snapshot from Goal creation, never updated after.
+      const latestWeightLog = await Progress.findOne({
+        patientId: req.user._id,
+        weight: { $exists: true, $ne: null },
+      })
+        .sort({ date: -1 })
+        .select('weight')
+        .lean();
+      return { goal: shapeGoal(goal, effectiveEndDate, latestWeightLog?.weight ?? null), stats };
     }
   );
   return sendSuccess(res, { data });

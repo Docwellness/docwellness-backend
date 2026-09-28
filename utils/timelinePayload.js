@@ -15,13 +15,19 @@ const { formatDayLabel, formatMonthLabel } = require('./seedGoalTimeline');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function shapeGoal(goal, effectiveEndDate) {
+function shapeGoal(goal, effectiveEndDate, liveCurrentValue) {
   return {
     id: goal._id,
     title: goal.title,
     metric: goal.metric,
     startValue: goal.startValue,
-    currentValue: goal.currentValue,
+    // goal.currentValue is only ever written once, at Goal creation (see
+    // seedGoalTimeline.js) - nothing rewrites it as the patient logs new
+    // weigh-ins afterward, so trusting the stored field here left "kg now"
+    // frozen at whatever it was the day the goal was created. Prefer the
+    // patient's latest real Progress weight log instead, falling back to
+    // the stored snapshot only when nothing has been logged since.
+    currentValue: liveCurrentValue ?? goal.currentValue,
     targetValue: goal.targetValue,
     unit: goal.unit,
     startDate: goal.startDate,
@@ -44,6 +50,16 @@ function parseRangeParam(value, fallback) {
 async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   const { goal, stats, effectiveEndDate, pauses = [] } = await computeGoalStats(patientId);
   if (!goal) return { goal: null, stats: null, milestones: [], pauses: [] };
+
+  // See shapeGoal's comment - the patient's most recent real weigh-in,
+  // used to keep "kg now" live instead of frozen at Goal-creation time.
+  const latestWeightLog = await Progress.findOne({
+    patientId,
+    weight: { $exists: true, $ne: null },
+  })
+    .sort({ date: -1 })
+    .select('weight')
+    .lean();
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -200,7 +216,7 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   );
 
   return {
-    goal: shapeGoal(goal, effectiveEndDate),
+    goal: shapeGoal(goal, effectiveEndDate, latestWeightLog?.weight ?? null),
     stats,
     milestones: allMilestones,
     // The pause window(s) that shifted the dates above - so the client can
