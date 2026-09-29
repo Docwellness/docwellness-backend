@@ -109,6 +109,41 @@ describe('getPatientVisibleWeeks / buildPlanItemPatientView - plan-item plans', 
     expect(override.nutritionPerServing.calories).toBeCloseTo(389);
   });
 
+  test('buildPlanItemPatientView carries an ingredient image from the base Recipe, even though RecipeVersion/FoodItem have no image field of their own', async () => {
+    // Regression test: a plan-item view's ingredients used to hardcode
+    // image: null unconditionally (RecipeVersion.ingredients and FoodItem
+    // both genuinely have no image field - see their own schemas), so a
+    // dietician adding/editing an ingredient photo on the base Recipe
+    // (recipe_details.dart's per-ingredient refresh button) never reached
+    // any plan-item patient's view. Matched back by normalized ingredient
+    // name against the version's parent Recipe, same as syncV1FromRecipe
+    // already matches Recipe ingredients to FoodItems.
+    const dieticianId = new mongoose.Types.ObjectId();
+    const patientId = new mongoose.Types.ObjectId();
+    const dietPlan = await DietPlan.create({ patientId, dieticianId, dataModel: 'plan-item' });
+
+    await FoodItem.create({ name: 'Paneer', normalizedName: 'paneer', nutritionPer100g: { calories: 265, protein: 18, carbs: 4, fats: 20, fiber: 0 } });
+    const recipe = await Recipe.create({
+      dieticianId,
+      name: 'Paneer Tikka',
+      servingTime: 'Dinner',
+      components: [{ label: 'Paneer Tikka', quantity: 100, unit: 'g' }],
+      ingredients: [{ name: 'Paneer', quantity: 100, unit: 'g', image: 'https://res.cloudinary.com/demo/paneer.jpg' }],
+      nutrition: { calories: 265, protein: 18, carbs: 4, fats: 20, fiber: 0 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300)); // let the post-save V1 sync hook land
+    const v1 = await RecipeVersion.findOne({ parentRecipeId: recipe._id, versionNumber: 1 });
+
+    const dayPlan = await DayPlan.create({ dietPlanId: dietPlan._id, patientId, week: 1, dayGroup: 'Monday' });
+    const mealSlot = await MealSlotPlan.create({ dayPlanId: dayPlan._id, servingTime: 'Dinner' });
+    await PlanItem.create({ mealSlotId: mealSlot._id, recipeVersionId: v1._id, calculatedNutrition: v1.nutritionPerServing });
+
+    const { recipeVersionOverrides } = await buildPlanItemPatientView(dietPlan);
+
+    const override = recipeVersionOverrides[versionedRecipeKey(String(recipe._id), 1)];
+    expect(override.ingredients[0].image).toBe('https://res.cloudinary.com/demo/paneer.jpg');
+  });
+
   test('buildPlanItemPatientView reflects a custom (V2) version when the item was edited', async () => {
     const { dietPlan, recipe, v1, oats, planItem } = await seedPlanItemPlan();
     const { createCustomVersion } = require('../services/recipeVersioningService');

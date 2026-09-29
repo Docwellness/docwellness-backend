@@ -14,7 +14,8 @@
  */
 
 const { getFinalizedWeeks } = require('./dietPlanLegacyView');
-const { DayPlan, MealSlotPlan, PlanItem, SupplementItem, RecipeVersion, FoodItem } = require('../models');
+const { DayPlan, MealSlotPlan, PlanItem, SupplementItem, RecipeVersion, FoodItem, Recipe } = require('../models');
+const { normalize } = require('./ingredientLibrary');
 
 // A single Recipe can be prescribed at more than one PlanItem (different
 // day/slot, or the same slot across weeks) at DIFFERENT versions - e.g. the
@@ -99,6 +100,26 @@ async function buildPlanItemPatientView(dietPlan) {
   const foodItems = await FoodItem.find({ _id: { $in: foodItemIds } }).select('name').lean();
   const foodItemNameById = new Map(foodItems.map((f) => [String(f._id), f.name]));
 
+  // A RecipeVersion's own ingredients carry no `image` (neither does
+  // FoodItem - see models/RecipeVersion.js/FoodItem.js, ingredient images
+  // are a base-Recipe-only concept) - matched back here by normalized name
+  // against each version's PARENT Recipe, the same {parentRecipeId, name}
+  // matching syncV1FromRecipe already uses to build a version's ingredients
+  // in the first place. A dietician editing a recipe's ingredient photos
+  // (recipe_details.dart's per-ingredient refresh button) therefore reaches
+  // every patient's plan-item view immediately, with no new RecipeVersion
+  // needed - this is presentational data, not a prescribed quantity, so it
+  // deliberately isn't subject to the freeze-on-prescribe invariant the rest
+  // of this file exists to protect.
+  const baseRecipeIds = [...new Set(recipeVersions.map((v) => String(v.parentRecipeId)))];
+  const baseRecipes = await Recipe.find({ _id: { $in: baseRecipeIds } }).select('ingredients').lean();
+  const ingredientImageByNamePerRecipe = new Map(
+    baseRecipes.map((recipe) => [
+      String(recipe._id),
+      new Map((recipe.ingredients || []).map((ing) => [normalize(ing.name), ing.image || null])),
+    ])
+  );
+
   const dayPlanById = new Map(dayPlans.map((dp) => [String(dp._id), dp]));
   const mealSlotById = new Map(mealSlots.map((ms) => [String(ms._id), ms]));
 
@@ -132,13 +153,16 @@ async function buildPlanItemPatientView(dietPlan) {
         baseRecipeId: recipeId,
         versionNumber: version.versionNumber,
         steps: version.steps || [],
-        ingredients: (version.ingredients || []).map((ingredient) => ({
-          name: foodItemNameById.get(String(ingredient.foodItemId)) || 'Ingredient',
-          quantity: ingredient.rawQuantity,
-          unit: ingredient.unit,
-          image: null,
-          isScalable: true,
-        })),
+        ingredients: (version.ingredients || []).map((ingredient) => {
+          const name = foodItemNameById.get(String(ingredient.foodItemId)) || 'Ingredient';
+          return {
+            name,
+            quantity: ingredient.rawQuantity,
+            unit: ingredient.unit,
+            image: ingredientImageByNamePerRecipe.get(recipeId)?.get(normalize(name)) || null,
+            isScalable: true,
+          };
+        }),
         nutritionPerServing: {
           calories: version.nutritionPerServing?.calories ?? 0,
           protein: version.nutritionPerServing?.protein ?? 0,
