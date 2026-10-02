@@ -33,7 +33,6 @@ require('dotenv').config({ quiet: true });
 const mongoose = require('mongoose');
 
 const EXECUTE = process.argv.includes('--execute');
-const DIETICIAN_EMAIL = 'localdietician@dev.local';
 
 const ZERO_NUTRITION = { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 };
 
@@ -108,18 +107,14 @@ async function main() {
 
   const connectDB = require('../config/database');
   await connectDB();
-  const { User, Recipe } = require('../models');
-
-  const dietician = await User.findOne({ email: DIETICIAN_EMAIL, role: 'dietician' });
-  if (!dietician) throw new Error(`Dietician account not found: ${DIETICIAN_EMAIL}`);
-  console.log(`Target dietician: ${dietician.profile?.fullName || dietician.email} (${dietician._id})`);
+  const Recipe = require('../models/Recipe');
 
   const factsPlan = [];
   const nutritionPlan = [];
   const notFound = [];
 
   for (const update of SUPPLEMENT_FACTS_UPDATES) {
-    const recipe = await Recipe.findOne({ dieticianId: dietician._id, name: update.recipeName });
+    const recipe = await Recipe.findOne({ name: update.recipeName });
     if (!recipe) {
       notFound.push(update.recipeName);
       continue;
@@ -128,7 +123,7 @@ async function main() {
   }
 
   for (const update of NUTRITION_UPDATES) {
-    const recipe = await Recipe.findOne({ dieticianId: dietician._id, name: update.recipeName });
+    const recipe = await Recipe.findOne({ name: update.recipeName });
     if (!recipe) {
       notFound.push(update.recipeName);
       continue;
