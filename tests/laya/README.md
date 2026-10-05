@@ -96,3 +96,30 @@ Summarises shadow rows (latency, failures by reason, meal-type agreement). Agree
 is Laya vs the slot the dietician **requested** - a consistency signal, not accuracy. Use
 `--exclude-dietician` to keep test accounts out of the numbers. On production, run it from
 the backend container's Coolify Terminal, where the private DB address works.
+
+## Load test (integration plan section 24)
+
+```
+node scripts/laya-load-test.js --yes --levels=1,5,10,20,50
+```
+
+Run it **in the backend container's Coolify Terminal** (Laya is internal-only, so that is the
+only place it is reachable from), at a quiet time: Laya shares the VM's 2 cores with the
+backend. It refuses to run without `--yes`.
+
+It sends real-shaped payloads through the same `layaDecisionService` code path production uses,
+and while doing so times the backend's own `/health` (idle baseline vs during each stage) to
+measure backend impact. It reports per stage: p50/p95/p99, throughput, and error, timeout and
+overload rates. It stops escalating if Laya is failing outright or the backend's `/health`
+p95 passes `--abort-backend-p95-ms`. Pass `--recipes-file=<review sheet or recipes json>` so
+payload sizes match your real recipes.
+
+Reading it:
+- `overloadRate` is HTTP 503: Laya refusing work past `LAYA_MAX_CONCURRENT`. Deliberate load
+  shedding, not a crash - but in shadow mode that is a dropped decision, and in live mode a
+  fallback.
+- A client timeout does **not** cancel the work inside Laya: it keeps processing the abandoned
+  request, so a burst of timeouts is followed by 503s while it catches up.
+- Laya's CPU and RAM are not visible from the script. Read them from the Laya resource's metrics
+  in Coolify for each stage's printed UTC window.
+- Results go to `tests/laya/results/load-*.json` (git-ignored).

@@ -69,7 +69,7 @@ to extend. The recommended approach:
     benchmarks were not measured on this hardware. Test at 1/5/10/20/50 concurrent
     requests against actual recipe/diet-plan-sized payloads; record average, p50, p95,
     p99 latency, CPU, RAM, and any backend-latency impact. Do this before `LAYA_MODE`
-    ever leaves `shadow`.
+    ever leaves `shadow`. Use `scripts/laya-load-test.js` (see `tests/laya/README.md`, "Load test").
 
 ## Rollback
 
