@@ -43,6 +43,37 @@ const generationLogSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Laya decision-log fields (see services/layaDecisionService.js) - all
+    // additive/optional so existing recipe/dietPlan/exercise writes are
+    // untouched. Decision metadata only, never PII/PHI. Nothing writes
+    // these yet in Stage A; the schema is ready for Stage B's shadow-mode
+    // wiring (see docs/laya-architecture.md).
+    layaMode: {
+      type: String,
+      enum: ['off', 'shadow', 'live', null],
+      default: null,
+    },
+    // Which decision a shadow row is for (services/layaShadowService.js).
+    layaSurface: {
+      type: String,
+      default: null,
+    },
+    layaDecisions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    layaLatencyMs: {
+      type: Number,
+      default: null,
+    },
+    layaConfidence: {
+      type: Number,
+      default: null,
+    },
+    layaTimedOut: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -65,4 +65,8 @@ scripts/.etwoe-expiry-backup.json
 # if it's the LAST matching rule for a given path).
 !.env.example
 !docs/SECURITY.md
+!docs/laya-integration-analysis.md
+!docs/laya-architecture.md
+!docs/laya-deployment.md
+!docs/laya-evaluation.md
 !RELEASE_CHECKLIST.md

@@ -19,6 +19,8 @@ const {
 const { sendPushToTokens } = require('../../utils/push');
 const { getChatIO } = require('../../chat');
 const config = require('../../config/environment');
+const { runShadow } = require('../../services/layaShadowService');
+const { requiresDieticianReview } = require('../../services/layaDecisionService');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const { generateDietPlanDeterministically } = require('../../services/recipeSelectionEngine');
 const { balanceWeek } = require('../../services/dietPlanAutoBalanceService');
@@ -1235,6 +1237,28 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engin
   } catch (logError) {
     console.error('Failed to write GenerationLog entry:', logError.message);
   }
+
+  // Shadow-mode only (no-op unless enabled): log whether Laya would flag this
+  // generation for dietician review, next to the risk flags the deterministic
+  // checks actually raised. Never awaited, never feeds riskFlags/warnings.
+  runShadow({
+    surface: 'diet_plan_review',
+    kind: 'dietPlan',
+    dieticianId,
+    refId: dietPlan._id,
+    inputHash,
+    reference: { riskFlags: newRiskFlags, warningCount: newValidationWarnings.length, attemptsUsed },
+    call: () =>
+      requiresDieticianReview({
+        decisionSummary: {
+          riskFlags: newRiskFlags,
+          warningCount: newValidationWarnings.length,
+          warnings: newValidationWarnings.slice(0, 10).map((w) => String(w).slice(0, 200)),
+          attemptsUsed,
+          engine,
+        },
+      }),
+  });
 
   return { ok: true, validationWarnings: newValidationWarnings, riskFlags: newRiskFlags };
 }
