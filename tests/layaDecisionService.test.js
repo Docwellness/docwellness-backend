@@ -172,6 +172,22 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     expect(body.questions).toHaveProperty('meal_type_fit');
     expect(body.questions).toHaveProperty('protein_level');
   });
+
+  it('never sends servingTime to Laya (it would leak the answer to the meal-type question)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ answers: {}, usage: {} }) });
+    config.laya.enabled = true;
+
+    await classifyRecipe({ recipe }); // the shared fixture has servingTime: 'Dinner'
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.state).toEqual({
+      name: 'Paneer Butter Masala',
+      cuisine: 'North Indian',
+      category: 'High Protein',
+      ingredients: ['Paneer', 'Tomato', 'Butter'],
+    });
+    expect(JSON.stringify(body)).not.toMatch(/servingTime|"Dinner"/);
+  });
 });
 
 describe('Stage B shadow-wiring invariant', () => {

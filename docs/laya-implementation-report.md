@@ -122,8 +122,11 @@ Of the 15 successes, Laya's meal type matched the slot the generator was asked f
 was part of the recipe text sent to Laya, so Laya could read the answer it was being asked for.
 It is neither accuracy nor a clean consistency measure, and should be ignored. (The one "miss",
 a snack requested as "Evening Snack" that Laya called "dinner", happened even with the slot
-visible, which suggests Laya weighs that field lightly, but that is a guess.) The fix is to stop
-sending `servingTime` to Laya for the meal-type question. Laya's `protein_level` answered "low" for several clearly
+visible, which suggests Laya weighs that field lightly, but that is a guess.) **Fixed in code on
+2026-10-05:** `classifyRecipe` no longer sends `servingTime`, the review sheet and dataset inputs
+never contain it, and the sheet is now blind and shuffled. The fix takes effect when the backend is
+redeployed; shadow rows written before that deploy stay contaminated, so use
+`scripts/laya-shadow-report.js --since=<deploy time>` for any agreement figure. Laya's `protein_level` answered "low" for several clearly
 protein-rich dishes (chicken curry, chole, fish curry, rajma, paneer tikka). That is anecdotal
 and small-sample, but it is the kind of disagreement the evaluation dataset exists to quantify.
 Laya also warns at startup that this checkpoint's confidence is not calibrated.

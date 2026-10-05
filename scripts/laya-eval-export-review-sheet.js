@@ -9,12 +9,14 @@
  * `expected` and sets `reviewed_by: "dietician"` (see tests/laya/README.md).
  *
  * Deliberately excludes Laya's own prediction from the sheet, so a reviewer
- * isn't anchored by what the model said. `proposed` is just the recipe's
- * existing servingTime, as a starting point to confirm or correct.
+ * isn't anchored by what the model said. The CSV is also BLIND by default: it
+ * shows neither the recipe's existing servingTime nor its meal type, so the
+ * reviewer judges from the recipe alone. --with-source adds them (not blind).
+ * The source label stays in the JSON sheet under `source`, outside `input`.
  *
  * Usage:
  *   node scripts/laya-eval-export-review-sheet.js [--per-class=25] [--seed=1]
- *        [--format=json|csv] [--stdout] [--out=<file>]
+ *        [--format=json|csv] [--stdout] [--with-source] [--out=<file>]
  *
  * --format=csv gives a spreadsheet for the reviewer (read back with
  * scripts/laya-eval-import-review-sheet.js). --stdout prints the sheet instead
@@ -35,8 +37,8 @@ const path = require('path');
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
 const Recipe = require('../models/Recipe');
-const { mealTypeFromServingTime, sampleStratified } = require('../utils/layaEval');
-const { toCsv, sheetToCsvRows } = require('../utils/layaCsv');
+const { mealTypeFromServingTime, sampleStratified, shuffleSeeded } = require('../utils/layaEval');
+const { toCsv, sheetToCsvRows, csvColumns } = require('../utils/layaCsv');
 
 function parseArgs(argv) {
   const out = {};
@@ -73,35 +75,46 @@ function parseArgs(argv) {
     .select('name cuisine category servingTime ingredients.name')
     .lean();
 
-  const sample = sampleStratified(recipes, (r) => mealTypeFromServingTime(r.servingTime), perClass, seed);
+  // Shuffled after sampling: the sample is grouped by meal type, and for a blind
+  // review the row order must not reveal it.
+  const sample = shuffleSeeded(
+    sampleStratified(recipes, (r) => mealTypeFromServingTime(r.servingTime), perClass, seed),
+    seed + 1
+  );
 
   const counts = {};
   const sheet = sample.map((r) => {
-    const proposed = mealTypeFromServingTime(r.servingTime);
-    counts[proposed] = (counts[proposed] || 0) + 1;
+    const sourceMeal = mealTypeFromServingTime(r.servingTime);
+    counts[sourceMeal] = (counts[sourceMeal] || 0) + 1;
     return {
       id: String(r._id),
+      // `input` is what Laya will be shown, so it carries NO servingTime: the
+      // slot would leak the answer to the meal-type question.
       input: {
         recipe: {
           name: r.name,
           cuisine: r.cuisine || null,
           category: r.category || null,
-          servingTime: r.servingTime,
           ingredients: (r.ingredients || []).map((i) => ({ name: i.name })),
         },
       },
-      // Starting point only - the reviewer confirms or corrects it.
-      proposed: { meal_type: proposed },
+      // The recipe's existing slot, kept OUTSIDE `input` for later analysis. It is
+      // hidden from reviewers unless --with-source is passed (blind review).
+      source: { servingTime: r.servingTime, meal_type: sourceMeal },
       // The reviewer fills these in. protein_level: "low" | "moderate" | "high".
       expected: null,
       reviewed_by: null,
     };
   });
 
-  const content = format === 'csv' ? toCsv(sheetToCsvRows(sheet)) : JSON.stringify(sheet, null, 2);
+  const withSource = Boolean(args['with-source']);
+  const content =
+    format === 'csv'
+      ? toCsv(sheetToCsvRows(sheet, { withSource }), csvColumns({ withSource }))
+      : JSON.stringify(sheet, null, 2);
   if (toStdout) {
     process.stdout.write(content);
-    console.log(`Printed ${sheet.length} unreviewed rows (${format}) to stdout.`);
+    console.log(`Printed ${sheet.length} unreviewed rows (${format}${format === 'csv' && !withSource ? ', blind' : ''}) to stdout.`);
   } else {
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
     fs.writeFileSync(outFile, content);

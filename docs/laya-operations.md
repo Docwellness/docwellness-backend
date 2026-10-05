@@ -133,8 +133,8 @@ Shadow rows record why a call failed in `layaError`:
   temperatures. Treat confidence as one weak signal, never as proof (plan §17).
 - **Quality is unproven.** An earlier "meal type matched the requested slot in 12 of 13 rows"
   figure is **invalid**: the requested slot was included in the text Laya reads, so it could see the
-  answer. Ignore it, and treat any shadow-report "agreement" as meaningless until `servingTime` is
-  removed from Laya's input. `protein_level` has looked wrong for clearly protein-rich dishes
+  answer. Ignore it. `servingTime` is no longer sent (fixed 2026-10-05, effective once the backend is
+  redeployed); use `--since=<deploy time>` so only rows written after the fix feed any agreement figure. `protein_level` has looked wrong for clearly protein-rich dishes
   (small-sample, test-account data; not an accuracy measurement).
 - **Load testing:** `node scripts/laya-load-test.js --yes` (see `tests/laya/README.md`). Run it
   from the backend Terminal at a quiet time; it loads the VM the backend shares. First VM run

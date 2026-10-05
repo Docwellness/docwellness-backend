@@ -225,8 +225,9 @@ function summarizeShadowRows(rows, { excludeDieticianIds = [], surface = 'recipe
     mealTypeAgreement: { scorable, agree, rate: scorable ? Number((agree / scorable).toFixed(3)) : null, confusion },
     laya_protein_level_distribution: protein,
     note:
-      'Agreement is Laya vs the slot the dietician REQUESTED. WARNING: while servingTime is part of the ' +
-      'recipe sent to Laya (it was, up to 2026-10-05) Laya can read that slot, so this agreement is NOT valid. ' +
+      'Agreement is Laya vs the slot the dietician REQUESTED. WARNING: rows written before servingTime was ' +
+      'removed from the input sent to Laya (fixed 2026-10-05, effective on the next deploy) let Laya read that ' +
+      'slot, so their agreement is NOT valid - use --since=<deploy time>. ' +
       'Accuracy needs the dietician-reviewed dataset (tests/laya/README.md).',
   };
 }
@@ -273,6 +274,21 @@ function sampleStratified(items, classOf, perClass, seed) {
   return picked;
 }
 
+/**
+ * Deterministic shuffle (same seed -> same order). The stratified sample comes
+ * out grouped by class (all breakfast, then all lunch...), and for a BLIND review
+ * the row order must not reveal the class.
+ */
+function shuffleSeeded(items, seed) {
+  const rand = seededRandom(seed);
+  const arr = items.slice();
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 module.exports = {
   MEAL_TYPE_FROM_SERVING_TIME,
   mealTypeFromServingTime,
@@ -286,4 +302,5 @@ module.exports = {
   summarizeShadowRows,
   seededRandom,
   sampleStratified,
+  shuffleSeeded,
 };

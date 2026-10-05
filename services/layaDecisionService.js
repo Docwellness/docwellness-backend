@@ -81,6 +81,12 @@ async function callLaya({ state, questions }) {
  * already derive those deterministically from the ingredient list (see
  * utils/dietaryConstraintValidator.js) and re-deriving them via Laya would
  * be redundant, not additive.
+ *
+ * `servingTime` is deliberately NOT sent. One of the questions below asks which
+ * meal type the recipe fits; sending the slot the recipe was requested for
+ * would hand Laya the answer (found 2026-10-05: it was being sent, which made
+ * shadow "agreement" figures meaningless). Callers may still pass a recipe that
+ * has a servingTime - it is dropped here, so no caller or dataset can leak it.
  */
 async function classifyRecipe({ recipe }) {
   return callLaya({
@@ -88,7 +94,6 @@ async function classifyRecipe({ recipe }) {
       name: recipe.name,
       cuisine: recipe.cuisine || null,
       category: recipe.category || null,
-      servingTime: recipe.servingTime || null,
       ingredients: (recipe.ingredients || []).map((i) => i.name),
     },
     questions: {

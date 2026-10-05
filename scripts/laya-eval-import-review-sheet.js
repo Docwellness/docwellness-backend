@@ -5,8 +5,11 @@
  * run it on a laptop, then commit the result.
  *
  * Strict by design: rows with a reviewer name and valid expected values become
- * examples; rows with no reviewer stay pending (skipped); any row that is
- * half-filled or has an invalid value is reported and NOTHING is written.
+ * examples; rows marked review_status skipped/unsure are listed but never
+ * scored; rows with nothing filled stay pending; any row that is half-filled or
+ * has an invalid value is reported and NOTHING is written. The recipe's
+ * servingTime is never copied into the dataset's `input` (it would leak the
+ * answer to Laya), whatever columns the sheet has.
  *
  * Usage:
  *   node scripts/laya-eval-import-review-sheet.js --in=<sheet.csv>
@@ -46,7 +49,7 @@ try {
   process.exit(1);
 }
 
-const { examples, errors, pending } = csvToDataset(objects);
+const { examples, errors, pending, skipped, unsure } = csvToDataset(objects);
 
 if (errors.length) {
   console.error(`${errors.length} problem(s) found. Nothing was written. Fix these rows and run again:`);
@@ -68,7 +71,10 @@ for (const e of merged) {
   const m = (e.expected && e.expected.meal_type) || '(protein only)';
   perMeal[m] = (perMeal[m] || 0) + 1;
 }
-console.log(`Imported ${examples.length} reviewed row(s); ${pending} still pending (no reviewer) were skipped.`);
+console.log(`Imported ${examples.length} reviewed row(s).`);
+console.log(`Not scored: ${skipped.length} marked skipped, ${unsure.length} marked unsure, ${pending} still pending (not reviewed).`);
+for (const r of skipped) console.log(`  skipped: ${r.name || r.id}${r.notes ? ` - ${r.notes}` : ''}`);
+for (const r of unsure) console.log(`  needs a second opinion: ${r.name || r.id}${r.notes ? ` - ${r.notes}` : ''}`);
 console.log(`Dataset now has ${merged.length} example(s) in ${outFile}`);
 console.log('Per expected meal type:', perMeal);
 console.log('Commit this file; it ships in the backend image so scripts/laya-eval-run.js can read it.');

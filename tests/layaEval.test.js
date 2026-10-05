@@ -20,6 +20,7 @@ const {
   scoreResults,
   summarizeShadowRows,
   sampleStratified,
+  shuffleSeeded,
   CATEGORIES,
 } = require('../utils/layaEval');
 
@@ -184,6 +185,27 @@ describe('sampleStratified', () => {
     const c = sampleStratified(items, (i) => i.c, 4, 8).map((i) => i.id);
     expect(a).toEqual(b);
     expect(a).not.toEqual(c);
+  });
+});
+
+describe('shuffleSeeded (blind review: row order must not reveal the class)', () => {
+  const grouped = [
+    ...Array.from({ length: 10 }, (_, i) => ({ id: `b${i}`, c: 'breakfast' })),
+    ...Array.from({ length: 10 }, (_, i) => ({ id: `l${i}`, c: 'lunch' })),
+  ];
+  it('is deterministic per seed, keeps every item exactly once, and does not mutate the input', () => {
+    const copy = grouped.slice();
+    const a = shuffleSeeded(grouped, 3);
+    expect(shuffleSeeded(grouped, 3)).toEqual(a);
+    expect(shuffleSeeded(grouped, 4)).not.toEqual(a);
+    expect(a.map((x) => x.id).sort()).toEqual(grouped.map((x) => x.id).sort());
+    expect(grouped).toEqual(copy);
+  });
+  it('breaks up the class blocks', () => {
+    const a = shuffleSeeded(grouped, 3).map((x) => x.c);
+    const firstTen = a.slice(0, 10).filter((c) => c === 'breakfast').length;
+    expect(firstTen).toBeGreaterThan(0);
+    expect(firstTen).toBeLessThan(10); // not "all breakfast first"
   });
 });
 
