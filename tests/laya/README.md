@@ -49,6 +49,28 @@ Allowed values:
 `Brunch`, `Morning Drink` and `Night Drink` have no single clean meal type, so they are not
 sampled for meal-type examples.
 
+## Reviewer guidelines (give these to the dieticians)
+
+Consistency between reviewers is what makes the accuracy numbers mean anything.
+
+- **Judge each recipe yourself.** `proposed_meal_type` is only the recipe's existing slot. If you
+  just accept it, the dataset measures agreement with the existing labels, not accuracy. Change it
+  whenever you would not serve the dish at that meal.
+- **`expected_meal_type`:** `breakfast`, `lunch`, `dinner` or `snack`. The question Laya answers is
+  "which meal type does this recipe best fit?" (breakfast: eaten in the morning; lunch: a
+  substantial midday meal; dinner: a substantial evening meal; snack: a light dish between meals).
+- **`expected_protein_level`** (optional, but needed to score Laya's protein answer). The question
+  Laya answers is "how would you characterize this recipe's protein content relative to a typical
+  dish of its type?":
+  - `low`: little to no significant protein source
+  - `moderate`: a moderate protein contribution
+  - `high`: a prominent protein source (e.g. meat, fish, legumes, dairy or egg in quantity)
+- **`reviewer`:** your name or initials. A row with no reviewer is ignored.
+- **Not a meal, or you can't decide?** (a tea, a chutney, a raita, a papad, a single ingredient)
+  **leave `reviewer` blank.** It stays pending and is never scored. Do not guess to fill a row.
+- Leave `id` and the recipe columns unchanged. Save as CSV (UTF-8) when done.
+- Plan for roughly a minute a row.
+
 ## Do not put personal health information in `input`
 
 Use recipe data and anonymised/generalised profile fields only. No names, contact details,

@@ -23,8 +23,10 @@
  *   node scripts/laya-eval-export-review-sheet.js --format=csv --stdout
  * in the Coolify Terminal and copy the output into a .csv file.
  *
- * Stratified by meal type (breakfast/lunch/dinner/snack). Drinks and Brunch
- * have no single clean meal type, so they are not sampled.
+ * Stratified by meal type (breakfast/lunch/dinner/snack). Drinks, Brunch and
+ * Supplements have no single clean meal type, so they are not sampled. Sides
+ * (chutney, raita, papad) and teas filed under Evening Snack ARE included, so
+ * reviewers must be told how to treat them (tests/laya/README.md).
  */
 // quiet: dotenv's own banner goes to stdout and would corrupt --stdout output.
 require('dotenv').config({ quiet: true });
@@ -63,7 +65,11 @@ function parseArgs(argv) {
   );
 
   await connectDB();
-  const recipes = await Recipe.find({ servingTime: { $in: ['Breakfast', 'Lunch', 'Dinner', 'Evening Snack'] } })
+  // Supplements (tablets) are not meals, so a meal-type label is meaningless for them.
+  const recipes = await Recipe.find({
+    servingTime: { $in: ['Breakfast', 'Lunch', 'Dinner', 'Evening Snack'] },
+    category: { $ne: 'Supplements' },
+  })
     .select('name cuisine category servingTime ingredients.name')
     .lean();
 
