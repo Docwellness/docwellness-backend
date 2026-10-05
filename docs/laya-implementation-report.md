@@ -181,5 +181,7 @@ cost in latency (a second thread earlier helped by only ~15%).
 3. A decision on latency for `live`: this hardware allows ~11 calls a minute, so `live` needs a
    different setup (faster model format, more CPU, GPU, or a dedicated VM). Shadow mode does not.
 4. A per-user flag mechanism for the staged rollout, and `laya_*` metrics.
+5. The single-core experiment (`docs/laya-operations.md`): limit Laya's non-torch thread pools to
+   see whether it can run on about one core, freeing backend headroom, and what that costs in latency.
 
 Do not claim production readiness for `live` until items 1 and 3 are resolved.

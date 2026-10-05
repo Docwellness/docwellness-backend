@@ -200,11 +200,53 @@ the new one passes its health check.
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
+## Experiment: make Laya truly single-core (not yet run)
+
+**Why.** Under load Laya's CPU plateaus at its container limit (~140-150% of one core) even though
+`LAYA_THREADS=1`: that setting only caps torch's own compute threads. The likely cause is thread
+pools in other libraries (OpenMP, BLAS, the HuggingFace tokenizer) — a hypothesis, not confirmed.
+If it is right, limiting those pools brings Laya to about one core and leaves the backend more of
+the VM's 2 cores. The cost is unknown: calls may get slower than ~5.5 s. (Earlier, a second thread
+bought only ~15%, so a modest slowdown is expected, but it has not been measured.)
+
+**Baseline to compare against** (1 thread, 1.5 CPU limit, 2026-10-05, concurrency 1, 80/20 mix):
+mean 5.5 s, p50 5.3 s, p95 7.0 s, p99 7.1 s, 0 errors; CPU ~140-150%; RAM ~2.2 GB.
+
+**Procedure** (all reversible; no code change):
+1. On `docwellness-laya` → Environment Variables, add (runtime, not build-only):
+   `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `TOKENIZERS_PARALLELISM=false`.
+   (`OPENBLAS_NUM_THREADS` is an addition to the three originally proposed: aarch64 torch builds
+   commonly use OpenBLAS.) Leave `LAYA_THREADS=1` and the 1.5 CPU limit unchanged so only one
+   thing changes.
+2. Redeploy Laya and wait for `running:healthy`. Check the variables reached the container, in
+   Laya's Terminal: `env | grep -E 'OMP|MKL|OPENBLAS|TOKENIZERS|LAYA_THREADS'`.
+3. Open `docwellness-laya` → Metrics, range "Last 5 minutes · live".
+4. In the backend's Terminal run `node scripts/laya-load-test.js --yes --levels=1 --requests-per-level=40`
+   (~4 minutes; it warms up first, so the slow first call after a redeploy is not counted).
+5. Compare latency (mean/p50/p95/p99) and the CPU plateau and RAM on the chart to the baseline.
+
+**Reading the result** (the thresholds are a suggestion; the team decides what is acceptable):
+- CPU near 100% and mean latency within about +25% (≤ ~7 s): **adopt it.** Keep the variables.
+  Optionally lower the CPU limit toward 1.0-1.2 as a separate follow-up, and re-test.
+- CPU near 100% but latency clearly worse: a real trade-off between backend headroom and Laya
+  speed. Decide which matters; shadow mode is not latency-sensitive.
+- CPU still ~150%: the hypothesis was wrong (the extra CPU is not from those pools). **Remove the
+  variables** and look elsewhere (e.g. the web server's own threads).
+- Latency better or unchanged with lower CPU: adopt.
+
+**Rollback:** delete the four variables and redeploy Laya.
+
+Run it when no real shadow traffic is expected; calls during the redeploy are simply skipped or
+time out and cost nothing but shadow rows.
+
 ## Open items (not done yet)
 
 - Dietician-reviewed dataset (500 rows) and the accuracy thresholds the team sets.
-- Load test on the VM, and reading Laya's CPU/RAM from Coolify during it.
+- **The single-core experiment above** (needs one redeploy and one short test).
 - `laya_*` metrics and any alerting.
 - `validate_diet_plan()`, candidate filtering and the PASS/FAIL/UNCERTAIN gating flows.
 - Phases 5–7 of the rollout (internal users, percentage of traffic, gradual).
-- The final implementation report required by the integration plan.
+- Real shadow traffic: every row so far is from a test account.
+
+Done and recorded elsewhere: the load test on the VM and the final implementation report
+(`docs/laya-implementation-report.md`).
