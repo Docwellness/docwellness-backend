@@ -232,6 +232,37 @@ third, tier agreement with the grams tertiles, and the same correlation **within
 slot** (because "high protein for a dish of its type" is not raw grams). This says whether the tier
 carries information; it is not a case for using Laya for nutrition (the plan keeps that exact).
 
+## The cheapest prompt that keeps its accuracy (token ablation)
+
+Laya runs on our own VM, so its cost is compute, and compute is proportional to **input tokens**
+(measured 2026-10-05: ~12 ms a token on a laptop, ~29 ms on the production VM). The tokens are mostly
+the **question text**, not the recipe: of the current 376-token request the protein question is ~138
+and the seven slot descriptions ~106, while an ingredient costs only ~4 tokens.
+
+```
+node scripts/laya-prompt-ablation.js --dry-run            # sample, variants, time estimate
+node scripts/laya-prompt-ablation.js --yes                # all variants (~48 min on the VM)
+node scripts/laya-prompt-ablation.js --yes --variants=no_protein,labels   # a subset ('current' always runs)
+node scripts/laya-prompt-ablation.js --from=<saved .json> --tolerance=0.02
+```
+
+Run it in the backend container's Coolify Terminal at a quiet time (shadowing is off, so nothing
+competes). It runs the same recipes through stripped-down versions of the slot question
+(`utils/layaPrompts.js`: with/without descriptions, with/without the protein question, fewer
+ingredients, name+category only; a with-protein variant is kept so its value can be weighed against its
+~37% of the cost) and reports per variant: **input tokens per call** (Laya's own usage count),
+latency, the threshold-free rank metrics (mean rank, top-1/2, macro AUC) and a bag-of-words baseline
+for reference, plus the protein-vs-nutrition check for the variants that ask it. It marks variants
+that are **dominated** (another is at least as accurate and no costlier) and recommends the
+**cheapest variant within `--tolerance` (default 0.03) AUC of the best**. `current` is, by test,
+exactly the request production sends.
+
+The yardstick is agreement with the existing slot labels, **not accuracy**: imperfect, but the same
+for every variant on the same recipes, which is what an ablation needs. With ~70 recipes differences
+under ~0.04 AUC are within noise; confirm a winner on dietician-reviewed data before relying on it.
+The method is generic: add a variant to `utils/layaPrompts.js` (or a new question's variants) to
+reuse it for the next Laya question.
+
 ## Load test (integration plan section 24)
 
 ```

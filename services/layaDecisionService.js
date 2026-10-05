@@ -31,6 +31,7 @@
 
 const config = require('../config/environment');
 const { buildSlotQuestions, buildSlotChoiceQuestion } = require('../utils/layaSlots');
+const { buildProteinQuestion } = require('../utils/layaPrompts');
 
 async function callLaya({ state, questions }) {
   if (!config.laya.enabled) {
@@ -103,16 +104,7 @@ async function classifyRecipe({ recipe, slotMode }) {
       // probability per slot, ~1/4 of the cost. 'noul': seven independent yes/no
       // questions (slower; see LAYA_SLOT_MODE).
       ...(mode === 'noul' ? buildSlotQuestions() : buildSlotChoiceQuestion()),
-      protein_level: {
-        type: 'choice',
-        instructions:
-          "Based on the ingredient list, how would you characterize this recipe's protein content relative to a typical dish of its type?",
-        criteria: {
-          low: 'Little to no significant protein source',
-          moderate: 'A moderate protein contribution',
-          high: 'A prominent protein source (e.g. meat, legumes, dairy, egg in quantity)',
-        },
-      },
+      ...buildProteinQuestion(),
     },
   });
 }
@@ -223,7 +215,18 @@ async function requiresDieticianReview({ decisionSummary }) {
   });
 }
 
+/**
+ * Send an arbitrary { state, questions } request through the same fail-soft,
+ * timeout-bound, authenticated path as every other call. Used by the prompt
+ * ablation harness (scripts/laya-prompt-ablation.js) to try prompt variants;
+ * production code should use the typed functions above.
+ */
+async function askLaya({ state, questions }) {
+  return callLaya({ state, questions });
+}
+
 module.exports = {
+  askLaya,
   classifyRecipe,
   scoreRecipe,
   checkRecipeCompatibility,

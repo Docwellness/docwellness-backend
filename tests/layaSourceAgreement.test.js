@@ -63,6 +63,13 @@ describe('runSourceAgreement', () => {
     expect(results[0].slotProbs).toMatchObject({ breakfast: 0.9, brunch: 0.9, lunch: 0.1 });
   });
 
+  it('records the input token count Laya reports for each call (for the prompt ablation)', async () => {
+    const withUsage = { ...reply(['lunch']), usage: { input_tokens: 123, output_tokens: 0 } };
+    const { results } = await runSourceAgreement({ items: [item('1', 'Dal', 'lunch'), item('2', 'Poha', 'breakfast')], classify: jest.fn().mockResolvedValueOnce(withUsage).mockResolvedValueOnce(reply(['breakfast'])), sleep: noSleep });
+    expect(results[0].inputTokens).toBe(123);
+    expect(results[1].inputTokens).toBeNull(); // no usage reported: null, not a guess
+  });
+
   it('retries a refused (HTTP 503) request after a pause instead of counting it as a failure', async () => {
     const replies = [{ ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, { ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, reply(['dinner'])];
     const classify = jest.fn(async () => replies.shift());

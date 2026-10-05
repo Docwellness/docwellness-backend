@@ -66,6 +66,7 @@ async function runSourceAgreement({ items, classify, sleep, retries = 3, retryDe
       slotMode: r.ok ? slotAnswerMode(r.answers) : null,
       topSlot: probs ? topSlot(probs) : null,
       latencyMs: r.ok ? r.latencyMs : null,
+      inputTokens: r.ok && r.usage && typeof r.usage.input_tokens === 'number' ? r.usage.input_tokens : null,
       error: r.ok ? null : `${r.reason}${r.detail ? `: ${r.detail}` : ''}`,
       retries: attempt,
     });

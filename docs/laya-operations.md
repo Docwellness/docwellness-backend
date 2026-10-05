@@ -207,6 +207,7 @@ the new one passes its health check.
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
 | `scripts/laya-source-agreement.js` | Blind smoke test: can Laya tell which serving slot a recipe belongs to when it cannot see the existing slot? Threshold-free rank and per-slot AUC results (vs chance), plus per-call latency. `--slot-mode=choice\|noul` to compare the two question forms; `--from=<json>` re-analyses a saved run. **Agreement with existing labels, not accuracy.** Run in the backend Terminal with `--yes`. |
 | `scripts/laya-slot-baseline.js` | Scores trivial non-LLM baselines (base rate, category prior, bag-of-words) leave-one-out on the existing slot labels, optionally side by side with a saved Laya smoke-test run (`--laya=<json>`). Read-only, seconds, no Laya. **Agreement with existing labels, not accuracy.** |
+| `scripts/laya-prompt-ablation.js` | Prompt ablation: runs the same recipes through stripped-down versions of the slot question and reports input tokens per call, latency and rank/AUC next to a bag-of-words baseline; recommends the cheapest variant within a tolerance of the best. Cost is proportional to input tokens (~29 ms a token on the VM). **Agreement with existing labels, not accuracy.** `--dry-run` for the estimate (~48 min for all 7 variants); run in the backend Terminal with `--yes`. |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
 ## Experiment: make Laya truly single-core (run 2026-10-05; KEPT)

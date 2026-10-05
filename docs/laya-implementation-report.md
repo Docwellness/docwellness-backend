@@ -246,6 +246,27 @@ Nothing here says Laya is useless: it says it is not earning its place on this q
 slots is on hold. The remaining candidates are decisions with no labelled history to train a baseline on
 (compatibility with a user's preferences, review gating), which need their own reviewed datasets.
 
+## Where Laya's tokens go (2026-10-05)
+
+Laya runs on our VM, so its cost is compute, and compute scales with **input tokens**: about 12 ms a
+token on a laptop and ~29 ms on the production VM (10.8 s / 376 tokens). Measured against a local Laya on
+three representative recipes:
+
+| Request | Input tokens | Time (local) |
+|---|---|---|
+| Current: slots with descriptions + protein, all ingredients | 376 | 4.6 s |
+| Drop the protein question | 238 (-37%) | 2.3 s |
+| Slot names only, keep protein | 270 (-28%) | 2.6 s |
+| Slot names only, no protein | 132 (-65%) | 1.3 s |
+| ... and only the first 5 ingredients | 114 | 1.2 s |
+| ... and name + category only | 81 (-78%) | 0.9 s |
+
+The cost is the **question text**, not the recipe: the protein question is ~138 tokens, the seven slot
+descriptions ~106, an ingredient ~4. What this does not say is whether the cheaper prompts lose accuracy.
+`scripts/laya-prompt-ablation.js` measures tokens and agreement-with-labels together, per variant, on the same
+recipes (the slot task is the test case because it has a labelled proxy and a baseline; the surface itself
+stays paused). Results: not yet run.
+
 ## Findings and fixes during rollout
 
 | Issue | Effect | Resolution |
