@@ -70,6 +70,7 @@ scripts/.etwoe-expiry-backup.json
 !docs/laya-deployment.md
 !docs/laya-evaluation.md
 !docs/laya-operations.md
+!docs/laya-implementation-report.md
 !RELEASE_CHECKLIST.md
 
 # Laya evaluation: the README and reviewed datasets are tracked; review sheets and run outputs are not.
