@@ -30,6 +30,52 @@ const foodItemSchema = new mongoose.Schema(
       carbs: { type: Number, default: null },
       fats: { type: Number, default: null },
       fiber: { type: Number, default: null },
+      // Added by fill-recipe-micronutrients (openspec) - g unless noted.
+      // null means "not researched", never "zero" - see
+      // micronutrientProvenance below for what backs a real 0.
+      saturatedFat: { type: Number, default: null },
+      transFat: { type: Number, default: null },
+      sugar: { type: Number, default: null },
+      cholesterol: { type: Number, default: null }, // mg
+      sodium: { type: Number, default: null }, // mg
+      calcium: { type: Number, default: null }, // mg
+      iron: { type: Number, default: null }, // mg
+      potassium: { type: Number, default: null }, // mg
+      vitaminC: { type: Number, default: null }, // mg
+    },
+    // Per-nutrient sourcing record for the nine fields above - keyed by
+    // nutrient name (e.g. "iron"). Exists so a real, multi-source-confirmed
+    // 0 (status: 'verified-zero') stays distinguishable from a value nobody
+    // has looked up yet (status: 'unknown', which is what every ingredient
+    // starts at) - see openspec/changes/fill-recipe-micronutrients/design.md
+    // Decision 2 and Decision 5's zero-is-a-finding rule.
+    micronutrientProvenance: {
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          status: { type: String, enum: ['researched', 'verified-zero', 'unknown'], default: 'unknown' },
+          sources: [
+            {
+              name: String, // e.g. 'IFCT2017', 'USDA-FDC'
+              ref: String, // food code / FDC id / URL
+              value: { type: Number, default: null },
+              basis: { type: String, enum: ['raw', 'as-eaten'], default: 'raw' },
+            },
+          ],
+          confidence: { type: String, enum: ['high', 'medium', 'low'], default: 'low' },
+          // Not an enum: 'multi-source' | 'single-source' | 'rule:<name>' (e.g.
+          // 'rule:plant-cholesterol') - the rule name is open-ended per design.md
+          // Decision 5, so a fixed enum can't express it.
+          method: { type: String, default: 'single-source', validate: {
+            validator: (v) => v === 'multi-source' || v === 'single-source' || /^rule:/.test(v),
+            message: 'method must be multi-source, single-source, or rule:<name>',
+          } },
+          note: String,
+          researchedAt: Date,
+        },
+        { _id: false }
+      ),
+      default: undefined,
     },
     // g/ml, for volume<->weight conversion where unitConversions below
     // doesn't already give a direct answer for the needed unit.

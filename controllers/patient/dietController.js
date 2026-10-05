@@ -87,6 +87,17 @@ function toPatientRecipeCard(recipe) {
     carbs: n.carbs ?? 0,
     fats: n.fats ?? 0,
     fiber: n.fiber ?? 0,
+    // fill-recipe-micronutrients (openspec): `?? null`, not `?? 0` - see
+    // dietPlanReadDispatch.js's identical convention/rationale.
+    saturatedFat: n.saturatedFat ?? null,
+    transFat: n.transFat ?? null,
+    sugar: n.sugar ?? null,
+    cholesterol: n.cholesterol ?? null,
+    sodium: n.sodium ?? null,
+    calcium: n.calcium ?? null,
+    iron: n.iron ?? null,
+    potassium: n.potassium ?? null,
+    vitaminC: n.vitaminC ?? null,
   };
   return {
     id,
@@ -334,6 +345,16 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           carbs: recipe.nutrition?.carbs ?? 0,
           fats: recipe.nutrition?.fats ?? 0,
           fiber: recipe.nutrition?.fiber ?? 0,
+          // fill-recipe-micronutrients (openspec): `?? null`, not `?? 0`.
+          saturatedFat: recipe.nutrition?.saturatedFat ?? null,
+          transFat: recipe.nutrition?.transFat ?? null,
+          sugar: recipe.nutrition?.sugar ?? null,
+          cholesterol: recipe.nutrition?.cholesterol ?? null,
+          sodium: recipe.nutrition?.sodium ?? null,
+          calcium: recipe.nutrition?.calcium ?? null,
+          iron: recipe.nutrition?.iron ?? null,
+          potassium: recipe.nutrition?.potassium ?? null,
+          vitaminC: recipe.nutrition?.vitaminC ?? null,
         },
         nutrition: {
           calories: recipe.nutrition?.calories ?? 0,
@@ -341,6 +362,15 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           carbs: recipe.nutrition?.carbs ?? 0,
           fats: recipe.nutrition?.fats ?? 0,
           fiber: recipe.nutrition?.fiber ?? 0,
+          saturatedFat: recipe.nutrition?.saturatedFat ?? null,
+          transFat: recipe.nutrition?.transFat ?? null,
+          sugar: recipe.nutrition?.sugar ?? null,
+          cholesterol: recipe.nutrition?.cholesterol ?? null,
+          sodium: recipe.nutrition?.sodium ?? null,
+          calcium: recipe.nutrition?.calcium ?? null,
+          iron: recipe.nutrition?.iron ?? null,
+          potassium: recipe.nutrition?.potassium ?? null,
+          vitaminC: recipe.nutrition?.vitaminC ?? null,
         },
         ingredients: Array.isArray(recipe.ingredients)
           ? recipe.ingredients.map((ingredient) => ({

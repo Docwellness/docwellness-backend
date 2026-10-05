@@ -284,6 +284,19 @@ const recipeSchema = new mongoose.Schema(
       carbs: { type: Number }, // grams
       fats: { type: Number }, // grams
       fiber: { type: Number, default: 0 }, // grams
+      // Added by fill-recipe-micronutrients (openspec) - copied from this
+      // recipe's V1 RecipeVersion (never hand-authored per recipe), g unless
+      // noted. null means "not yet researched at the ingredient level",
+      // never 0 - see design.md Decision 1/5.
+      saturatedFat: { type: Number, default: null },
+      transFat: { type: Number, default: null },
+      sugar: { type: Number, default: null },
+      cholesterol: { type: Number, default: null }, // mg
+      sodium: { type: Number, default: null }, // mg
+      calcium: { type: Number, default: null }, // mg
+      iron: { type: Number, default: null }, // mg
+      potassium: { type: Number, default: null }, // mg
+      vitaminC: { type: Number, default: null }, // mg
     },
     // Real per-serving active-ingredient facts for category:'Supplements'
     // recipes - a vitamin/mineral tablet's meaningful numbers are its
@@ -362,6 +375,16 @@ const recipeSchema = new mongoose.Schema(
       carbs: { type: Number, default: null },
       fats: { type: Number, default: null },
       fiber: { type: Number, default: null },
+      // Mirrors `nutrition` above - see fill-recipe-micronutrients openspec.
+      saturatedFat: { type: Number, default: null },
+      transFat: { type: Number, default: null },
+      sugar: { type: Number, default: null },
+      cholesterol: { type: Number, default: null },
+      sodium: { type: Number, default: null },
+      calcium: { type: Number, default: null },
+      iron: { type: Number, default: null },
+      potassium: { type: Number, default: null },
+      vitaminC: { type: Number, default: null },
     },
   },
   {
@@ -441,6 +464,18 @@ recipeSchema.pre('save', function () {
         carbs: this.nutrition?.carbs ?? null,
         fats: this.nutrition?.fats ?? null,
         fiber: this.nutrition?.fiber ?? null,
+        // fill-recipe-micronutrients: mirror the same `?? null` cache-copy
+        // convention as the five macros above - never `?? 0`, so an
+        // un-researched value stays visibly unknown through this cache too.
+        saturatedFat: this.nutrition?.saturatedFat ?? null,
+        transFat: this.nutrition?.transFat ?? null,
+        sugar: this.nutrition?.sugar ?? null,
+        cholesterol: this.nutrition?.cholesterol ?? null,
+        sodium: this.nutrition?.sodium ?? null,
+        calcium: this.nutrition?.calcium ?? null,
+        iron: this.nutrition?.iron ?? null,
+        potassium: this.nutrition?.potassium ?? null,
+        vitaminC: this.nutrition?.vitaminC ?? null,
       };
     }
   } catch (err) {

@@ -1912,6 +1912,16 @@ exports.getDietPlanDetails = async (req, res, next) => {
           carbs: normalizedNutrition.carbs ?? 0,
           fats: normalizedNutrition.fats ?? 0,
           fiber: normalizedNutrition.fiber ?? 0,
+          // fill-recipe-micronutrients (openspec): `?? null`, not `?? 0`.
+          saturatedFat: normalizedNutrition.saturatedFat ?? null,
+          transFat: normalizedNutrition.transFat ?? null,
+          sugar: normalizedNutrition.sugar ?? null,
+          cholesterol: normalizedNutrition.cholesterol ?? null,
+          sodium: normalizedNutrition.sodium ?? null,
+          calcium: normalizedNutrition.calcium ?? null,
+          iron: normalizedNutrition.iron ?? null,
+          potassium: normalizedNutrition.potassium ?? null,
+          vitaminC: normalizedNutrition.vitaminC ?? null,
         },
       };
     });

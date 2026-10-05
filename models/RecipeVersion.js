@@ -113,7 +113,26 @@ const recipeVersionSchema = new mongoose.Schema(
       carbs: { type: Number, default: null },
       fats: { type: Number, default: null },
       fiber: { type: Number, default: null },
+      // Added by fill-recipe-micronutrients (openspec) - g unless noted,
+      // computed the same strict-null way as the five macros above (see
+      // recipeVersioningService.js::computeNutritionFromIngredients and
+      // MICRONUTRIENT_FIELDS). Never defaulted to 0.
+      saturatedFat: { type: Number, default: null },
+      transFat: { type: Number, default: null },
+      sugar: { type: Number, default: null },
+      cholesterol: { type: Number, default: null }, // mg
+      sodium: { type: Number, default: null }, // mg
+      calcium: { type: Number, default: null }, // mg
+      iron: { type: Number, default: null }, // mg
+      potassium: { type: Number, default: null }, // mg
+      vitaminC: { type: Number, default: null }, // mg
     },
+    // Which of the nine micronutrients above came out null on this version,
+    // and why (ingredient not researched, or unresolved to a FoodItem at
+    // all) - audit-only, mirrors unresolvedIngredientNames below but scoped
+    // to micronutrients specifically since those never gate menu generation
+    // (design.md Decision 3) and so need their own visibility mechanism.
+    micronutrientsIncomplete: { type: [String], default: [] },
     // True if any ingredient's foodItemId resolves to a FoodItem with
     // nutritionPer100g still null (or couldn't be resolved to a FoodItem at
     // all) - nutritionPerServing above is computed from only the resolved
