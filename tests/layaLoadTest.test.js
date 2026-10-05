@@ -20,6 +20,8 @@ const {
   summarizeStage,
   startProbe,
   shouldAbort,
+  drainLaya,
+  median,
 } = require('../utils/layaLoadTest');
 
 describe('parseMix', () => {
@@ -159,18 +161,72 @@ describe('startProbe', () => {
 });
 
 describe('shouldAbort', () => {
-  const stage = (over) => ({ concurrency: 10, requests: 50, ok: 40, errorRate: 0.2, otherErrorRate: 0, ...over });
-  it('continues on overload (503) alone - that is load shedding, not failure', () => {
-    expect(shouldAbort(stage({ errorRate: 0.8, ok: 10, overloadRate: 0.8, otherErrorRate: 0 }))).toBeNull();
+  const stage = (over) => ({ concurrency: 10, requests: 50, ok: 40, errorRate: 0.2, timeoutRate: 0, overloadRate: 0, otherErrorRate: 0, ...over });
+  it('continues on overload (503) alone, even with zero successes - that is load shedding, not failure', () => {
+    expect(shouldAbort(stage({ ok: 10, errorRate: 0.8, overloadRate: 0.8 }))).toBeNull();
+    expect(shouldAbort(stage({ ok: 0, errorRate: 1, overloadRate: 1 }))).toBeNull();
   });
-  it('stops when Laya is failing outright', () => {
-    expect(shouldAbort(stage({ ok: 0, errorRate: 1, otherErrorRate: 1 }))).toMatch(/every request failed/);
+  it('stops when nothing succeeds because Laya is stalling (timeouts) or failing (errors)', () => {
+    expect(shouldAbort(stage({ ok: 0, errorRate: 1, timeoutRate: 1 }))).toMatch(/no request succeeded/);
+    expect(shouldAbort(stage({ ok: 0, errorRate: 1, otherErrorRate: 1 }))).toMatch(/no request succeeded/);
     expect(shouldAbort(stage({ otherErrorRate: 0.6, ok: 20 }))).toMatch(/non-overload errors/);
+  });
+  it('does not stop on a few timeouts while requests are still succeeding', () => {
+    expect(shouldAbort(stage({ ok: 30, errorRate: 0.4, timeoutRate: 0.4 }))).toBeNull();
   });
   it('stops to protect the backend', () => {
     expect(shouldAbort(stage({}), { abortBackendP95Ms: 2000, backend: { p95: 2500, n: 20, failures: 0 } })).toMatch(/protect the backend/);
     expect(shouldAbort(stage({}), { backend: { p95: null, n: 0, failures: 4 } })).toMatch(/stopped answering/);
     expect(shouldAbort(stage({}), { backend: { p95: 50, n: 20, failures: 0 } })).toBeNull();
+  });
+});
+
+describe('median', () => {
+  it('handles odd, even, empty and non-numeric input', () => {
+    expect(median([5000, 100, 300])).toBe(300);
+    expect(median([100, 300])).toBe(200);
+    expect(median([])).toBeNull();
+    expect(median([null, undefined])).toBeNull();
+  });
+});
+
+describe('drainLaya', () => {
+  // A fake clock so the wait logic is tested without real sleeping.
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, sleep: async (ms) => { t += ms; }, advance: (ms) => { t += ms; } };
+  };
+
+  it('returns immediately when the first probe is fast and ok', async () => {
+    const c = clock();
+    const r = await drainLaya({ probe: async () => { c.advance(5000); return { ok: true }; }, baselineMs: 5000, sleep: c.sleep, now: c.now });
+    expect(r).toMatchObject({ drained: true, attempts: 1 });
+  });
+
+  it('keeps polling through 503s and slow answers until Laya is back to normal', async () => {
+    const c = clock();
+    const script = [
+      { took: 5, result: { ok: false, reason: 'error', detail: 'HTTP 503 busy' } }, // refused: still draining
+      { took: 14000, result: { ok: true } },                                          // answered, but queued behind backlog
+      { took: 5200, result: { ok: true } },                                           // normal again
+    ];
+    let i = 0;
+    const r = await drainLaya({
+      probe: async () => { const step = script[i]; i += 1; c.advance(step.took); return step.result; },
+      baselineMs: 5000, sleep: c.sleep, now: c.now, intervalMs: 2000,
+    });
+    expect(r).toMatchObject({ drained: true, attempts: 3 });
+    expect(r.waitedMs).toBeGreaterThan(14000);
+  });
+
+  it('gives up after maxWaitMs and says it did not drain', async () => {
+    const c = clock();
+    const r = await drainLaya({
+      probe: async () => { c.advance(5); return { ok: false, reason: 'timeout' }; },
+      baselineMs: 5000, sleep: c.sleep, now: c.now, intervalMs: 2000, maxWaitMs: 10000,
+    });
+    expect(r.drained).toBe(false);
+    expect(r.waitedMs).toBeGreaterThanOrEqual(10000);
   });
 });
 
@@ -304,9 +360,11 @@ describe('scripts/laya-load-test.js (end to end)', () => {
       );
       expect(r.code).toBe(0);
       const report = JSON.parse(fs.readFileSync(out, 'utf8'));
-      expect(report.warmup).toEqual({ ok: 3, of: 3 });
-      expect(report.stoppedEarly).toMatch(/every request failed|non-overload errors/);
+      expect(report.warmup).toMatchObject({ ok: 3, of: 3 });
+      expect(report.warmup.medianMs).toBeGreaterThan(0);
+      expect(report.stoppedEarly).toMatch(/no request succeeded|non-overload errors/);
       expect(report.stages).toHaveLength(1); // never reached concurrency 4
+      expect(report.stages[0].drain).toBeUndefined(); // hard errors leave no backlog to wait for
       expect(report.stages[0].errorSamples[0]).toMatch(/HTTP 500/);
     } finally {
       await new Promise((r2) => flaky.close(r2));

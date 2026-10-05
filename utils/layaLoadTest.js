@@ -164,6 +164,39 @@ function summarizeStage({ concurrency, outcomes, wallMs, peakInFlight }) {
   };
 }
 
+// ---- draining between stages ------------------------------------------------
+
+/**
+ * Wait until Laya has worked off the requests a previous stage abandoned. A
+ * client timeout does not cancel work inside Laya, so after an overloaded
+ * stage it is still busy for a while, and the next stage would otherwise be
+ * measuring that backlog, not itself. Polls with a single cheap request until
+ * one completes ok in about the normal single-call time.
+ */
+async function drainLaya({ probe, baselineMs, sleep, maxWaitMs = 120000, intervalMs = 2000, now = Date.now, factor = 1.5, slackMs = 500 }) {
+  const started = now();
+  const limit = baselineMs * factor + slackMs;
+  let attempts = 0;
+  for (;;) {
+    attempts += 1;
+    const t0 = now();
+    // eslint-disable-next-line no-await-in-loop
+    const r = await probe();
+    const took = now() - t0;
+    if (r && r.ok && took <= limit) return { drained: true, waitedMs: now() - started, attempts };
+    if (now() - started >= maxWaitMs) return { drained: false, waitedMs: now() - started, attempts };
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(intervalMs);
+  }
+}
+
+function median(values) {
+  const v = values.filter((x) => typeof x === 'number').sort((a, b) => a - b);
+  if (!v.length) return null;
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 ? v[mid] : Math.round((v[mid - 1] + v[mid]) / 2);
+}
+
 // ---- backend responsiveness probe ------------------------------------------
 
 /**
@@ -200,8 +233,12 @@ function startProbe({ sample, intervalMs = 250 }) {
 
 /** Why the run should stop escalating, or null to continue. */
 function shouldAbort(stage, { abortErrorRate = 0.5, abortBackendP95Ms = 2000, backend } = {}) {
-  if (stage.errorRate >= abortErrorRate && stage.requests >= 10 && stage.ok === 0) {
-    return `every request failed at concurrency ${stage.concurrency}`;
+  // Nothing succeeded and the failures are timeouts/errors (Laya stalled or
+  // dead). All-503 with zero successes is NOT this: that is Laya shedding load
+  // on purpose, and the later stages are still worth measuring.
+  const stalled = (stage.timeoutRate || 0) + (stage.otherErrorRate || 0);
+  if (stage.ok === 0 && stage.requests >= 10 && stalled >= abortErrorRate) {
+    return `no request succeeded at concurrency ${stage.concurrency} (${Math.round(stalled * 100)}% timeouts/errors)`;
   }
   if (stage.otherErrorRate >= abortErrorRate) {
     return `${Math.round(stage.otherErrorRate * 100)}% non-overload errors at concurrency ${stage.concurrency} (Laya is failing, not just shedding load)`;
@@ -225,4 +262,6 @@ module.exports = {
   summarizeStage,
   startProbe,
   shouldAbort,
+  drainLaya,
+  median,
 };

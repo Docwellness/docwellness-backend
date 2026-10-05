@@ -18,7 +18,7 @@
  *        [--mix=recipe:80,review:20]     kinds: recipe | compat | review
  *        [--recipes-file=<json>]         recipes, or a review sheet from
  *                                        scripts/laya-eval-export-review-sheet.js
- *        [--timeout-ms=15000] [--cooldown-ms=5000] [--baseline-ms=5000]
+ *        [--timeout-ms=15000] [--cooldown-ms=5000] [--baseline-ms=5000] [--drain-max-ms=120000]
  *        [--probe-url=http://127.0.0.1:<PORT>/health]
  *        [--abort-backend-p95-ms=2000] [--abort-error-rate=0.5]
  *        [--out=<file>]
@@ -30,8 +30,12 @@
  *   - CPU and RAM of the Laya container are NOT visible from here. Watch the
  *     Laya resource's metrics in Coolify (or `docker stats` on the VM) during
  *     the run; each stage prints its UTC start/end so you can line them up.
- *   - It stops escalating on its own if Laya is failing outright, or the
- *     backend's /health p95 passes --abort-backend-p95-ms.
+ *   - After every stage it waits for Laya to drain: a client timeout does not
+ *     cancel work inside Laya, so an overloaded stage leaves a backlog that
+ *     would otherwise contaminate the next stage (and real shadow traffic).
+ *   - It stops escalating on its own if nothing succeeds because Laya is
+ *     stalling or failing (all-503 does NOT stop it: that is deliberate load
+ *     shedding), or the backend's /health p95 passes --abort-backend-p95-ms.
  */
 require('dotenv').config();
 const fs = require('fs');
@@ -46,6 +50,8 @@ const {
   summarizeStage,
   startProbe,
   shouldAbort,
+  drainLaya,
+  median,
 } = require('../utils/layaLoadTest');
 
 function parseArgs(argv) {
@@ -131,19 +137,31 @@ async function layaHealth() {
   console.log('Warming up (3 sequential calls, not counted)...');
   config.laya.timeoutMs = Math.max(timeoutMs, 90000);
   let warmOk = 0;
+  const warmLatencies = [];
   for (let i = 0; i < 3; i += 1) {
     const { fn, args: a } = buildRequest('recipe', i, recipes);
+    const t0 = Date.now();
     // eslint-disable-next-line no-await-in-loop
     const r = await layaService[fn](a);
-    if (r.ok) warmOk += 1;
-    else console.log(`  warm-up call ${i + 1} failed: ${r.reason}${r.detail ? ` (${r.detail})` : ''}`);
+    if (r.ok) {
+      warmOk += 1;
+      warmLatencies.push(Date.now() - t0);
+    } else console.log(`  warm-up call ${i + 1} failed: ${r.reason}${r.detail ? ` (${r.detail})` : ''}`);
   }
   config.laya.timeoutMs = timeoutMs;
   if (!warmOk) {
     console.error('Laya answered none of the warm-up calls - check LAYA_BASE_URL/LAYA_API_KEY and that Laya is healthy. Not load testing a service that is not answering.');
     process.exit(1);
   }
-  report.warmup = { ok: warmOk, of: 3 };
+  // Typical single-call time with an idle Laya (median, so one cold call does
+  // not skew it). Used to recognise "drained" between stages.
+  const baselineCallMs = median(warmLatencies);
+  report.warmup = { ok: warmOk, of: 3, medianMs: baselineCallMs };
+  const drainMaxMs = Number(args['drain-max-ms'] || 120000);
+  const drain = async () => {
+    const { fn, args: a } = buildRequest('recipe', 0, recipes);
+    return drainLaya({ probe: () => layaService[fn](a), baselineMs: baselineCallMs, sleep, maxWaitMs: drainMaxMs });
+  };
 
   console.log(`Measuring backend baseline at ${probeUrl} (idle, ${baselineMs}ms)...`);
   const base = startProbe({ sample });
@@ -185,14 +203,29 @@ async function layaHealth() {
     if (stage.errorSamples.length) console.log('  error samples:', stage.errorSamples.join(' | '));
 
     const reason = shouldAbort(stage, { abortErrorRate, abortBackendP95Ms, backend });
+
+    // Let Laya work off whatever this stage abandoned before anything else
+    // runs: the next stage, or (after the last one) real shadow traffic.
+    // Skipped only when the run is stopping because Laya is throwing hard
+    // errors: with no timeouts or 503s there is no abandoned work to wait out.
+    const noBacklog = reason && stage.timeoutRate === 0 && stage.overloadRate === 0;
+    if (!noBacklog) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(cooldownMs);
+      console.log('  waiting for Laya to drain...');
+      // eslint-disable-next-line no-await-in-loop
+      stage.drain = await drain();
+      const waited = Math.round(stage.drain.waitedMs / 1000);
+      console.log(
+        `  drain: ${stage.drain.drained ? `done in ${waited}s` : `NOT drained after ${waited}s - the next stage starts with a backlog`}`
+      );
+      if (!stage.drain.drained) report.backlogWarning = true;
+    }
+
     if (reason) {
       report.stoppedEarly = reason;
       console.log(`\nStopping early: ${reason}`);
       break;
-    }
-    if (concurrency !== levels[levels.length - 1]) {
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(cooldownMs);
     }
   }
 
