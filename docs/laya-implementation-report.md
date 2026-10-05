@@ -131,6 +131,34 @@ protein-rich dishes (chicken curry, chole, fish curry, rajma, paneer tikka). Tha
 and small-sample, but it is the kind of disagreement the evaluation dataset exists to quantify.
 Laya also warns at startup that this checkpoint's confidence is not calibrated.
 
+## Blind meal-type smoke test (2026-10-05, after the `servingTime` fix)
+
+`scripts/laya-source-agreement.js`: 80 saved recipes (20 per existing slot), Laya asked the
+meal-type question one at a time **without** the recipe's slot. The result is **agreement with the
+existing slot labels, not accuracy**: those labels can be wrong and many dishes fit several meals.
+
+| | Result |
+|---|---|
+| Overall agreement | **37 / 80 = 46%** (chance with 4 slots: 25%) |
+| By existing slot | dinner 8/20, breakfast 10/20, snack 9/20, lunch 10/20 |
+| Lunch and dinner counted as one "main meal" (derived from the confusion table) | 52 / 80 = 65% (always guessing "main meal": 50%) |
+| Exact lunch-vs-dinner match where both are main meals | 18 / 33 = 55% (coin flip: 50%) |
+| Mean confidence, agree vs differ | 0.022 vs 0.022 (no discriminating signal) |
+| Latency (recipe-only request, single-core) | mean 6.3 s, p50 6.2 s, p95 7.4 s; 0 errors, 0 timeouts |
+
+**Reading it.** Better than chance, but weak. Laya answered "lunch" for 29 of 80 recipes (an even
+split would be ~20), so it behaves as if lunch were its default. Lunch vs dinner is close to a
+coin flip, which is as much a property of the question as of the model (most dishes suit both).
+Breakfast and snack were recognised only about half the time. Laya's confidence did not separate
+right from wrong answers, so it cannot support review gating. Before the leak fix shadow rows showed
+confidences near 0.35; they fall to ~0.02 once the slot is hidden. This is consistent with the
+slot having been doing the work, though it is not proof.
+
+**Consequence for the evaluation design.** A single "best meal" label penalises Laya for the
+inherent lunch/dinner ambiguity. The dataset should record every meal a dish suits and score
+Laya as correct when its answer is in that set (the system already models suitability this way:
+`Recipe.mealSlotSuitability`). Decision pending with the team.
+
 ## Findings and fixes during rollout
 
 | Issue | Effect | Resolution |
