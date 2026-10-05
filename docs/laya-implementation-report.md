@@ -168,6 +168,32 @@ multi-slot suitability through `Recipe.mealSlotSuitability`. The field exists, b
 (in the database checked) has more than one slot in it, so it is not evidence of current practice;
 it is only a place where reviewed multi-slot judgements could eventually be stored.
 
+## Per-slot smoke test, seven yes/no questions (2026-10-05)
+
+`scripts/laya-source-agreement.js`, 70 recipes (10 per slot, all seven slots), slot hidden from Laya,
+seven yes/no ("noul") questions per call. Agreement with existing slot labels, **not accuracy**.
+
+| | Result |
+|---|---|
+| Latency per call | **mean 28.8 s**, p50 27.7 s, p95 35.5 s, p99 38.6 s (4.6x the old two-question call) |
+| Laya rates the existing slot suitable (>= 0.5) | 49 / 70 = 70% |
+| Slots it says yes to per recipe | mean 4.87 of 7 (an overall yes-rate of 70%) |
+| Its single top pick is the existing slot | 6 / 70 = 9% (chance among 7: 14%) |
+| Yes-rate by slot | Morning Drink 86%, Night Drink 83%, Dinner 76%, Lunch 71%, Brunch 69%, Evening Snack 57%, Breakfast 46% |
+
+**Reading it.** The existing slot is rated suitable 70% of the time, which is exactly Laya's base
+rate of saying yes, so that figure carries no signal. Top pick was below chance (Morning Drink won
+for 9 of 10 dinners). The probabilities cluster near 0.5 (examples 0.36-0.56), so a 0.5 line mostly
+splits noise, and the per-slot bias dominates. At 28.8 s a call, with a 30 s timeout, roughly a third
+of calls would time out. **This form did not work as built.** What it does not show is whether a
+threshold-free reading would find signal that the 0.5 line hides; the rank metrics added afterwards
+(`utils/layaRank.js`) are for that.
+
+**Alternative implemented:** the default form is now **one 7-option choice question** (`slot_fit`,
+`LAYA_SLOT_MODE=choice`): a probability per slot in about a quarter of the time (local probe ~4 s vs
+~10 s for the seven questions; production latency not yet measured). Not yet measured for quality
+on the 70 recipes; the seven-question form stays available as `LAYA_SLOT_MODE=noul` for comparison.
+
 ## Findings and fixes during rollout
 
 | Issue | Effect | Resolution |

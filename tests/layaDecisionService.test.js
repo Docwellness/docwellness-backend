@@ -169,15 +169,33 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     expect(requestInit.headers.Authorization).toBe('Bearer test-key');
     const body = JSON.parse(requestInit.body);
     expect(body.model).toBe('laya-typed-decisions');
-    // multi-label: one yes/no question per serving slot, plus the protein tier
-    expect(Object.keys(body.questions)).toEqual([
+    // default form: ONE 7-option slot question plus the protein tier
+    expect(Object.keys(body.questions)).toEqual(['slot_fit', 'protein_level']);
+    expect(body.questions.slot_fit.type).toBe('choice');
+    expect(Object.keys(body.questions.slot_fit.criteria)).toEqual([
+      'morning_drink', 'breakfast', 'brunch', 'lunch', 'evening_snack', 'dinner', 'night_drink',
+    ]);
+    expect(body.questions).not.toHaveProperty('meal_type_fit');
+    expect(body.questions.protein_level.type).toBe('choice');
+  });
+
+  it('can ask the seven yes/no questions instead, per call or by configuration (LAYA_SLOT_MODE)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ answers: {}, usage: {} }) });
+    config.laya.enabled = true;
+
+    await classifyRecipe({ recipe, slotMode: 'noul' }); // per call
+    expect(Object.keys(JSON.parse(mockFetch.mock.calls[0][1].body).questions)).toEqual([
       'slot_morning_drink', 'slot_breakfast', 'slot_brunch', 'slot_lunch',
       'slot_evening_snack', 'slot_dinner', 'slot_night_drink', 'protein_level',
     ]);
-    expect(body.questions.slot_dinner).toMatchObject({ type: 'noul' });
-    expect(body.questions.slot_dinner.instructions).toMatch(/suitable to be served as Dinner/);
-    expect(body.questions).not.toHaveProperty('meal_type_fit');
-    expect(body.questions.protein_level.type).toBe('choice');
+    const q = JSON.parse(mockFetch.mock.calls[0][1].body).questions;
+    expect(q.slot_dinner).toMatchObject({ type: 'noul' });
+    expect(q.slot_dinner.instructions).toMatch(/suitable to be served as Dinner/);
+
+    config.laya.slotMode = 'noul'; // by configuration
+    await classifyRecipe({ recipe });
+    expect(Object.keys(JSON.parse(mockFetch.mock.calls[1][1].body).questions)).toHaveLength(8);
+    config.laya.slotMode = undefined;
   });
 
   it('never sends servingTime to Laya (it would leak the answer to the meal-type question)', async () => {

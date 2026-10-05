@@ -8,7 +8,7 @@
 const path = require('path');
 const { execFile } = require('child_process');
 const { SLOT_KEYS } = require('../utils/layaSlots');
-const { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable } = require('../utils/layaSourceAgreement');
+const { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable, rankSummary } = require('../utils/layaSourceAgreement');
 
 const item = (id, name, sourceSlot) => ({
   id, name, sourceSlot,
@@ -20,6 +20,13 @@ const reply = (yesSlots = [], latencyMs = 9000) => ({
   latencyMs,
   answers: Object.fromEntries(SLOT_KEYS.map((k) => [`slot_${k}`, { type: 'noul', noul: yesSlots.includes(k) ? 0.9 : 0.1 }])),
 });
+// The one-question form: a probability per slot summing to 1, `top` highest.
+const choiceReply = (top, second = null, latencyMs = 4000) => {
+  const probabilities = Object.fromEntries(SLOT_KEYS.map((k) => [k, 0.03]));
+  probabilities[top] = 0.6;
+  if (second) probabilities[second] = 0.25;
+  return { ok: true, latencyMs, answers: { slot_fit: { type: 'choice', choice: top, confidence: 0.4, probabilities } } };
+};
 const noSleep = jest.fn(async () => {});
 
 beforeEach(() => noSleep.mockClear());
@@ -137,6 +144,35 @@ describe('summaries', () => {
   });
 });
 
+describe('rankSummary (threshold-free, works for both answer forms)', () => {
+  const runWith = async (specs, make) => {
+    const items = specs.map(([name, source]) => item(name, name, source));
+    const replies = specs.map((s) => make(s));
+    return (await runSourceAgreement({ items, classify: async () => replies.shift(), sleep: noSleep })).results;
+  };
+
+  it('scores the one-question form by where the existing slot ranks, with chance levels', async () => {
+    const results = await runWith(
+      [['Poha', 'breakfast', 'breakfast', null], ['Dal', 'lunch', 'dinner', 'lunch'], ['Tea', 'night_drink', 'morning_drink', null]],
+      ([, , top, second]) => choiceReply(top, second)
+    );
+    expect(results.every((r) => r.slotMode === 'choice')).toBe(true);
+    const r = rankSummary(results);
+    expect(r.n).toBe(3);
+    // Poha: rank 1; Dal: lunch is 2nd; Tea: night_drink tied low with four others -> rank 5
+    expect(r.meanBestAcceptedRank).toBeCloseTo((1 + 2 + 4.5) / 3, 1);
+    expect(r.chanceMeanBestRank).toBe(4);
+    expect(r.topK[1]).toMatchObject({ hit: 1, chance: 0.143 });
+    expect(r.topK[2].hit).toBe(2);
+  });
+
+  it('reads the seven-yes/no form too, and detects which form was used', async () => {
+    const results = await runWith([['A', 'lunch', ['lunch']], ['B', 'dinner', ['dinner']]], ([, , yes]) => reply(yes));
+    expect(results.every((r) => r.slotMode === 'noul')).toBe(true);
+    expect(rankSummary(results).topK[1].rate).toBe(1);
+  });
+});
+
 describe('scripts/laya-source-agreement.js', () => {
   it('refuses to run when Laya is not enabled (before touching the database)', async () => {
     const r = await new Promise((resolve) => {
@@ -148,10 +184,34 @@ describe('scripts/laya-source-agreement.js', () => {
     expect(r.stderr).toMatch(/LAYA_ENABLED=true/);
   });
 
+  it('re-analyses a saved results file without Laya or the database (--from)', async () => {
+    const fs = require('fs');
+    const os = require('os');
+    const items = [item('1', 'Poha', 'breakfast'), item('2', 'Dal', 'lunch')];
+    const replies = [choiceReply('breakfast'), choiceReply('dinner', 'lunch')];
+    const { results } = await runSourceAgreement({ items, classify: async () => replies.shift(), sleep: noSleep });
+    const file = path.join(os.tmpdir(), `sa-${Date.now()}.json`);
+    fs.writeFileSync(file, JSON.stringify({ results }));
+    const r = await new Promise((resolve) => {
+      execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'laya-source-agreement.js'), `--from=${file}`],
+        // deliberately no Laya settings and no usable database: --from must need neither
+        { env: { ...process.env, OPENAI_API_KEY: 'dummy', LAYA_ENABLED: 'false', MONGODB_URI: 'mongodb://127.0.0.1:1/none' }, cwd: path.join(__dirname, '..') },
+        (err, stdout, stderr) => resolve({ code: err ? err.code : 0, stdout, stderr }));
+    });
+    fs.rmSync(file, { force: true });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/Re-analysing 2 saved results/);
+    expect(r.stdout).toMatch(/one 7-option question/);
+    expect(r.stdout).toMatch(/Existing slot's rank among the 7 scores: mean 1\.5/);
+    expect(r.stdout).toMatch(/Existing slot in Laya's top 1: 1\/2 = 50%\s+\(chance 14%\)/);
+    expect(r.stdout).toMatch(/NOT accuracy/);
+    expect(r.stdout).not.toMatch(/Thresholded yes\/no view/); // not meaningful for the choice form
+  });
+
   it('states loudly, in its own header, that this is not accuracy, and samples all seven slots', () => {
     const src = require('fs').readFileSync(path.join(__dirname, '..', 'scripts', 'laya-source-agreement.js'), 'utf8');
     expect(src).toMatch(/NOT accuracy/);
-    expect(src).toMatch(/Neither is accuracy/);
+    expect(src).toMatch(/Agreement with existing labels, NOT accuracy/);
     expect(src).toMatch(/servingTime: \{ \$in: SLOT_NAMES \}/);
   });
 });

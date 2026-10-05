@@ -9,6 +9,15 @@
  * (multi-label classification), and the dietician-reviewed dataset lists every
  * slot a recipe suits.
  *
+ * Two ways to ask, selected by LAYA_SLOT_MODE (config.laya.slotMode):
+ *   'choice' (default): ONE question whose seven options are the slots. Laya
+ *     returns a probability for each option, which gives a ranking of the
+ *     slots for ~1/4 of the cost (measured: seven yes/no questions took ~29 s
+ *     a call on the production VM, one question ~3-4 s). The probabilities
+ *     sum to 1, so use rank metrics (utils/layaRank.js), not a 0.5 threshold.
+ *   'noul': seven yes/no questions, each an independent probability. Slower,
+ *     and measured to cluster near 0.5 with a strong per-slot bias.
+ *
  * The descriptions below are part of the prompt Laya sees: changing them
  * changes its answers, so re-measure after any edit. They are drafts for the
  * team to refine.
@@ -74,6 +83,7 @@ function parseSlotList(text) {
 }
 
 const questionId = (key) => `slot_${key}`;
+const CHOICE_QUESTION_ID = 'slot_fit';
 
 /** The seven yes/no ("noul") questions, keyed slot_<key>. */
 function buildSlotQuestions() {
@@ -90,12 +100,47 @@ function buildSlotQuestions() {
   return questions;
 }
 
-/** Laya's answers -> { slotKey: probability of "yes" | null }. */
+/**
+ * ONE choice question with the seven slots as options (criteria keyed by slot
+ * key, so the returned probabilities are keyed by slot key too).
+ */
+function buildSlotChoiceQuestion() {
+  const criteria = {};
+  for (const s of SLOTS) criteria[s.key] = s.description;
+  return {
+    [CHOICE_QUESTION_ID]: {
+      type: 'choice',
+      instructions:
+        'Given the recipe name, cuisine, category and ingredients, which serving slot is this recipe best suited to? ' +
+        'Many recipes suit more than one slot; give the best fit.',
+      criteria,
+    },
+  };
+}
+
+/** 'choice' | 'noul' | null: which form of slot answer this is. */
+function slotAnswerMode(answers) {
+  if (answers && answers[CHOICE_QUESTION_ID] && answers[CHOICE_QUESTION_ID].probabilities) return 'choice';
+  if (answers && SLOT_KEYS.some((k) => answers[questionId(k)] && typeof answers[questionId(k)].noul === 'number')) return 'noul';
+  return null;
+}
+
+/**
+ * Laya's answers -> { slotKey: score | null }. For 'noul' answers the score is
+ * the probability of "yes" (independent per slot); for the 'choice' answer it
+ * is that option's probability (they sum to ~1). Either way higher = better fit,
+ * which is all the rank metrics need.
+ */
 function slotProbabilities(answers) {
   const out = {};
+  const choice = answers && answers[CHOICE_QUESTION_ID] && answers[CHOICE_QUESTION_ID].probabilities;
   for (const k of SLOT_KEYS) {
-    const a = answers && answers[questionId(k)];
-    out[k] = a && typeof a.noul === 'number' ? a.noul : null;
+    if (choice) {
+      out[k] = typeof choice[k] === 'number' ? choice[k] : null;
+    } else {
+      const a = answers && answers[questionId(k)];
+      out[k] = a && typeof a.noul === 'number' ? a.noul : null;
+    }
   }
   return out;
 }
@@ -119,7 +164,10 @@ module.exports = {
   slotName,
   parseSlotList,
   questionId,
+  CHOICE_QUESTION_ID,
   buildSlotQuestions,
+  buildSlotChoiceQuestion,
+  slotAnswerMode,
   slotProbabilities,
   topSlot,
 };

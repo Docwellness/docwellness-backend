@@ -66,6 +66,7 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | `LAYA_API_KEY` | same secret as Laya | |
 | `LAYA_TIMEOUT_MS` | `30000` | Raised from 15000 for the single-core configuration (8 s calls). Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
 | `LAYA_SHADOW_MAX_IN_FLIGHT` | `1` (code default 2) | Cap on concurrent shadow calls. Past it, a call is **skipped** (not sent to Laya) and recorded. Keeps a burst of generations from filling Laya's single lane with work that will time out. Keep it at or below Laya's `LAYA_MAX_CONCURRENT`. |
+| `LAYA_SLOT_MODE` | `choice` (default) | How serving slots are asked: `choice` = one 7-option question (~1/4 of the cost), `noul` = seven yes/no questions (measured ~29 s a call on the VM, so it needs `LAYA_TIMEOUT_MS` well above 30000). Applies to shadow calls and the evaluation scripts.
 
 Env changes only take effect after the app is **redeployed**; there is no hot toggle.
 
@@ -204,7 +205,7 @@ the new one passes its health check.
 | `scripts/laya-shadow-report.js` | Summarise shadow rows; `--exclude-dietician` for test accounts. Read-only. |
 | `scripts/laya-eval-export-review-sheet.js` | Build a review sheet from real recipes for dieticians to label. Read-only. |
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
-| `scripts/laya-source-agreement.js` | Blind smoke test: does Laya rate each recipe's EXISTING slot suitable (seven per-slot questions; it cannot see the slot), and is it discriminating? Also measures the per-call latency of the eight-question request. **Agreement with existing labels, not accuracy.** Run in the backend Terminal with `--yes`. |
+| `scripts/laya-source-agreement.js` | Blind smoke test: can Laya tell which serving slot a recipe belongs to when it cannot see the existing slot? Threshold-free rank and per-slot AUC results (vs chance), plus per-call latency. `--slot-mode=choice\|noul` to compare the two question forms; `--from=<json>` re-analyses a saved run. **Agreement with existing labels, not accuracy.** Run in the backend Terminal with `--yes`. |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
 ## Experiment: make Laya truly single-core (run 2026-10-05; KEPT)

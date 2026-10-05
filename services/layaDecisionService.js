@@ -30,7 +30,7 @@
  */
 
 const config = require('../config/environment');
-const { buildSlotQuestions } = require('../utils/layaSlots');
+const { buildSlotQuestions, buildSlotChoiceQuestion } = require('../utils/layaSlots');
 
 async function callLaya({ state, questions }) {
   if (!config.laya.enabled) {
@@ -89,7 +89,8 @@ async function callLaya({ state, questions }) {
  * shadow "agreement" figures meaningless). Callers may still pass a recipe that
  * has a servingTime - it is dropped here, so no caller or dataset can leak it.
  */
-async function classifyRecipe({ recipe }) {
+async function classifyRecipe({ recipe, slotMode }) {
+  const mode = slotMode || config.laya.slotMode || 'choice';
   return callLaya({
     state: {
       name: recipe.name,
@@ -98,9 +99,10 @@ async function classifyRecipe({ recipe }) {
       ingredients: (recipe.ingredients || []).map((i) => i.name),
     },
     questions: {
-      // One yes/no question per serving slot (utils/layaSlots.js): a recipe can
-      // suit several slots, so this is multi-label, not "which ONE meal".
-      ...buildSlotQuestions(),
+      // Serving slots (utils/layaSlots.js). 'choice' (default): one question, a
+      // probability per slot, ~1/4 of the cost. 'noul': seven independent yes/no
+      // questions (slower; see LAYA_SLOT_MODE).
+      ...(mode === 'noul' ? buildSlotQuestions() : buildSlotChoiceQuestion()),
       protein_level: {
         type: 'choice',
         instructions:

@@ -9,7 +9,8 @@
  * (dietician-reviewed); these helpers only score against it once it exists.
  */
 
-const { SLOT_KEYS, slotKeyFromServingTime, slotProbabilities, topSlot } = require('./layaSlots');
+const { SLOT_KEYS, slotKeyFromServingTime, slotProbabilities, slotAnswerMode, topSlot } = require('./layaSlots');
+const { rankMetrics, rankOf, chanceTopK } = require('./layaRank');
 
 // Laya's yes/no ("noul") answer is a probability of "yes" in [0,1]
 // (observed: {"type":"noul","noul":0.28}), not a boolean.
@@ -160,7 +161,7 @@ function scoreResults(results) {
  * `baselineAllYesPrecision` is what answering "yes" to every slot would score
  * (recall 1.0), so a precision near it means Laya is not discriminating.
  */
-function scoreSlots(results, { threshold = DEFAULT_NOUL_THRESHOLD } = {}) {
+function scoreSlots(results, { threshold = DEFAULT_NOUL_THRESHOLD, mode = null } = {}) {
   const per = Object.fromEntries(SLOT_KEYS.map((k) => [k, { tp: 0, fp: 0, fn: 0, tn: 0 }]));
   let n = 0;
   let topHit = 0;
@@ -213,9 +214,19 @@ function scoreSlots(results, { threshold = DEFAULT_NOUL_THRESHOLD } = {}) {
   }
   const precision = ratio(TP, TP + FP);
   const recall = ratio(TP, TP + FN);
+  // Threshold-free view of the same scores (utils/layaRank.js). For the one-question
+  // 'choice' form the probabilities sum to 1, so the thresholded numbers above are
+  // not meaningful and this ranking is the result to read.
+  const ranking = rankMetrics(
+    results
+      .filter((r) => !r.error && r.slotProbs && Array.isArray(r.expectedSlots))
+      .map((r) => ({ accepted: r.expectedSlots, probs: r.slotProbs }))
+  );
   return {
     examples: n,
+    mode,
     threshold,
+    ranking,
     slots,
     micro: { precision, recall, f1: f1(precision, recall) },
     topPickInExpectedSet: ratio(topHit, topN),
@@ -259,8 +270,11 @@ function summarizeShadowRows(rows, { excludeDieticianIds = [], surface = 'recipe
   // slots, so this is recall of one known-good slot, not accuracy). Rows written
   // before the per-slot questions have no slot answers and are skipped.
   let scorable = 0;
-  let ratedSuitable = 0;
   let topIsRequested = 0;
+  let top2IsRequested = 0;
+  let rankSum = 0;
+  let noulScorable = 0;
+  let ratedSuitable = 0;
   let slotsRatedTotal = 0;
   const bySlot = {};
   const protein = {};
@@ -273,14 +287,23 @@ function summarizeShadowRows(rows, { excludeDieticianIds = [], surface = 'recipe
     const top = topSlot(probs);
     if (!requested || !top) continue;
     scorable += 1;
-    const yes = typeof probs[requested] === 'number' && probs[requested] >= DEFAULT_NOUL_THRESHOLD;
-    if (yes) ratedSuitable += 1;
-    if (top === requested) topIsRequested += 1;
-    slotsRatedTotal += SLOT_KEYS.filter((k) => typeof probs[k] === 'number' && probs[k] >= DEFAULT_NOUL_THRESHOLD).length;
+    const rank = rankOf(probs, requested);
+    rankSum += rank;
+    if (rank <= 1) topIsRequested += 1;
+    if (rank <= 2) top2IsRequested += 1;
     const b2 = (bySlot[requested] = bySlot[requested] || { n: 0, ratedSuitable: 0, topIsRequested: 0 });
     b2.n += 1;
-    if (yes) b2.ratedSuitable += 1;
-    if (top === requested) b2.topIsRequested += 1;
+    if (rank <= 1) b2.topIsRequested += 1;
+    // The 0.5 "suitable" line only means something for independent yes/no answers.
+    if (slotAnswerMode(answers) === 'noul') {
+      noulScorable += 1;
+      const yes = typeof probs[requested] === 'number' && probs[requested] >= DEFAULT_NOUL_THRESHOLD;
+      if (yes) {
+        ratedSuitable += 1;
+        b2.ratedSuitable += 1;
+      }
+      slotsRatedTotal += SLOT_KEYS.filter((k) => typeof probs[k] === 'number' && probs[k] >= DEFAULT_NOUL_THRESHOLD).length;
+    }
   }
 
   return {
@@ -293,11 +316,19 @@ function summarizeShadowRows(rows, { excludeDieticianIds = [], surface = 'recipe
     latency: summarizeLatencies(okRows.map((r) => r.layaLatencyMs)),
     requestedSlotAgreement: {
       scorable,
-      ratedSuitable,
-      rate: scorable ? Number((ratedSuitable / scorable).toFixed(3)) : null,
+      // rank-based (works for both answer forms): where the REQUESTED slot lands among the seven
       topPickIsRequested: topIsRequested,
       topPickRate: scorable ? Number((topIsRequested / scorable).toFixed(3)) : null,
-      meanSlotsRatedSuitable: scorable ? Number((slotsRatedTotal / scorable).toFixed(2)) : null,
+      top2IsRequested,
+      top2Rate: scorable ? Number((top2IsRequested / scorable).toFixed(3)) : null,
+      chanceTop1: Number(chanceTopK(1, 1).toFixed(3)),
+      chanceTop2: Number(chanceTopK(1, 2).toFixed(3)),
+      meanRankOfRequested: scorable ? Number((rankSum / scorable).toFixed(2)) : null, // chance: 4.0
+      // yes/no (noul) rows only: does Laya say yes to the requested slot?
+      noulScorable,
+      ratedSuitable,
+      rate: noulScorable ? Number((ratedSuitable / noulScorable).toFixed(3)) : null,
+      meanSlotsRatedSuitable: noulScorable ? Number((slotsRatedTotal / noulScorable).toFixed(2)) : null,
       bySlot,
     },
     laya_protein_level_distribution: protein,

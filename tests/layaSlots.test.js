@@ -14,6 +14,8 @@ const {
   slotName,
   parseSlotList,
   buildSlotQuestions,
+  buildSlotChoiceQuestion,
+  slotAnswerMode,
   slotProbabilities,
   topSlot,
 } = require('../utils/layaSlots');
@@ -91,5 +93,28 @@ describe('slotProbabilities / topSlot', () => {
   it('picks the highest probability, ties to the earlier slot, null when nothing was answered', () => {
     expect(topSlot(slotProbabilities(answers))).toBe('lunch');
     expect(topSlot(slotProbabilities({}))).toBeNull();
+  });
+});
+
+describe('the one-question (choice) form', () => {
+  const q = buildSlotChoiceQuestion();
+  it('is a single choice question whose options are the seven slot keys', () => {
+    expect(Object.keys(q)).toEqual(['slot_fit']);
+    expect(q.slot_fit.type).toBe('choice');
+    expect(Object.keys(q.slot_fit.criteria)).toEqual(SLOT_KEYS);
+    expect(q.slot_fit.criteria.dinner).toMatch(/evening meal/);
+  });
+  const answers = { slot_fit: { type: 'choice', choice: 'lunch', confidence: 0.3, probabilities: { morning_drink: 0.1, breakfast: 0.2, brunch: 0.1, lunch: 0.3, evening_snack: 0.1, dinner: 0.15, night_drink: 0.05 } } };
+  it('reads the per-option probabilities as the slot scores', () => {
+    const p = slotProbabilities(answers);
+    expect(p.lunch).toBe(0.3);
+    expect(p.night_drink).toBe(0.05);
+    expect(topSlot(p)).toBe('lunch');
+  });
+  it('tells the two answer forms apart', () => {
+    expect(slotAnswerMode(answers)).toBe('choice');
+    expect(slotAnswerMode({ slot_lunch: { type: 'noul', noul: 0.4 } })).toBe('noul');
+    expect(slotAnswerMode({ protein_level: { choice: 'low' } })).toBeNull();
+    expect(slotAnswerMode(null)).toBeNull();
   });
 });

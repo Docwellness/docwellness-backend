@@ -16,7 +16,8 @@
  * a server. The recipe handed to `classify` carries NO servingTime.
  */
 
-const { SLOT_KEYS, slotProbabilities, topSlot } = require('./layaSlots');
+const { SLOT_KEYS, slotProbabilities, slotAnswerMode, topSlot } = require('./layaSlots');
+const { rankMetrics } = require('./layaRank');
 
 const BUSY = /HTTP 503/;
 const YES_AT = 0.5;
@@ -55,6 +56,7 @@ async function runSourceAgreement({ items, classify, sleep, retries = 3, retryDe
       name: it.name,
       sourceSlot: it.sourceSlot,
       slotProbs: probs,
+      slotMode: r.ok ? slotAnswerMode(r.answers) : null,
       topSlot: probs ? topSlot(probs) : null,
       latencyMs: r.ok ? r.latencyMs : null,
       error: r.ok ? null : `${r.reason}${r.detail ? `: ${r.detail}` : ''}`,
@@ -151,4 +153,17 @@ function notRatedSuitable(results, limit = 15, threshold = YES_AT) {
     }));
 }
 
-module.exports = { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable };
+/**
+ * Threshold-free summary for either answer form: where the EXISTING slot ranks
+ * among the seven scores (chance: mean rank 4, top-1 14%), per-slot AUC, and
+ * top-1 after removing each slot's own bias. See utils/layaRank.js.
+ */
+function rankSummary(results) {
+  return rankMetrics(
+    answered(results)
+      .filter((r) => r.sourceSlot)
+      .map((r) => ({ accepted: [r.sourceSlot], probs: r.slotProbs }))
+  );
+}
+
+module.exports = { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable, rankSummary };

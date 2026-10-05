@@ -111,7 +111,7 @@ patient ids, or consultation free text.
 
 ## How Laya's answers are read
 
-- **choice** question (`protein_level`): the answer's `choice`. The seven slot questions are **noul** (below): each gives a probability that the slot suits the recipe.
+- **choice** questions: the answer's `choice` (`protein_level`). The slot question comes in two forms (`LAYA_SLOT_MODE`): the default **one 7-option choice question** (`slot_fit`, a probability per slot, summing to 1), or **seven noul questions** (`slot_<name>`, each an independent probability). `utils/layaSlots.js` reads both into one score per slot; higher = better fit.
 - **noul** (yes/no) questions: Laya returns a probability of "yes" in `[0,1]`
   (observed: `{"type":"noul","noul":0.28}`), not a boolean. The scorer treats
   `>= 0.5` as true (`--noul-threshold` to change it). The right threshold is itself
@@ -175,20 +175,31 @@ the backend container's Coolify Terminal, where the private DB address works.
 ## Smoke test before the review (agreement with existing labels)
 
 ```
-node scripts/laya-source-agreement.js --yes --per-class=10
+node scripts/laya-source-agreement.js --yes --slot-mode=choice --per-class=10
+node scripts/laya-source-agreement.js --yes --slot-mode=noul   --per-class=10
 ```
 
-Run it in the backend container's Coolify Terminal (`--dry-run` first to see the sample size).
-It samples about 70 saved recipes across all seven slots and asks Laya the slot questions one
-recipe at a time, **without** the recipe's existing slot. It reports: how often Laya rates the
-existing slot suitable, how often its single top pick *is* the existing slot (chance among 7 slots:
-14%), how many slots it says yes to per recipe (7 would mean "yes to everything": no
-discrimination), per-slot results, and the recipes where it disagrees. It also prints the
-**per-call latency of the eight-question request**, which is not known until it is measured.
+Run it in the backend container's Coolify Terminal (`--dry-run` first to see the sample size). It
+samples about 70 saved recipes across all seven slots and asks Laya the slot question for each,
+one at a time, **without** the recipe's existing slot. Run both forms on the same sample
+(same `--seed`) to compare them:
+
+- `--slot-mode=choice` (default): **one** 7-option question. Laya returns a probability per slot
+  (they sum to 1). About a quarter of the cost.
+- `--slot-mode=noul`: seven yes/no questions, each an independent probability. Measured on the
+  production VM at ~29 s a call, with probabilities clustered near 0.5 and a strong per-slot bias
+  (yes to Morning Drink 86% of the time, to Breakfast 46%, whatever the recipe).
+
+The main result is **threshold-free**, because a 0.5 line is meaningless for the choice form and
+fragile for yes/no: where the existing slot **ranks** among the seven scores (chance: mean rank
+4.0, top-1 14%, top-2 29%), the **per-slot AUC** (do recipes filed under a slot score higher for it
+than the others do? 0.5 = no signal, 1.0 = perfect), and top-1 after removing each slot's own bias.
+It also prints the per-call latency. Results are saved; re-analyse a saved run without Laya or the
+database with `--from=<results.json>`.
 
 **This is not accuracy.** The existing slot is just how someone filed the recipe and it is one
-acceptable slot, not the only one. Read it as "worth investigating" (low) or "not obviously
-broken" (high). Only the dietician-reviewed dataset measures accuracy.
+acceptable slot, not the only one. Read it as "worth investigating" (rank/AUC near chance) or "not
+obviously broken" (clearly better). Only the dietician-reviewed dataset measures accuracy.
 
 ## Load test (integration plan section 24)
 

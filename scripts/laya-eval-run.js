@@ -26,7 +26,7 @@ const path = require('path');
 const config = require('../config/environment');
 const layaService = require('../services/layaDecisionService');
 const { CATEGORIES, isReviewed, scoreResults, scoreSlots, DEFAULT_NOUL_THRESHOLD } = require('../utils/layaEval');
-const { slotProbabilities, SLOT_KEYS, slotName } = require('../utils/layaSlots');
+const { slotProbabilities, slotAnswerMode, SLOT_KEYS, slotName } = require('../utils/layaSlots');
 
 function parseArgs(argv) {
   const out = {};
@@ -97,10 +97,12 @@ function parseArgs(argv) {
         error: r.ok ? null : `${r.reason}${r.detail ? `: ${r.detail}` : ''}`,
         expectedSlots: cat.slots ? expectedSlots || null : null,
         slotProbs: cat.slots && r.ok ? slotProbabilities(r.answers) : null,
+        slotMode: cat.slots && r.ok ? slotAnswerMode(r.answers) : null,
       });
     }
     const scored = scoreResults(results);
-    const slotScore = cat.slots ? scoreSlots(results, { threshold: noulThreshold }) : null;
+    const slotMode = (results.find((x) => x.slotMode) || {}).slotMode || null;
+    const slotScore = cat.slots ? scoreSlots(results, { threshold: noulThreshold, mode: slotMode }) : null;
     report.categories[name] = {
       status: 'scored',
       reviewedScored: reviewed.length,
@@ -116,17 +118,19 @@ function parseArgs(argv) {
     );
     if (slotScore && slotScore.examples) {
       const pc = (v) => (v == null ? 'n/a' : `${Math.round(v * 100)}%`);
-      console.log(
-        `  serving slots (yes at >= ${slotScore.threshold}): micro precision ${pc(slotScore.micro.precision)}, recall ${pc(slotScore.micro.recall)}, F1 ${pc(slotScore.micro.f1)}` +
-          ` | top pick is an accepted slot ${pc(slotScore.topPickInExpectedSet)} | exact set ${pc(slotScore.exactSetMatch)}`
-      );
-      console.log(
-        `  Laya says yes to ${slotScore.meanSlotsPredicted} slots per recipe; the reviewers accepted ${slotScore.meanSlotsExpected}. ` +
-          `Answering yes to every slot would score precision ${pc(slotScore.baselineAllYesPrecision)} at recall 100%.`
-      );
+      const rk = slotScore.ranking;
+      console.log(`  serving slots, threshold-free (read these; ${slotScore.mode === 'noul' ? 'seven yes/no questions' : 'one 7-option question'}):`);
+      console.log(`    best accepted slot's rank: mean ${rk.meanBestAcceptedRank} (chance ${rk.chanceMeanBestRank}) | in top 1: ${pc(rk.topK[1].rate)} (chance ${pc(rk.topK[1].chance)}) | top 2: ${pc(rk.topK[2].rate)} (chance ${pc(rk.topK[2].chance)}) | top 3: ${pc(rk.topK[3].rate)} (chance ${pc(rk.topK[3].chance)})`);
+      console.log(`    macro AUC ${rk.macroAuc == null ? 'n/a' : rk.macroAuc.toFixed(2)} (0.5 = no signal) | top-1 after removing each slot's bias: ${pc(rk.biasCorrectedTop1.rate)}`);
       for (const k of SLOT_KEYS) {
-        const c = slotScore.slots[k];
-        console.log(`    ${slotName(k).padEnd(14)} suits ${String(c.support).padStart(3)} | precision ${pc(c.precision).padStart(4)} recall ${pc(c.recall).padStart(4)} F1 ${pc(c.f1).padStart(4)}`);
+        const a = rk.aucBySlot[k];
+        console.log(`      ${slotName(k).padEnd(14)} AUC ${a.auc == null ? 'n/a' : a.auc.toFixed(2)} (${a.positives} accepted, ${a.negatives} not)`);
+      }
+      if (slotScore.mode === 'noul') {
+        console.log(
+          `  thresholded at >= ${slotScore.threshold} (yes/no answers only): micro precision ${pc(slotScore.micro.precision)}, recall ${pc(slotScore.micro.recall)}, F1 ${pc(slotScore.micro.f1)}` +
+            ` | exact set ${pc(slotScore.exactSetMatch)} | says yes to ${slotScore.meanSlotsPredicted} slots per recipe; reviewers accepted ${slotScore.meanSlotsExpected} (yes-to-all would score precision ${pc(slotScore.baselineAllYesPrecision)})`
+        );
       }
     }
   }

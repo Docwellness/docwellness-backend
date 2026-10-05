@@ -104,6 +104,10 @@ module.exports = {
     // serves one request at a time (~5-6 s each on the prod VM), so past ~2 the
     // queue outlasts the timeout and congests; extras are skipped and recorded.
     shadowMaxInFlight: Number(process.env.LAYA_SHADOW_MAX_IN_FLIGHT) || 2,
+    // How serving slots are asked (utils/layaSlots.js): 'choice' (default, one
+    // 7-option question, ~1/4 of the cost) or 'noul' (seven yes/no questions,
+    // ~29 s a call on the prod VM and near-0.5 probabilities).
+    slotMode: process.env.LAYA_SLOT_MODE === 'noul' ? 'noul' : 'choice',
     // Internal-only base URL (e.g. Coolify's internal network hostname) -
     // must never be a publicly reachable address. See docs/laya-deployment.md.
     baseUrl: process.env.LAYA_BASE_URL,
