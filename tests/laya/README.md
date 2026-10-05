@@ -151,6 +151,21 @@ answer, so earlier agreement figures are invalid): pass `--since=<deploy time>`.
 `--exclude-dietician` to keep test accounts out of the numbers. On production, run it from
 the backend container's Coolify Terminal, where the private DB address works.
 
+## Smoke test before the review (agreement with existing labels)
+
+```
+node scripts/laya-source-agreement.js --yes --per-class=20
+```
+
+Run it in the backend container's Coolify Terminal (`--dry-run` first to see the sample size).
+It asks Laya the meal-type question for about 80 saved recipes, one at a time, **without** the
+recipe's existing slot, and reports how often Laya's answer matches that slot, per slot, with a
+confusion table and examples of disagreements. About 11 minutes of Laya time.
+
+**This is not accuracy.** The existing slot is just how someone filed the recipe: it can be wrong
+and many dishes fit several meals. Read it as "worth investigating" (low) or "not obviously
+broken" (high). Only the dietician-reviewed dataset measures accuracy.
+
 ## Load test (integration plan section 24)
 
 ```
