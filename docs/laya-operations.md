@@ -204,7 +204,7 @@ the new one passes its health check.
 | `scripts/laya-shadow-report.js` | Summarise shadow rows; `--exclude-dietician` for test accounts. Read-only. |
 | `scripts/laya-eval-export-review-sheet.js` | Build a review sheet from real recipes for dieticians to label. Read-only. |
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
-| `scripts/laya-source-agreement.js` | Blind smoke test: Laya's meal-type answer vs each recipe's EXISTING slot (Laya cannot see the slot). **Agreement with existing labels, not accuracy.** ~11 min for 80 recipes; run in the backend Terminal with `--yes`. |
+| `scripts/laya-source-agreement.js` | Blind smoke test: does Laya rate each recipe's EXISTING slot suitable (seven per-slot questions; it cannot see the slot), and is it discriminating? Also measures the per-call latency of the eight-question request. **Agreement with existing labels, not accuracy.** Run in the backend Terminal with `--yes`. |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
 ## Experiment: make Laya truly single-core (run 2026-10-05; KEPT)

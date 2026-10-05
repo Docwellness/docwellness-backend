@@ -7,13 +7,19 @@
 
 const path = require('path');
 const { execFile } = require('child_process');
-const { runSourceAgreement, perClassAgreement, disagreements } = require('../utils/layaSourceAgreement');
+const { SLOT_KEYS } = require('../utils/layaSlots');
+const { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable } = require('../utils/layaSourceAgreement');
 
-const item = (id, name, sourceMeal) => ({
-  id, name, sourceMeal,
+const item = (id, name, sourceSlot) => ({
+  id, name, sourceSlot,
   recipe: { name, cuisine: null, category: null, ingredients: [{ name: 'x' }] }, // no servingTime, by construction
 });
-const ok = (choice, confidence = 0.4, latencyMs = 8000) => ({ ok: true, latencyMs, answers: { meal_type_fit: { type: 'choice', choice, confidence } } });
+// A Laya reply: yes (0.9) for the named slots, no (0.1) for the rest.
+const reply = (yesSlots = [], latencyMs = 9000) => ({
+  ok: true,
+  latencyMs,
+  answers: Object.fromEntries(SLOT_KEYS.map((k) => [`slot_${k}`, { type: 'noul', noul: yesSlots.includes(k) ? 0.9 : 0.1 }])),
+});
 const noSleep = jest.fn(async () => {});
 
 beforeEach(() => noSleep.mockClear());
@@ -29,26 +35,27 @@ describe('runSourceAgreement', () => {
       seen.push(JSON.stringify(arg));
       await new Promise((r) => setTimeout(r, 5));
       inFlight -= 1;
-      return ok('breakfast');
+      return reply(['breakfast']);
     };
     const { results } = await runSourceAgreement({ items: [item('1', 'Poha', 'breakfast'), item('2', 'Dal', 'lunch'), item('3', 'Soup', 'dinner')], classify, sleep: noSleep });
     expect(results).toHaveLength(3);
     expect(peak).toBe(1);
-    expect(seen.join('')).not.toMatch(/servingTime|sourceMeal|"lunch"|"dinner"/);
+    expect(seen.join('')).not.toMatch(/servingTime|sourceSlot|"lunch"|"dinner"/);
   });
 
-  it('records the answer against the source slot, with confidence and latency', async () => {
-    const { results } = await runSourceAgreement({ items: [item('1', 'Poha', 'breakfast')], classify: async () => ok('lunch', 0.35, 7100), sleep: noSleep });
-    expect(results[0]).toMatchObject({ id: '1', expected: { meal_type: 'breakfast' }, predicted: { meal_type: 'lunch' }, confidence: 0.35, latencyMs: 7100, error: null, retries: 0 });
+  it('records the per-slot probabilities, the top pick and the latency against the source slot', async () => {
+    const { results } = await runSourceAgreement({ items: [item('1', 'Poha', 'breakfast')], classify: async () => reply(['brunch', 'breakfast'], 11200), sleep: noSleep });
+    expect(results[0]).toMatchObject({ id: '1', sourceSlot: 'breakfast', topSlot: 'breakfast', latencyMs: 11200, error: null, retries: 0 });
+    expect(results[0].slotProbs).toMatchObject({ breakfast: 0.9, brunch: 0.9, lunch: 0.1 });
   });
 
   it('retries a refused (HTTP 503) request after a pause instead of counting it as a failure', async () => {
-    const replies = [{ ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, { ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, ok('dinner')];
+    const replies = [{ ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, { ok: false, reason: 'error', detail: 'HTTP 503 Service Unavailable - busy' }, reply(['dinner'])];
     const classify = jest.fn(async () => replies.shift());
     const { results, aborted } = await runSourceAgreement({ items: [item('1', 'Curry', 'dinner')], classify, sleep: noSleep, retryDelayMs: 3000 });
     expect(classify).toHaveBeenCalledTimes(3);
     expect(noSleep).toHaveBeenCalledWith(3000);
-    expect(results[0]).toMatchObject({ predicted: { meal_type: 'dinner' }, error: null, retries: 2 });
+    expect(results[0]).toMatchObject({ topSlot: 'dinner', error: null, retries: 2 });
     expect(aborted).toBeNull();
   });
 
@@ -58,7 +65,7 @@ describe('runSourceAgreement', () => {
     expect(busy).toHaveBeenCalledTimes(3); // first try + 2 retries
     expect(a.results[0].error).toMatch(/503/);
 
-    const timeout = jest.fn(async () => ({ ok: false, reason: 'timeout', detail: 'No response within 30000ms' }));
+    const timeout = jest.fn(async () => ({ ok: false, reason: 'timeout', detail: 'No response within 60000ms' }));
     await runSourceAgreement({ items: [item('1', 'A', 'lunch')], classify: timeout, sleep: noSleep });
     expect(timeout).toHaveBeenCalledTimes(1);
   });
@@ -71,7 +78,7 @@ describe('runSourceAgreement', () => {
     expect(a.aborted).toMatch(/5 calls in a row failed.*ECONNREFUSED/);
 
     const flaky = jest.fn();
-    for (let i = 0; i < 10; i += 1) flaky.mockResolvedValueOnce(i % 3 === 2 ? { ok: false, reason: 'timeout' } : ok('lunch'));
+    for (let i = 0; i < 10; i += 1) flaky.mockResolvedValueOnce(i % 3 === 2 ? { ok: false, reason: 'timeout' } : reply(['lunch']));
     const b = await runSourceAgreement({ items, classify: flaky, sleep: noSleep, maxConsecutiveFailures: 5 });
     expect(b.results).toHaveLength(10);
     expect(b.aborted).toBeNull();
@@ -79,30 +86,54 @@ describe('runSourceAgreement', () => {
 
   it('reports progress after every recipe', async () => {
     const progress = jest.fn();
-    await runSourceAgreement({ items: [item('1', 'A', 'lunch'), item('2', 'B', 'lunch')], classify: async () => ok('lunch'), sleep: noSleep, onProgress: progress });
+    await runSourceAgreement({ items: [item('1', 'A', 'lunch'), item('2', 'B', 'lunch')], classify: async () => reply(['lunch']), sleep: noSleep, onProgress: progress });
     expect(progress.mock.calls.map((c) => [c[0], c[1]])).toEqual([[1, 2], [2, 2]]);
   });
 });
 
 describe('summaries', () => {
-  const results = [
-    { name: 'Poha', expected: { meal_type: 'breakfast' }, predicted: { meal_type: 'breakfast' }, confidence: 0.5 },
-    { name: 'Upma', expected: { meal_type: 'breakfast' }, predicted: { meal_type: 'lunch' }, confidence: 0.3 },
-    { name: 'Dal', expected: { meal_type: 'lunch' }, predicted: { meal_type: 'lunch' }, confidence: 0.6 },
-    { name: 'Tea', expected: { meal_type: 'snack' }, predicted: null, error: 'timeout' }, // not answered: excluded
-  ];
+  const run = async (specs) => {
+    const items = specs.map(([name, source]) => item(name, name, source));
+    const replies = specs.map(([, , yes]) => (yes === null ? { ok: false, reason: 'timeout' } : reply(yes)));
+    return (await runSourceAgreement({ items, classify: async () => replies.shift(), sleep: noSleep })).results;
+  };
 
-  it('computes per-slot agreement over answered recipes only', () => {
-    expect(perClassAgreement(results)).toEqual({
-      breakfast: { n: 2, agree: 1, rate: 0.5 },
-      lunch: { n: 1, agree: 1, rate: 1 },
-    });
+  it('rates whether the existing slot is suitable, whether it is the top pick, and how many slots get a yes', async () => {
+    const results = await run([
+      ['Poha', 'breakfast', ['breakfast', 'brunch']], // suitable, top pick is breakfast (earlier slot wins the tie)
+      ['Upma', 'breakfast', ['lunch']], // existing slot NOT rated suitable
+      ['Dal', 'lunch', ['lunch', 'dinner']], // suitable, top pick lunch
+      ['Tea', 'night_drink', null], // not answered: excluded
+    ]);
+    const a = slotAgreement(results);
+    expect(a).toMatchObject({ n: 3, ratedSuitable: 2, suitableRate: 0.667, topIsSource: 2, topRate: 0.667, meanSlotsRatedSuitable: 1.67, maxSlots: 7 });
+    expect(a.bySlot.breakfast).toMatchObject({ n: 2, ratedSuitable: 1, topIsSource: 1, suitableRate: 0.5 });
+    expect(a.bySlot.lunch).toMatchObject({ n: 1, ratedSuitable: 1 });
+    expect(a.bySlot.night_drink).toBeUndefined();
   });
 
-  it('lists disagreements with the existing slot, capped', () => {
-    expect(disagreements(results)).toEqual([{ name: 'Upma', source: 'breakfast', laya: 'lunch', confidence: 0.3 }]);
-    const many = Array.from({ length: 30 }, (_, i) => ({ name: `R${i}`, expected: { meal_type: 'lunch' }, predicted: { meal_type: 'dinner' }, confidence: null }));
-    expect(disagreements(many, 5)).toHaveLength(5);
+  it('shows "yes to everything" as perfect suitability but no discrimination', async () => {
+    const results = await run([['A', 'lunch', SLOT_KEYS], ['B', 'dinner', SLOT_KEYS]]);
+    const a = slotAgreement(results);
+    expect(a.suitableRate).toBe(1);
+    expect(a.meanSlotsRatedSuitable).toBe(7);
+  });
+
+  it('counts how often Laya says yes to each slot', async () => {
+    const results = await run([['A', 'lunch', ['lunch', 'dinner']], ['B', 'lunch', ['lunch']]]);
+    const y = slotYesRates(results);
+    expect(y.lunch).toEqual({ yes: 2, n: 2, rate: 1 });
+    expect(y.dinner).toEqual({ yes: 1, n: 2, rate: 0.5 });
+    expect(y.morning_drink.yes).toBe(0);
+  });
+
+  it('tabulates existing slot -> top pick and lists recipes whose existing slot is not rated suitable', async () => {
+    const results = await run([['Poha', 'breakfast', ['breakfast']], ['Upma', 'breakfast', ['lunch']], ['Dal', 'dinner', ['lunch']]]);
+    expect(topPickConfusion(results)).toEqual({ 'breakfast -> breakfast': 1, 'breakfast -> lunch': 1, 'dinner -> lunch': 1 });
+    const bad = notRatedSuitable(results);
+    expect(bad.map((d) => d.name)).toEqual(['Upma', 'Dal']);
+    expect(bad[0]).toMatchObject({ source: 'breakfast', laysTop: 'lunch', pSource: 0.1, pTop: 0.9 });
+    expect(notRatedSuitable(results, 1)).toHaveLength(1);
   });
 });
 
@@ -117,9 +148,10 @@ describe('scripts/laya-source-agreement.js', () => {
     expect(r.stderr).toMatch(/LAYA_ENABLED=true/);
   });
 
-  it('states loudly, in its own header, that this is not accuracy', () => {
+  it('states loudly, in its own header, that this is not accuracy, and samples all seven slots', () => {
     const src = require('fs').readFileSync(path.join(__dirname, '..', 'scripts', 'laya-source-agreement.js'), 'utf8');
     expect(src).toMatch(/NOT accuracy/);
     expect(src).toMatch(/Neither is accuracy/);
+    expect(src).toMatch(/servingTime: \{ \$in: SLOT_NAMES \}/);
   });
 });

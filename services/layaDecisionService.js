@@ -30,6 +30,7 @@
  */
 
 const config = require('../config/environment');
+const { buildSlotQuestions } = require('../utils/layaSlots');
 
 async function callLaya({ state, questions }) {
   if (!config.laya.enabled) {
@@ -82,8 +83,8 @@ async function callLaya({ state, questions }) {
  * utils/dietaryConstraintValidator.js) and re-deriving them via Laya would
  * be redundant, not additive.
  *
- * `servingTime` is deliberately NOT sent. One of the questions below asks which
- * meal type the recipe fits; sending the slot the recipe was requested for
+ * `servingTime` is deliberately NOT sent. The slot questions below ask which
+ * serving slots the recipe suits; sending the slot the recipe was requested for
  * would hand Laya the answer (found 2026-10-05: it was being sent, which made
  * shadow "agreement" figures meaningless). Callers may still pass a recipe that
  * has a servingTime - it is dropped here, so no caller or dataset can leak it.
@@ -97,17 +98,9 @@ async function classifyRecipe({ recipe }) {
       ingredients: (recipe.ingredients || []).map((i) => i.name),
     },
     questions: {
-      meal_type_fit: {
-        type: 'choice',
-        instructions:
-          'Given the recipe name, cuisine, category and ingredients, which meal type does this recipe best fit?',
-        criteria: {
-          breakfast: 'Typically eaten in the morning',
-          lunch: 'A substantial midday meal',
-          dinner: 'A substantial evening meal',
-          snack: 'A light, smaller dish eaten between meals',
-        },
-      },
+      // One yes/no question per serving slot (utils/layaSlots.js): a recipe can
+      // suit several slots, so this is multi-label, not "which ONE meal".
+      ...buildSlotQuestions(),
       protein_level: {
         type: 'choice',
         instructions:

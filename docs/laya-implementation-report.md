@@ -154,10 +154,19 @@ right from wrong answers, so it cannot support review gating. Before the leak fi
 confidences near 0.35; they fall to ~0.02 once the slot is hidden. This is consistent with the
 slot having been doing the work, though it is not proof.
 
-**Consequence for the evaluation design.** A single "best meal" label penalises Laya for the
-inherent lunch/dinner ambiguity. The dataset should record every meal a dish suits and score
-Laya as correct when its answer is in that set (the system already models suitability this way:
-`Recipe.mealSlotSuitability`). Decision pending with the team.
+**Consequence for the evaluation design (decided 2026-10-05).** A single "best meal" label penalises
+Laya for the inherent lunch/dinner ambiguity, and it cannot express drinks or brunch. The question
+is now **multi-label over all seven serving slots** (`utils/layaSlots.js`): Laya answers a yes/no
+"is this suitable for <slot>?" for each of Morning Drink, Breakfast, Brunch, Lunch, Evening Snack,
+Dinner and Night Drink, and the dietician-reviewed dataset lists every slot a recipe suits. Scoring is
+per slot (precision/recall) plus whether Laya's top pick is an accepted slot. This replaces the
+single-pick `meal_type_fit` question, so the 46% figure above describes the old question. The new
+question's latency (eight questions per call) and quality are **not yet measured**.
+
+**Correction to an earlier statement:** this report previously said the system "already models"
+multi-slot suitability through `Recipe.mealSlotSuitability`. The field exists, but no recipe
+(in the database checked) has more than one slot in it, so it is not evidence of current practice;
+it is only a place where reviewed multi-slot judgements could eventually be stored.
 
 ## Findings and fixes during rollout
 

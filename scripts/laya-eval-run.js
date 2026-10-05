@@ -11,7 +11,7 @@
  *
  * Usage:
  *   LAYA_ENABLED=true LAYA_BASE_URL=http://... LAYA_API_KEY=... \
- *   node scripts/laya-eval-run.js [--category=recipe_classification|meal_type|
+ *   node scripts/laya-eval-run.js [--category=recipe_classification|meal_type (serving slots)|
  *        diet_compatibility|preference_matching|review_gating|all]
  *        [--model=laya-typed-decisions] [--timeout-ms=20000]
  *        [--noul-threshold=0.5] [--dir=tests/laya] [--out=<file>]
@@ -25,7 +25,8 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config/environment');
 const layaService = require('../services/layaDecisionService');
-const { CATEGORIES, isReviewed, scoreResults, DEFAULT_NOUL_THRESHOLD } = require('../utils/layaEval');
+const { CATEGORIES, isReviewed, scoreResults, scoreSlots, DEFAULT_NOUL_THRESHOLD } = require('../utils/layaEval');
+const { slotProbabilities, SLOT_KEYS, slotName } = require('../utils/layaSlots');
 
 function parseArgs(argv) {
   const out = {};
@@ -85,27 +86,49 @@ function parseArgs(argv) {
       // eslint-disable-next-line no-await-in-loop
       const r = await layaService[cat.service](cat.args(ex.input));
       if (r.ok && r.model) served.add(r.model);
+      // The multi-label slot answers are scored separately (scoreSlots), so the
+      // single-valued fields are scored from `expected` minus suitable_slots.
+      const { suitable_slots: expectedSlots, ...singleValued } = ex.expected || {};
       results.push({
-        expected: ex.expected,
+        expected: singleValued,
         predicted: r.ok ? cat.extract(r.answers, { noulThreshold }) : null,
         confidence: r.ok ? cat.confidence(r.answers) : null,
         latencyMs: r.ok ? r.latencyMs : null,
         error: r.ok ? null : `${r.reason}${r.detail ? `: ${r.detail}` : ''}`,
+        expectedSlots: cat.slots ? expectedSlots || null : null,
+        slotProbs: cat.slots && r.ok ? slotProbabilities(r.answers) : null,
       });
     }
     const scored = scoreResults(results);
+    const slotScore = cat.slots ? scoreSlots(results, { threshold: noulThreshold }) : null;
     report.categories[name] = {
       status: 'scored',
       reviewedScored: reviewed.length,
       unreviewedSkipped: all.length - reviewed.length,
       ...scored,
+      ...(slotScore ? { slots: slotScore } : {}),
     };
     const accs = Object.entries(scored.fields)
       .map(([f, s]) => `${f} ${s.correct}/${s.n}`)
       .join(', ');
     console.log(
-      `${name}: ${reviewed.length} reviewed | ${accs || 'no scorable fields'} | errors ${scored.errors} | p50 ${scored.latency.p50}ms p95 ${scored.latency.p95}ms`
+      `${name}: ${reviewed.length} reviewed | ${accs || 'no single-valued fields'} | errors ${scored.errors} | p50 ${scored.latency.p50}ms p95 ${scored.latency.p95}ms`
     );
+    if (slotScore && slotScore.examples) {
+      const pc = (v) => (v == null ? 'n/a' : `${Math.round(v * 100)}%`);
+      console.log(
+        `  serving slots (yes at >= ${slotScore.threshold}): micro precision ${pc(slotScore.micro.precision)}, recall ${pc(slotScore.micro.recall)}, F1 ${pc(slotScore.micro.f1)}` +
+          ` | top pick is an accepted slot ${pc(slotScore.topPickInExpectedSet)} | exact set ${pc(slotScore.exactSetMatch)}`
+      );
+      console.log(
+        `  Laya says yes to ${slotScore.meanSlotsPredicted} slots per recipe; the reviewers accepted ${slotScore.meanSlotsExpected}. ` +
+          `Answering yes to every slot would score precision ${pc(slotScore.baselineAllYesPrecision)} at recall 100%.`
+      );
+      for (const k of SLOT_KEYS) {
+        const c = slotScore.slots[k];
+        console.log(`    ${slotName(k).padEnd(14)} suits ${String(c.support).padStart(3)} | precision ${pc(c.precision).padStart(4)} recall ${pc(c.recall).padStart(4)} F1 ${pc(c.f1).padStart(4)}`);
+      }
+    }
   }
 
   report.servedModels = [...served];

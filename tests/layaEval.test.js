@@ -12,31 +12,19 @@ const http = require('http');
 const { execFile } = require('child_process');
 
 const {
-  mealTypeFromServingTime,
   noulToBoolean,
   isReviewed,
   percentile,
   summarizeLatencies,
   scoreResults,
   summarizeShadowRows,
+  scoreSlots,
   sampleStratified,
   shuffleSeeded,
   CATEGORIES,
 } = require('../utils/layaEval');
 
-describe('mealTypeFromServingTime', () => {
-  it('maps the four clean slots', () => {
-    expect(mealTypeFromServingTime('Breakfast')).toBe('breakfast');
-    expect(mealTypeFromServingTime('Lunch')).toBe('lunch');
-    expect(mealTypeFromServingTime('Dinner')).toBe('dinner');
-    expect(mealTypeFromServingTime('Evening Snack')).toBe('snack');
-  });
-  it('returns null for slots with no single meal type, and for unknown values', () => {
-    for (const s of ['Brunch', 'Morning Drink', 'Night Drink', 'Nonsense', undefined]) {
-      expect(mealTypeFromServingTime(s)).toBeNull();
-    }
-  });
-});
+const { SLOT_KEYS } = require('../utils/layaSlots');
 
 describe('noulToBoolean (Laya noul answers are probabilities)', () => {
   it('thresholds the observed {type, noul} shape', () => {
@@ -103,13 +91,17 @@ describe('scoreResults', () => {
 });
 
 describe('CATEGORIES extract the real Laya answer shapes', () => {
-  const choiceAnswers = {
-    meal_type_fit: { type: 'choice', choice: 'breakfast', confidence: 0.35 },
+  const answers = {
+    slot_lunch: { type: 'noul', noul: 0.8 },
+    slot_dinner: { type: 'noul', noul: 0.7 },
     protein_level: { type: 'choice', choice: 'low', confidence: 0.2 },
   };
-  it('recipe_classification reads both choice fields and the lowest confidence', () => {
-    expect(CATEGORIES.recipe_classification.extract(choiceAnswers)).toEqual({ meal_type: 'breakfast', protein_level: 'low' });
-    expect(CATEGORIES.recipe_classification.confidence(choiceAnswers)).toBe(0.2);
+  it('recipe_classification scores protein as a single field and flags the multi-label slots', () => {
+    expect(CATEGORIES.recipe_classification.extract(answers)).toEqual({ protein_level: 'low' });
+    expect(CATEGORIES.recipe_classification.confidence(answers)).toBe(0.2);
+    expect(CATEGORIES.recipe_classification.slots).toBe(true);
+    expect(CATEGORIES.meal_type.slots).toBe(true);
+    expect(CATEGORIES.meal_type.extract(answers)).toEqual({});
   });
   it('compatibility and review gating read the noul probability', () => {
     expect(CATEGORIES.diet_compatibility.extract({ compatible: { type: 'noul', noul: 0.28 } })).toEqual({ compatible: false });
@@ -117,13 +109,68 @@ describe('CATEGORIES extract the real Laya answer shapes', () => {
   });
 });
 
+describe('scoreSlots (multi-label serving slots)', () => {
+  // probs: yes-probability per slot. Only the slots named are non-null.
+  const probs = (over) => ({ ...Object.fromEntries(SLOT_KEYS.map((k) => [k, 0.1])), ...over });
+
+  it('computes per-slot precision/recall, micro averages, top pick and exact-set match', () => {
+    const r = scoreSlots([
+      // Laya says lunch+dinner; the dietician accepts lunch+dinner: perfect
+      { expectedSlots: ['lunch', 'dinner'], slotProbs: probs({ lunch: 0.9, dinner: 0.8 }) },
+      // Laya says only dinner; the dietician accepts lunch: top pick wrong, lunch missed, dinner a false alarm
+      { expectedSlots: ['lunch'], slotProbs: probs({ dinner: 0.9 }) },
+    ]);
+    expect(r.examples).toBe(2);
+    expect(r.slots.lunch).toMatchObject({ tp: 1, fn: 1, fp: 0, support: 2, precision: 1, recall: 0.5 });
+    expect(r.slots.dinner).toMatchObject({ tp: 1, fp: 1, fn: 0, precision: 0.5, recall: 1 });
+    expect(r.slots.brunch).toMatchObject({ tp: 0, fp: 0, fn: 0, tn: 2, precision: null, recall: null });
+    expect(r.micro).toMatchObject({ precision: 0.667, recall: 0.667 });
+    expect(r.topPickInExpectedSet).toBe(0.5); // first top pick = lunch (ok), second = dinner (not accepted)
+    expect(r.exactSetMatch).toBe(0.5);
+    expect(r.meanSlotsPredicted).toBe(1.5);
+    expect(r.meanSlotsExpected).toBe(1.5);
+    expect(r.baselineAllYesPrecision).toBe(Number((3 / 14).toFixed(3))); // 3 accepted slots out of 14 decisions
+  });
+
+  it('respects the threshold and ties go to the earlier slot', () => {
+    const r = scoreSlots([{ expectedSlots: ['breakfast'], slotProbs: probs({ breakfast: 0.4, lunch: 0.4 }) }], { threshold: 0.3 });
+    expect(r.slots.breakfast.tp).toBe(1);
+    expect(r.slots.lunch.fp).toBe(1);
+    expect(r.topPickInExpectedSet).toBe(1); // breakfast and lunch tie at 0.4; breakfast comes first
+  });
+
+  it('skips errored rows, rows with no slot answers and rows with no expected slots', () => {
+    const r = scoreSlots([
+      { expectedSlots: ['lunch'], slotProbs: null, error: 'timeout' },
+      { expectedSlots: ['lunch'], slotProbs: Object.fromEntries(SLOT_KEYS.map((k) => [k, null])) },
+      { expectedSlots: null, slotProbs: probs({ lunch: 0.9 }) },
+    ]);
+    expect(r.examples).toBe(0);
+    expect(r.micro).toEqual({ precision: null, recall: null, f1: null });
+  });
+
+  it('shows that answering yes to everything is not rewarded: perfect recall but low precision', () => {
+    const allYes = Object.fromEntries(SLOT_KEYS.map((k) => [k, 0.95]));
+    const r = scoreSlots([{ expectedSlots: ['lunch'], slotProbs: allYes }]);
+    expect(r.micro.recall).toBe(1);
+    expect(r.micro.precision).toBe(Number((1 / 7).toFixed(3)));
+    expect(r.baselineAllYesPrecision).toBe(r.micro.precision);
+  });
+});
+
 describe('summarizeShadowRows', () => {
+  const slotAnswers = (over) => ({
+    ...Object.fromEntries(SLOT_KEYS.map((k) => [`slot_${k}`, { type: 'noul', noul: 0.1 }])),
+    protein_level: { choice: 'low' },
+    ...over,
+  });
+  const yes = (k, p = 0.9) => ({ [`slot_${k}`]: { type: 'noul', noul: p } });
   const row = (over) => ({
     layaSurface: 'recipe_classification',
     dieticianId: 'real1',
     succeeded: true,
     layaLatencyMs: 5000,
-    layaDecisions: { answers: { meal_type_fit: { choice: 'dinner' }, protein_level: { choice: 'low' } }, reference: { servingTime: 'Dinner' } },
+    layaDecisions: { answers: slotAnswers(yes('dinner')), reference: { servingTime: 'Dinner' } },
     ...over,
   });
 
@@ -145,18 +192,29 @@ describe('summarizeShadowRows', () => {
     const s = summarizeShadowRows(rows);
     expect(s.succeeded).toBe(1);
     expect(s.failedByReason).toEqual({ timeout: 1, error: 1 });
-    expect(s.mealTypeAgreement.scorable).toBe(1);
+    expect(s.requestedSlotAgreement.scorable).toBe(1);
   });
 
-  it('computes agreement and skips slots with no clean meal type', () => {
+  it('reports whether Laya rates the REQUESTED slot suitable, across all seven slots incl. drinks', () => {
     const rows = [
-      row({}),
-      row({ layaDecisions: { answers: { meal_type_fit: { choice: 'dinner' } }, reference: { servingTime: 'Evening Snack' } } }),
-      row({ layaDecisions: { answers: { meal_type_fit: { choice: 'lunch' } }, reference: { servingTime: 'Morning Drink' } } }),
+      row({}), // requested Dinner, Laya says dinner: suitable, top pick matches
+      row({ layaDecisions: { answers: slotAnswers({ ...yes('lunch', 0.8), ...yes('dinner', 0.6) }), reference: { servingTime: 'Dinner' } } }), // suitable but top is lunch
+      row({ layaDecisions: { answers: slotAnswers(yes('breakfast')), reference: { servingTime: 'Morning Drink' } } }), // drink: requested slot not suitable
+      row({ layaDecisions: { answers: slotAnswers(yes('night_drink')), reference: { servingTime: 'Night Drink' } } }),
     ];
-    const a = summarizeShadowRows(rows).mealTypeAgreement;
-    expect(a).toMatchObject({ scorable: 2, agree: 1, rate: 0.5 });
-    expect(a.confusion).toEqual({ 'dinner -> dinner': 1, 'snack -> dinner': 1 });
+    const a = summarizeShadowRows(rows).requestedSlotAgreement;
+    expect(a).toMatchObject({ scorable: 4, ratedSuitable: 3, rate: 0.75, topPickIsRequested: 2, topPickRate: 0.5 });
+    expect(a.meanSlotsRatedSuitable).toBe(1.25); // 1 + 2 + 1 + 1 over 4 recipes
+    expect(a.bySlot.dinner).toEqual({ n: 2, ratedSuitable: 2, topIsRequested: 1 });
+    expect(a.bySlot.morning_drink).toEqual({ n: 1, ratedSuitable: 0, topIsRequested: 0 });
+    expect(a.bySlot.night_drink).toEqual({ n: 1, ratedSuitable: 1, topIsRequested: 1 });
+  });
+
+  it('skips older rows that predate the per-slot questions (they have no slot answers)', () => {
+    const old = row({ layaDecisions: { answers: { meal_type_fit: { choice: 'dinner' }, protein_level: { choice: 'low' } }, reference: { servingTime: 'Dinner' } } });
+    const s = summarizeShadowRows([old]);
+    expect(s.succeeded).toBe(1);
+    expect(s.requestedSlotAgreement.scorable).toBe(0);
   });
 
   it('ignores rows from other surfaces', () => {
@@ -221,28 +279,27 @@ describe('scripts/laya-eval-run.js (end to end against a fake Laya)', () => {
       req.on('data', (c) => { body += c; });
       req.on('end', () => {
         seen.push({ auth: req.headers.authorization, body: JSON.parse(body) });
-        // Always answers "dinner" / "low" so the fixture has one right and one wrong meal_type.
+        // Always says yes to dinner only (0.9) and "low" protein, so the fixture has known
+        // hits and misses.
+        const answers = { protein_level: { type: 'choice', choice: 'low', confidence: 0.3 } };
+        for (const q of Object.keys(JSON.parse(body).questions)) {
+          if (q.startsWith('slot_')) answers[q] = { type: 'noul', noul: q === 'slot_dinner' ? 0.9 : 0.1 };
+        }
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          model: 'laya-rl-agent',
-          answers: {
-            meal_type_fit: { type: 'choice', choice: 'dinner', confidence: 0.6 },
-            protein_level: { type: 'choice', choice: 'low', confidence: 0.3 },
-          },
-          usage: { input_tokens: 1, output_tokens: 0 },
-        }));
+        res.end(JSON.stringify({ model: 'laya-rl-agent', answers, usage: { input_tokens: 1, output_tokens: 0 } }));
       });
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     baseUrl = `http://127.0.0.1:${server.address().port}`;
 
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'laya-eval-'));
-    const recipe = (name) => ({ recipe: { name, servingTime: 'Dinner', ingredients: [{ name: 'x' }] } });
+    // A deliberately carries a servingTime (an old-style row): the service must still not send it.
+    const recipe = (name, extra = {}) => ({ recipe: { name, ingredients: [{ name: 'x' }], ...extra } });
     fs.writeFileSync(path.join(dir, 'recipe_classification.json'), JSON.stringify([
-      { input: recipe('A'), expected: { meal_type: 'dinner', protein_level: 'low' }, reviewed_by: 'dietician' },
-      { input: recipe('B'), expected: { meal_type: 'lunch', protein_level: 'low' }, reviewed_by: 'dietician' },
+      { input: recipe('A', { servingTime: 'Dinner' }), expected: { suitable_slots: ['lunch', 'dinner'], protein_level: 'low' }, reviewed_by: 'dietician' },
+      { input: recipe('B'), expected: { suitable_slots: ['lunch'], protein_level: 'low' }, reviewed_by: 'dietician' },
       // Never scored: not reviewed, and a pending sheet row.
-      { input: recipe('C'), expected: { meal_type: 'dinner' }, reviewed_by: null },
+      { input: recipe('C'), expected: { suitable_slots: ['dinner'] }, reviewed_by: null },
       { input: recipe('D'), expected: null, reviewed_by: null },
     ]));
   });
@@ -269,8 +326,17 @@ describe('scripts/laya-eval-run.js (end to end against a fake Laya)', () => {
     const report = JSON.parse(fs.readFileSync(out, 'utf8'));
     const cat = report.categories.recipe_classification;
     expect(cat).toMatchObject({ status: 'scored', reviewedScored: 2, unreviewedSkipped: 2, errors: 0 });
-    expect(cat.fields.meal_type).toMatchObject({ n: 2, correct: 1, accuracy: 0.5 });
     expect(cat.fields.protein_level).toMatchObject({ n: 2, correct: 2, accuracy: 1 });
+    // multi-label slots: Laya says yes to dinner only. A accepts lunch+dinner, B accepts lunch.
+    expect(cat.slots.examples).toBe(2);
+    expect(cat.slots.slots.dinner).toMatchObject({ tp: 1, fp: 1, fn: 0, precision: 0.5, recall: 1 });
+    expect(cat.slots.slots.lunch).toMatchObject({ tp: 0, fn: 2, recall: 0 });
+    expect(cat.slots.micro).toMatchObject({ precision: 0.5, recall: 0.333 });
+    expect(cat.slots.topPickInExpectedSet).toBe(0.5);
+    expect(r.stdout).toMatch(/serving slots \(yes at >= 0\.5\)/);
+    // what Laya was shown: seven slot questions plus protein, and never the servingTime
+    expect(Object.keys(seen[0].body.questions)).toHaveLength(8);
+    expect(JSON.stringify(seen.map((x) => x.body))).not.toMatch(/servingTime|"Dinner"/);
     expect(report.servedModels).toEqual(['laya-rl-agent']);
     expect(seen).toHaveLength(2); // the two unreviewed rows never reached Laya
     expect(seen.every((s) => s.auth === 'Bearer k')).toBe(true);

@@ -1,23 +1,28 @@
 /**
  * Logic for scripts/laya-source-agreement.js: a BLIND, sequential run of Laya's
- * meal-type question over saved recipes, scored against each recipe's EXISTING
+ * per-slot questions over saved recipes, compared with each recipe's EXISTING
  * serving slot.
  *
  * This is NOT accuracy. The existing slot is just what someone filed the recipe
- * under; it can be wrong, and many dishes fit several meals. It is a cheap
- * smoke test - "is Laya's meal-type judgement anywhere near the existing labels
- * once it can no longer read them?" - to run before spending dietician time.
- * Real accuracy comes only from the dietician-reviewed dataset
- * (tests/laya/README.md).
+ * under; it is one slot that is acceptable, not the only one (a recipe can suit
+ * several), so the fair question is "does Laya rate the existing slot
+ * suitable?" - recall of one known-good slot. How many OTHER slots it also says
+ * yes to shows whether it is discriminating at all (yes to everything would
+ * score perfect recall). Real accuracy comes only from the dietician-reviewed
+ * dataset (tests/laya/README.md). It also measures the per-call latency of the
+ * eight-question request.
  *
  * Pure: the Laya call and the sleep are injected, so it is unit-tested without
  * a server. The recipe handed to `classify` carries NO servingTime.
  */
 
+const { SLOT_KEYS, slotProbabilities, topSlot } = require('./layaSlots');
+
 const BUSY = /HTTP 503/;
+const YES_AT = 0.5;
 
 /**
- * @param {Array<{id, name, sourceMeal, recipe}>} items  recipe has no servingTime
+ * @param {Array<{id, name, sourceSlot, recipe}>} items  recipe has no servingTime
  * @param {Function} classify  ({ recipe }) => layaDecisionService-style result
  * @param {Function} sleep     (ms) => Promise
  */
@@ -44,13 +49,13 @@ async function runSourceAgreement({ items, classify, sleep, retries = 3, retryDe
       break;
     }
 
-    const answer = r.ok ? r.answers && r.answers.meal_type_fit : null;
+    const probs = r.ok ? slotProbabilities(r.answers) : null;
     results.push({
       id: it.id,
       name: it.name,
-      expected: { meal_type: it.sourceMeal },
-      predicted: r.ok ? { meal_type: (answer && answer.choice) || null } : null,
-      confidence: r.ok && answer && typeof answer.confidence === 'number' ? answer.confidence : null,
+      sourceSlot: it.sourceSlot,
+      slotProbs: probs,
+      topSlot: probs ? topSlot(probs) : null,
       latencyMs: r.ok ? r.latencyMs : null,
       error: r.ok ? null : `${r.reason}${r.detail ? `: ${r.detail}` : ''}`,
       retries: attempt,
@@ -66,26 +71,84 @@ async function runSourceAgreement({ items, classify, sleep, retries = 3, retryDe
   return { results, aborted };
 }
 
-/** { slot: { n, agree, rate } } over results Laya actually answered. */
-function perClassAgreement(results) {
-  const out = {};
-  for (const r of results) {
-    if (!r.predicted || !r.predicted.meal_type) continue;
-    const slot = r.expected.meal_type;
-    const c = (out[slot] = out[slot] || { n: 0, agree: 0 });
-    c.n += 1;
-    if (r.predicted.meal_type === slot) c.agree += 1;
+const rate = (a, b) => (b ? Number((a / b).toFixed(3)) : null);
+const answered = (results) => results.filter((r) => r.slotProbs && r.topSlot);
+
+/**
+ * Overall and per existing slot: how often Laya rates the existing slot
+ * suitable (>= 0.5), how often its top pick IS the existing slot, and how many
+ * slots it says yes to per recipe.
+ */
+function slotAgreement(results, threshold = YES_AT) {
+  const rows = answered(results).filter((r) => r.sourceSlot);
+  const bySlot = {};
+  let ratedSuitable = 0;
+  let topIsSource = 0;
+  let yesTotal = 0;
+  for (const r of rows) {
+    const p = r.slotProbs[r.sourceSlot];
+    const yes = typeof p === 'number' && p >= threshold;
+    const top = r.topSlot === r.sourceSlot;
+    if (yes) ratedSuitable += 1;
+    if (top) topIsSource += 1;
+    yesTotal += SLOT_KEYS.filter((k) => typeof r.slotProbs[k] === 'number' && r.slotProbs[k] >= threshold).length;
+    const b = (bySlot[r.sourceSlot] = bySlot[r.sourceSlot] || { n: 0, ratedSuitable: 0, topIsSource: 0 });
+    b.n += 1;
+    if (yes) b.ratedSuitable += 1;
+    if (top) b.topIsSource += 1;
   }
-  for (const c of Object.values(out)) c.rate = c.n ? Number((c.agree / c.n).toFixed(3)) : null;
+  for (const b of Object.values(bySlot)) {
+    b.suitableRate = rate(b.ratedSuitable, b.n);
+    b.topRate = rate(b.topIsSource, b.n);
+  }
+  return {
+    n: rows.length,
+    threshold,
+    ratedSuitable,
+    suitableRate: rate(ratedSuitable, rows.length),
+    topIsSource,
+    topRate: rate(topIsSource, rows.length),
+    meanSlotsRatedSuitable: rows.length ? Number((yesTotal / rows.length).toFixed(2)) : null,
+    // answering yes to every slot would score 100% suitable; a mean near 7 means no discrimination
+    maxSlots: SLOT_KEYS.length,
+    bySlot,
+  };
+}
+
+/** How often Laya says yes to each slot, across all answered recipes. */
+function slotYesRates(results, threshold = YES_AT) {
+  const rows = answered(results);
+  const out = {};
+  for (const k of SLOT_KEYS) {
+    const yes = rows.filter((r) => typeof r.slotProbs[k] === 'number' && r.slotProbs[k] >= threshold).length;
+    out[k] = { yes, n: rows.length, rate: rate(yes, rows.length) };
+  }
   return out;
 }
 
-/** The first `limit` rows where Laya's answer differs from the existing slot. */
-function disagreements(results, limit = 15) {
-  return results
-    .filter((r) => r.predicted && r.predicted.meal_type && r.predicted.meal_type !== r.expected.meal_type)
-    .slice(0, limit)
-    .map((r) => ({ name: r.name, source: r.expected.meal_type, laya: r.predicted.meal_type, confidence: r.confidence }));
+/** Existing-slot -> Laya's top pick counts, e.g. { "dinner -> lunch": 9 }. */
+function topPickConfusion(results) {
+  const out = {};
+  for (const r of answered(results)) {
+    if (!r.sourceSlot) continue;
+    const key = `${r.sourceSlot} -> ${r.topSlot}`;
+    out[key] = (out[key] || 0) + 1;
+  }
+  return out;
 }
 
-module.exports = { runSourceAgreement, perClassAgreement, disagreements };
+/** The first `limit` recipes where Laya does NOT rate the existing slot suitable. */
+function notRatedSuitable(results, limit = 15, threshold = YES_AT) {
+  return answered(results)
+    .filter((r) => r.sourceSlot && !(r.slotProbs[r.sourceSlot] >= threshold))
+    .slice(0, limit)
+    .map((r) => ({
+      name: r.name,
+      source: r.sourceSlot,
+      pSource: r.slotProbs[r.sourceSlot],
+      laysTop: r.topSlot,
+      pTop: r.slotProbs[r.topSlot],
+    }));
+}
+
+module.exports = { runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable };

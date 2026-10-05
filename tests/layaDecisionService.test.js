@@ -169,8 +169,15 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     expect(requestInit.headers.Authorization).toBe('Bearer test-key');
     const body = JSON.parse(requestInit.body);
     expect(body.model).toBe('laya-typed-decisions');
-    expect(body.questions).toHaveProperty('meal_type_fit');
-    expect(body.questions).toHaveProperty('protein_level');
+    // multi-label: one yes/no question per serving slot, plus the protein tier
+    expect(Object.keys(body.questions)).toEqual([
+      'slot_morning_drink', 'slot_breakfast', 'slot_brunch', 'slot_lunch',
+      'slot_evening_snack', 'slot_dinner', 'slot_night_drink', 'protein_level',
+    ]);
+    expect(body.questions.slot_dinner).toMatchObject({ type: 'noul' });
+    expect(body.questions.slot_dinner.instructions).toMatch(/suitable to be served as Dinner/);
+    expect(body.questions).not.toHaveProperty('meal_type_fit');
+    expect(body.questions.protein_level.type).toBe('choice');
   });
 
   it('never sends servingTime to Laya (it would leak the answer to the meal-type question)', async () => {

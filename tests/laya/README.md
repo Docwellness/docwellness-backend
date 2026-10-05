@@ -13,7 +13,7 @@ must not fabricate it. A row counts only when a dietician has filled in `expecte
 ```
 tests/laya/
   recipe_classification.json   # reviewed examples (committed)
-  meal_type.json
+  meal_type.json               # serving slots only (same expected.suitable_slots)
   diet_compatibility.json
   preference_matching.json
   review_gating.json
@@ -29,36 +29,49 @@ Target for the first gate: **100 reviewed examples per category (500 total)**.
 {
   "id": "optional stable id",
   "input": { "...": "see per-category input below" },
-  "expected": { "meal_type": "dinner", "protein_level": "high" },
+  "expected": { "suitable_slots": ["lunch", "dinner"], "protein_level": "high" },
   "reviewed_by": "dietician"
 }
 ```
 
 | Category | `input` | `expected` | Laya question |
 |---|---|---|---|
-| `recipe_classification` | `{ recipe: { name, cuisine, category, ingredients: [{name}] } }` (no `servingTime`) | `{ meal_type, protein_level }` (either or both) | `classifyRecipe` |
-| `meal_type` | same as above | `{ meal_type }` | `classifyRecipe` (meal type only) |
+| `recipe_classification` | `{ recipe: { name, cuisine, category, ingredients: [{name}] } }` (no `servingTime`) | `{ suitable_slots, protein_level }` (either or both) | `classifyRecipe`: seven per-slot yes/no questions plus the protein tier |
+| `meal_type` | same as above | `{ suitable_slots }` | `classifyRecipe` (serving slots only) |
 | `diet_compatibility` | `{ recipe, userProfile: { currentEatingStyle, preferences, cravings } }` | `{ compatible: true \| false }` | `checkRecipeCompatibility` |
 | `preference_matching` | same as above (preferences/cravings decide the answer) | `{ compatible: true \| false }` | `checkRecipeCompatibility` |
 | `review_gating` | `{ decisionSummary: { riskFlags, warningCount, warnings, attemptsUsed, engine } }` | `{ needs_review: true \| false }` | `requiresDieticianReview` |
 
 Allowed values:
-- `meal_type`: `breakfast` | `lunch` | `dinner` | `snack`
+- `suitable_slots`: any of `morning_drink`, `breakfast`, `brunch`, `lunch`, `evening_snack`,
+  `dinner`, `night_drink` (the seven `Recipe.servingTime` values; `utils/layaSlots.js`)
 - `protein_level`: `low` | `moderate` | `high`
 
-`Brunch`, `Morning Drink` and `Night Drink` have no single clean meal type, so they are not
-sampled for meal-type examples.
+**Serving slots are multi-label.** A recipe can suit several slots (poha: Breakfast and Brunch; dal:
+Lunch and Dinner), and drinks and meals are different kinds of thing, so Laya is not asked "which
+ONE meal is this?" (measured 2026-10-05: lunch-biased, lunch vs dinner a coin flip). It is asked, for
+each of the seven slots, "is this recipe suitable for it?", and the dataset lists every slot the
+dietician accepts. Scoring is per slot (precision, recall) plus whether Laya's top pick is an
+accepted slot (`scripts/laya-eval-run.js`).
 
 ## Reviewer guidelines (give these to the dieticians)
 
 Consistency between reviewers is what makes the accuracy numbers mean anything.
 
-- **The sheet is blind on purpose.** It does not show the recipe's existing meal slot or meal
-  type, and the rows are shuffled, so you decide from the recipe alone. Do not look the slot up.
-  (Accepting the existing label would measure agreement with it, not accuracy.)
-- **`expected_meal_type`:** `breakfast`, `lunch`, `dinner` or `snack`. The question Laya answers is
-  "which meal type does this recipe best fit?" (breakfast: eaten in the morning; lunch: a
-  substantial midday meal; dinner: a substantial evening meal; snack: a light dish between meals).
+- **The sheet is blind on purpose.** It does not show the recipe's existing slot, and the rows are
+  shuffled, so you decide from the recipe alone. Do not look the slot up. (Accepting the existing
+  label would measure agreement with it, not accuracy.)
+- **`suitable_slots`: list EVERY slot the recipe would reasonably be served in**, separated by `;`,
+  for example `Lunch; Dinner` or `Breakfast; Brunch`. Use these names:
+  - `Morning Drink`: a drink taken early in the morning, before or instead of breakfast
+  - `Breakfast`: a morning meal eaten at the start of the day
+  - `Brunch`: a late-morning meal between breakfast and lunch
+  - `Lunch`: a substantial midday meal
+  - `Evening Snack`: a light snack or drink between lunch and dinner
+  - `Dinner`: a substantial evening meal
+  - `Night Drink`: a drink taken at night, before bed
+  A slot you do not list means "not suitable". An unknown name is rejected on import (so a typo
+  cannot silently become an answer).
 - **`expected_protein_level`** (optional, but needed to score Laya's protein answer). The question
   Laya answers is "how would you characterize this recipe's protein content relative to a typical
   dish of its type?", judged from the ingredient names (Laya is not shown quantities):
@@ -68,19 +81,25 @@ Consistency between reviewers is what makes the accuracy numbers mean anything.
 - **`reviewer`:** your name or initials. Required on every row you touch.
 - **`review_status`:**
   - `reviewed`: you filled the expected values. This is the only status that is scored.
-  - `skipped`: you looked and it should be excluded (a tea, a supplement, a chutney, a raita, a
-    papad, a single ingredient). Leave the expected columns empty and say why in `review_notes`.
+  - `skipped`: you looked and it should be excluded (a supplement, a single ingredient, anything
+    that is not a servable item). Leave the expected columns empty and say why in `review_notes`.
   - `unsure`: you want a second opinion. Leave the expected columns empty.
   - blank: not reviewed yet. Do not guess to fill a row.
-- **`review_notes`:** optional free text. Worth using for hard cases ("a drink named like a meal",
-  "fits both lunch and dinner") and for every skipped row.
+- **`review_notes`:** optional free text. Worth using for hard cases ("fits both lunch and dinner",
+  "a drink named like a meal") and for every skipped row.
+- A tea or a side (chutney, raita) is a judgement call: if it would be served in a slot, list that
+  slot (a tea is often `Morning Drink`, `Evening Snack` or `Night Drink`); if it would not be served
+  on its own at all, mark it `skipped`.
+- If your team prefers to answer yes/no for every slot explicitly (so a forgotten slot cannot be
+  mistaken for "no"), export with `--slot-columns`: seven `slot_<name>` columns, y or n in each, and
+  every one must be answered once any is.
 - Leave `id` and the recipe columns unchanged. Save as CSV (UTF-8) when done.
 - Plan for roughly a minute a row.
 
 ## What goes in `input` (and what must not)
 
 `input` is exactly what Laya is shown. It must **never contain the answer**:
-- **No `servingTime` / meal slot** in `input.recipe`. Laya is asked which meal type a recipe
+- **No `servingTime` / meal slot** in `input.recipe`. Laya is asked which serving slots a recipe
   fits, so the slot would hand it the answer. (`classifyRecipe` also drops it itself, as a second
   line of defence; it was being sent until 2026-10-05.)
 - No Laya output, no reviewer notes.
@@ -92,7 +111,7 @@ patient ids, or consultation free text.
 
 ## How Laya's answers are read
 
-- **choice** questions (`meal_type_fit`, `protein_level`): the answer's `choice`.
+- **choice** question (`protein_level`): the answer's `choice`. The seven slot questions are **noul** (below): each gives a probability that the slot suits the recipe.
 - **noul** (yes/no) questions: Laya returns a probability of "yes" in `[0,1]`
   (observed: `{"type":"noul","noul":0.28}`), not a boolean. The scorer treats
   `>= 0.5` as true (`--noul-threshold` to change it). The right threshold is itself
@@ -104,28 +123,29 @@ patient ids, or consultation free text.
 1. **Export a review sheet** from real saved recipes (read-only, no DB writes). On production
    the container's disk is ephemeral, so print it and copy it out:
    ```
-   node scripts/laya-eval-export-review-sheet.js --format=csv --stdout --per-class=25
+   node scripts/laya-eval-export-review-sheet.js --format=csv --stdout --per-class=15
    ```
    Run that in the backend container's Coolify Terminal, copy the CSV (from the `id,name,...`
    header to the last row; the lines about the database connection are not part of it) into a file
    such as `review-sheet.csv`, and open it in a spreadsheet (import as UTF-8).
-   The sheet is **blind** (no meal slot, no source meal type), **shuffled** (the sample is grouped
-   by meal type, and the order would reveal it), and contains no Laya predictions, so reviewers
-   aren't anchored. The recipe's existing slot is not lost: the JSON form
-   (`--format=json`) keeps it under `source`, and it stays on the recipe by `id`. `--with-source`
-   adds it to the CSV for a non-blind sheet.
-2. **A dietician reviews each row** in the spreadsheet (see the reviewer guidelines above): fill
-   `expected_meal_type` and optionally `expected_protein_level`, put their name in `reviewer`, and
-   set `review_status` to `reviewed`, `skipped` or `unsure`.
+   Recipes are sampled from **all seven slots** (up to `--per-class` each; some slots have fewer
+   recipes). The sheet is **blind** (no existing slot), **shuffled** (the sample is grouped by slot,
+   and the order would reveal it), and contains no Laya predictions, so reviewers aren't anchored.
+   The recipe's existing slot is not lost: the JSON form (`--format=json`) keeps it under
+   `source`, and it stays on the recipe by `id`. `--with-source` adds it to the CSV for a
+   non-blind sheet.
+2. **A dietician reviews each row** in the spreadsheet (see the reviewer guidelines above): list the
+   suitable slots in `suitable_slots`, optionally `expected_protein_level`, put their name in
+   `reviewer`, and set `review_status` to `reviewed`, `skipped` or `unsure`.
 3. **Import the reviewed rows** (on a laptop, no database needed):
    ```
    node scripts/laya-eval-import-review-sheet.js --in=review-sheet.csv
    ```
    Writes `tests/laya/recipe_classification.json`, merging by `id`, and lists the rows marked
-   skipped or unsure. It is strict: if any row is half-filled or has an invalid value it lists the
-   problems and writes **nothing**. The recipe's `servingTime` is never copied into the dataset's
-   `input`. Commit the file and redeploy the backend: `.dockerignore` lets `tests/laya` ship in the
-   image, so the scorer can read it there.
+   skipped or unsure. It is strict: if any row is half-filled or has an invalid value (including an
+   unknown slot name) it lists the problems and writes **nothing**. The recipe's `servingTime` is
+   never copied into the dataset's `input`. Commit the file and redeploy the backend:
+   `.dockerignore` lets `tests/laya` ship in the image, so the scorer can read it there.
 4. **Score Laya** (sequential, one example at a time, against a Laya you are happy to load):
    ```
    LAYA_ENABLED=true LAYA_BASE_URL=http://... LAYA_API_KEY=... \
@@ -145,25 +165,29 @@ node scripts/laya-shadow-report.js --exclude-dietician=<test-account-id>
 ```
 
 Summarises shadow rows (latency, failures by reason, meal-type agreement). Agreement there
-is Laya vs the slot the dietician **requested**. It is only meaningful for rows written **after**
-the fix that stopped sending `servingTime` to Laya (2026-10-05; before that Laya could read the
-answer, so earlier agreement figures are invalid): pass `--since=<deploy time>`. Use
+is whether Laya rates the slot the dietician **requested** as suitable (a recipe can suit several,
+so it is recall of one known-good slot). It is only meaningful for rows written **after** both the fix
+that stopped sending `servingTime` to Laya and the per-slot questions were deployed (older rows have
+no slot answers or let Laya read the slot): pass `--since=<deploy time>`. Use
 `--exclude-dietician` to keep test accounts out of the numbers. On production, run it from
 the backend container's Coolify Terminal, where the private DB address works.
 
 ## Smoke test before the review (agreement with existing labels)
 
 ```
-node scripts/laya-source-agreement.js --yes --per-class=20
+node scripts/laya-source-agreement.js --yes --per-class=10
 ```
 
 Run it in the backend container's Coolify Terminal (`--dry-run` first to see the sample size).
-It asks Laya the meal-type question for about 80 saved recipes, one at a time, **without** the
-recipe's existing slot, and reports how often Laya's answer matches that slot, per slot, with a
-confusion table and examples of disagreements. About 11 minutes of Laya time.
+It samples about 70 saved recipes across all seven slots and asks Laya the slot questions one
+recipe at a time, **without** the recipe's existing slot. It reports: how often Laya rates the
+existing slot suitable, how often its single top pick *is* the existing slot (chance among 7 slots:
+14%), how many slots it says yes to per recipe (7 would mean "yes to everything": no
+discrimination), per-slot results, and the recipes where it disagrees. It also prints the
+**per-call latency of the eight-question request**, which is not known until it is measured.
 
-**This is not accuracy.** The existing slot is just how someone filed the recipe: it can be wrong
-and many dishes fit several meals. Read it as "worth investigating" (low) or "not obviously
+**This is not accuracy.** The existing slot is just how someone filed the recipe and it is one
+acceptable slot, not the only one. Read it as "worth investigating" (low) or "not obviously
 broken" (high). Only the dietician-reviewed dataset measures accuracy.
 
 ## Load test (integration plan section 24)

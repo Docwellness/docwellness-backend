@@ -66,15 +66,15 @@ const merged = [...byId.values()];
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, `${JSON.stringify(merged, null, 2)}\n`);
 
-const perMeal = {};
+const perSlot = {};
 for (const e of merged) {
-  const m = (e.expected && e.expected.meal_type) || '(protein only)';
-  perMeal[m] = (perMeal[m] || 0) + 1;
+  const slots = (e.expected && e.expected.suitable_slots) || [];
+  for (const k of slots) perSlot[k] = (perSlot[k] || 0) + 1;
 }
 console.log(`Imported ${examples.length} reviewed row(s).`);
 console.log(`Not scored: ${skipped.length} marked skipped, ${unsure.length} marked unsure, ${pending} still pending (not reviewed).`);
 for (const r of skipped) console.log(`  skipped: ${r.name || r.id}${r.notes ? ` - ${r.notes}` : ''}`);
 for (const r of unsure) console.log(`  needs a second opinion: ${r.name || r.id}${r.notes ? ` - ${r.notes}` : ''}`);
 console.log(`Dataset now has ${merged.length} example(s) in ${outFile}`);
-console.log('Per expected meal type:', perMeal);
+console.log('Recipes judged suitable per slot (a recipe counts once for each slot it suits):', perSlot);
 console.log('Commit this file; it ships in the backend image so scripts/laya-eval-run.js can read it.');
