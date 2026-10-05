@@ -132,12 +132,16 @@ Laya also warns at startup that this checkpoint's confidence is not calibrated.
 | Laya uses its full 1.5-CPU limit despite `LAYA_THREADS=1` | Three quarters of the VM busy during inference | Open: see below |
 | Stage A assumed port 8080 and a `laya-` prefix on `LAYA_MODELS` | Wrong defaults | Corrected (port 8000, short names) |
 
-**Open finding.** Under load Laya's CPU plateaus at the container limit (~150%), so
-`LAYA_THREADS=1` does not confine it to one core. The likely cause is thread pools outside torch
-(OpenMP/BLAS/tokenizers); that is a hypothesis, not confirmed. The Docker limit still guarantees the
-backend at least 0.5 core. An untried experiment would set `OMP_NUM_THREADS=1`,
-`MKL_NUM_THREADS=1` and `TOKENIZERS_PARALLELISM=false` to make Laya truly single-core, at an unknown
-cost in latency (a second thread earlier helped by only ~15%).
+**Single-core experiment (2026-10-05).** Under load Laya's CPU plateaued at the container limit
+(~145%) even with `LAYA_THREADS=1`, because that setting only caps torch's own threads. Adding
+`OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1` and
+`TOKENIZERS_PARALLELISM=false` brought CPU to a flat ~100% (one core), confirming the cause. The
+cost: per-call latency rose **~45%** (mean 8.0 s vs 5.5 s; p95 10.0 s vs 7.0 s) and throughput fell
+from ~11 to ~8 calls a minute. Both configurations spend about 8 core-seconds per call, so Laya
+is CPU-bound and speed trades against backend headroom roughly 1:1. Backend `/health` p95 was
+unaffected either way. **Which configuration stays is undecided.** If single-core is kept,
+`LAYA_TIMEOUT_MS` must go to ~30000, because 2 admitted requests x ~8 s now exceeds the 15 s
+timeout. See `docs/laya-operations.md`.
 
 ## Definition of done (plan section 30)
 
@@ -181,7 +185,7 @@ cost in latency (a second thread earlier helped by only ~15%).
 3. A decision on latency for `live`: this hardware allows ~11 calls a minute, so `live` needs a
    different setup (faster model format, more CPU, GPU, or a dedicated VM). Shadow mode does not.
 4. A per-user flag mechanism for the staged rollout, and `laya_*` metrics.
-5. The single-core experiment (`docs/laya-operations.md`): limit Laya's non-torch thread pools to
-   see whether it can run on about one core, freeing backend headroom, and what that costs in latency.
+5. Decide whether Laya stays single-core (+45% latency, backend keeps a full core) or reverts to
+   the faster 1.5-core setup. Experiment done; see `docs/laya-operations.md`.
 
 Do not claim production readiness for `live` until items 1 and 3 are resolved.

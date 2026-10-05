@@ -200,7 +200,7 @@ the new one passes its health check.
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
-## Experiment: make Laya truly single-core (not yet run)
+## Experiment: make Laya truly single-core (run 2026-10-05; decision pending)
 
 **Why.** Under load Laya's CPU plateaus at its container limit (~140-150% of one core) even though
 `LAYA_THREADS=1`: that setting only caps torch's own compute threads. The likely cause is thread
@@ -235,6 +235,26 @@ mean 5.5 s, p50 5.3 s, p95 7.0 s, p99 7.1 s, 0 errors; CPU ~140-150%; RAM ~2.2 G
 - Latency better or unchanged with lower CPU: adopt.
 
 **Rollback:** delete the four variables and redeploy Laya.
+
+**Result (2026-10-05, concurrency 1, 40 requests, 40/40 ok, 0 errors):**
+
+| | Baseline (1.5 CPU, ~145% used) | Single-core (~100% used) |
+|---|---|---|
+| mean / p50 | 5.5 s / 5.3 s | **8.0 s / 7.6 s** (+45%) |
+| p95 / p99 | 7.0 s / 7.1 s | 10.0 s / 10.2 s (+43%) |
+| throughput | 0.18 ok/s (~11/min) | 0.13 ok/s (~8/min) |
+| RAM | ~2.2 GB | ~2.2 GB |
+| backend `/health` p95 | ~10 ms | 9 ms (idle 16) |
+
+The hypothesis held: the variables brought CPU from ~140-150% to a flat ~100%. The cost is
+latency, which scales with CPU: both configurations spend about **8 core-seconds per call**
+(1.45 cores x 5.5 s; 1.0 core x 8.0 s), so Laya is CPU-bound and speed and backend headroom trade
+roughly 1:1. This exceeded the +25% latency the procedure suggested as acceptable.
+
+**If the single-core configuration is kept:** raise the backend's `LAYA_TIMEOUT_MS` to `30000`.
+With 8 s calls and 2 requests admitted, the second waits ~16 s, past the 15 s timeout (p95 ~20 s),
+which would recreate timeouts and abandoned work. Shadow calls are not awaited, so a longer
+timeout is harmless. The cap rule is cap x per-call time < timeout.
 
 Run it when no real shadow traffic is expected; calls during the redeploy are simply skipped or
 time out and cost nothing but shadow rows.
