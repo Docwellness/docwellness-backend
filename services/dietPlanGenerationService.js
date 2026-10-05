@@ -15,7 +15,7 @@ const config = require('../config/environment');
  * change, no redeploy of anything but config.
  */
 
-async function generateWeekPlan({ dietPlan, dieticianId, weekNumbers }) {
+async function generateWeekPlan({ dietPlan, dieticianId, weekNumbers, requestId }) {
   // Required lazily (not at module top-level) because dietPlanController.js
   // requires this module to call generateWeekPlan, so requiring it back at
   // top-level here would create a circular require and could capture that
@@ -23,7 +23,7 @@ async function generateWeekPlan({ dietPlan, dieticianId, weekNumbers }) {
   // By call time (inside a request handler) the app has fully loaded, so the
   // export is guaranteed to be present.
   const { runDietPlanGeneration } = require('../controllers/dietician/dietPlanController');
-  return runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine: config.dietPlanEngine });
+  return runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine: config.dietPlanEngine, requestId });
 }
 
 module.exports = { generateWeekPlan };

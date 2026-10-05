@@ -31,6 +31,12 @@ const generationLogSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Backend request id (req.id) - set on Laya shadow rows so they can be
+    // matched to request logs; null on ordinary generation rows.
+    requestId: {
+      type: String,
+      default: null,
+    },
     latencyMs: {
       type: Number,
       default: null,

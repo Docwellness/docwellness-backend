@@ -61,7 +61,7 @@ async function callLaya({ state, questions }) {
     }
 
     const parsed = JSON.parse(text);
-    return { ok: true, answers: parsed.answers, usage: parsed.usage, latencyMs: Date.now() - startedAt };
+    return { ok: true, answers: parsed.answers, usage: parsed.usage, model: parsed.model, latencyMs: Date.now() - startedAt };
   } catch (err) {
     if (err.name === 'AbortError') {
       return { ok: false, reason: 'timeout', detail: `No response within ${timeoutMs}ms` };

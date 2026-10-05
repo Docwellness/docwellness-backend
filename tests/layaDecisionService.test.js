@@ -149,6 +149,7 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
       ok: true,
       text: async () =>
         JSON.stringify({
+          model: 'laya-rl-agent',
           answers: { meal_type_fit: 'dinner', protein_level: 'high' },
           usage: { input_tokens: 42, output_tokens: 8 },
         }),
@@ -158,6 +159,7 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
 
     expect(result.ok).toBe(true);
     expect(result.answers).toEqual({ meal_type_fit: 'dinner', protein_level: 'high' });
+    expect(result.model).toBe('laya-rl-agent'); // the checkpoint Laya actually served
     expect(typeof result.latencyMs).toBe('number');
 
     expect(mockFetch).toHaveBeenCalledTimes(1);

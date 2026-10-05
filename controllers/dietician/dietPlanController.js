@@ -878,7 +878,7 @@ exports.sendPaymentRequest = async (req, res, next) => {
  */
 exports.runDietPlanGeneration = runDietPlanGeneration;
 
-async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine = 'ai' }) {
+async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine = 'ai', requestId }) {
   const patientId = dietPlan.patientId?._id?.toString() || dietPlan.patientId?.toString();
   const firstConsultationId =
     dietPlan.firstConsultation?._id?.toString() || dietPlan.firstConsultation?.toString();
@@ -1247,6 +1247,7 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engin
     dieticianId,
     refId: dietPlan._id,
     inputHash,
+    requestId,
     reference: { riskFlags: newRiskFlags, warningCount: newValidationWarnings.length, attemptsUsed },
     call: () =>
       requiresDieticianReview({
@@ -1506,7 +1507,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
     // generateWeekPlan saves generatedPlan/validationWarnings/etc. without
     // touching status, which is what a later regeneration (that must not
     // downgrade an already-Finalized/Active plan) needs too.
-    const generationResult = await generateWeekPlan({ dietPlan, dieticianId, weekNumbers });
+    const generationResult = await generateWeekPlan({ dietPlan, dieticianId, weekNumbers, requestId: req.id });
     if (!generationResult.ok) {
       return res.status(generationResult.status).json({ success: false, message: generationResult.message });
     }
@@ -1667,6 +1668,7 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
       dietPlan,
       dieticianId,
       weekNumbers: sortedWeekNumbers,
+      requestId: req.id,
     });
     if (!generationResult.ok) {
       return res.status(generationResult.status).json({ success: false, message: generationResult.message });

@@ -36,19 +36,27 @@ function minConfidence(answers) {
   return values.length ? Math.min(...values) : null;
 }
 
-async function recordShadow({ surface, kind, dieticianId, refId, inputHash, reference, call }) {
+async function recordShadow({ surface, kind, dieticianId, refId, inputHash, requestId, reference, call }) {
   const result = await call();
   await GenerationLog.create({
     kind,
     dieticianId,
     refId: refId || null,
     inputHash: inputHash || null,
+    // Backend request id (req.id, also the X-Request-Id response header), so a
+    // shadow row can be matched to the request's log lines.
+    requestId: requestId || null,
+    // The checkpoint asked for; the one Laya actually served is in
+    // layaDecisions.servedModel (its router can pick a different one).
+    model: config.laya.model || null,
     layaMode: 'shadow',
     layaSurface: surface,
     // Laya's answers plus whatever the existing flow decided for the same
     // question ("reference"), so the two can be compared offline. Decision
     // metadata only - never the request text, never PII/PHI.
-    layaDecisions: result.ok ? { answers: result.answers, reference: reference || null } : { reference: reference || null },
+    layaDecisions: result.ok
+      ? { answers: result.answers, servedModel: result.model || null, reference: reference || null }
+      : { reference: reference || null },
     layaLatencyMs: result.ok ? result.latencyMs : null,
     layaConfidence: result.ok ? minConfidence(result.answers) : null,
     layaTimedOut: !result.ok && result.reason === 'timeout',
@@ -61,6 +69,7 @@ async function recordShadow({ surface, kind, dieticianId, refId, inputHash, refe
  * @param {object}   opts
  * @param {string}   opts.surface   which decision this is, e.g. 'recipe_classification'
  * @param {string}   opts.kind      GenerationLog.kind of the flow being shadowed
+ * @param {string}  [opts.requestId] req.id of the request being shadowed
  * @param {Function} opts.call      () => a layaDecisionService call (resolves, never throws)
  * @param {object}  [opts.reference] what the existing flow decided, for later comparison
  * @returns {void}  deliberately - callers must not depend on the outcome

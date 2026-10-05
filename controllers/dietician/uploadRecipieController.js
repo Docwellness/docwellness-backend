@@ -454,6 +454,7 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       kind: 'recipe',
       dieticianId: req.user._id,
       inputHash,
+      requestId: req.id,
       reference: { servingTime },
       call: () => classifyRecipe({ recipe: previewRecipe }),
     });

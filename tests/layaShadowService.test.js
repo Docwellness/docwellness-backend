@@ -60,6 +60,18 @@ describe('runShadow when enabled', () => {
     expect(row.layaDecisions.reference).toEqual({ servingTime: 'Breakfast' });
   });
 
+  it('records the backend request id and the Laya model on the row', async () => {
+    config.laya.model = 'laya-typed-decisions';
+    runShadow({ ...base, requestId: 'abc123def456', call: jest.fn().mockResolvedValue({ ...okResult, model: 'laya-rl-agent' }) });
+    runShadow({ ...base, call: jest.fn().mockResolvedValue(okResult) });
+    await flush();
+    const [withId, withoutId] = GenerationLog.create.mock.calls.map((c) => c[0]);
+    expect(withId).toMatchObject({ requestId: 'abc123def456', model: 'laya-typed-decisions' });
+    expect(withId.layaDecisions.servedModel).toBe('laya-rl-agent');
+    expect(withoutId.requestId).toBeNull();
+    expect(withoutId.layaDecisions.servedModel).toBeNull();
+  });
+
   it('records a timeout as a failed shadow row', async () => {
     runShadow({ ...base, call: jest.fn().mockResolvedValue({ ok: false, reason: 'timeout' }) });
     await flush();
