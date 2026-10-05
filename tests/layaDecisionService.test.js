@@ -135,6 +135,15 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     expect(result).toEqual({ ok: false, reason: 'error', detail: 'ECONNREFUSED' });
   });
 
+  it('includes the underlying network error code (Node fetch hides it in err.cause)', async () => {
+    const err = new TypeError('fetch failed');
+    err.cause = Object.assign(new Error('getaddrinfo ENOTFOUND laya'), { code: 'ENOTFOUND' });
+    mockFetch.mockRejectedValue(err);
+
+    const result = await classifyRecipe({ recipe });
+    expect(result).toEqual({ ok: false, reason: 'error', detail: 'fetch failed (ENOTFOUND)' });
+  });
+
   it('parses a successful response and posts to /v1/systemone with bearer auth', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

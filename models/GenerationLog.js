@@ -74,6 +74,12 @@ const generationLogSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Why a shadow call produced no answer: { reason: 'disabled'|'timeout'|
+    // 'error', detail } - detail is a short error string, never request text.
+    layaError: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

@@ -52,6 +52,7 @@ async function recordShadow({ surface, kind, dieticianId, refId, inputHash, refe
     layaLatencyMs: result.ok ? result.latencyMs : null,
     layaConfidence: result.ok ? minConfidence(result.answers) : null,
     layaTimedOut: !result.ok && result.reason === 'timeout',
+    layaError: result.ok ? null : { reason: result.reason, detail: String(result.detail || '').slice(0, 300) || null },
     succeeded: Boolean(result.ok),
   });
 }

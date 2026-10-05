@@ -66,7 +66,10 @@ async function callLaya({ state, questions }) {
     if (err.name === 'AbortError') {
       return { ok: false, reason: 'timeout', detail: `No response within ${timeoutMs}ms` };
     }
-    return { ok: false, reason: 'error', detail: err.message };
+    // Node's fetch reports every network failure as just "fetch failed";
+    // the real cause (ENOTFOUND = DNS, ECONNREFUSED, ...) is on err.cause.
+    const code = err.cause && (err.cause.code || err.cause.message);
+    return { ok: false, reason: 'error', detail: code ? `${err.message} (${code})` : err.message };
   } finally {
     clearTimeout(timer);
   }

@@ -66,6 +66,20 @@ describe('runShadow when enabled', () => {
     expect(GenerationLog.create.mock.calls[0][0]).toMatchObject({ layaTimedOut: true, succeeded: false, layaLatencyMs: null });
   });
 
+  it('records why a failed call failed (reason + detail), and null on success', async () => {
+    runShadow({ ...base, call: jest.fn().mockResolvedValue({ ok: false, reason: 'error', detail: 'fetch failed (ENOTFOUND)' }) });
+    runShadow({ ...base, call: jest.fn().mockResolvedValue(okResult) });
+    await flush();
+    expect(GenerationLog.create.mock.calls[0][0].layaError).toEqual({ reason: 'error', detail: 'fetch failed (ENOTFOUND)' });
+    expect(GenerationLog.create.mock.calls[1][0].layaError).toBeNull();
+  });
+
+  it('truncates a very long error detail', async () => {
+    runShadow({ ...base, call: jest.fn().mockResolvedValue({ ok: false, reason: 'error', detail: 'x'.repeat(5000) }) });
+    await flush();
+    expect(GenerationLog.create.mock.calls[0][0].layaError.detail).toHaveLength(300);
+  });
+
   it('returns before a slow Laya call resolves (never delays the caller)', async () => {
     let release;
     const call = jest.fn(() => new Promise((r) => { release = () => r(okResult); }));
