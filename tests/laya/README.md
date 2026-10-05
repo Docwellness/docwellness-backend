@@ -120,6 +120,10 @@ patient ids, or consultation free text.
 
 ## Workflow
 
+> **On hold (2026-10-05): do not start the serving-slot review yet.** The slot question lost to a trivial
+> baseline and `recipe_classification` shadowing was stopped (see `docs/laya-implementation-report.md`,
+> "Decision"). The tooling below stays so the review can be run if the decision changes.
+
 1. **Export a review sheet** from real saved recipes (read-only, no DB writes). On production
    the container's disk is ephemeral, so print it and copy it out:
    ```

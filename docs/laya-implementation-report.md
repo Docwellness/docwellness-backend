@@ -1,6 +1,6 @@
 # Laya integration — implementation report
 
-_As of 2026-10-05. Status: **shadow mode, one surface, no real traffic yet. Not production-ready
+_As of 2026-10-05. Status: **shadow infrastructure in place; recipe_classification shadowing stopped 2026-10-05; no real traffic yet. Not production-ready
 for `live`.**_ This is the report the integration plan (section 31) asks for. It reports what was
 measured, says where the measurement is weak, and leaves a field empty where nothing was measured.
 Companion docs: `docs/laya-integration-analysis.md`, `docs/laya-architecture.md`,
@@ -41,7 +41,8 @@ Backend latency impact:  backend /health p95 9-16 ms during load vs 13 ms idle; 
                          concurrent clients (partly the test's own overhead). No failures.
 Fallback behavior:       fire-and-forget behind a timeout; any Laya failure is swallowed. Verified in
                          production through DNS failures, timeouts and 503s: recipes returned 200.
-Production rollout:      Phase 4 (shadow), recipe_classification only, test traffic only.
+Production rollout:      Phase 4 infrastructure done; recipe_classification shadowing STOPPED 2026-10-05
+                         (see Decision below); diet_plan_review built, not enabled; test traffic only.
                          Phases 5-7 not started. diet_plan_review built but not enabled.
 ```
 
@@ -228,6 +229,22 @@ accepts several slots per recipe) is still needed to measure either properly.
 **Protein check:** a rank-based comparison of Laya's `protein_level` with the nutrition data's exact
 protein per serving is now part of the smoke test (`utils/layaProtein.js`); no result yet, it needs one more
 run.
+
+## Decision: stop shadowing recipe_classification (2026-10-05)
+
+`LAYA_SHADOW_SURFACES` was emptied, so nothing is shadowed. Reasons, all measured above:
+
+- **Serving slots:** Laya's judgement beats chance but, on a comparable sample, loses clearly to a bag-of-words
+  baseline trained on the existing labels (top-1 33% vs 47%, macro AUC 0.75 vs 0.86). What Laya gets right
+  (drinks vs food) is recoverable from the category and ingredients.
+- **Protein tier:** it never answered "high" (0 of 15 high-protein recipes), the within-slot correlation was weak
+  and inconsistent, and the nutrition data already holds the exact grams (where it is missing, the fix is filling
+  the data: 25 of 70 sampled recipes have no protein per serving).
+- **Cost:** each shadow call kept Laya busy for ~11 s and produced data of limited use.
+
+Nothing here says Laya is useless: it says it is not earning its place on this question. The dietician review for
+slots is on hold. The remaining candidates are decisions with no labelled history to train a baseline on
+(compatibility with a user's preferences, review gating), which need their own reviewed datasets.
 
 ## Findings and fixes during rollout
 

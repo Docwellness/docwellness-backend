@@ -10,11 +10,11 @@ _Last verified against production: 2026-10-05._
 
 | | |
 |---|---|
-| Mode | **Shadow only**, one surface: `recipe_classification`. Laya never affects a response. |
+| Mode | **Shadow infrastructure in place, but no surface is being shadowed.** `recipe_classification` was stopped on 2026-10-05 (`LAYA_SHADOW_SURFACES` emptied): its serving-slot judgement lost to a trivial label-trained baseline and its protein tier is redundant with the nutrition data (`docs/laya-implementation-report.md`). Laya never affects a response. |
 | `diet_plan_review` surface | Wired, **not enabled** (see "Before enabling another surface"). |
 | `LAYA_MODE=live` | **Not allowed** until the evaluation gate in `docs/laya-evaluation.md` is met. |
 | Evaluation dataset | Does not exist yet (human deliverable, `tests/laya/README.md`). |
-| Load test | Script exists (`scripts/laya-load-test.js`); **has not been run on the VM**. |
+| Load test | Run on the VM on 2026-10-05; results in `docs/laya-implementation-report.md`. |
 | Alerting / metrics | **None.** There are no `laya_*` metrics and no alerts; checking is manual (below). |
 
 ## What runs where
@@ -61,7 +61,7 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 |---|---|---|
 | `LAYA_ENABLED` | `true` | Master switch. `false` = Laya fully inert. |
 | `LAYA_MODE` | `shadow` | `off` \| `shadow` \| `live`. Never `live` yet. |
-| `LAYA_SHADOW_SURFACES` | `recipe_classification` | Comma list. Shadow runs only for listed surfaces. |
+| `LAYA_SHADOW_SURFACES` | **empty** (since 2026-10-05) | Comma list: `recipe_classification`, `diet_plan_review`. Shadow runs only when `LAYA_ENABLED=true`, `LAYA_MODE=shadow` AND the surface is listed. Empty = nothing is shadowed and Laya is idle (about 0% CPU, ~2.2 GB RAM). To resume a surface, add its name here and redeploy the backend - but see the decision in the report first. |
 | `LAYA_BASE_URL` | `http://docwellness-laya:8000` | Must use the **alias**, not the bare app uuid or a container name. |
 | `LAYA_API_KEY` | same secret as Laya | |
 | `LAYA_TIMEOUT_MS` | `30000` | Raised from 15000 for the single-core configuration (8 s calls). Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
