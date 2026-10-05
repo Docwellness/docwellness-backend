@@ -217,7 +217,7 @@ there.
 - **Laya** is a second Coolify application in the same project and environment as the backend,
   built from `Dockerfile.laya` (pasted into Coolify's Dockerfile field). It is reachable only on
   the internal Docker network. The public domain Coolify assigns by default is cleared.
-- **Resource caps:** `LAYA_THREADS=1`, CPU limit 1.5, memory limit 4 GB, `LAYA_MAX_CONCURRENT=4`,
+- **Resource caps:** `LAYA_THREADS=1`, CPU limit 1.5, memory limit 4 GB, `LAYA_MAX_CONCURRENT=1`,
   `LAYA_PRELOAD=1`. The backend keeps the remainder of the 2 cores.
 - **Health:** Laya's `/health`, monitored by Coolify (its restart policy has not been verified here). The health check needs
   `curl` in the image.

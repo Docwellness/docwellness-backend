@@ -45,12 +45,19 @@ Production rollout:      Phase 4 (shadow), recipe_classification only, test traf
                          Phases 5-7 not started. diet_plan_review built but not enabled.
 ```
 
+> **Which configuration these figures describe.** The block above was measured with the original
+> 1.5-core setting. The configuration now in production is **single-core** (see "Single-core
+> experiment" below): per-call latency is about **8.0 s mean / 7.6 s p50 / 10.0 s p95 / 10.2 s p99**,
+> throughput ~8 calls a minute, CPU ~100% of one core, RAM ~2.2 GB, 0 errors at concurrency 1.
+> Rerun `scripts/laya-load-test.js` against the current setting before quoting higher-concurrency
+> numbers for it.
+
 ## What was built
 
 | Area | State |
 |---|---|
 | Deployment | Separate Coolify app `docwellness-laya`, same project and `coolify` network as the backend. No public domain or port. Reached through a Custom Network Alias. Weights in a `/models` volume. Non-root. |
-| Resource caps | `LAYA_THREADS=1`, CPU limit 1.5, memory limit 4 GB, `LAYA_PRELOAD=1`, `LAYA_MAX_CONCURRENT=2`. |
+| Resource caps | `LAYA_THREADS=1`, CPU limit 1.5, memory limit 4 GB, `LAYA_PRELOAD=1`, `LAYA_MAX_CONCURRENT=1`, plus `OMP/MKL/OPENBLAS_NUM_THREADS=1` and `TOKENIZERS_PARALLELISM=false` (single-core configuration, kept 2026-10-05). Backend: `LAYA_TIMEOUT_MS=30000`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`. |
 | Abstraction | `services/layaDecisionService.js`: fail-soft calls, short typed functions. `validate_diet_plan()` not written. |
 | Shadow mode | `services/layaShadowService.js`: fire-and-forget, per-surface switch, in-flight cap, rows in `GenerationLog` with request id, model, answer, latency, confidence, error. |
 | Flags / rollback | `LAYA_ENABLED`, `LAYA_MODE`, `LAYA_SHADOW_SURFACES`, `LAYA_SHADOW_MAX_IN_FLIGHT`. Rollback = `LAYA_ENABLED=false` + backend redeploy; no migration. |
@@ -139,9 +146,9 @@ Laya also warns at startup that this checkpoint's confidence is not calibrated.
 cost: per-call latency rose **~45%** (mean 8.0 s vs 5.5 s; p95 10.0 s vs 7.0 s) and throughput fell
 from ~11 to ~8 calls a minute. Both configurations spend about 8 core-seconds per call, so Laya
 is CPU-bound and speed trades against backend headroom roughly 1:1. Backend `/health` p95 was
-unaffected either way. **Which configuration stays is undecided.** If single-core is kept,
-`LAYA_TIMEOUT_MS` must go to ~30000, because 2 admitted requests x ~8 s now exceeds the 15 s
-timeout. See `docs/laya-operations.md`.
+unaffected either way. **Decision: single-core was kept (2026-10-05).** Because 2 admitted requests
+x ~8 s would exceed the old 15 s timeout, `LAYA_TIMEOUT_MS` was raised to 30000 and both caps were
+set to 1 (`LAYA_MAX_CONCURRENT=1`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`). See `docs/laya-operations.md`.
 
 ## Definition of done (plan section 30)
 
@@ -185,7 +192,6 @@ timeout. See `docs/laya-operations.md`.
 3. A decision on latency for `live`: this hardware allows ~11 calls a minute, so `live` needs a
    different setup (faster model format, more CPU, GPU, or a dedicated VM). Shadow mode does not.
 4. A per-user flag mechanism for the staged rollout, and `laya_*` metrics.
-5. Decide whether Laya stays single-core (+45% latency, backend keeps a full core) or reverts to
-   the faster 1.5-core setup. Experiment done; see `docs/laya-operations.md`.
+5. (Done) Single-core configuration kept; see `docs/laya-operations.md`.
 
 Do not claim production readiness for `live` until items 1 and 3 are resolved.

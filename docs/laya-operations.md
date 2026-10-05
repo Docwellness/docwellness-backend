@@ -43,10 +43,12 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | Setting | Value | Why |
 |---|---|---|
 | `LAYA_API_KEY` | secret | Bearer token the backend must send. Set in Coolify only. |
-| `LAYA_THREADS` | `1` | The VM has 2 cores shared with the backend; do not give Laya all of them. |
+| `LAYA_THREADS` | `1` | torch's compute threads. On its own it does **not** confine Laya to one core (see the next four rows). |
+| `OMP_NUM_THREADS`, `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS` | `1` | Limit OpenMP/BLAS thread pools, which `LAYA_THREADS` does not control. With these, Laya uses ~1 core instead of ~1.45. |
+| `TOKENIZERS_PARALLELISM` | `false` | Stops the HuggingFace tokenizer using extra threads. |
 | `LAYA_PRELOAD` | `1` | Load the checkpoint at startup. Lazy loading makes the first call ~75 s. |
 | `LAYA_MODELS` | `typed-decisions` | Short names (`english`, `multilingual`, `typed-decisions`), not `laya-typed-decisions`. |
-| `LAYA_MAX_CONCURRENT` | `4` today; **recommended `2`** | Past this, Laya answers HTTP 503 instead of queueing. Laya serves one request at a time (~5-6 s each), so accepted requests wait for those ahead: with a 15 s client timeout, cap x per-call time must stay under 15 s (2 x ~6 s = 12 s; 4 x 6 s = 24 s means queued requests time out and become abandoned work). |
+| `LAYA_MAX_CONCURRENT` | `1` | Past this, Laya answers HTTP 503 instead of queueing. Laya serves one request at a time (~8 s each in the single-core configuration), so any request admitted beyond the first waits for those ahead. The rule is cap x per-call time < client timeout; at 1, nothing queues. (It was 4, then 2, before the single-core change; see "Capacity".) |
 | CPU limit / memory limit | `1.5` / `4g` | Resource Limits. Model uses ~2 GB. |
 | Persistent storage | volume at `/models` | Model weights (~1 GB). Without it every restart re-downloads them. |
 | Domains | **empty** | Coolify auto-assigns a public `sslip.io` domain on creation; it must be cleared. |
@@ -62,8 +64,8 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | `LAYA_SHADOW_SURFACES` | `recipe_classification` | Comma list. Shadow runs only for listed surfaces. |
 | `LAYA_BASE_URL` | `http://docwellness-laya:8000` | Must use the **alias**, not the bare app uuid or a container name. |
 | `LAYA_API_KEY` | same secret as Laya | |
-| `LAYA_TIMEOUT_MS` | `15000` | Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
-| `LAYA_SHADOW_MAX_IN_FLIGHT` | `2` (default) | Cap on concurrent shadow calls. Past it, a call is **skipped** (not sent to Laya) and recorded. Keeps a burst of generations from filling Laya's single lane with work that will time out. Keep it at or below Laya's `LAYA_MAX_CONCURRENT`. |
+| `LAYA_TIMEOUT_MS` | `30000` | Raised from 15000 for the single-core configuration (8 s calls). Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
+| `LAYA_SHADOW_MAX_IN_FLIGHT` | `1` (code default 2) | Cap on concurrent shadow calls. Past it, a call is **skipped** (not sent to Laya) and recorded. Keeps a burst of generations from filling Laya's single lane with work that will time out. Keep it at or below Laya's `LAYA_MAX_CONCURRENT`. |
 
 Env changes only take effect after the app is **redeployed**; there is no hot toggle.
 
@@ -112,16 +114,18 @@ Shadow rows record why a call failed in `layaError`:
 
 ## Capacity and behaviour to know about
 
-- **Latency on this VM:** about **5 s per call** at `LAYA_THREADS=1` (measured 4.5–5.3 s on the
-  real recipe-classification payload); about 4.4 s at 2 threads. Two threads would take both of the
-  VM's cores from the backend, so it stays at 1.
+- **Latency on this VM (current, single-core configuration):** about **8 s per call** (mean 8.0,
+  p95 10.0 s at concurrency 1), ~8 calls a minute. Before the single-core change it was ~5.5 s at
+  ~1.45 cores used; at 2 threads/2 CPUs ~4.4 s. Per call costs about 8 core-seconds either way, so
+  latency scales inversely with the cores Laya may use. It is a trade between Laya speed and the
+  backend's headroom, and shadow mode does not need the speed.
 - **Laya handles one request at a time.** Throughput does not rise with concurrency; extra
   concurrent requests queue and, past `LAYA_MAX_CONCURRENT`, are refused with 503.
 - **A client timeout does not cancel work inside Laya.** It keeps processing the abandoned
   request, so a burst of timeouts is followed by 503s while it catches up. Measured on the
   VM (load test, 2026-10-05): 5 concurrent clients completed 2 of 25 requests and throughput fell
   from 0.18 to 0.03 ok/s, because the queue filled with abandoned requests ("congestion
-  collapse"). This is why shadow calls are capped in flight and `LAYA_MAX_CONCURRENT` should be 2.
+  collapse"). This is why shadow calls are capped in flight and `LAYA_MAX_CONCURRENT` is kept low (now 1).
 - **First call after a Laya redeploy** is slower (warm-up); discard it when measuring.
 - **Model choice:** we request `laya-typed-decisions` but Laya's router has served
   `laya-rl-agent` every time. Do not assume the requested checkpoint is the one answering.
@@ -200,7 +204,7 @@ the new one passes its health check.
 | `scripts/laya-eval-run.js` | Score Laya against the reviewed dataset (reviewed rows only). |
 | `scripts/laya-load-test.js` | 1/5/10/20/50 concurrency load test with backend-impact probe. Needs `--yes`. |
 
-## Experiment: make Laya truly single-core (run 2026-10-05; decision pending)
+## Experiment: make Laya truly single-core (run 2026-10-05; KEPT)
 
 **Why.** Under load Laya's CPU plateaus at its container limit (~140-150% of one core) even though
 `LAYA_THREADS=1`: that setting only caps torch's own compute threads. The likely cause is thread
@@ -251,8 +255,9 @@ latency, which scales with CPU: both configurations spend about **8 core-seconds
 (1.45 cores x 5.5 s; 1.0 core x 8.0 s), so Laya is CPU-bound and speed and backend headroom trade
 roughly 1:1. This exceeded the +25% latency the procedure suggested as acceptable.
 
-**If the single-core configuration is kept:** raise the backend's `LAYA_TIMEOUT_MS` to `30000`.
-With 8 s calls and 2 requests admitted, the second waits ~16 s, past the 15 s timeout (p95 ~20 s),
+**Decision (2026-10-05): kept.** Applied: the four variables on Laya, `LAYA_TIMEOUT_MS=30000` and
+`LAYA_SHADOW_MAX_IN_FLIGHT=1` on the backend, `LAYA_MAX_CONCURRENT=1` on Laya. Why the timeout and
+caps had to change: with 8 s calls and 2 requests admitted, the second waits ~16 s, past the 15 s timeout (p95 ~20 s),
 which would recreate timeouts and abandoned work. Shadow calls are not awaited, so a longer
 timeout is harmless. The cap rule is cap x per-call time < timeout.
 
