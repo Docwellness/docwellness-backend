@@ -199,7 +199,8 @@ fragile for yes/no: where the existing slot **ranks** among the seven scores (ch
 4.0, top-1 14%, top-2 29%), the **per-slot AUC** (do recipes filed under a slot score higher for it
 than the others do? 0.5 = no signal, 1.0 = perfect), and top-1 after removing each slot's own bias.
 It also prints the per-call latency. Results are saved; re-analyse a saved run without Laya or the
-database with `--from=<results.json>`.
+database with `--from=<results.json>`. **The saved file lives on the container's disk and is lost on
+any redeploy**, so copy out the output you need (or run the baseline comparison) in the same session.
 
 **This is not accuracy.** The existing slot is just how someone filed the recipe and it is one
 acceptable slot, not the only one. Read it as "worth investigating" (rank/AUC near chance) or "not
