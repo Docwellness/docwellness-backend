@@ -21,11 +21,18 @@ const reply = (yesSlots = [], latencyMs = 9000) => ({
   answers: Object.fromEntries(SLOT_KEYS.map((k) => [`slot_${k}`, { type: 'noul', noul: yesSlots.includes(k) ? 0.9 : 0.1 }])),
 });
 // The one-question form: a probability per slot summing to 1, `top` highest.
-const choiceReply = (top, second = null, latencyMs = 4000) => {
+const choiceReply = (top, second = null, latencyMs = 4000, high = 0.6) => {
   const probabilities = Object.fromEntries(SLOT_KEYS.map((k) => [k, 0.03]));
   probabilities[top] = 0.6;
   if (second) probabilities[second] = 0.25;
-  return { ok: true, latencyMs, answers: { slot_fit: { type: 'choice', choice: top, confidence: 0.4, probabilities } } };
+  return {
+    ok: true,
+    latencyMs,
+    answers: {
+      slot_fit: { type: 'choice', choice: top, confidence: 0.4, probabilities },
+      protein_level: { type: 'choice', choice: high > 0.5 ? 'high' : 'low', confidence: 0.3, probabilities: { low: Number((0.9 - high).toFixed(2)), moderate: 0.1, high } },
+    },
+  };
 };
 const noSleep = jest.fn(async () => {});
 
@@ -187,9 +194,14 @@ describe('scripts/laya-source-agreement.js', () => {
   it('re-analyses a saved results file without Laya or the database (--from)', async () => {
     const fs = require('fs');
     const os = require('os');
-    const items = [item('1', 'Poha', 'breakfast'), item('2', 'Dal', 'lunch')];
-    const replies = [choiceReply('breakfast'), choiceReply('dinner', 'lunch')];
+    // eight recipes so the protein check has enough rows; Laya's protein score rises with the grams
+    const specs = [['Poha', 'breakfast', 2, 0.1], ['Dal', 'lunch', 6, 0.2], ['Tea', 'night_drink', 1, 0.05], ['Curry', 'dinner', 20, 0.7],
+      ['Soup', 'dinner', 9, 0.3], ['Chaat', 'evening_snack', 11, 0.4], ['Egg', 'breakfast', 25, 0.8], ['Fish', 'lunch', 30, 0.9]];
+    const items = specs.map(([n, s, g]) => ({ ...item(n, n, s), proteinG: g }));
+    const replies = specs.map(([, s, , h], i) => (i === 1 ? choiceReply('dinner', 'lunch', 4000, h) : choiceReply(s, null, 4000, h)));
     const { results } = await runSourceAgreement({ items, classify: async () => replies.shift(), sleep: noSleep });
+    expect(results[3].proteinG).toBe(20); // carried through for the protein check
+    expect(results[3].protein.probabilities.high).toBe(0.7);
     const file = path.join(os.tmpdir(), `sa-${Date.now()}.json`);
     fs.writeFileSync(file, JSON.stringify({ results }));
     const r = await new Promise((resolve) => {
@@ -200,10 +212,13 @@ describe('scripts/laya-source-agreement.js', () => {
     });
     fs.rmSync(file, { force: true });
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/Re-analysing 2 saved results/);
+    expect(r.stdout).toMatch(/Re-analysing 8 saved results/);
     expect(r.stdout).toMatch(/one 7-option question/);
-    expect(r.stdout).toMatch(/Existing slot's rank among the 7 scores: mean 1\.5/);
-    expect(r.stdout).toMatch(/Existing slot in Laya's top 1: 1\/2 = 50%\s+\(chance 14%\)/);
+    expect(r.stdout).toMatch(/Existing slot in Laya's top 1: 7\/8 = 88%\s+\(chance 14%\)/); // only Dal (a decoy 'dinner' top pick) misses
+    // the protein check rides along: Laya's score is monotone in the grams here
+    expect(r.stdout).toMatch(/protein_level vs the nutrition data/);
+    expect(r.stdout).toMatch(/recipes with both Laya's protein answer and grams: 8/);
+    expect(r.stdout).toMatch(/Spearman rank correlation: 1 /);
     expect(r.stdout).toMatch(/NOT accuracy/);
     expect(r.stdout).not.toMatch(/Thresholded yes\/no view/); // not meaningful for the choice form
   });

@@ -55,6 +55,13 @@ async function runSourceAgreement({ items, classify, sleep, retries = 3, retryDe
       id: it.id,
       name: it.name,
       sourceSlot: it.sourceSlot,
+      // For the protein check (utils/layaProtein.js): Laya's protein_level answer and the
+      // recipe's exact protein per serving from the nutrition data (null if unknown).
+      proteinG: it.proteinG == null ? null : it.proteinG,
+      protein:
+        r.ok && r.answers && r.answers.protein_level
+          ? { choice: r.answers.protein_level.choice || null, confidence: r.answers.protein_level.confidence ?? null, probabilities: r.answers.protein_level.probabilities || null }
+          : null,
       slotProbs: probs,
       slotMode: r.ok ? slotAnswerMode(r.answers) : null,
       topSlot: probs ? topSlot(probs) : null,

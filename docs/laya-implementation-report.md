@@ -194,6 +194,41 @@ threshold-free reading would find signal that the 0.5 line hides; the rank metri
 ~10 s for the seven questions; production latency not yet measured). Not yet measured for quality
 on the 70 recipes; the seven-question form stays available as `LAYA_SLOT_MODE=noul` for comparison.
 
+## One-question slot form vs a trivial baseline (2026-10-05)
+
+Same 70-recipe design (10 per slot, slot hidden from Laya), `LAYA_SLOT_MODE=choice` (one 7-option
+question): **latency mean 10.8 s** (p50 10.6, p95 12.5), no errors. Agreement with existing slot labels,
+**not accuracy**. Chance in brackets.
+
+| | Laya (choice form) | Bag-of-words baseline* | Category prior* |
+|---|---|---|---|
+| Existing slot's mean rank (4.0) | 3.09 | 1.99 | 2.91 |
+| In top 1 (14%) | 33% | **47%** | 26% |
+| In top 2 (29%) | 44% | **71%** | 54% |
+| In top 3 (43%) | 56% | **90%** | 69% |
+| Macro AUC (0.50) | 0.75 | **0.86** | n/a** |
+
+\*Trained on the existing labels and scored leave-one-out; run on a sample built the same way as
+Laya's (same seed), not necessarily the identical 70 recipes. `scripts/laya-slot-baseline.js --laya=<json>`
+scores both on exactly the same ones. \*\*Leave-one-out makes a prior's AUC meaningless.
+
+**Laya's per-slot AUC:** Night Drink 0.95, Morning Drink 0.93, Dinner 0.79, Breakfast 0.72,
+Brunch 0.68, Lunch 0.68, Evening Snack 0.52. Its top picks were right mostly for drinks and
+breakfast (Morning Drink 10/10, Breakfast 9/10); for lunch, dinner and brunch the top pick was almost
+never the existing slot (it favours "breakfast" for most food).
+
+**Reading it.** Laya's serving-slot judgement is clearly better than chance (overall) but, on this
+sample, **clearly worse than a few lines of code trained on the existing labels**, and the part it gets
+right (telling drinks from food) is largely recoverable from the category and ingredients. The labelled
+data has near-duplicate recipes and one set of authors, which flatters any baseline trained on it, so the
+baseline's advantage overstates what it would do on genuinely novel dishes; Laya needs no labels. Even so,
+for slot assignment Laya is not clearly earning its ~11 s a call. The dietician-reviewed dataset (which
+accepts several slots per recipe) is still needed to measure either properly.
+
+**Protein check:** a rank-based comparison of Laya's `protein_level` with the nutrition data's exact
+protein per serving is now part of the smoke test (`utils/layaProtein.js`); no result yet, it needs one more
+run.
+
 ## Findings and fixes during rollout
 
 | Issue | Effect | Resolution |

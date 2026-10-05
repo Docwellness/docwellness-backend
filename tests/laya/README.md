@@ -201,6 +201,32 @@ database with `--from=<results.json>`.
 acceptable slot, not the only one. Read it as "worth investigating" (rank/AUC near chance) or "not
 obviously broken" (clearly better). Only the dietician-reviewed dataset measures accuracy.
 
+## Does Laya beat a trivial baseline? (no Laya time, no dieticians)
+
+```
+node scripts/laya-slot-baseline.js --laya=tests/laya/results/<saved smoke-test results>.json
+```
+
+Run it in the backend container's Coolify Terminal (it only reads the recipe collection; seconds).
+It trains three trivial, non-LLM predictors on the recipes' **existing** slot labels and scores each
+**leave-one-out** (every recipe is scored by a model that never saw it): the base rate, the
+category's usual slot, and a small bag-of-words classifier over name, category, cuisine and
+ingredients. It prints the same rank metrics as the smoke test, on the same recipes when
+`--laya` is given, so they can be read side by side. The baselines learned from your labels and
+Laya never saw them, so beating them is a high bar; clearly losing to them means Laya's cost
+(~11 s a call) needs a different justification. Still agreement with existing labels, not accuracy.
+(Base-rate AUC is "n/a" and category-prior AUCs at or below 0.5 are leave-one-out artifacts, not
+findings; read the bag-of-words column as the real baseline.)
+
+## Does Laya's protein tier carry information? (no human labels)
+
+The smoke test (`scripts/laya-source-agreement.js`) also compares Laya's `protein_level` answer with
+the exact protein per serving in the nutrition data (`Recipe.nutritionPerServing.protein`), with no
+gram threshold chosen: Spearman rank correlation, AUC for the highest-protein third vs the lowest
+third, tier agreement with the grams tertiles, and the same correlation **within each serving
+slot** (because "high protein for a dish of its type" is not raw grams). This says whether the tier
+carries information; it is not a case for using Laya for nutrition (the plan keeps that exact).
+
 ## Load test (integration plan section 24)
 
 ```

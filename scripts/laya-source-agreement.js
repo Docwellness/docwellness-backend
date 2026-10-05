@@ -38,6 +38,7 @@ require('dotenv').config({ quiet: true });
 const fs = require('fs');
 const path = require('path');
 const { sampleStratified, shuffleSeeded, summarizeLatencies } = require('../utils/layaEval');
+const { proteinSummary } = require('../utils/layaProtein');
 const { SLOT_KEYS, SLOT_NAMES, slotKeyFromServingTime, slotName } = require('../utils/layaSlots');
 const {
   runSourceAgreement, slotAgreement, slotYesRates, topPickConfusion, notRatedSuitable, rankSummary,
@@ -77,6 +78,23 @@ function report({ results, mode, aborted }) {
     console.log(`  ${slotName(k).padEnd(14)} AUC ${a.auc == null ? 'n/a' : a.auc.toFixed(2)}   (${a.positives} filed under it, ${a.negatives} others)`);
   }
   console.log(`Macro-average AUC: ${rank.macroAuc == null ? 'n/a' : rank.macroAuc.toFixed(2)}`);
+
+  // Laya's protein_level vs the exact protein per serving in the nutrition data. No human labels,
+  // no gram threshold: rank-based. (Not a reason to use Laya for nutrition - the plan keeps that exact.)
+  const prot = proteinSummary(results);
+  console.log("\n-- protein_level vs the nutrition data's protein per serving (rank-based) --");
+  if (prot.spearman == null && prot.note) {
+    console.log(`  ${prot.note} (n=${prot.n}; results with no protein answers or no grams are skipped)`);
+  } else {
+    console.log(`  recipes with both Laya's protein answer and grams: ${prot.n}`);
+    console.log(`  Spearman rank correlation: ${prot.spearman}   (0 = none, 1 = perfect, negative = backwards)`);
+    console.log(`  AUC, highest-protein third vs lowest third: ${prot.aucHighVsLowThird}   (0.5 = no signal)`);
+    console.log(`  Laya's tier equals the grams tertile: ${prot.tierAgreement.agree}/${prot.tierAgreement.n} = ${pct(prot.tierAgreement.rate)}   (chance ${pct(prot.tierAgreement.chance)})`);
+    console.log(`  Same correlation WITHIN each slot (controls for dish type), mean over ${prot.withinSlotSpearman.slots} slots: ${prot.withinSlotSpearman.mean}`);
+    for (const [slot, b] of Object.entries(prot.withinSlotSpearman.bySlot)) console.log(`    ${slotName(slot).padEnd(14)} rho ${b.rho} (n=${b.n})`);
+    console.log('  grams tertile -> Laya tier:');
+    for (const [k, v] of Object.entries(prot.confusion).sort((a, b) => b[1] - a[1])) console.log(`    ${k}: ${v}`);
+  }
 
   const agreement = slotAgreement(results);
   console.log('\nExisting slot -> Laya top pick:');
@@ -132,7 +150,7 @@ function report({ results, mode, aborted }) {
     servingTime: { $in: SLOT_NAMES },
     category: { $ne: 'Supplements' },
   })
-    .select('name cuisine category servingTime ingredients.name')
+    .select('name cuisine category servingTime ingredients.name nutritionPerServing.protein')
     .lean();
 
   const sample = shuffleSeeded(
@@ -144,6 +162,7 @@ function report({ results, mode, aborted }) {
     id: String(r._id),
     name: r.name,
     sourceSlot: slotKeyFromServingTime(r.servingTime),
+    proteinG: typeof r.nutritionPerServing?.protein === 'number' ? r.nutritionPerServing.protein : null,
     recipe: {
       name: r.name,
       cuisine: r.cuisine || null,
