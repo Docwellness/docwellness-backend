@@ -65,15 +65,28 @@ patient ids, or consultation free text.
 
 ## Workflow
 
-1. **Export a review sheet** from real saved recipes (read-only, no DB writes):
+1. **Export a review sheet** from real saved recipes (read-only, no DB writes). On production
+   the container's disk is ephemeral, so print it and copy it out:
    ```
-   node scripts/laya-eval-export-review-sheet.js --per-class=25 --seed=1
+   node scripts/laya-eval-export-review-sheet.js --format=csv --stdout --per-class=25
    ```
-   Writes `pending/recipe_classification.pending.json`: real recipes, stratified by meal
-   type, with `expected: null`. It deliberately does **not** include Laya's own guess, so
-   reviewers aren't anchored. `proposed.meal_type` is just the recipe's existing slot.
-2. **A dietician reviews each row**: fills in `expected`, sets `reviewed_by: "dietician"`.
-3. **Move the reviewed rows** into `tests/laya/<category>.json`.
+   Run that in the backend container's Coolify Terminal, copy the output into a file such as
+   `review-sheet.csv`, and open it in a spreadsheet (Excel / Google Sheets, import as UTF-8).
+   Rows are real recipes stratified by meal type. Laya's own guess is deliberately **not**
+   included, so reviewers aren't anchored. `proposed_meal_type` is just the recipe's existing slot.
+   (Without `--stdout` it writes `tests/laya/pending/recipe_classification.pending.csv` or `.json`.)
+2. **A dietician reviews each row** in the spreadsheet: fill `expected_meal_type`
+   (`breakfast`/`lunch`/`dinner`/`snack`), optionally `expected_protein_level`
+   (`low`/`moderate`/`high`), and put their name or initials in `reviewer`. A row with no reviewer
+   is treated as not reviewed. Leave the other columns alone.
+3. **Import the reviewed rows** (on a laptop, no database needed):
+   ```
+   node scripts/laya-eval-import-review-sheet.js --in=review-sheet.csv
+   ```
+   Writes `tests/laya/recipe_classification.json`, merging by `id`. It is strict: if any row is
+   half-filled or has an invalid value it lists the problems and writes **nothing**. Commit the
+   file and redeploy the backend: `.dockerignore` lets `tests/laya` ship in the image, so the
+   scorer can read it there.
 4. **Score Laya** (sequential, one example at a time, against a Laya you are happy to load):
    ```
    LAYA_ENABLED=true LAYA_BASE_URL=http://... LAYA_API_KEY=... \
@@ -120,6 +133,11 @@ Reading it:
   fallback.
 - A client timeout does **not** cancel the work inside Laya: it keeps processing the abandoned
   request, so a burst of timeouts is followed by 503s while it catches up.
+- After every stage the script waits for Laya to **drain** (it keeps working on requests the
+  client abandoned), so one overloaded stage does not contaminate the next, or real shadow
+  traffic afterwards. It reports `drain` per stage and sets `backlogWarning` if Laya never settled.
+- It stops escalating if nothing succeeds because Laya is stalling or erroring; all-503 does
+  **not** stop it, since that is deliberate load shedding.
 - Laya's CPU and RAM are not visible from the script. Read them from the Laya resource's metrics
   in Coolify for each stage's printed UTC window.
 - Results go to `tests/laya/results/load-*.json` (git-ignored).

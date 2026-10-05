@@ -10,5 +10,9 @@ logs
 coverage
 .nyc_output
 tests
+!tests/laya
+# review sheets and run outputs stay out of the image; only reviewed datasets ship
+tests/laya/pending
+tests/laya/results
 *.md
 *.txt

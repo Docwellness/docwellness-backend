@@ -46,7 +46,7 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | `LAYA_THREADS` | `1` | The VM has 2 cores shared with the backend; do not give Laya all of them. |
 | `LAYA_PRELOAD` | `1` | Load the checkpoint at startup. Lazy loading makes the first call ~75 s. |
 | `LAYA_MODELS` | `typed-decisions` | Short names (`english`, `multilingual`, `typed-decisions`), not `laya-typed-decisions`. |
-| `LAYA_MAX_CONCURRENT` | `4` | Past this, Laya answers HTTP 503 instead of queueing. |
+| `LAYA_MAX_CONCURRENT` | `4` today; **recommended `2`** | Past this, Laya answers HTTP 503 instead of queueing. Laya serves one request at a time (~5-6 s each), so accepted requests wait for those ahead: with a 15 s client timeout, cap x per-call time must stay under 15 s (2 x ~6 s = 12 s; 4 x 6 s = 24 s means queued requests time out and become abandoned work). |
 | CPU limit / memory limit | `1.5` / `4g` | Resource Limits. Model uses ~2 GB. |
 | Persistent storage | volume at `/models` | Model weights (~1 GB). Without it every restart re-downloads them. |
 | Domains | **empty** | Coolify auto-assigns a public `sslip.io` domain on creation; it must be cleared. |
@@ -63,6 +63,7 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | `LAYA_BASE_URL` | `http://docwellness-laya:8000` | Must use the **alias**, not the bare app uuid or a container name. |
 | `LAYA_API_KEY` | same secret as Laya | |
 | `LAYA_TIMEOUT_MS` | `15000` | Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
+| `LAYA_SHADOW_MAX_IN_FLIGHT` | `2` (default) | Cap on concurrent shadow calls. Past it, a call is **skipped** (not sent to Laya) and recorded. Keeps a burst of generations from filling Laya's single lane with work that will time out. Keep it at or below Laya's `LAYA_MAX_CONCURRENT`. |
 
 Env changes only take effect after the app is **redeployed**; there is no hot toggle.
 
@@ -102,6 +103,7 @@ Shadow rows record why a call failed in `layaError`:
 | `fetch failed (ECONNREFUSED)` | Name resolves, nothing listening. | Laya is down, restarting, or still loading the model. Check Coolify status/logs. |
 | `reason: timeout` | No answer within `LAYA_TIMEOUT_MS`. | Laya is slow or busy (see below). Compare `layaLatencyMs` on successes. |
 | `HTTP 503 ... server busy` | Past `LAYA_MAX_CONCURRENT`. | Deliberate load shedding. Expected under bursts; see "Capacity". |
+| `reason: skipped` | The backend's shadow in-flight cap was hit; Laya was **not** called. | Expected under bursts. Many skips mean generations arrive faster than Laya's ~10 calls a minute. |
 | `HTTP 401` | API key mismatch between backend and Laya. | Make both `LAYA_API_KEY` values identical; redeploy both. |
 
 **Laya's own logs** (Coolify → `docwellness-laya` → Logs) show a line per request. An absence of
@@ -116,7 +118,10 @@ Shadow rows record why a call failed in `layaError`:
 - **Laya handles one request at a time.** Throughput does not rise with concurrency; extra
   concurrent requests queue and, past `LAYA_MAX_CONCURRENT`, are refused with 503.
 - **A client timeout does not cancel work inside Laya.** It keeps processing the abandoned
-  request, so a burst of timeouts is followed by 503s while it catches up.
+  request, so a burst of timeouts is followed by 503s while it catches up. Measured on the
+  VM (load test, 2026-10-05): 5 concurrent clients completed 2 of 25 requests and throughput fell
+  from 0.18 to 0.03 ok/s, because the queue filled with abandoned requests ("congestion
+  collapse"). This is why shadow calls are capped in flight and `LAYA_MAX_CONCURRENT` should be 2.
 - **First call after a Laya redeploy** is slower (warm-up); discard it when measuring.
 - **Model choice:** we request `laya-typed-decisions` but Laya's router has served
   `laya-rl-agent` every time. Do not assume the requested checkpoint is the one answering.
@@ -126,7 +131,9 @@ Shadow rows record why a call failed in `layaError`:
   rows, but `protein_level` has looked wrong for clearly protein-rich dishes. This is small-sample,
   test-account data; it is not an accuracy measurement.
 - **Load testing:** `node scripts/laya-load-test.js --yes` (see `tests/laya/README.md`). Run it
-  from the backend Terminal at a quiet time; it loads the VM the backend shares.
+  from the backend Terminal at a quiet time; it loads the VM the backend shares. First VM run
+  (concurrency 1): mean 5.6 s, p50 5.4, p95 7.2, p99 8.0, 0 errors, 0.18 ok/s; backend `/health`
+  p95 unaffected (~10 ms). It now waits for Laya to drain between stages.
 
 ## Rollback and emergency off
 
