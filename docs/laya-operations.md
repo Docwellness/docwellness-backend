@@ -131,9 +131,11 @@ Shadow rows record why a call failed in `layaError`:
   `laya-rl-agent` every time. Do not assume the requested checkpoint is the one answering.
 - **Confidence is not calibrated:** Laya warns at startup that this checkpoint ships invalid
   temperatures. Treat confidence as one weak signal, never as proof (plan §17).
-- **Quality is unproven.** In shadow data so far meal type matched the requested slot in 12 of 13
-  rows, but `protein_level` has looked wrong for clearly protein-rich dishes. This is small-sample,
-  test-account data; it is not an accuracy measurement.
+- **Quality is unproven.** An earlier "meal type matched the requested slot in 12 of 13 rows"
+  figure is **invalid**: the requested slot was included in the text Laya reads, so it could see the
+  answer. Ignore it, and treat any shadow-report "agreement" as meaningless until `servingTime` is
+  removed from Laya's input. `protein_level` has looked wrong for clearly protein-rich dishes
+  (small-sample, test-account data; not an accuracy measurement).
 - **Load testing:** `node scripts/laya-load-test.js --yes` (see `tests/laya/README.md`). Run it
   from the backend Terminal at a quiet time; it loads the VM the backend shares. First VM run
   (concurrency 1): mean 5.6 s, p50 5.4, p95 7.2, p99 8.0, 0 errors, 0.18 ok/s; backend `/health`

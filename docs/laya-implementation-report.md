@@ -117,9 +117,13 @@ reached (2)`) and never reached Laya. All 5 recipe responses were 200 in 6-10 s.
 | Failed during bring-up (DNS ×4, timeouts ×2, one before failure reasons were recorded) | 7 |
 | Skipped by the in-flight cap | 3 |
 
-Of the 15 successes, Laya's meal type matched the slot the generator was asked for in **14**. The
-miss was a snack requested as "Evening Snack" that Laya called "dinner". That measures consistency
-with the request, which is not accuracy. Laya's `protein_level` answered "low" for several clearly
+Of the 15 successes, Laya's meal type matched the slot the generator was asked for in 14.
+**Correction (found 2026-10-05): this figure is not valid.** The requested slot (`servingTime`)
+was part of the recipe text sent to Laya, so Laya could read the answer it was being asked for.
+It is neither accuracy nor a clean consistency measure, and should be ignored. (The one "miss",
+a snack requested as "Evening Snack" that Laya called "dinner", happened even with the slot
+visible, which suggests Laya weighs that field lightly, but that is a guess.) The fix is to stop
+sending `servingTime` to Laya for the meal-type question. Laya's `protein_level` answered "low" for several clearly
 protein-rich dishes (chicken curry, chole, fish curry, rajma, paneer tikka). That is anecdotal
 and small-sample, but it is the kind of disagreement the evaluation dataset exists to quantify.
 Laya also warns at startup that this checkpoint's confidence is not calibrated.

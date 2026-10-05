@@ -225,7 +225,8 @@ function summarizeShadowRows(rows, { excludeDieticianIds = [], surface = 'recipe
     mealTypeAgreement: { scorable, agree, rate: scorable ? Number((agree / scorable).toFixed(3)) : null, confusion },
     laya_protein_level_distribution: protein,
     note:
-      'Agreement is Laya vs the slot the dietician REQUESTED - a consistency signal, not accuracy. ' +
+      'Agreement is Laya vs the slot the dietician REQUESTED. WARNING: while servingTime is part of the ' +
+      'recipe sent to Laya (it was, up to 2026-10-05) Laya can read that slot, so this agreement is NOT valid. ' +
       'Accuracy needs the dietician-reviewed dataset (tests/laya/README.md).',
   };
 }

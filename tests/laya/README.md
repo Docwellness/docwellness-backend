@@ -128,7 +128,8 @@ node scripts/laya-shadow-report.js --exclude-dietician=<test-account-id>
 ```
 
 Summarises shadow rows (latency, failures by reason, meal-type agreement). Agreement there
-is Laya vs the slot the dietician **requested** - a consistency signal, not accuracy. Use
+is Laya vs the slot the dietician **requested**. It is only meaningful if the requested slot was
+**not** part of Laya's input; up to 2026-10-05 it was, so earlier agreement figures are invalid. Use
 `--exclude-dietician` to keep test accounts out of the numbers. On production, run it from
 the backend container's Coolify Terminal, where the private DB address works.
 
