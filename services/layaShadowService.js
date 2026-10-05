@@ -36,9 +36,21 @@ function minConfidence(answers) {
   return values.length ? Math.min(...values) : null;
 }
 
-async function recordShadow({ surface, kind, dieticianId, refId, inputHash, requestId, reference, call }) {
-  const result = await call();
-  await GenerationLog.create({
+// Laya serves ONE request at a time, and a client timeout does NOT cancel work
+// it already started (measured on the production VM: ~5.6 s per call; with 3+
+// requests queued, every one outlasts the timeout and the queue fills with
+// abandoned work, so nothing completes until the load stops). So shadow calls
+// are capped in flight: past the cap a call is SKIPPED and recorded, never
+// queued behind Laya. Shadow data is best-effort; users are never affected.
+let inFlight = 0;
+
+function maxInFlight() {
+  const n = Number(config.laya.shadowMaxInFlight);
+  return Number.isFinite(n) && n > 0 ? n : 2;
+}
+
+function baseRow({ surface, kind, dieticianId, refId, inputHash, requestId }) {
+  return {
     kind,
     dieticianId,
     refId: refId || null,
@@ -51,6 +63,30 @@ async function recordShadow({ surface, kind, dieticianId, refId, inputHash, requ
     model: config.laya.model || null,
     layaMode: 'shadow',
     layaSurface: surface,
+  };
+}
+
+async function recordSkipped(opts) {
+  await GenerationLog.create({
+    ...baseRow(opts),
+    layaDecisions: { reference: opts.reference || null },
+    layaError: { reason: 'skipped', detail: `shadow in-flight cap reached (${maxInFlight()})` },
+    succeeded: false,
+  });
+}
+
+async function recordShadow(opts) {
+  const { reference, call } = opts;
+  let result;
+  try {
+    result = await call();
+  } finally {
+    // The cap is about concurrent work on Laya, so release it as soon as the
+    // call returns - not after the database write below.
+    inFlight -= 1;
+  }
+  await GenerationLog.create({
+    ...baseRow(opts),
     // Laya's answers plus whatever the existing flow decided for the same
     // question ("reference"), so the two can be compared offline. Decision
     // metadata only - never the request text, never PII/PHI.
@@ -77,6 +113,13 @@ async function recordShadow({ surface, kind, dieticianId, refId, inputHash, requ
 function runShadow(opts) {
   try {
     if (!opts || !surfaceEnabled(opts.surface)) return;
+    if (inFlight >= maxInFlight()) {
+      recordSkipped(opts).catch((err) => {
+        console.warn(`[laya-shadow] ${opts.surface} skip-record failed:`, err && err.message);
+      });
+      return;
+    }
+    inFlight += 1; // released in recordShadow's finally
     recordShadow(opts).catch((err) => {
       console.warn(`[laya-shadow] ${opts.surface} failed:`, err && err.message);
     });
@@ -85,4 +128,9 @@ function runShadow(opts) {
   }
 }
 
-module.exports = { runShadow, surfaceEnabled };
+// Test seam: the counter is module state.
+function _inFlightForTests() {
+  return inFlight;
+}
+
+module.exports = { runShadow, surfaceEnabled, _inFlightForTests };

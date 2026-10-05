@@ -81,7 +81,8 @@ const generationLogSchema = new mongoose.Schema(
       default: false,
     },
     // Why a shadow call produced no answer: { reason: 'disabled'|'timeout'|
-    // 'error', detail } - detail is a short error string, never request text.
+    // 'error'|'skipped', detail } - 'skipped' means the in-flight cap was hit
+    // and Laya was not called. detail is a short string, never request text.
     layaError: {
       type: mongoose.Schema.Types.Mixed,
       default: null,

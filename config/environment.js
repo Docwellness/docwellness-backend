@@ -100,6 +100,10 @@ module.exports = {
     // comma-separated surface names, e.g. 'recipe_classification,diet_plan_review'.
     // Empty (default) shadows nothing even with LAYA_MODE=shadow.
     shadowSurfaces: (process.env.LAYA_SHADOW_SURFACES || '').split(',').map((x) => x.trim()).filter(Boolean),
+    // Max shadow calls in flight at once (services/layaShadowService.js). Laya
+    // serves one request at a time (~5-6 s each on the prod VM), so past ~2 the
+    // queue outlasts the timeout and congests; extras are skipped and recorded.
+    shadowMaxInFlight: Number(process.env.LAYA_SHADOW_MAX_IN_FLIGHT) || 2,
     // Internal-only base URL (e.g. Coolify's internal network hostname) -
     // must never be a publicly reachable address. See docs/laya-deployment.md.
     baseUrl: process.env.LAYA_BASE_URL,

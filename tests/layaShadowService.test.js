@@ -7,7 +7,7 @@ jest.mock('../models/GenerationLog', () => ({ create: jest.fn() }));
 
 const config = require('../config/environment');
 const GenerationLog = require('../models/GenerationLog');
-const { runShadow, surfaceEnabled } = require('../services/layaShadowService');
+const { runShadow, surfaceEnabled, _inFlightForTests } = require('../services/layaShadowService');
 
 const flush = () => new Promise((r) => setImmediate(r));
 const base = { surface: 'recipe_classification', kind: 'recipe', inputHash: 'h', reference: { servingTime: 'Breakfast' } };
@@ -22,6 +22,7 @@ beforeEach(() => {
   config.laya.enabled = true;
   config.laya.mode = 'shadow';
   config.laya.shadowSurfaces = ['recipe_classification'];
+  config.laya.shadowMaxInFlight = 2;
 });
 
 describe('runShadow gating', () => {
@@ -132,5 +133,108 @@ describe('runShadow failure isolation', () => {
     expect(() => runShadow()).not.toThrow();
     expect(() => runShadow(null)).not.toThrow();
     expect(() => runShadow({ surface: 'recipe_classification' })).not.toThrow();
+  });
+});
+
+describe('runShadow in-flight cap (Laya serves one request at a time)', () => {
+  // A Laya call we control: resolves only when released.
+  const controllable = () => {
+    let release;
+    const call = jest.fn(() => new Promise((r) => { release = () => r(okResult); }));
+    return { call, release: () => release() };
+  };
+
+  it('calls Laya for at most the cap, and records the rest as skipped without calling Laya', async () => {
+    const calls = [controllable(), controllable(), controllable(), controllable()];
+    calls.forEach((c, i) => runShadow({ ...base, requestId: `r${i}`, call: c.call }));
+    await flush();
+
+    expect(calls.map((c) => c.call.mock.calls.length)).toEqual([1, 1, 0, 0]); // 3rd and 4th never reach Laya
+    expect(_inFlightForTests()).toBe(2);
+
+    const skipped = GenerationLog.create.mock.calls.map((c) => c[0]).filter((r) => r.layaError && r.layaError.reason === 'skipped');
+    expect(skipped).toHaveLength(2);
+    expect(skipped[0]).toMatchObject({ layaMode: 'shadow', layaSurface: 'recipe_classification', succeeded: false, requestId: 'r2' });
+    expect(skipped[0].layaDecisions.reference).toEqual({ servingTime: 'Breakfast' });
+    expect(skipped[0].layaDecisions.answers).toBeUndefined();
+
+    calls[0].release();
+    calls[1].release();
+    await flush();
+    expect(_inFlightForTests()).toBe(0);
+  });
+
+  it('frees a slot as soon as the Laya call returns, so later calls go through again', async () => {
+    const a = controllable();
+    const b = controllable();
+    const c = controllable();
+    runShadow({ ...base, call: a.call });
+    runShadow({ ...base, call: b.call });
+    await flush();
+    a.release();
+    await flush();
+    runShadow({ ...base, call: c.call }); // slot freed by a
+    await flush();
+    expect(c.call).toHaveBeenCalledTimes(1);
+    b.release();
+    c.release();
+    await flush();
+    expect(_inFlightForTests()).toBe(0);
+  });
+
+  it('releases the slot even when the Laya call rejects or throws', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    runShadow({ ...base, call: jest.fn().mockRejectedValue(new Error('boom')) });
+    runShadow({ ...base, call: () => { throw new Error('sync'); } });
+    await flush();
+    expect(_inFlightForTests()).toBe(0);
+    warn.mockRestore();
+  });
+
+  it('releases the slot before the database write finishes', async () => {
+    let finishWrite;
+    GenerationLog.create.mockImplementationOnce(() => new Promise((r) => { finishWrite = () => r({}); }));
+    runShadow({ ...base, call: jest.fn().mockResolvedValue(okResult) });
+    await flush();
+    expect(_inFlightForTests()).toBe(0); // Laya is idle even though the write is still pending
+    finishWrite();
+    await flush();
+  });
+
+  it('honours a configured cap and falls back to 2 on a bad value', async () => {
+    config.laya.shadowMaxInFlight = 1;
+    const a = controllable();
+    const b = controllable();
+    runShadow({ ...base, call: a.call });
+    runShadow({ ...base, call: b.call });
+    await flush();
+    expect(b.call).not.toHaveBeenCalled();
+    a.release();
+    await flush();
+
+    config.laya.shadowMaxInFlight = 'nonsense';
+    const c = [controllable(), controllable(), controllable()];
+    c.forEach((x) => runShadow({ ...base, call: x.call }));
+    await flush();
+    expect(c.map((x) => x.call.mock.calls.length)).toEqual([1, 1, 0]);
+    c[0].release();
+    c[1].release();
+    await flush();
+  });
+
+  it('a failed skip-record write does not throw or leak a slot', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    GenerationLog.create.mockRejectedValue(new Error('mongo down'));
+    const a = controllable();
+    const b = controllable();
+    runShadow({ ...base, call: a.call });
+    runShadow({ ...base, call: b.call });
+    expect(() => runShadow({ ...base, call: jest.fn() })).not.toThrow(); // over the cap -> skip path
+    await flush();
+    a.release();
+    b.release();
+    await flush();
+    expect(_inFlightForTests()).toBe(0);
+    warn.mockRestore();
   });
 });
