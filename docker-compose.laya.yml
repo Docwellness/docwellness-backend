@@ -8,38 +8,41 @@
 # (or run standalone with `docker compose -f docker-compose.laya.yml up` if
 # you already have Mongo/Redis running separately for local dev).
 #
-# TODO before first use: confirm the Laya project publishes a prebuilt
-# image (check the upstream Laya repository/registry) and set `image:`
-# below accordingly. If no image is published, building one is a Stage B
-# follow-up (a Dockerfile.laya), not something fabricated here.
+# The image is built from Dockerfile.laya (laya[serve] from PyPI, CPU-only
+# torch). First request downloads checkpoint weights into the model-cache
+# volume, so keep LAYA_PRELOAD=1 outside throwaway local runs - a cold lazy
+# load takes longer than LAYA_TIMEOUT_MS and would soft-fail the call.
 
 services:
   laya:
-    image: laya-ai/laya:latest # placeholder - confirm actual image/tag before use
+    build:
+      context: .
+      dockerfile: Dockerfile.laya
     restart: unless-stopped
     environment:
       LAYA_DEVICE: cpu
+      LAYA_JEV_STRICT: '1'
       # Keep at or below the number of PHYSICAL cores available to Laya -
       # never assume all host cores are free (the backend and any other
       # local services need their share too). Tune with a load test before
       # trusting a number - see docs/laya-deployment.md.
       LAYA_THREADS: ${LAYA_THREADS:-2}
-      LAYA_PRELOAD: ${LAYA_PRELOAD:-0}
-      LAYA_MODELS: ${LAYA_MODEL:-laya-typed-decisions}
+      LAYA_PRELOAD: ${LAYA_PRELOAD:-1}
+      LAYA_MODELS: typed-decisions # preload list uses short names (english, multilingual, typed-decisions)
       LAYA_API_KEY: ${LAYA_API_KEY}
     # No `ports:` mapping to the host - only the `backend` service (on the
     # same Docker network) can reach Laya, by its service name. This is the
     # local-dev analogue of "bind to an internal network only, never expose
     # publicly" - see config/environment.js's laya.baseUrl comment.
     volumes:
-      - laya-model-cache:/root/.cache/laya # persist downloaded model weights across restarts
+      - laya-model-cache:/models # persist downloaded model weights across restarts
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
+      test: ['CMD', 'python', '-c', "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
-    user: '1000:1000' # non-root, per docs/laya-deployment.md's security section
+      start_period: 180s
+    # non-root: Dockerfile.laya runs as uid 1000
 
   backend:
     environment:
@@ -47,7 +50,7 @@ services:
       LAYA_MODE: ${LAYA_MODE:-off}
       # Internal Docker DNS by service name - separate containers do not
       # share a localhost network namespace, so this is never 127.0.0.1.
-      LAYA_BASE_URL: http://laya:8080
+      LAYA_BASE_URL: http://laya:8000
       LAYA_API_KEY: ${LAYA_API_KEY}
       LAYA_MODEL: ${LAYA_MODEL:-laya-typed-decisions}
     depends_on:

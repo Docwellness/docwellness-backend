@@ -16,7 +16,7 @@ running separately for local dev).
 
 This starts a `laya` service on the compose network with no host port published — only
 the `backend` service (same Docker network) can reach it, by service name
-(`http://laya:8080`), never `127.0.0.1`. Before first use:
+(`http://laya:8000`), never `127.0.0.1`. Before first use:
 
 1. Confirm the actual Laya project publishes a prebuilt image and set the `image:`
    field in `docker-compose.laya.yml` accordingly — it currently has a placeholder. If
