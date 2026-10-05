@@ -197,6 +197,14 @@ describe('Stage B shadow-wiring invariant', () => {
     expect(importers).toEqual([...ALLOWED].sort());
   });
 
+  it('the diet_plan_review reference stores a risk-flag COUNT, never the flag names (health-adjacent)', () => {
+    const { src } = files.find((f) => f.rel === 'controllers/dietician/dietPlanController.js');
+    const hook = src.slice(src.indexOf("surface: 'diet_plan_review'"));
+    const reference = hook.match(/reference:\s*\{([^}]*)\}/)[1];
+    expect(reference).toMatch(/riskFlagCount/);
+    expect(reference).not.toMatch(/riskFlags/);
+  });
+
   it('those call sites use it only inside runShadow and never await a Laya call', () => {
     for (const rel of ALLOWED) {
       const { src } = files.find((f) => f.rel === rel);

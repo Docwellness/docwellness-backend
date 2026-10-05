@@ -1248,7 +1248,10 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engin
     refId: dietPlan._id,
     inputHash,
     requestId,
-    reference: { riskFlags: newRiskFlags, warningCount: newValidationWarnings.length, attemptsUsed },
+    // Only the COUNT of risk flags is stored, never which ones: names like
+    // isMinor are health-adjacent, and the stored reference only needs to say
+    // "did the deterministic checks raise anything" to compare against Laya.
+    reference: { riskFlagCount: newRiskFlags.length, warningCount: newValidationWarnings.length, attemptsUsed },
     call: () =>
       requiresDieticianReview({
         decisionSummary: {

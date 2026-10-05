@@ -175,9 +175,12 @@ the new one passes its health check.
 
 ## Before enabling another surface
 
-- **`diet_plan_review`:** its stored `reference` includes `riskFlags` (e.g. `isMinor`), which is
-  health-adjacent. Remove or generalise that before enabling, to honour "do not log unnecessary
-  personal health information" (plan §20). Then add it to `LAYA_SHADOW_SURFACES`.
+- **`diet_plan_review`:** its stored `reference` now holds only a risk-flag **count**
+  (`riskFlagCount`), not the flag names (e.g. `isMinor`), so nothing health-adjacent is stored.
+  One thing is still open: the summary **sent to** Laya for the call (not stored) still includes
+  the flag names and up to 10 warning strings. That goes to an internal service only, but
+  decide whether it should be generalised too (open question 12 in the analysis doc) before
+  adding the surface to `LAYA_SHADOW_SURFACES`.
 - Re-run the load test with the added traffic, and watch backend latency while it runs.
 
 ## Data hygiene

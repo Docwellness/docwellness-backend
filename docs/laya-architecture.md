@@ -124,7 +124,7 @@ fire-and-forget and invisible to the response:
 | Surface | Where | Laya call | Stored `reference` for comparison |
 |---|---|---|---|
 | `recipe_classification` | `uploadRecipieController.generateRecipeWithAI`, after the success log | `classifyRecipe` | the `servingTime` the dietician requested |
-| `diet_plan_review` | `dietPlanController.runDietPlanGeneration`, after the success log | `requiresDieticianReview` | the deterministic `riskFlags`, warning count, attempts used |
+| `diet_plan_review` | `dietPlanController.runDietPlanGeneration`, after the success log | `requiresDieticianReview` | risk-flag count (not the flag names), warning count, attempts used |
 
 Nothing is shadowed unless `LAYA_ENABLED=true`, `LAYA_MODE=shadow` and the surface is in
 `LAYA_SHADOW_SURFACES`. `tests/layaDecisionService.test.js` pins that only these two files

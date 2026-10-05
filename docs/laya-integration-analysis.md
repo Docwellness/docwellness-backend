@@ -271,9 +271,10 @@ Decisions or unknowns that the code cannot answer. Each blocks or shapes later w
 
 **Data and privacy**
 
-12. **`diet_plan_review` stores `riskFlags`** (e.g. `isMinor`) in its reference field and sends a
-    summary of validation warnings to Laya. Is that acceptable for an internal service, or must it
-    be generalised before the surface is enabled?
+12. **`diet_plan_review` and health-adjacent data.** The stored reference now holds only a
+    risk-flag count (done 2026-10-05). The summary *sent to* Laya for the call (not stored) still
+    contains the flag names (e.g. `isMinor`) and up to 10 warning strings. Is that acceptable for an
+    internal service, or must it be generalised before the surface is enabled?
 13. **Preference-matching and compatibility datasets** need user-profile fields. Which fields are
     safe to put in a committed test file (the README says no personal health information)?
 
