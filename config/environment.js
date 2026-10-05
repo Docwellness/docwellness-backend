@@ -96,6 +96,10 @@ module.exports = {
     enabled: process.env.LAYA_ENABLED === 'true',
     // 'off' | 'shadow' (log decisions, never affect the response) | 'live'
     mode: process.env.LAYA_MODE || 'off',
+    // Which decisions run in shadow mode (services/layaShadowService.js) -
+    // comma-separated surface names, e.g. 'recipe_classification,diet_plan_review'.
+    // Empty (default) shadows nothing even with LAYA_MODE=shadow.
+    shadowSurfaces: (process.env.LAYA_SHADOW_SURFACES || '').split(',').map((x) => x.trim()).filter(Boolean),
     // Internal-only base URL (e.g. Coolify's internal network hostname) -
     // must never be a publicly reachable address. See docs/laya-deployment.md.
     baseUrl: process.env.LAYA_BASE_URL,

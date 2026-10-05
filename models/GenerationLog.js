@@ -53,6 +53,11 @@ const generationLogSchema = new mongoose.Schema(
       enum: ['off', 'shadow', 'live', null],
       default: null,
     },
+    // Which decision a shadow row is for (services/layaShadowService.js).
+    layaSurface: {
+      type: String,
+      default: null,
+    },
     layaDecisions: {
       type: mongoose.Schema.Types.Mixed,
       default: null,

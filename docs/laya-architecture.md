@@ -115,3 +115,18 @@ actually writes to them, alongside the existing `GenerationLog.create(...)` call
 equivalent, simpler shape (single OpenAI call, no outer retry loop today). A shadow-mode
 `classifyRecipe` call after generation, logged the same way, is the natural first
 integration point there — deferred to Stage B alongside the diet-plan wiring.
+
+## Stage B status: shadow wiring (implemented)
+
+`services/layaShadowService.js` (`runShadow`) is wired at exactly two call sites, both
+fire-and-forget and invisible to the response:
+
+| Surface | Where | Laya call | Stored `reference` for comparison |
+|---|---|---|---|
+| `recipe_classification` | `uploadRecipieController.generateRecipeWithAI`, after the success log | `classifyRecipe` | the `servingTime` the dietician requested |
+| `diet_plan_review` | `dietPlanController.runDietPlanGeneration`, after the success log | `requiresDieticianReview` | the deterministic `riskFlags`, warning count, attempts used |
+
+Nothing is shadowed unless `LAYA_ENABLED=true`, `LAYA_MODE=shadow` and the surface is in
+`LAYA_SHADOW_SURFACES`. `tests/layaDecisionService.test.js` pins that only these two files
+use Laya and never `await` it. `shouldRegenerate`/`requiresDieticianReview` still have no
+live (`LAYA_MODE=live`) effect anywhere.

@@ -7,6 +7,9 @@
  * Stage A invariant that no live traffic path has been touched.
  */
 
+const fs = require('fs');
+const path = require('path');
+
 const realFetch = global.fetch;
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -160,23 +163,34 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
   });
 });
 
-describe('Stage A invariant', () => {
-  it('no controller or route imports layaDecisionService yet', () => {
-    // eslint-disable-next-line global-require
-    const { execSync } = require('child_process');
-    let output;
-    try {
-      output = execSync("grep -rl \"layaDecisionService\" controllers routes", {
-        cwd: `${__dirname}/..`,
-      }).toString();
-    } catch (err) {
-      // grep exits 1 when it finds nothing - that's the expected/passing case.
-      if (err.status === 1) {
-        output = '';
-      } else {
-        throw err;
-      }
+describe('Stage B shadow-wiring invariant', () => {
+  // Only these two call sites may use Laya, and only through runShadow
+  // (services/layaShadowService.js): never awaited, never feeding a response.
+  const ALLOWED = [
+    'controllers/dietician/dietPlanController.js',
+    'controllers/dietician/uploadRecipieController.js',
+  ];
+
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]
+    );
+  const root = path.join(__dirname, '..');
+  const files = ['controllers', 'routes']
+    .flatMap((d) => walk(path.join(root, d)))
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => ({ rel: path.relative(root, f).split(path.sep).join('/'), src: fs.readFileSync(f, 'utf8') }));
+
+  it('only the two shadow call sites import layaDecisionService', () => {
+    const importers = files.filter((f) => f.src.includes('layaDecisionService')).map((f) => f.rel).sort();
+    expect(importers).toEqual([...ALLOWED].sort());
+  });
+
+  it('those call sites use it only inside runShadow and never await a Laya call', () => {
+    for (const rel of ALLOWED) {
+      const { src } = files.find((f) => f.rel === rel);
+      expect(src).toContain('runShadow(');
+      expect(src).not.toMatch(/await\s+(runShadow|classifyRecipe|requiresDieticianReview|shouldRegenerate|scoreRecipe|checkRecipeCompatibility)/);
     }
-    expect(output.trim()).toBe('');
   });
 });

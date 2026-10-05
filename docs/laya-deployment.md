@@ -83,6 +83,7 @@ every field added to `GenerationLog` in Stage A is additive/optional, and nothin
 |---|---|---|
 | `LAYA_ENABLED` | `false` | Master kill switch. Must stay `false` in prod until the evaluation dataset (`docs/laya-evaluation.md`) and shadow-mode review are complete. |
 | `LAYA_MODE` | `off` | `off` \| `shadow` \| `live` — see `docs/laya-architecture.md`. |
+| `LAYA_SHADOW_SURFACES` | empty | Comma-separated shadow surfaces: `recipe_classification`, `diet_plan_review`. Shadow only runs when `LAYA_ENABLED=true`, `LAYA_MODE=shadow` AND the surface is listed - so each decision is switched on independently. Rows land in `GenerationLog` with `layaMode: 'shadow'` and `layaSurface`. |
 | `LAYA_BASE_URL` | unset | Internal-only address. Never a public URL. |
 | `LAYA_API_KEY` | unset | Bearer token, set via Coolify secrets in prod. |
 | `LAYA_MODEL` | `laya-typed-decisions` | See `docs/laya-evaluation.md` for why this default, not the base checkpoint. |

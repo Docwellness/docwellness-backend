@@ -30,6 +30,8 @@ const {
   componentsAreDerivable,
 } = require('../../utils/coreIngredientHeuristic');
 const fs = require('fs');
+const { runShadow } = require('../../services/layaShadowService');
+const { classifyRecipe } = require('../../services/layaDecisionService');
 
 const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
   crypto
@@ -442,6 +444,18 @@ exports.generateRecipeWithAI = async (req, res, next) => {
       latencyMs: Date.now() - generationStartedAt,
       warnings: previewRecipe.warnings,
       succeeded: true,
+    });
+
+    // Shadow-mode only (no-op unless enabled): log what Laya would classify
+    // this recipe as, next to the meal slot the dietician asked for. Never
+    // awaited and never affects the response below.
+    runShadow({
+      surface: 'recipe_classification',
+      kind: 'recipe',
+      dieticianId: req.user._id,
+      inputHash,
+      reference: { servingTime },
+      call: () => classifyRecipe({ recipe: previewRecipe }),
     });
 
     return res.status(200).json({
