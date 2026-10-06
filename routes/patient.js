@@ -176,6 +176,18 @@ router.post(
  */
 router.delete('/profile', patientOnly, profileController.deleteAccount);
 
+/**
+ * @route   GET /api/patient/data-deletion/categories
+ * @desc    Data categories the patient can choose to delete
+ */
+router.get('/data-deletion/categories', patientOnly, profileController.getDeletableDataCategories);
+
+/**
+ * @route   POST /api/patient/data-deletion
+ * @desc    Delete selected data categories (or the whole account); password required
+ */
+router.post('/data-deletion', patientOnly, profileController.requestDataDeletion);
+
 // ==========================================
 // Health Profile Routes
 // ==========================================
