@@ -385,6 +385,32 @@ Whatever is measured, the bar is the same as for slots: **beat a simple trained 
 dietician-reviewed data**, at an acceptable token cost (find the cheapest prompt first with the ablation harness),
 before anything moves past shadow. Until then Laya earns no surface.
 
+### Category experiment (2026-10-06, production recipes, 45 recipes, 9 categories, 5 each)
+
+The one decision measurable with today's data: can Laya recover the dietician-set `category` from the recipe
+name (and ingredients)? `category` and `cuisine` (a near copy of it) were never sent. Agreement with the
+existing label, **not accuracy**; the label mixes cuisine, diet and product type.
+
+| Method | Tokens | Time per call | Mean rank (chance 5.0) | Top-1 (11%) | Top-2 (22%) | Macro AUC (0.5) |
+|---|---|---|---|---|---|---|
+| Laya, name only | 87 | 2.1 s | 3.16 | 40% | 56% | 0.81 |
+| Laya, name + ingredients | 117 | 2.8 s | 3.20 | 42% | 56% | 0.80 |
+| Naive Bayes, name only (trained on the labels) | - | - | 2.72 | 42% | 53% | 0.77 |
+| Naive Bayes, name + ingredients (trained on the labels) | - | - | 2.16 | 49% | 73% | 0.84 |
+
+- **A tie, not a win.** With 45 recipes, differences under ~0.05 AUC are noise: Laya (0.81) is level with the
+  trained baseline (0.77-0.84). This differs from meal slots, where the baseline was clearly ahead.
+- **Laya needs no training data and ingredients again did not help it** (117 vs 87 tokens, same result).
+- **The two make different mistakes.** Laya is right on categories with an everyday meaning (Smoothies & Drinks
+  100% vs baseline 0%; Supplements 100% vs 80%) and wrong where the label is a house convention it cannot
+  know (Detox 0% vs 80%, Healthy Bowls 0% vs 40%, Mediterranean 20% vs 80%). Per-category results rest on 5
+  recipes each, so every figure moves in steps of 20 points.
+- **Not usable as an automatic category yet:** top-1 is 40%, top-2 56%. Some "disagreements" may be wrong
+  labels (`category` defaults to Indian), which this experiment cannot tell apart from Laya's errors.
+- **The pause stands.** Nothing here unlocks a surface. The only untested idea it supports: combining the
+  two (Laya for everyday categories, the baseline for conventions), and having a dietician judge the cases
+  where Laya's top pick differs from the stored label.
+
 ## Limits of this report
 
 - One VM, one day, one operator. Latency was measured with fixture payloads.
