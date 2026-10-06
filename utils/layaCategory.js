@@ -165,7 +165,22 @@ function leaveOneOutBaseline(recipes, classes, { withIngredients = false } = {})
   return out;
 }
 
+/** One Laya call with a short wait-and-retry while Laya is busy (HTTP 503). */
+async function askWithRetry(askLaya, request, { retries = 3, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), retryDelayMs = 3000 } = {}) {
+  for (let attempt = 0; ; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await askLaya(request);
+    if (!r.ok && /HTTP 503/.test(r.detail || '') && attempt < retries) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(retryDelayMs);
+      continue;
+    }
+    return r;
+  }
+}
+
 module.exports = {
+  askWithRetry,
   QUESTION_ID,
   categoryKey,
   selectClasses,

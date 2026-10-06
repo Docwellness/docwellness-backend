@@ -29,6 +29,7 @@ const {
   selectClasses,
   buildCategoryRequest,
   categoryProbabilities,
+  askWithRetry,
   categoryMetrics,
   leaveOneOutBaseline,
 } = require('../utils/layaCategory');
@@ -42,24 +43,8 @@ function parseArgs(argv) {
   return out;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pct = (v) => (v == null ? 'n/a' : `${Math.round(v * 100)}%`);
 const f2 = (v) => (v == null ? 'n/a' : Number(v).toFixed(2));
-
-/** One Laya call with a short wait-and-retry while Laya is busy (HTTP 503). */
-async function askWithRetry(askLaya, request, retries = 3) {
-  let r;
-  for (let attempt = 0; ; attempt += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    r = await askLaya(request);
-    if (!r.ok && /HTTP 503/.test(r.detail || '') && attempt < retries) {
-      // eslint-disable-next-line no-await-in-loop
-      await sleep(3000);
-      continue;
-    }
-    return r;
-  }
-}
 
 (async () => {
   const args = parseArgs(process.argv);

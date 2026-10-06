@@ -263,6 +263,35 @@ under ~0.04 AUC are within noise; confirm a winner on dietician-reviewed data be
 The method is generic: add a variant to `utils/layaPrompts.js` (or a new question's variants) to
 reuse it for the next Laya question.
 
+## Category review: who is right when Laya and the stored category disagree
+
+The category experiment (`scripts/laya-category-experiment.js`) found Laya level with a trained baseline
+at agreeing with the stored `category`. Agreement is not accuracy: a stored category can be wrong
+(`category` defaults to Indian), so some "disagreements" may be Laya being right. This review answers it.
+
+```
+# 1. in the backend Terminal (quiet time; ~2 min; Laya must be running)
+node scripts/laya-category-review-export.js --stdout > category-review.txt     # or copy the two blocks from the screen
+# 2. split the output into the two CSV blocks it marks: SHEET (send to the dietician) and KEY (keep)
+# 3. the dietician fills the sheet; then, on any machine:
+node scripts/laya-category-review-import.js --sheet=category-review-sheet.csv --key=category-review-key.csv
+```
+
+**Instructions for the reviewer.** Each row is a recipe with two possible categories, A and B, in random
+order. Do not try to guess which came from where. In `better_option` write one of:
+
+| Write | When |
+|---|---|
+| `A` or `B` | that category fits the recipe better |
+| `both` | both are reasonable (e.g. a recipe that is genuinely Healthy Bowls and Mediterranean) |
+| `neither` | neither fits; put the right one in `correct_category` |
+| `unsure` | you cannot tell from the recipe |
+
+Fill `reviewed_by` with your name on every row you answered. Leave a row empty to skip it (it stays pending).
+The key file says which option was the stored category and which was Laya's; scoring joins them by recipe id,
+so keep the `id` column. The sheet covers only the recipes where the two disagree, so the result is
+"are Laya's disagreements mistakes or catches?", not Laya's overall accuracy.
+
 ## Load test (integration plan section 24)
 
 ```
