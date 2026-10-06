@@ -19,8 +19,6 @@ const {
 const { sendPushToTokens } = require('../../utils/push');
 const { getChatIO } = require('../../chat');
 const config = require('../../config/environment');
-const { runShadow } = require('../../services/layaShadowService');
-const { requiresDieticianReview } = require('../../services/layaDecisionService');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
 const { generateDietPlanDeterministically } = require('../../services/recipeSelectionEngine');
 const { balanceWeek } = require('../../services/dietPlanAutoBalanceService');
@@ -878,7 +876,7 @@ exports.sendPaymentRequest = async (req, res, next) => {
  */
 exports.runDietPlanGeneration = runDietPlanGeneration;
 
-async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine = 'ai', requestId }) {
+async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engine = 'ai' }) {
   const patientId = dietPlan.patientId?._id?.toString() || dietPlan.patientId?.toString();
   const firstConsultationId =
     dietPlan.firstConsultation?._id?.toString() || dietPlan.firstConsultation?.toString();
@@ -1238,32 +1236,6 @@ async function runDietPlanGeneration({ dietPlan, dieticianId, weekNumbers, engin
     console.error('Failed to write GenerationLog entry:', logError.message);
   }
 
-  // Shadow-mode only (no-op unless enabled): log whether Laya would flag this
-  // generation for dietician review, next to the risk flags the deterministic
-  // checks actually raised. Never awaited, never feeds riskFlags/warnings.
-  runShadow({
-    surface: 'diet_plan_review',
-    kind: 'dietPlan',
-    dieticianId,
-    refId: dietPlan._id,
-    inputHash,
-    requestId,
-    // Only the COUNT of risk flags is stored, never which ones: names like
-    // isMinor are health-adjacent, and the stored reference only needs to say
-    // "did the deterministic checks raise anything" to compare against Laya.
-    reference: { riskFlagCount: newRiskFlags.length, warningCount: newValidationWarnings.length, attemptsUsed },
-    call: () =>
-      requiresDieticianReview({
-        decisionSummary: {
-          riskFlags: newRiskFlags,
-          warningCount: newValidationWarnings.length,
-          warnings: newValidationWarnings.slice(0, 10).map((w) => String(w).slice(0, 200)),
-          attemptsUsed,
-          engine,
-        },
-      }),
-  });
-
   return { ok: true, validationWarnings: newValidationWarnings, riskFlags: newRiskFlags };
 }
 
@@ -1510,7 +1482,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
     // generateWeekPlan saves generatedPlan/validationWarnings/etc. without
     // touching status, which is what a later regeneration (that must not
     // downgrade an already-Finalized/Active plan) needs too.
-    const generationResult = await generateWeekPlan({ dietPlan, dieticianId, weekNumbers, requestId: req.id });
+    const generationResult = await generateWeekPlan({ dietPlan, dieticianId, weekNumbers });
     if (!generationResult.ok) {
       return res.status(generationResult.status).json({ success: false, message: generationResult.message });
     }
@@ -1671,7 +1643,6 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
       dietPlan,
       dieticianId,
       weekNumbers: sortedWeekNumbers,
-      requestId: req.id,
     });
     if (!generationResult.ok) {
       return res.status(generationResult.status).json({ success: false, message: generationResult.message });

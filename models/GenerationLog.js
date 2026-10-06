@@ -31,12 +31,6 @@ const generationLogSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    // Backend request id (req.id) - set on Laya shadow rows so they can be
-    // matched to request logs; null on ordinary generation rows.
-    requestId: {
-      type: String,
-      default: null,
-    },
     latencyMs: {
       type: Number,
       default: null,
@@ -48,44 +42,6 @@ const generationLogSchema = new mongoose.Schema(
     succeeded: {
       type: Boolean,
       default: true,
-    },
-    // Laya decision-log fields (see services/layaDecisionService.js) - all
-    // additive/optional so existing recipe/dietPlan/exercise writes are
-    // untouched. Decision metadata only, never PII/PHI. Nothing writes
-    // these yet in Stage A; the schema is ready for Stage B's shadow-mode
-    // wiring (see docs/laya-architecture.md).
-    layaMode: {
-      type: String,
-      enum: ['off', 'shadow', 'live', null],
-      default: null,
-    },
-    // Which decision a shadow row is for (services/layaShadowService.js).
-    layaSurface: {
-      type: String,
-      default: null,
-    },
-    layaDecisions: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
-    },
-    layaLatencyMs: {
-      type: Number,
-      default: null,
-    },
-    layaConfidence: {
-      type: Number,
-      default: null,
-    },
-    layaTimedOut: {
-      type: Boolean,
-      default: false,
-    },
-    // Why a shadow call produced no answer: { reason: 'disabled'|'timeout'|
-    // 'error'|'skipped', detail } - 'skipped' means the in-flight cap was hit
-    // and Laya was not called. detail is a short string, never request text.
-    layaError: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
     },
   },
   {

@@ -83,43 +83,6 @@ module.exports = {
   typesafe: {
     apiKey: process.env.TYPESAFE_API_KEY,
   },
-  // Laya - a self-hosted, Jev-compatible typed-decision service (see
-  // services/layaDecisionService.js) for recipe/diet-plan classification,
-  // scoring, compatibility and review-gating decisions. Scoped strictly to
-  // structured decisions - never generation, never nutrition math, never
-  // the sole authority on safety-critical restrictions. Disabled by default
-  // (enabled: false) until Stage B's dietician-reviewed evaluation dataset
-  // and shadow-mode results justify turning it on - see
-  // docs/laya-evaluation.md. Stage A: nothing in a request path reads this
-  // block yet.
-  laya: {
-    enabled: process.env.LAYA_ENABLED === 'true',
-    // 'off' | 'shadow' (log decisions, never affect the response) | 'live'
-    mode: process.env.LAYA_MODE || 'off',
-    // Which decisions run in shadow mode (services/layaShadowService.js) -
-    // comma-separated surface names, e.g. 'recipe_classification,diet_plan_review'.
-    // Empty (default) shadows nothing even with LAYA_MODE=shadow.
-    shadowSurfaces: (process.env.LAYA_SHADOW_SURFACES || '').split(',').map((x) => x.trim()).filter(Boolean),
-    // Max shadow calls in flight at once (services/layaShadowService.js). Laya
-    // serves one request at a time (~5-6 s each on the prod VM), so past ~2 the
-    // queue outlasts the timeout and congests; extras are skipped and recorded.
-    shadowMaxInFlight: Number(process.env.LAYA_SHADOW_MAX_IN_FLIGHT) || 2,
-    // How serving slots are asked (utils/layaSlots.js): 'choice' (default, one
-    // 7-option question, ~1/4 of the cost) or 'noul' (seven yes/no questions,
-    // ~29 s a call on the prod VM and near-0.5 probabilities).
-    slotMode: process.env.LAYA_SLOT_MODE === 'noul' ? 'noul' : 'choice',
-    // Wording of the 'choice' slot request (utils/layaPrompts.js variant id).
-    // Default labels_min: ~82 tokens vs 357 for 'current' (the old request,
-    // with descriptions + protein) at equal agreement with existing labels.
-    // Unknown ids fall back to the default.
-    promptVariant: process.env.LAYA_PROMPT_VARIANT || 'labels_min',
-    // Internal-only base URL (e.g. Coolify's internal network hostname) -
-    // must never be a publicly reachable address. See docs/laya-deployment.md.
-    baseUrl: process.env.LAYA_BASE_URL,
-    apiKey: process.env.LAYA_API_KEY,
-    model: process.env.LAYA_MODEL || 'laya-typed-decisions',
-    timeoutMs: Number(process.env.LAYA_TIMEOUT_MS) || 3000,
-  },
   // Which engine services/dietPlanGenerationService.js uses to build new
   // diet-plan weeks: 'ai' (default, current OpenAI pipeline) or
   // 'deterministic' (the rules-based engine). Flipping this is the entire
