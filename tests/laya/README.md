@@ -271,7 +271,7 @@ at agreeing with the stored `category`. Agreement is not accuracy: a stored cate
 
 ```
 # 1. in the backend Terminal (quiet time; ~2 min; Laya must be running)
-node scripts/laya-category-review-export.js --stdout > category-review.txt     # or copy the two blocks from the screen
+node scripts/laya-category-review-export.js --stdout     # prints two CSV blocks; copy each out of the Terminal (the container disk is ephemeral)
 # 2. split the output into the two CSV blocks it marks: SHEET (send to the dietician) and KEY (keep)
 # 3. the dietician fills the sheet; then, on any machine:
 node scripts/laya-category-review-import.js --sheet=category-review-sheet.csv --key=category-review-key.csv
