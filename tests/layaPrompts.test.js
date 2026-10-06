@@ -43,9 +43,9 @@ describe('the variants', () => {
     for (const v of VARIANTS) expect(v.label.length).toBeGreaterThan(10);
   });
 
-  it('`current` is EXACTLY the request production sends (so the harness measures production)', async () => {
+  it('`current` is EXACTLY the old (descriptions + protein) request, still available as promptVariant: current', async () => {
     mockFetch.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ answers: {}, usage: {} }) });
-    await classifyRecipe({ recipe });
+    await classifyRecipe({ recipe, promptVariant: 'current' });
     const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
     const built = buildRequest('current', recipe);
     expect(sent.state).toEqual(built.state);

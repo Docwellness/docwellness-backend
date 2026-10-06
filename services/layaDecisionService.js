@@ -30,8 +30,8 @@
  */
 
 const config = require('../config/environment');
-const { buildSlotQuestions, buildSlotChoiceQuestion } = require('../utils/layaSlots');
-const { buildProteinQuestion } = require('../utils/layaPrompts');
+const { buildSlotQuestions } = require('../utils/layaSlots');
+const { buildProteinQuestion, buildRequest, variantById } = require('../utils/layaPrompts');
 
 async function callLaya({ state, questions }) {
   if (!config.laya.enabled) {
@@ -90,8 +90,20 @@ async function callLaya({ state, questions }) {
  * shadow "agreement" figures meaningless). Callers may still pass a recipe that
  * has a servingTime - it is dropped here, so no caller or dataset can leak it.
  */
-async function classifyRecipe({ recipe, slotMode }) {
+const DEFAULT_PROMPT_VARIANT = 'labels_min';
+
+async function classifyRecipe({ recipe, slotMode, promptVariant }) {
   const mode = slotMode || config.laya.slotMode || 'choice';
+  if (mode !== 'noul') {
+    // Default form: one 7-option question, worded by a prompt variant
+    // (utils/layaPrompts.js). Default 'labels_min' (name + category, slot names
+    // only, no protein): -77% input tokens vs 'current' with no loss of
+    // agreement with the existing labels (ablation, 2026-10-06). An unknown
+    // id falls back to the default rather than failing the call.
+    const wanted = promptVariant || config.laya.promptVariant;
+    const id = variantById(wanted) ? wanted : DEFAULT_PROMPT_VARIANT;
+    return callLaya(buildRequest(id, recipe));
+  }
   return callLaya({
     state: {
       name: recipe.name,
@@ -100,10 +112,8 @@ async function classifyRecipe({ recipe, slotMode }) {
       ingredients: (recipe.ingredients || []).map((i) => i.name),
     },
     questions: {
-      // Serving slots (utils/layaSlots.js). 'choice' (default): one question, a
-      // probability per slot, ~1/4 of the cost. 'noul': seven independent yes/no
-      // questions (slower; see LAYA_SLOT_MODE).
-      ...(mode === 'noul' ? buildSlotQuestions() : buildSlotChoiceQuestion()),
+      // Seven independent yes/no slot questions (slower; see LAYA_SLOT_MODE).
+      ...buildSlotQuestions(),
       ...buildProteinQuestion(),
     },
   });

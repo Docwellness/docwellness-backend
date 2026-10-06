@@ -357,9 +357,10 @@ describe('scripts/laya-eval-run.js (end to end against a fake Laya)', () => {
     expect(cat.slots.mode).toBe('choice');
     expect(cat.slots.ranking).toMatchObject({ n: 2, meanBestAcceptedRank: 2.75 });
     expect(cat.slots.ranking.topK[1].rate).toBe(0.5);
-    // what Laya was shown: ONE slot question plus protein (default form), and never the servingTime
-    expect(Object.keys(seen[0].body.questions)).toEqual(['slot_fit', 'protein_level']);
-    expect(JSON.stringify(seen.map((x) => x.body))).not.toMatch(/servingTime|"Dinner"/);
+    // what Laya was shown: ONE slot question (default form), and never the servingTime
+    expect(Object.keys(seen[0].body.questions)).toEqual(['slot_fit']);
+    expect(JSON.stringify(seen.map((x) => x.body))).not.toMatch(/servingTime/);
+    expect(JSON.stringify(seen.map((x) => x.body.state))).not.toMatch(/Dinner/);
     expect(report.servedModels).toEqual(['laya-rl-agent']);
     expect(seen).toHaveLength(2); // the two unreviewed rows never reached Laya
     expect(seen.every((s) => s.auth === 'Bearer k')).toBe(true);

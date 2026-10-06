@@ -66,6 +66,7 @@ MongoDB: separate Oracle VM, private address, TLS      <- shadow rows live here
 | `LAYA_API_KEY` | same secret as Laya | |
 | `LAYA_TIMEOUT_MS` | `30000` | Raised from 15000 for the single-core configuration (8 s calls). Fine for fire-and-forget shadow calls. **Far too long for `live`.** |
 | `LAYA_SHADOW_MAX_IN_FLIGHT` | `1` (code default 2) | Cap on concurrent shadow calls. Past it, a call is **skipped** (not sent to Laya) and recorded. Keeps a burst of generations from filling Laya's single lane with work that will time out. Keep it at or below Laya's `LAYA_MAX_CONCURRENT`. |
+| `LAYA_PROMPT_VARIANT` | `labels_min` (default) | Wording of the `choice` slot request (`utils/layaPrompts.js`). `labels_min` = name + category, slot names only, no protein: ~82 input tokens, ~2.2 s a call on the VM. `current` = the old request with slot descriptions + `protein_level` (~357 tokens, ~10.5 s). `labels_protein` keeps protein at ~251 tokens. Unknown ids fall back to the default. Choice was made on agreement with existing labels, not accuracy (ablation 2026-10-06). Applies to shadow calls and the evaluation scripts; has no effect with `LAYA_SLOT_MODE=noul`. |
 | `LAYA_SLOT_MODE` | `choice` (default) | How serving slots are asked: `choice` = one 7-option question (~1/4 of the cost), `noul` = seven yes/no questions (measured ~29 s a call on the VM, so it needs `LAYA_TIMEOUT_MS` well above 30000). Applies to shadow calls and the evaluation scripts.
 
 Env changes only take effect after the app is **redeployed**; there is no hot toggle.

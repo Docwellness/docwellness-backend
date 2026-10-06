@@ -108,6 +108,11 @@ module.exports = {
     // 7-option question, ~1/4 of the cost) or 'noul' (seven yes/no questions,
     // ~29 s a call on the prod VM and near-0.5 probabilities).
     slotMode: process.env.LAYA_SLOT_MODE === 'noul' ? 'noul' : 'choice',
+    // Wording of the 'choice' slot request (utils/layaPrompts.js variant id).
+    // Default labels_min: ~82 tokens vs 357 for 'current' (the old request,
+    // with descriptions + protein) at equal agreement with existing labels.
+    // Unknown ids fall back to the default.
+    promptVariant: process.env.LAYA_PROMPT_VARIANT || 'labels_min',
     // Internal-only base URL (e.g. Coolify's internal network hostname) -
     // must never be a publicly reachable address. See docs/laya-deployment.md.
     baseUrl: process.env.LAYA_BASE_URL,

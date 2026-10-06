@@ -368,3 +368,10 @@ set to 1 (`LAYA_MAX_CONCURRENT=1`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`). See `docs/lay
 5. (Done) Single-core configuration kept; see `docs/laya-operations.md`.
 
 Do not claim production readiness for `live` until items 1 and 3 are resolved.
+
+## Default prompt changed to `labels_min` (2026-10-06)
+
+Following the ablation above, `classifyRecipe` now sends the `labels_min` request by default (name + category,
+slot names only, no protein question): 82 input tokens instead of 357. The old request remains available as
+`LAYA_PROMPT_VARIANT=current` (or `labels_protein` to keep `protein_level` at 251 tokens). No surface is shadowed,
+so nothing in production changes until shadowing is re-enabled; shadow rows from then on carry no `protein_level`.

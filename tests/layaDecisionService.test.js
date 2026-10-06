@@ -169,14 +169,31 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     expect(requestInit.headers.Authorization).toBe('Bearer test-key');
     const body = JSON.parse(requestInit.body);
     expect(body.model).toBe('laya-typed-decisions');
-    // default form: ONE 7-option slot question plus the protein tier
-    expect(Object.keys(body.questions)).toEqual(['slot_fit', 'protein_level']);
+    // default form (labels_min): ONE 7-option slot question, no protein tier
+    expect(Object.keys(body.questions)).toEqual(['slot_fit']);
     expect(body.questions.slot_fit.type).toBe('choice');
     expect(Object.keys(body.questions.slot_fit.criteria)).toEqual([
       'morning_drink', 'breakfast', 'brunch', 'lunch', 'evening_snack', 'dinner', 'night_drink',
     ]);
     expect(body.questions).not.toHaveProperty('meal_type_fit');
-    expect(body.questions.protein_level.type).toBe('choice');
+    expect(body.questions).not.toHaveProperty('protein_level');
+  });
+
+  it('can still send the old, longer request (descriptions + protein) via promptVariant or LAYA_PROMPT_VARIANT', async () => {
+    mockFetch.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ answers: {}, usage: {} }) });
+    config.laya.enabled = true;
+
+    await classifyRecipe({ recipe, promptVariant: 'current' }); // per call
+    expect(Object.keys(JSON.parse(mockFetch.mock.calls[0][1].body).questions)).toEqual(['slot_fit', 'protein_level']);
+
+    config.laya.promptVariant = 'labels_protein'; // by configuration
+    await classifyRecipe({ recipe });
+    expect(Object.keys(JSON.parse(mockFetch.mock.calls[1][1].body).questions)).toEqual(['slot_fit', 'protein_level']);
+
+    config.laya.promptVariant = 'no_such_variant'; // unknown id falls back to the default
+    await classifyRecipe({ recipe });
+    expect(Object.keys(JSON.parse(mockFetch.mock.calls[2][1].body).questions)).toEqual(['slot_fit']);
+    config.laya.promptVariant = undefined;
   });
 
   it('can ask the seven yes/no questions instead, per call or by configuration (LAYA_SLOT_MODE)', async () => {
@@ -205,13 +222,20 @@ describe('layaDecisionService - LAYA_ENABLED=true', () => {
     await classifyRecipe({ recipe }); // the shared fixture has servingTime: 'Dinner'
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.state).toEqual({
+    expect(body.state).toEqual({ name: 'Paneer Butter Masala', category: 'High Protein' }); // labels_min
+    await classifyRecipe({ recipe, promptVariant: 'current' });
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).state).toEqual({
       name: 'Paneer Butter Masala',
       cuisine: 'North Indian',
       category: 'High Protein',
       ingredients: ['Paneer', 'Tomato', 'Butter'],
     });
-    expect(JSON.stringify(body)).not.toMatch(/servingTime|"Dinner"/);
+    // slot names are legitimately the option text, so check what describes the RECIPE
+    for (const call of mockFetch.mock.calls) {
+      const sent = JSON.parse(call[1].body);
+      expect(JSON.stringify(sent)).not.toMatch(/servingTime/);
+      expect(JSON.stringify(sent.state)).not.toMatch(/Dinner/);
+    }
   });
 });
 
