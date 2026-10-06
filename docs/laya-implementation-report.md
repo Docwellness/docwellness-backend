@@ -411,6 +411,37 @@ existing label, **not accuracy**; the label mixes cuisine, diet and product type
   two (Laya for everyday categories, the baseline for conventions), and having a dietician judge the cases
   where Laya's top pick differs from the stored label.
 
+#### Dietician review of the disagreements (2026-10-06, 27 recipes, blind A/B)
+
+Of the 45 sampled recipes Laya agreed with the stored category on 18 and disagreed on 27. A dietician
+judged each disagreement blind (options A/B in random order, key kept apart):
+
+| Verdict | Count | Share |
+|---|---|---|
+| Stored category better | 16 | 59% |
+| Laya's pick better | 7 | 26% |
+| Both acceptable | 1 | 4% |
+| Neither (reviewer named the right one) | 3 | 11% |
+
+- **Laya's disagreements are mostly its mistakes:** when one was clearly better, Laya's was in 7 of 23
+  (30%, 95% interval 16-51%). It follows its everyday sense of a word (12 of its 27 picks were
+  "Smoothies & Drinks": soups, porridge, chia pudding, detox waters, curd) and cannot know house
+  conventions (Detox drinks 5/5, Mediterranean salads 4/4 went to the stored label).
+- **The stored labels are not clean either.** In 10 of the 27 disagreements (7 Laya, 3 neither) the stored
+  category was not the best one. Examples: oats idli, fruit chaat and ragi cookies filed under Healthy Bowls
+  (Indian); two grilled-chicken recipes under American (Mediterranean marinade); flaxseed water and warm almond
+  milk, a roasted foxnut mix and a chia pudding under Vegan Specials, where the reviewer says "vegan" is
+  incidental. The two trail-mix recipes are filed under different categories. This is a data-quality
+  finding for the team, independent of Laya.
+- **Laya's confidence did not separate its hits from its misses** (mean top probability 0.46 on its 7 hits,
+  0.40 on the 16 where the stored label was better; the ranges overlap).
+- **As a "possible mislabel" flag** it would send a dietician about 3 false alarms for every 2 real findings
+  (10 of 27, roughly 22-57%). A trained baseline might do the same job; that was not measured.
+- Limits: one reviewer, 27 disagreements only (agreements were not reviewed, so recall is unknown), and a
+  sample stratified by category, not representative of all 215 recipes.
+
+Conclusion unchanged: no surface for Laya, the pause stands.
+
 ## Limits of this report
 
 - One VM, one day, one operator. Latency was measured with fixture payloads.
