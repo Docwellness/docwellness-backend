@@ -336,7 +336,7 @@ set to 1 (`LAYA_MAX_CONCURRENT=1`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`). See `docs/lay
 | ✅ | Sensitive information not unnecessarily logged | Shadow rows hold decision metadata only; the diet-plan reference now stores a risk-flag count, not names |
 | 🟡 | CPU/RAM load testing | Done, with caveats: built-in fixtures not real DB recipes; stages above 1 client are short |
 | 🟡 | Production logging and metrics | Rows and logs exist; **no `laya_*` metrics, no alerting** |
-| ❌ | Evaluation dataset | Not started; needs dieticians |
+| ❌ | Evaluation dataset | Blocked on data, not on effort: see "Status: paused" |
 | ❌ | Recipe classification, compatibility and plan validation evaluated | Blocked on the dataset |
 | ❌ | Gradual production rollout | Not started |
 
@@ -350,6 +350,40 @@ set to 1 (`LAYA_MAX_CONCURRENT=1`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`). See `docs/lay
 - **Not built:** `validate_diet_plan()`, candidate filtering, compatibility wiring, PASS/FAIL/UNCERTAIN
   gating.
 - **Manual testing wrote production rows** (all 25), from a test account, to a production database.
+
+## Status: paused until the data exists (2026-10-06)
+
+Laya integration is **paused at the current state**. The infrastructure, abstraction, fail-soft behaviour,
+shadow mode, load test and measurement tooling are complete and safe to leave as they are (nothing is shadowed,
+`LAYA_ENABLED`/`LAYA_SHADOW_SURFACES` are the switches, rollback is configuration only). The reason is
+data, found with `scripts/laya-data-probe.js` on the production database (counts only):
+
+| Plan dataset (section 10) | Production today | Can it be built? |
+|---|---|---|
+| Recipe classification | 215 recipes; 189 vegetarian, 4 non-veg, 4 eggitarian, 18 unflagged; 0 vegan, 0 Jain, 0 `freeFrom`; all have a category | Only for labels that exist. Veg/non-veg is a deterministic check. |
+| Meal type | 215 `servingTime` labels | Yes, and measured: Laya loses to a label-trained baseline (AUC 0.77 vs 0.83, top-2 60% vs 71%). |
+| User-preference matching | 1 patient, 0 plan placements | No |
+| Compatibility | 1 consultation with no allergies, foods to avoid, eating style or cravings filled in | No |
+| Review gating | 0 swap events, 0 edited recipe versions | No: no real "the dietician disagreed" cases |
+
+The plan's "100 examples per decision type" is therefore not reachable yet for three of five types, and the
+fourth (meal type) has been measured without Laya earning a place. The 24 diet-plan generations in the log are
+test runs, not reviewed outcomes. **Do not claim production readiness**; synthetic cases would not change that.
+
+### Criteria to resume (re-measure with `node scripts/laya-data-probe.js`)
+
+Resume evaluation when **all** of the relevant rows are met; each unlocks the decision type named:
+
+| Unlocks | Needed in production | Then do |
+|---|---|---|
+| User-preference matching | Finalized or Active plans with meals in `days[]` for **30+ patients**, each linked to a consultation, ~100+ placements per candidate set | Build the exporter (pseudonymous ids, age band not date of birth, no contact details or free text); measure against a deterministic/category-prior baseline |
+| Compatibility | **100+ consultations** with allergies, foods to avoid or eating style filled in | Deterministic rules stay the authority; measure Laya only on the soft (non-allergen) cases |
+| Review gating | **100+ swap events**, ideally most with a `reason`, or another recorded dietician correction of generated output | Measure whether Laya's confidence flags the cases dieticians corrected |
+| Any further recipe-label work | Vegan, Jain or `freeFrom` labels populated on **100+ recipes** each, or a decision to measure `category` | Run the ablation method (`scripts/laya-prompt-ablation.js`) with a baseline first |
+
+Whatever is measured, the bar is the same as for slots: **beat a simple trained or rule-based baseline on
+dietician-reviewed data**, at an acceptable token cost (find the cheapest prompt first with the ablation harness),
+before anything moves past shadow. Until then Laya earns no surface.
 
 ## Limits of this report
 
@@ -367,7 +401,8 @@ set to 1 (`LAYA_MAX_CONCURRENT=1`, `LAYA_SHADOW_MAX_IN_FLIGHT=1`). See `docs/lay
 4. A per-user flag mechanism for the staged rollout, and `laya_*` metrics.
 5. (Done) Single-core configuration kept; see `docs/laya-operations.md`.
 
-Do not claim production readiness for `live` until items 1 and 3 are resolved.
+Do not claim production readiness for `live` until items 1 and 3 are resolved. Item 1 is blocked on data
+(see "Status: paused" above).
 
 ## Default prompt changed to `labels_min` (2026-10-06)
 

@@ -13,7 +13,7 @@ _Last verified against production: 2026-10-05._
 | Mode | **Shadow infrastructure in place, but no surface is being shadowed.** `recipe_classification` was stopped on 2026-10-05 (`LAYA_SHADOW_SURFACES` emptied): its serving-slot judgement lost to a trivial label-trained baseline and its protein tier is redundant with the nutrition data (`docs/laya-implementation-report.md`). Laya never affects a response. |
 | `diet_plan_review` surface | Wired, **not enabled** (see "Before enabling another surface"). |
 | `LAYA_MODE=live` | **Not allowed** until the evaluation gate in `docs/laya-evaluation.md` is met. |
-| Evaluation dataset | Does not exist yet (human deliverable, `tests/laya/README.md`). |
+| Evaluation dataset | Does not exist, and cannot yet: production has 1 patient, 0 plan placements and 0 swaps (2026-10-06). Integration is **paused** until the criteria in `docs/laya-implementation-report.md` ("Status: paused") are met; `scripts/laya-data-probe.js` re-measures them. |
 | Load test | Run on the VM on 2026-10-05; results in `docs/laya-implementation-report.md`. |
 | Alerting / metrics | **None.** There are no `laya_*` metrics and no alerts; checking is manual (below). |
 
