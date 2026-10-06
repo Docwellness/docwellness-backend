@@ -11,6 +11,7 @@ _Last verified against production: 2026-10-05._
 | | |
 |---|---|
 | Mode | **Shadow infrastructure in place, but no surface is being shadowed.** `recipe_classification` was stopped on 2026-10-05 (`LAYA_SHADOW_SURFACES` emptied): its serving-slot judgement lost to a trivial label-trained baseline and its protein tier is redundant with the nutrition data (`docs/laya-implementation-report.md`). Laya never affects a response. |
+| Laya service | **Stopped on 2026-10-06** (Coolify `docwellness-laya` shows `exited`) to free ~2.2 GB RAM while the integration is paused. The backend's production Laya variables and the `/models` storage were kept, so resuming is: Coolify -> `docwellness-laya` -> **Start**, wait for `running:healthy` (the model is cached, ~1 min), then re-run `scripts/laya-data-probe.js`. The five stale preview-environment Laya variables on the backend were deleted the same day. Scripts that call Laya (`laya-category-experiment.js`, `laya-prompt-ablation.js`, the review exporters) need it started first. |
 | `diet_plan_review` surface | Wired, **not enabled** (see "Before enabling another surface"). |
 | `LAYA_MODE=live` | **Not allowed** until the evaluation gate in `docs/laya-evaluation.md` is met. |
 | Evaluation dataset | Does not exist, and cannot yet: production has 1 patient, 0 plan placements and 0 swaps (2026-10-06). Integration is **paused** until the criteria in `docs/laya-implementation-report.md` ("Status: paused") are met; `scripts/laya-data-probe.js` re-measures them. |
