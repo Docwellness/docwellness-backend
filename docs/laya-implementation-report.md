@@ -265,7 +265,37 @@ The cost is the **question text**, not the recipe: the protein question is ~138 
 descriptions ~106, an ingredient ~4. What this does not say is whether the cheaper prompts lose accuracy.
 `scripts/laya-prompt-ablation.js` measures tokens and agreement-with-labels together, per variant, on the same
 recipes (the slot task is the test case because it has a labelled proxy and a baseline; the surface itself
-stays paused). Results: not yet run.
+stays paused). **Results (2026-10-06, 70 recipes, production VM, 0 errors).** Agreement with existing slot labels,
+**not accuracy**; the reference variant gave identical numbers in two separate runs (Laya is deterministic).
+
+| Variant | Input tokens | Time per call | Mean rank (chance 4.0) | Top-1 (14%) | Top-2 (29%) | Macro AUC (0.5) |
+|---|---|---|---|---|---|---|
+| current (descriptions + protein) | 357 | 10.5 s | 3.09 | 33% | 44% | 0.75 |
+| no protein | 228 (-36%) | 5.4 s | 3.09 | 33% | 44% | 0.75 |
+| slot names only + protein | 251 (-30%) | 5.9 s | 2.49 | 39% | 54% | 0.76 |
+| few-word descriptions, no protein | 140 (-61%) | 3.4 s | 3.06 | 29% | 46% | 0.76 |
+| slot names only | 122 (-66%) | 3.0 s | 2.49 | 39% | 54% | 0.76 |
+| names only, first 5 ingredients | 115 (-68%) | 2.9 s | 2.46 | 37% | 59% | 0.76 |
+| **names only, name + category only** | **82 (-77%)** | **2.2 s** | 2.55 | 30% | 60% | **0.77** |
+| *bag-of-words baseline (trained on the labels)* | - | - | 2.01 | 49% | 71% | 0.83 |
+
+**What it shows.**
+- **More tokens did not buy accuracy here.** Cutting the request by 77% left the AUC at 0.77 (vs 0.75), and
+  "slot names only" ranked slightly better than the full descriptions (mean rank 2.49 vs 3.09; top-2 54% vs 44%).
+  The differences between variants are small (AUC 0.75-0.77, within noise at this sample size), so read it as
+  "the extra text does not help", not "the shortest prompt is better".
+- **The protein question has no effect on the slot answers** (identical with and without it) and costs 129 tokens
+  (+57% over the no-protein request). Its own results were unchanged by the surrounding text (Spearman 0.51,
+  AUC 0.88, within-slot 0.27), and the exact grams are already in the nutrition data.
+- **Laya's slot judgement follows the recipe name and category, not the ingredients:** dropping all but five
+  ingredients, then all of them, changed nothing measurable.
+- **It still loses to the baseline.** The best Laya variants reach AUC 0.76-0.77, top-2 54-60% against the
+  baseline's 0.83 and 71% (the baseline, rerun on production data, gives 49% / 71% / 0.83; this settles the earlier
+  caveat that it had been run on a local copy).
+- **The cost objection is largely removed; the value objection is not.** The cheapest request takes ~2.2 s on the
+  VM (about 27 calls a minute instead of 5.7), but a few lines of code trained on the existing labels are still
+  more accurate at no compute cost.
+
 
 ## Findings and fixes during rollout
 
