@@ -1861,8 +1861,45 @@ exports.submitMealLog = async (req, res, next) => {
       if (loggedItems.length > 0 && receiverId) {
         const recipeIds = loggedItems.map((i) => i.recipeId);
         const recipesInfo = await Recipe.find({ _id: { $in: recipeIds } })
-          .select('name image nutrition')
+          .select('name image nutrition servingSize')
           .lean();
+
+        // Real macros for what was actually eaten. caloriesConsumed is already
+        // assigned-portion calories x servings, and a recipe's macros scale
+        // with its calories, so scale the recipe's own nutrition by
+        // caloriesConsumed / recipe calories.
+        const macroTotals = { protein: 0, carbs: 0, fat: 0, fiber: 0 };
+        loggedItems.forEach((item) => {
+          const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
+          const n = recipe?.nutrition;
+          if (!n) return;
+          const scale = n.calories > 0 ? (item.caloriesConsumed || 0) / n.calories : item.servings || 0;
+          macroTotals.protein += (n.protein || 0) * scale;
+          macroTotals.carbs += (n.carbs || 0) * scale;
+          macroTotals.fat += (n.fats || 0) * scale;
+          macroTotals.fiber += (n.fiber || 0) * scale;
+        });
+
+        // Quantity label = the dietician-assigned amount x servings eaten
+        // (75g assigned, 2 servings -> "150 g"). The app sends the assigned
+        // amount shown in the Log Meal sheet; fall back to the recipe's own
+        // serving size for older clients / quick log.
+        const fmtQty = (n) => (Math.round(n * 10) / 10).toString();
+        let quantityLabel = null;
+        if (loggedItems.length === 1) {
+          const item = loggedItems[0];
+          const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
+          const assignedQty =
+            typeof item.assignedQuantity === 'number' && item.assignedQuantity > 0
+              ? item.assignedQuantity
+              : recipe?.servingSize?.quantity;
+          const assignedUnit = item.assignedUnit || recipe?.servingSize?.unit || '';
+          quantityLabel = assignedQty
+            ? `${fmtQty(assignedQty * item.servings)} ${assignedUnit}`.trim()
+            : `${fmtQty(item.servings)}x`;
+        } else {
+          quantityLabel = `${loggedItems.length} items`;
+        }
 
         const totalCaloriesLogged = loggedItems.reduce(
           (sum, item) => sum + (item.caloriesConsumed || 0),
@@ -1903,6 +1940,11 @@ exports.submitMealLog = async (req, res, next) => {
             itemName: mealNames.join(', '),
             calories: totalCaloriesLogged,
             servings: totalServingsLogged,
+            quantityLabel,
+            protein: Math.round(macroTotals.protein * 10) / 10,
+            carbs: Math.round(macroTotals.carbs * 10) / 10,
+            fat: Math.round(macroTotals.fat * 10) / 10,
+            fiber: Math.round(macroTotals.fiber * 10) / 10,
             servingTime: loggedItems[0]?.servingTime || '',
             totalConsumed: log.totalCalories,
           },
