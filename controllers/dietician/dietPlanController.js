@@ -1357,9 +1357,10 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
     // of whether the dietician picked one. When they didn't: for a renewal
     // (hasActivePlan - there's a running cycle) fall back to the start date
     // the patient chose on the request, which is constrained to be on/after
-    // the current cycle's expiry so the two don't overlap; otherwise "now".
+    // the current cycle's expiry so the two don't overlap. For a first-time
+    // plan the same field is the date the patient asked to begin on, so a
+    // future date is honoured too; otherwise "now".
     const renewalStartFallback =
-      dietPlanRequest?.hasActivePlan &&
       dietPlanRequest?.startDateForDiet &&
       new Date(dietPlanRequest.startDateForDiet) > new Date()
         ? new Date(dietPlanRequest.startDateForDiet)
@@ -2627,10 +2628,36 @@ exports.activateDietPlan = async (req, res, next) => {
         dietPlan.request.collectedAmount = proofDocument.amountReceived || 0;
       }
 
-      // Set subscription validity (30 days from now)
+      // Set subscription validity (30 days from when the diet actually
+      // begins). The patient's chosen start date (request.startDateForDiet,
+      // adjustable by the dietician) wins over "now" when it's still ahead;
+      // a plan that was generated before that date was known (week 1 stamped
+      // "now") is re-anchored to it so the diet begins on the agreed day
+      // instead of immediately.
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      dietPlan.request.subscriptionStartDate = now;
+      let effectiveStart = now;
+      const requestedStart = dietPlan.request.startDateForDiet
+        ? new Date(dietPlan.request.startDateForDiet)
+        : null;
+      if (requestedStart && !Number.isNaN(requestedStart.getTime())) {
+        requestedStart.setHours(0, 0, 0, 0);
+        if (requestedStart > now) {
+          effectiveStart = requestedStart;
+          const week1Start = dietPlan.weekSchedule?.[0]?.startDate
+            ? new Date(dietPlan.weekSchedule[0].startDate)
+            : null;
+          if (week1Start) week1Start.setHours(0, 0, 0, 0);
+          if (!week1Start || week1Start < requestedStart) {
+            dietPlan.startDate = requestedStart;
+            dietPlan.weekSchedule =
+              Array.isArray(dietPlan.weekSchedule) && dietPlan.weekSchedule.length > 0
+                ? cascadeWeekScheduleFrom(dietPlan.weekSchedule, 1, requestedStart)
+                : buildWeekSchedule(requestedStart);
+          }
+        }
+      }
+      const expiresAt = new Date(effectiveStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+      dietPlan.request.subscriptionStartDate = effectiveStart;
       dietPlan.request.subscriptionExpiresAt = expiresAt;
       // Fresh expiry window (first activation or a renewal) means any prior
       // "expiring soon" reminder is stale - clear it so the renewal-reminder
