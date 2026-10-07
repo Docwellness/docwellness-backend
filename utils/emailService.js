@@ -168,7 +168,7 @@ const sendWelcomeEmail = async (user) => {
         <li>Chat with dieticians</li>
       </ul>
       <p style="margin:0 0 8px 0;font-size:15px;line-height:24px;color:${BRAND.text};">Get started by completing your profile and health information.</p>
-      ${ctaButton(`${config.frontendUrl}/dashboard`, 'Go to Dashboard')}
+      ${ctaButton(`${config.frontendUrl}/open`, 'Go to Dashboard')}
       <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The Docwellness Team</p>
     `,
   });
