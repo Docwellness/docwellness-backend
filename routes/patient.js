@@ -27,7 +27,6 @@ const {
   dietPlanRequestController,
   dietController,
   waterController,
-  journeyController,
   firstConsultationController,
   timelineController,
   exerciseController,
@@ -538,41 +537,15 @@ router.get('/exercise-log/today-stats', patientOnly, exerciseController.getToday
 router.post('/exercise-log', patientOnly, exerciseController.submitExerciseLog);
 
 // ==========================================
-// Journey Routes
+// Client Journeys (dietician-curated before/after + review)
 // ==========================================
 
 /**
- * @route   GET /api/patient/journey/auto
- * @desc    Get auto-generated journey (first body log = before, latest = after)
+ * @route   GET /api/patient/client-journeys
+ * @desc    Active client journeys from the patient's dietician
  */
-router.get('/journey/auto', patientOnly, journeyController.getAutoJourney);
-
-/**
- * @route   GET /api/patient/journey/milestones
- * @desc    Get milestone-based journey cards from body log images
- */
-router.get('/journey/milestones', patientOnly, journeyController.getJourneyMilestones);
-
-/**
- * @route   POST /api/patient/journey
- * @desc    Upload journey images (before/after) — manual override
- */
-router.post(
-  '/journey',
-  patientOnly,
-  uploadLimiter,
-  upload.fields([
-    { name: 'beforeImage', maxCount: 1 },
-    { name: 'afterImage', maxCount: 1 },
-  ]),
-  journeyController.uploadJourneyImage
-);
-
-/**
- * @route   GET /api/patient/journey
- * @desc    Get all manually uploaded journey images for the patient
- */
-router.get('/journey', patientOnly, journeyController.getJourneyImages);
+const { getActiveClientJourneysForPatient } = require('../controllers/dietician/clientJourneyController');
+router.get('/client-journeys', patientOnly, getActiveClientJourneysForPatient);
 
 // ==========================================
 // Device Token (push notifications)

@@ -28,7 +28,7 @@ const Exercise = require('./Exercise');
 const ExercisePlan = require('./ExercisePlan');
 const ExerciseLog = require('./ExerciseLog');
 const CustomFoodRequest = require('./CustomFoodRequest');
-const JourneyImage = require('./JourneyImage');
+const ClientJourney = require('./ClientJourney');
 const NeedAttentionLog = require('./NeedAttentionLog');
 const FoodItem = require('./FoodItem');
 const RecipeVersion = require('./RecipeVersion');
@@ -69,7 +69,7 @@ module.exports = {
   ExercisePlan,
   ExerciseLog,
   CustomFoodRequest,
-  JourneyImage,
+  ClientJourney,
   NeedAttentionLog,
   FoodItem,
   RecipeVersion,

@@ -49,10 +49,16 @@ async function main() {
 
   const {
     User, Chat, Conversation, CheckIn, CustomFoodRequest, DietPlan, DietPlanRequest,
-    ExerciseLog, ExercisePlan, FirstConsultation, Goal, JourneyImage, ManualPaymentProof,
+    ExerciseLog, ExercisePlan, FirstConsultation, Goal, ManualPaymentProof,
     MealLog, Milestone, MilestoneTask, NeedAttentionLog, Notification, Nudge, Progress,
     WaterLog, Review,
   } = require('../models');
+  // Old patient-uploaded journey photos (model removed - see ClientJourney).
+  const LegacyJourneyImage = require('mongoose').model(
+    'LegacyJourneyImage',
+    new (require('mongoose').Schema)({}, { strict: false }),
+    'journeyimages'
+  );
 
   const users = await User.find({ email: { $in: TEST_USER_EMAILS } }).select('_id email role').lean();
   if (users.length === 0) {
@@ -80,7 +86,7 @@ async function main() {
   await del('exerciselogs', ExerciseLog, { patientId: { $in: ids } });
   await del('exerciseplans', ExercisePlan, { patientId: { $in: ids } });
   await del('firstconsultations', FirstConsultation, { patient: { $in: ids } });
-  await del('journeyimages', JourneyImage, { patientId: { $in: ids } });
+  await del('journeyimages', LegacyJourneyImage, { patientId: { $in: ids } });
   await del('manualpaymentproofs', ManualPaymentProof, { patient: { $in: ids } });
   await del('meallogs', MealLog, { patientId: { $in: ids } });
   await del('needattentionlogs', NeedAttentionLog, { patientId: { $in: ids } });

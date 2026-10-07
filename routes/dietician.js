@@ -16,7 +16,7 @@ const {
   dashboardController,
   videoController,
   quoteController,
-  journeyController,
+  clientJourneyController,
   profileController,
   couponController,
   consultationFormController,
@@ -50,6 +50,7 @@ router.param('proofId', validateObjectIdParam);
 router.param('requestId', validateObjectIdParam);
 router.param('couponId', validateObjectIdParam);
 router.param('quoteId', validateObjectIdParam);
+router.param('journeyId', validateObjectIdParam);
 router.param('videoId', validateObjectIdParam);
 router.param('imageId', validateObjectIdParam);
 router.param('imageId', validateObjectIdParam);
@@ -773,77 +774,34 @@ router.put(
 router.delete('/videos/:videoId', dieticianOnlyMiddleware, videoController.deleteVideo);
 
 // ==========================================
-// Journey Routes
+// Client Journey Routes (before/after + review, shown to the dietician's patients)
 // ==========================================
 
-/**
- * @route   GET /api/dietician/patients/:patientId/journey/auto
- * @desc    Get auto-generated journey for a patient
- */
-router.get(
-  '/patients/:patientId/journey/auto',
-  dieticianOnlyMiddleware,
-  journeyController.getAutoJourney
-);
+const clientJourneyImages = upload.fields([
+  { name: 'beforeImage', maxCount: 1 },
+  { name: 'afterImage', maxCount: 1 },
+  { name: 'reviewImage', maxCount: 1 },
+]);
 
-/**
- * @route   GET /api/dietician/patients/:patientId/journey/milestones
- * @desc    Get milestone-based journey cards for a patient
- */
-router.get(
-  '/patients/:patientId/journey/milestones',
-  dieticianOnlyMiddleware,
-  journeyController.getJourneyMilestones
-);
-
-/**
- * @route   GET /api/dietician/patients/:patientId/journey
- * @desc    Get all manually uploaded journey images for a patient
- */
-router.get(
-  '/patients/:patientId/journey',
-  dieticianOnlyMiddleware,
-  journeyController.getPatientJourneyImages
-);
-
-/**
- * @route   POST /api/dietician/patients/:patientId/journey
- * @desc    Upload journey images for a patient
- */
+router.get('/client-journeys', dieticianOnlyMiddleware, clientJourneyController.getClientJourneys);
 router.post(
-  '/patients/:patientId/journey',
+  '/client-journeys',
   dieticianOnlyMiddleware,
   uploadLimiter,
-  upload.fields([
-    { name: 'beforeImage', maxCount: 1 },
-    { name: 'afterImage', maxCount: 1 },
-  ]),
-  journeyController.uploadJourneyImage
+  clientJourneyImages,
+  clientJourneyController.addClientJourney
 );
-
-/**
- * @route   PUT /api/dietician/patients/:patientId/journey/:imageId
- * @desc    Update a journey image entry
- */
 router.put(
-  '/patients/:patientId/journey/:imageId',
+  '/client-journeys/:journeyId',
   dieticianOnlyMiddleware,
   uploadLimiter,
-  upload.fields([
-    { name: 'beforeImage', maxCount: 1 },
-    { name: 'afterImage', maxCount: 1 },
-  ]),
-  journeyController.updateJourneyImage
+  clientJourneyImages,
+  clientJourneyController.updateClientJourney
 );
-
-/**
- * @route   DELETE /api/dietician/patients/:patientId/journey/:imageId
- * @desc    Delete a journey image entry
- */
 router.delete(
-  '/patients/:patientId/journey/:imageId',
+  '/client-journeys/:journeyId',
   dieticianOnlyMiddleware,
-  journeyController.deleteJourneyImage
+  clientJourneyController.deleteClientJourney
 );
 
 // ==========================================

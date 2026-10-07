@@ -8,7 +8,7 @@ const trackingController = require('./trackingController');
 const dashboardController = require('./dashboardController');
 const videoController = require('./videoController');
 const quoteController = require('./quoteController');
-const journeyController = require('./journeyController');
+const clientJourneyController = require('./clientJourneyController');
 const profileController = require('./profileController');
 const couponController = require('./couponController');
 const consultationFormController = require('./consultationFormController');
@@ -32,7 +32,7 @@ module.exports = {
   dashboardController,
   videoController,
   quoteController,
-  journeyController,
+  clientJourneyController,
   profileController,
   couponController,
   consultationFormController,

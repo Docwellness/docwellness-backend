@@ -76,7 +76,7 @@ function registerAsset(oldUrl, ownerId, collection, docId, field) {
 }
 
 async function discover(models) {
-  const { Chat, MessageV1, FirstConsultation, JourneyImage, ManualPaymentProof, User, Quote, Progress, Recipe } =
+  const { Chat, MessageV1, FirstConsultation, ManualPaymentProof, User, Quote, Progress, Recipe } =
     models;
 
   const chats = await Chat.find({
@@ -104,17 +104,6 @@ async function discover(models) {
     (fc.labReports?.files || []).forEach((url, idx) => {
       registerAsset(url, fc.patient, 'FirstConsultation', fc._id, `labReports.files.${idx}`);
     });
-  }
-
-  const journeys = await JourneyImage.find({
-    $or: [
-      { beforeImageUrl: { $regex: CLOUDINARY_HOST } },
-      { afterImageUrl: { $regex: CLOUDINARY_HOST } },
-    ],
-  }).select('beforeImageUrl afterImageUrl patientId');
-  for (const j of journeys) {
-    registerAsset(j.beforeImageUrl, j.patientId, 'JourneyImage', j._id, 'beforeImageUrl');
-    registerAsset(j.afterImageUrl, j.patientId, 'JourneyImage', j._id, 'afterImageUrl');
   }
 
   const proofs = await ManualPaymentProof.find({ proofImage: { $regex: CLOUDINARY_HOST } }).select(
@@ -204,7 +193,6 @@ async function run() {
       Chat: require('../models/Chat'),
       MessageV1: require('../chat/models').MessageV1,
       FirstConsultation: require('../models/FirstConsultation'),
-      JourneyImage: require('../models/JourneyImage'),
       ManualPaymentProof: require('../models/ManualPaymentProof'),
       User: require('../models/User'),
       Quote: require('../models/Quote'),
