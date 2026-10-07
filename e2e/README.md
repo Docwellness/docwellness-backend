@@ -1,4 +1,4 @@
-# DocWellness end-to-end UI test
+# Docwellness end-to-end UI test
 
 One script drives **both** apps on **two emulators** through the whole
 new-patient journey against the **production** backend (`api.docwellness.fit`):

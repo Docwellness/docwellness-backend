@@ -57,7 +57,7 @@ function fetchUrl(url, timeout = 5000) {
       {
         timeout,
         headers: {
-          'User-Agent': 'DocWellnessBot/1.0 (+https://docwellness.app)',
+          'User-Agent': 'DocwellnessBot/1.0 (+https://docwellness.app)',
           Accept: 'text/html',
         },
       },

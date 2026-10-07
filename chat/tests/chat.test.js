@@ -286,7 +286,7 @@ async function testSocketIO(baseUrl, patientToken, dieticianToken) {
  */
 async function runTests() {
   console.log('='.repeat(60));
-  console.log('DocWellness Chat v1 Module - Test Suite');
+  console.log('Docwellness Chat v1 Module - Test Suite');
   console.log('='.repeat(60));
 
   // Generate tokens

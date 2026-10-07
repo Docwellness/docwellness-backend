@@ -1,5 +1,5 @@
 """
-DocWellness end-to-end UI test - one script, both apps, real production
+Docwellness end-to-end UI test - one script, both apps, real production
 backend (api.docwellness.fit).
 
 Flow (each step is a --phase you can run in isolation once state.json exists):

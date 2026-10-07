@@ -2,7 +2,7 @@
  * Default "First Consultation" questionnaire content, seeded into a
  * dietician's ConsultationFormTemplate the first time they open the form
  * with no template of their own (see consultationFormController.js's
- * getMyTemplate). Sourced from DocWellness_Nutrition_Intake_Questionnaire.
+ * getMyTemplate). Sourced from Docwellness_Nutrition_Intake_Questionnaire.
  *
  * fieldIds are hand-assigned and must stay stable - they're the join key for
  * FirstConsultation.customAnswers entries, for dependsOnFieldId references

@@ -1,6 +1,6 @@
 """
 uidriver.py - a thin, dependency-light UI automation driver for the two
-DocWellness Flutter apps, built on `adb` + `uiautomator dump`.
+Docwellness Flutter apps, built on `adb` + `uiautomator dump`.
 
 Why not uiautomator2 / Appium: the emulators run a very recent Android build
 whose window internals break uiautomator2's bundled jsonrpc stub

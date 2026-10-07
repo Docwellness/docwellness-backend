@@ -16,7 +16,7 @@ const mongoose = require('mongoose');
  *  - file       : file upload (lab reports only - not settable via the
  *                 dietician-facing builder, see consultationFormController.js)
  *
- * A dietician's template starts out pre-populated with the DocWellness
+ * A dietician's template starts out pre-populated with the Docwellness
  * standard questionnaire (utils/consultationFormSeed.js) the first time they
  * open "First Consultation" - see getMyTemplate. They can edit/reorder/add to
  * it afterward via "Customize Consultation".

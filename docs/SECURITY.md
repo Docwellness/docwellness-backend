@@ -1,7 +1,7 @@
 # Security Practices
 
 This document covers secret handling and rotation across all three
-DocWellness repositories (`docwellness-backend`, `docwellness-user`,
+Docwellness repositories (`docwellness-backend`, `docwellness-user`,
 `docwellness-dietician`). It is documentation only - it does not change any
 code or configuration by itself.
 

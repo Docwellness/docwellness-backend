@@ -92,7 +92,7 @@ const startServer = async () => {
 
     // Start server
     server.listen(config.port, '0.0.0.0', () => {
-      console.log(`DocWellness API running on port ${config.port}`);
+      console.log(`Docwellness API running on port ${config.port}`);
       console.log(`Environment: ${config.nodeEnv}`);
       console.log(`Local API URL: http://localhost:${config.port}/api`);
       console.log(`Network API URL: http://[YOUR_IP]:${config.port}/api`);

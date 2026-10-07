@@ -112,7 +112,7 @@ function createApp() {
   app.get('/health', (req, res) => {
     res.status(200).json({
       success: true,
-      message: 'DocWellness API is running',
+      message: 'Docwellness API is running',
       timestamp: new Date().toISOString(),
     });
   });
@@ -121,7 +121,7 @@ function createApp() {
   app.get('/api', (req, res) => {
     res.status(200).json({
       success: true,
-      message: 'Welcome to DocWellness API',
+      message: 'Welcome to Docwellness API',
       version: '1.0.0',
       documentation: 'Patient API endpoints for Flutter frontend',
       endpoints: {

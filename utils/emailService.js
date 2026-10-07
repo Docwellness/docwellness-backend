@@ -110,7 +110,7 @@ const renderEmailLayout = ({ preheader, bodyHtml }) => `
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background-color:${BRAND.cardBg};border:1px solid ${BRAND.border};border-radius:16px;">
             <tr>
               <td style="padding:36px 40px 20px 40px;text-align:center;">
-                <img src="${LOGO_URL}" alt="DocWellness" width="176" style="display:inline-block;border:0;max-width:176px;" />
+                <img src="${LOGO_URL}" alt="Docwellness" width="176" style="display:inline-block;border:0;max-width:176px;" />
               </td>
             </tr>
             <tr>
@@ -121,7 +121,7 @@ const renderEmailLayout = ({ preheader, bodyHtml }) => `
             <tr>
               <td style="padding:18px 40px;border-top:1px solid ${BRAND.border};">
                 <p style="margin:0;font-size:12px;line-height:18px;color:${BRAND.muted};text-align:center;">
-                  &copy; ${new Date().getFullYear()} DocWellness &middot; Nourishing you, transforming lives.<br />
+                  &copy; ${new Date().getFullYear()} Docwellness &middot; Nourishing you, transforming lives.<br />
                   This is an automated message - please don't reply directly to this email.
                 </p>
               </td>
@@ -153,13 +153,13 @@ const otpBlock = (otp) => `
 // Send welcome email
 const sendWelcomeEmail = async (user) => {
   const name = user.profile?.fullName || 'there';
-  const subject = 'Welcome to DocWellness!';
+  const subject = 'Welcome to Docwellness!';
   const html = renderEmailLayout({
-    preheader: 'Thanks for joining DocWellness - here is how to get started.',
+    preheader: 'Thanks for joining Docwellness - here is how to get started.',
     bodyHtml: `
-      <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:${BRAND.heading};">Welcome to DocWellness!</h1>
+      <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:${BRAND.heading};">Welcome to Docwellness!</h1>
       <p style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:${BRAND.text};">Hi ${name},</p>
-      <p style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:${BRAND.text};">Thank you for joining DocWellness. We're excited to have you on board! With DocWellness, you can:</p>
+      <p style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:${BRAND.text};">Thank you for joining Docwellness. We're excited to have you on board! With Docwellness, you can:</p>
       <ul style="margin:0 0 24px 0;padding-left:20px;font-size:15px;line-height:26px;color:${BRAND.text};">
         <li>Track your health metrics</li>
         <li>Get personalized diet plans</li>
@@ -169,14 +169,14 @@ const sendWelcomeEmail = async (user) => {
       </ul>
       <p style="margin:0 0 8px 0;font-size:15px;line-height:24px;color:${BRAND.text};">Get started by completing your profile and health information.</p>
       ${ctaButton(`${config.frontendUrl}/dashboard`, 'Go to Dashboard')}
-      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The DocWellness Team</p>
+      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The Docwellness Team</p>
     `,
   });
 
   return dispatchEmail({
     to: user.email,
     subject,
-    text: `Welcome to DocWellness! Thank you for joining us.`,
+    text: `Welcome to Docwellness! Thank you for joining us.`,
     html,
     from: config.email.fromAddressPersonal,
   });
@@ -187,7 +187,7 @@ const sendWelcomeEmail = async (user) => {
 // authController.js)
 const sendPasswordResetOtp = async (user, otp) => {
   const name = user.profile?.fullName || 'there';
-  const subject = 'Your DocWellness password reset code';
+  const subject = 'Your Docwellness password reset code';
   const html = renderEmailLayout({
     preheader: `Your password reset code is ${otp}`,
     bodyHtml: `
@@ -196,7 +196,7 @@ const sendPasswordResetOtp = async (user, otp) => {
       <p style="margin:0;font-size:15px;line-height:24px;color:${BRAND.text};">Use this code in the app to reset your password:</p>
       ${otpBlock(otp)}
       <p style="margin:0;font-size:14px;line-height:22px;color:${BRAND.muted};">This code expires shortly. If you didn't request this, you can safely ignore this email.</p>
-      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The DocWellness Team</p>
+      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The Docwellness Team</p>
     `,
   });
 
@@ -204,7 +204,7 @@ const sendPasswordResetOtp = async (user, otp) => {
     {
       to: user.email,
       subject,
-      text: `Your DocWellness password reset code is: ${otp}`,
+      text: `Your Docwellness password reset code is: ${otp}`,
       html,
     },
     { urgent: true }
@@ -216,15 +216,15 @@ const sendPasswordResetOtp = async (user, otp) => {
 // string rather than a user object since no Mongo profile exists yet at
 // this point in the flow.
 const sendSignupOtp = async (email, otp) => {
-  const subject = 'Verify your DocWellness account';
+  const subject = 'Verify your Docwellness account';
   const html = renderEmailLayout({
     preheader: `Your verification code is ${otp}`,
     bodyHtml: `
-      <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:${BRAND.heading};">Welcome to DocWellness!</h1>
+      <h1 style="margin:0 0 16px 0;font-size:22px;font-weight:600;color:${BRAND.heading};">Welcome to Docwellness!</h1>
       <p style="margin:0;font-size:15px;line-height:24px;color:${BRAND.text};">Use this code in the app to verify your email and finish creating your account:</p>
       ${otpBlock(otp)}
       <p style="margin:0;font-size:14px;line-height:22px;color:${BRAND.muted};">This code expires shortly. If you didn't request this, you can safely ignore this email.</p>
-      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The DocWellness Team</p>
+      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The Docwellness Team</p>
     `,
   });
 
@@ -232,7 +232,7 @@ const sendSignupOtp = async (email, otp) => {
     {
       to: email,
       subject,
-      text: `Your DocWellness verification code is: ${otp}`,
+      text: `Your Docwellness verification code is: ${otp}`,
       html,
       from: config.email.fromAddressPersonal,
     },
@@ -250,7 +250,7 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
   };
   const name = user.profile?.fullName || 'there';
 
-  const subject = `Diet Plan ${action.charAt(0).toUpperCase() + action.slice(1)} - DocWellness`;
+  const subject = `Diet Plan ${action.charAt(0).toUpperCase() + action.slice(1)} - Docwellness`;
   const html = renderEmailLayout({
     preheader: actionMessages[action],
     bodyHtml: `
@@ -263,7 +263,7 @@ const sendDietPlanNotification = async (user, dietPlan, action) => {
         <p style="margin:0;font-size:13px;color:${BRAND.muted};">Status: <strong style="color:${BRAND.text};">${dietPlan.status}</strong></p>
       </div>
       ${ctaButton(`${config.frontendUrl}/diet-plans/${dietPlan._id}`, 'View Diet Plan')}
-      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The DocWellness Team</p>
+      <p style="margin:32px 0 0 0;font-size:14px;color:${BRAND.muted};">Best regards,<br />The Docwellness Team</p>
     `,
   });
 

@@ -15,7 +15,7 @@ const ALLOWED_TYPES = [
 
 /**
  * @desc    Get the dietician's own consultation form template. The first
- *          time a dietician with no template fetches it, the DocWellness
+ *          time a dietician with no template fetches it, the Docwellness
  *          standard questionnaire is seeded and persisted as their default
  *          (editable afterward via upsertMyTemplate) - a dietician who has
  *          already built their own template is never touched.

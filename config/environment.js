@@ -56,10 +56,10 @@ module.exports = {
     // Resend (SPF/DKIM/DMARC records) - sandbox can only deliver to the
     // Resend account's own verified email, not real users. Override with
     // RESEND_FROM_EMAIL once the domain is verified.
-    fromAddress: process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
+    fromAddress: process.env.RESEND_FROM_EMAIL || 'Docwellness <onboarding@resend.dev>',
     // Used for onboarding-style emails (e.g. the welcome email) that should
     // come from a real person rather than a no-reply address.
-    fromAddressPersonal: process.env.RESEND_FROM_EMAIL_PERSONAL || process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
+    fromAddressPersonal: process.env.RESEND_FROM_EMAIL_PERSONAL || process.env.RESEND_FROM_EMAIL || 'Docwellness <onboarding@resend.dev>',
   },
   // Used for links inside emails (e.g. "Go to Dashboard") - the marketing/
   // web app's own origin, not this API's.
