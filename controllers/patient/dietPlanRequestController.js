@@ -1,6 +1,7 @@
 const { DietPlanRequest, User, ManualPaymentProof, Notification } = require('../../models');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { parseFlexibleDate } = require('../../utils/dateUtils');
+const { getMembershipPrice } = require('../../utils/membershipTiers');
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
 
@@ -315,7 +316,9 @@ exports.selectMembershipPlan = async (req, res, next) => {
       ['Paid', 'PartiallyPaid'].includes(request.status);
 
     request.membershipPlan = membershipPlan;
-    request.membershipAmount = amount;
+    // Known tiers use the canonical price; the client value only applies to
+    // plan names we don't recognise.
+    request.membershipAmount = getMembershipPrice(membershipPlan) ?? amount;
 
     if (isRenewalConfirmation) {
       request.status = 'Unpaid';

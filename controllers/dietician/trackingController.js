@@ -8,6 +8,7 @@ const {
   sumMealCalories,
   addDays,
   buildDateBuckets,
+  buildWeightTrend,
   resolvePlanStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
@@ -129,16 +130,8 @@ exports.getPatientTrackingData = async (req, res, next) => {
       };
     });
 
-    // 7. Weight trend, anchored to the goal - mirrors
-    // controllers/patient/progressController.js's getTrackingData exactly
-    // (see its comment for the full reasoning): a day the patient actually
-    // logged a weight on always wins outright and re-anchors the
-    // projection from there; any day without a real log is projected from
-    // the most recent anchor at the goal's own overall pace (startValue ->
-    // targetValue across its full duration), so a weight-loss goal's
-    // projection dips and a weight-gain goal's climbs, instead of the old
-    // calorie-surplus simulation that anchored the whole history to
-    // today's currentWeight and drifted every time meal logs changed.
+    // Weight trend: the planned goal trajectory (never re-anchored by logged
+    // weights - see buildWeightTrend), plus each bucket's measured weight.
     const cumulativeStart = resolvedPlanStart || startDate;
     const activeGoal = await Goal.findOne({ patientId, status: 'active' })
       .select('startValue targetValue startDate endDate')
@@ -159,8 +152,6 @@ exports.getPatientTrackingData = async (req, res, next) => {
             )
           )
         : 84; // ~12 weeks - only hit when the patient has no active goal yet.
-    // Positive for a gain goal, negative for a loss goal, ~0 for maintain.
-    const dailyRate = (goalTargetWeight - goalStartWeight) / planSpanDays;
 
     const realLogs = await Progress.find({
       patientId,
@@ -177,46 +168,16 @@ exports.getPatientTrackingData = async (req, res, next) => {
       loggedByDay.set(localDateStr(log.date), log.weight);
     }
 
-    const dailyWeights = {};
-    let anchorWeight = goalStartWeight;
-    let anchorDate = new Date(cumulativeStart);
-    anchorDate.setHours(0, 0, 0, 0);
-    let currentDate = new Date(cumulativeStart);
-    currentDate.setHours(0, 0, 0, 0);
-
-    while (currentDate <= endDate) {
-      const dateStr = localDateStr(currentDate);
-      if (loggedByDay.has(dateStr)) {
-        // Real data always wins - snap the projection to it and re-anchor
-        // going forward from here.
-        anchorWeight = loggedByDay.get(dateStr);
-        anchorDate = new Date(currentDate);
-        dailyWeights[dateStr] = Math.round(anchorWeight * 10) / 10;
-      } else {
-        const daysSinceAnchor = Math.round((currentDate - anchorDate) / MS_PER_DAY);
-        dailyWeights[dateStr] = Math.round((anchorWeight + dailyRate * daysSinceAnchor) * 10) / 10;
-      }
-      currentDate = addDays(currentDate, 1);
-    }
-
-    const weightTrend = buckets.map((bucket, index) => {
-      // Compare calendar days (not exact instants) against `today`, not
-      // `now` - see progressController.js's identical fix for why this
-      // matters for a bucket that legitimately starts today.
-      if (bucket.start > today) {
-        return { label: bucket.label, date: '', weight: 0 };
-      }
-      const effectiveEnd = bucket.end > now ? now : bucket.end;
-      const dayStr = localDateStr(effectiveEnd);
-      const weight = dailyWeights[dayStr] || currentWeight;
-      return {
-        label: bucket.label,
-        date: dayStr,
-        weight:
-          index === 0 && weight <= 0
-            ? Math.round(currentWeight * 10) / 10
-            : Math.round(weight * 10) / 10,
-      };
+    const weightTrend = buildWeightTrend({
+      buckets,
+      loggedByDay,
+      goalStartWeight,
+      goalTargetWeight,
+      planSpanDays,
+      cumulativeStart,
+      today,
+      now,
+      currentWeight,
     });
 
     // 8. Calculate BMI trend from weight trend (0 weight = no data = 0 bmi)

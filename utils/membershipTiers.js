@@ -18,6 +18,20 @@ function getMembershipTier(membershipPlan) {
   return null;
 }
 
+// Canonical monthly price (INR) per tier - mirrors _membershipPlans in
+// docwellness-user's request_diet_plan.view.dart. The server owns this so a
+// stale client or seed script can't store a price that doesn't match the plan.
+const TIER_MONTHLY_PRICE = {
+  silver: 1500,
+  golden: 2500,
+  platinum: 5500,
+};
+
+function getMembershipPrice(membershipPlan) {
+  const tier = getMembershipTier(membershipPlan);
+  return tier ? TIER_MONTHLY_PRICE[tier] : null;
+}
+
 // Weeks generated in the single initial "Create Diet Plan" action, per tier:
 // Silver gets all 4 up front (no regeneration ever offered), Golden gets
 // weeks 1-2 (one shared strategy), Platinum gets week 1 only.
@@ -118,6 +132,7 @@ function validateRegenerateRequest({
 
 module.exports = {
   getMembershipTier,
+  getMembershipPrice,
   TIER_INITIAL_WEEKS,
   validateRegenerateRequest,
 };
