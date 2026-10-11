@@ -27,6 +27,7 @@ const {
   dietPlanRequestController,
   dietController,
   waterController,
+  supplementLogController,
   firstConsultationController,
   timelineController,
   exerciseController,
@@ -527,6 +528,11 @@ router.post('/water/log', patientOnly, waterController.logWater);
 router.get('/water/today', patientOnly, waterController.getToday);
 router.get('/water/history', patientOnly, waterController.getHistory);
 router.put('/water/goal', patientOnly, waterController.updateGoal);
+
+// Supplement logging (optional - never counts toward adherence)
+router.get('/supplement-log', patientOnly, supplementLogController.getSupplementLogs);
+router.post('/supplement-log', patientOnly, supplementLogController.logSupplement);
+router.delete('/supplement-log', patientOnly, supplementLogController.unlogSupplement);
 
 // ==========================================
 // Exercise Plan (patient-facing)

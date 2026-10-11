@@ -21,6 +21,7 @@ const MilestoneTask = require('./MilestoneTask');
 const CheckIn = require('./CheckIn');
 const Nudge = require('./Nudge');
 const WaterLog = require('./WaterLog');
+const SupplementLog = require('./SupplementLog');
 const SocialMediaPost = require('./SocialMediaPost');
 const Article = require('./Article');
 const Review = require('./Review');
@@ -62,6 +63,7 @@ module.exports = {
   CheckIn,
   Nudge,
   WaterLog,
+  SupplementLog,
   SocialMediaPost,
   Article,
   Review,
