@@ -3,7 +3,7 @@
 // controllers/dietician/timelineController.js (a specific patient's
 // timeline), so the two never silently diverge in shape.
 
-const { Milestone, MilestoneTask, MealLog, Progress } = require('../models');
+const { Milestone, MilestoneTask, MealLog, Progress, DietPlan } = require('../models');
 const {
   computeGoalStats,
   computeAdherenceForMilestones,
@@ -11,7 +11,7 @@ const {
   computeTaskDoneMap,
 } = require('./goalAdherence');
 const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
-const { formatDayLabel, formatMonthLabel } = require('./seedGoalTimeline');
+const { formatDayLabel, formatMonthLabel, resolvePlanStartDate } = require('./seedGoalTimeline');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -61,6 +61,15 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     .select('weight')
     .lean();
 
+  // The journey must begin on the diet plan's own start date - a goal
+  // reused/created before the plan's start was moved can carry earlier
+  // milestones (e.g. Oct 07 for a plan starting Oct 09).
+  const plan = goal.dietPlanId
+    ? await DietPlan.findById(goal.dietPlanId).select('weekSchedule activationDate startDate').lean()
+    : null;
+  const planStart = resolvePlanStartDate(plan);
+  if (planStart) goal.startDate = planStart;
+
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const fromDays = parseRangeParam(from, -14);
@@ -90,6 +99,7 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   const milestones = rawMilestones
     .map((m) => ({ ...m, date: shiftDateForPauses(pauses, m.date) }))
     .filter((m) => m.date >= rangeStart && m.date <= rangeEnd)
+    .filter((m) => !planStart || m.date >= planStart)
     .sort((a, b) => a.date - b.date || (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   const milestoneIds = milestones.map((m) => m._id);
@@ -199,6 +209,7 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     ) {
       const day = new Date(t);
       if (day < rangeStart || day > rangeEnd) continue;
+      if (planStart && day < planStart) continue;
       pausedPlaceholders.push({
         id: `paused-${day.toISOString().slice(0, 10)}`,
         type: 'daily',
