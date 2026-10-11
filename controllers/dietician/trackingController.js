@@ -216,6 +216,8 @@ exports.getPatientTrackingData = async (req, res, next) => {
         plannedDailyCalories,
         tdee: Math.round(tdee),
         calorieData,
+        startWeight: Math.round(goalStartWeight * 10) / 10,
+        targetWeight: Math.round(goalTargetWeight * 10) / 10,
         weightTrend,
         bmiTrend,
       },
