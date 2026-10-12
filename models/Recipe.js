@@ -243,8 +243,22 @@ const recipeSchema = new mongoose.Schema(
     // predate this field or whose image was never explicitly attributed.
     imageSource: {
       type: String,
-      enum: ['dietician-uploaded', 'ai-generated'],
+      enum: ['dietician-uploaded', 'ai-generated', 'admin-uploaded', 'commercial'],
       default: null,
+    },
+    // Previous main images replaced from the admin panel, newest first, so a
+    // replacement is always reversible (admin panel: content management).
+    imageHistory: {
+      type: [
+        {
+          _id: false,
+          image: String,
+          imageSource: String,
+          replacedAt: Date,
+          replacedBy: String,
+        },
+      ],
+      default: undefined,
     },
     language: {
       type: [String],

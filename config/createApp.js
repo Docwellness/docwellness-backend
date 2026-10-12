@@ -16,7 +16,7 @@ const { chatRoutes } = require('../chat');
 const { v1Patient, v1Dietician } = require('../routes/v1');
 
 // Import routes
-const { patientRoutes, dieticianRoutes, internalRoutes } = require('../routes');
+const { patientRoutes, dieticianRoutes, internalRoutes, adminRoutes } = require('../routes');
 
 function createApp() {
   const app = express();
@@ -59,7 +59,14 @@ function createApp() {
   // wildcard, so setting those env vars is what locks CORS down (see
   // docs/SECURITY.md and .env.example) rather than a prerequisite for the
   // app to keep working today.
-  const allowedOrigins = [config.clientOrigin, config.dieticianOrigin].filter(Boolean);
+  const lockedOrigins = [config.clientOrigin, config.dieticianOrigin].filter(Boolean);
+  // The admin origin only joins the list when CORS is already locked down.
+  // When nothing is configured CORS stays open, and adding the admin origin
+  // to an empty list would silently lock out every other browser client.
+  const allowedOrigins =
+    lockedOrigins.length > 0 && config.admin?.origin
+      ? [...lockedOrigins, config.admin.origin]
+      : lockedOrigins;
   app.use(
     cors({
       origin(origin, callback) {
@@ -107,6 +114,9 @@ function createApp() {
 
   // Internal/cron-triggered routes (shared-secret auth, not user JWT)
   app.use('/api/internal', internalRoutes);
+
+  // Admin panel API (admin.docwellness.fit): Google SSO admin only.
+  app.use('/api/admin', adminRoutes);
 
   // Health check route
   app.get('/health', (req, res) => {
