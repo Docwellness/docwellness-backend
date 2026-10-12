@@ -40,9 +40,9 @@ const blocked = function () {
   'deleteMany',
   'replaceOne',
 ].forEach((op) => AdminAuditLogSchema.pre(op, blocked));
-AdminAuditLogSchema.pre('save', function (next) {
-  if (!this.isNew) return next(new Error('AdminAuditLog is append-only'));
-  next();
+// Mongoose 9 hooks take no `next` callback: throwing rejects the operation.
+AdminAuditLogSchema.pre('save', function () {
+  if (!this.isNew) throw new Error('AdminAuditLog is append-only');
 });
 
 module.exports = mongoose.models.AdminAuditLog || mongoose.model('AdminAuditLog', AdminAuditLogSchema);
