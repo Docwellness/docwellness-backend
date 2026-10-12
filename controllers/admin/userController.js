@@ -155,7 +155,7 @@ exports.getUser = async (req, res, next) => {
 
     const [request, proofs, plans] = await Promise.all([
       DietPlanRequest.findOne({ patient: u._id }).sort({ createdAt: -1 }).lean(),
-      ManualPaymentProof.find({ patient: u._id }).sort({ createdAt: -1 }).select('status amountReceived createdAt reviewedAt').lean(),
+      ManualPaymentProof.find({ patient: u._id }).sort({ createdAt: -1 }).select('status amountReceived amountPending createdAt reviewedAt').lean(),
       DietPlan.find({ patientId: u._id }).select('status createdAt updatedAt activationDate').lean(),
     ]);
     const hasDraftPlan = plans.some((p) => ['Draft', 'Finalized'].includes(p.status));

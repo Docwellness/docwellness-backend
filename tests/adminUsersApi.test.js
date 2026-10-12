@@ -266,7 +266,8 @@ describe('journey stage', () => {
       ['diet_ready', false],
       ['payment_requested', false],
       ['payment_submitted', false],
-      ['started', false],
+      ['payment_confirmed', false],
+      ['diet_started', false],
     ]);
     expect(early.journey[0].detail).toBe('Chose 3 months (9000)');
 
@@ -274,10 +275,12 @@ describe('journey stage', () => {
     expect(waiting.stage).toBe('payment_submitted');
     expect(waiting.journey.find((s) => s.key === 'diet_created').done).toBe(true);
     expect(waiting.journey.find((s) => s.key === 'payment_submitted').done).toBe(true);
-    expect(waiting.journey.find((s) => s.key === 'started').done).toBe(false);
+    expect(waiting.journey.find((s) => s.key === 'payment_confirmed').done).toBe(false);
+    expect(waiting.journey.find((s) => s.key === 'diet_started').done).toBe(false);
 
     const running = (await get(`/users/${ids.active}`)).body.data;
     expect(running.stage).toBe('active');
-    expect(running.journey.find((s) => s.key === 'started').done).toBe(true);
+    expect(running.journey.find((s) => s.key === 'diet_started').done).toBe(true);
+    expect(running.journey.find((s) => s.key === 'payment_confirmed').done).toBe(true); // request is Paid
   });
 });

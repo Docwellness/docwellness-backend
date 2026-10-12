@@ -6,8 +6,9 @@
  *   1. The patient sends a diet plan request and picks a membership plan.
  *   2. The dietician builds the diet plan (Draft, then Finalized).
  *   3. The dietician asks for payment; the patient submits a payment proof.
- *   4. The dietician activates the plan. Only then is the first payment
- *      settled and the membership clock started.
+ *   4. The dietician activates the plan. For a first payment this is when
+ *      the proof is approved and the membership clock starts, but the two are
+ *      tracked as separate steps in the timeline because they can differ.
  * So a patient can have a request and a chosen plan for a long time without
  * any subscription end date. An end date alone cannot describe that.
  */
@@ -59,7 +60,7 @@ function computeStage({ request, hasDraftPlan = false, now = new Date() }) {
 
 /**
  * Timeline of the journey for the detail view. A step is `done` once reached.
- * @param {{request: object|null, plans: object[], proofs: object[]}} data
+ * @param {{request: object|null, plans: object[], proofs: object[]}} data (proofs need status, amountReceived, amountPending, createdAt, reviewedAt)
  */
 function buildJourney({ request, plans = [], proofs = [] }) {
   if (!request) return [];
@@ -67,7 +68,17 @@ function buildJourney({ request, plans = [], proofs = [] }) {
   const finalized = plans.find((p) => ['Finalized', 'Active', 'Completed'].includes(p.status)) || null;
   const firstProof = [...proofs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0] || null;
   const approved = proofs.find((p) => p.status === 'Approved') || null;
-  const started = request.subscriptionStartDate || null;
+  const running = plans.find((p) => ['Active', 'Completed'].includes(p.status)) || null;
+  const settled = Boolean(approved) || ['Paid', 'PartiallyPaid'].includes(request.status);
+  const dayOf = (d) => new Date(d).toISOString().slice(0, 10);
+
+  let paymentDetail = '';
+  if (approved && Number.isFinite(approved.amountReceived)) {
+    paymentDetail = `${approved.amountReceived} received`;
+    if (approved.amountPending > 0) paymentDetail += `, ${approved.amountPending} still pending`;
+  } else if (request.status === 'PartiallyPaid') {
+    paymentDetail = 'Part paid, a balance is pending';
+  }
 
   return [
     {
@@ -108,11 +119,22 @@ function buildJourney({ request, plans = [], proofs = [] }) {
       detail: firstProof ? `${proofs.length} proof${proofs.length === 1 ? '' : 's'} sent` : '',
     },
     {
-      key: 'started',
-      label: 'Diet started, payment confirmed',
-      done: Boolean(started) && Boolean(request.hasActivePlan || approved),
-      at: started || approved?.reviewedAt || null,
-      detail: request.subscriptionExpiresAt ? `Runs until ${new Date(request.subscriptionExpiresAt).toISOString().slice(0, 10)}` : '',
+      // Confirmed when the proof is approved: by the dietician when they
+      // activate the plan, or by an admin for a renewal.
+      key: 'payment_confirmed',
+      label: 'Payment confirmed',
+      done: settled,
+      at: approved?.reviewedAt || null,
+      detail: paymentDetail,
+    },
+    {
+      // The diet is running once the plan is activated. This can happen
+      // before or after the payment is confirmed, so it is its own step.
+      key: 'diet_started',
+      label: 'Diet started',
+      done: Boolean(running) || Boolean(request.hasActivePlan),
+      at: running?.activationDate || request.subscriptionStartDate || null,
+      detail: request.subscriptionExpiresAt ? `Runs until ${dayOf(request.subscriptionExpiresAt)}` : '',
     },
   ];
 }

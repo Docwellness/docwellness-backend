@@ -67,7 +67,8 @@ describe('buildJourney', () => {
       ['diet_ready', false],
       ['payment_requested', false],
       ['payment_submitted', false],
-      ['started', false],
+      ['payment_confirmed', false],
+      ['diet_started', false],
     ]);
     expect(steps[0].detail).toBe('Chose 3 months (9000)');
   });
@@ -77,10 +78,38 @@ describe('buildJourney', () => {
     const steps = buildJourney({
       request: req({ status: 'Paid', hasActivePlan: true, paymentRequestedAt: t(3), subscriptionStartDate: t(1), subscriptionExpiresAt: new Date(now.getTime() + 29 * DAY) }),
       plans: [{ status: 'Active', createdAt: t(4), updatedAt: t(2) }],
-      proofs: [{ status: 'Approved', createdAt: t(2), reviewedAt: t(1) }],
+      proofs: [{ status: 'Approved', amountReceived: 9000, amountPending: 0, createdAt: t(2), reviewedAt: t(1) }],
     });
     expect(steps.every((s) => s.done)).toBe(true);
-    expect(steps.find((s) => s.key === 'started').detail).toMatch(/Runs until \d{4}-\d{2}-\d{2}/);
+    expect(steps.find((s) => s.key === 'payment_confirmed').detail).toBe('9000 received');
+    expect(steps.find((s) => s.key === 'diet_started').detail).toMatch(/Runs until \d{4}-\d{2}-\d{2}/);
+  });
+
+  it('keeps "payment confirmed" and "diet started" separate: the diet can run before the payment is settled', () => {
+    const t = (d) => new Date(now.getTime() - d * DAY);
+    const steps = buildJourney({
+      request: req({ status: 'PaymentSubmitted', hasActivePlan: true, subscriptionStartDate: t(1), subscriptionExpiresAt: new Date(now.getTime() + 29 * DAY) }),
+      plans: [{ status: 'Active', createdAt: t(4), updatedAt: t(2), activationDate: t(1) }],
+      proofs: [{ status: 'Submitted', amountReceived: 9000, amountPending: 0, createdAt: t(1) }],
+    });
+    const step = (k) => steps.find((s) => s.key === k);
+    expect(step('payment_submitted').done).toBe(true);
+    expect(step('payment_confirmed').done).toBe(false);
+    expect(step('diet_started').done).toBe(true);
+    expect(new Date(step('diet_started').at).getTime()).toBe(t(1).getTime());
+  });
+
+  it('shows the amounts on a partly paid, confirmed payment', () => {
+    const t = (d) => new Date(now.getTime() - d * DAY);
+    const steps = buildJourney({
+      request: req({ status: 'PartiallyPaid', hasActivePlan: true, subscriptionStartDate: t(1) }),
+      plans: [{ status: 'Active', createdAt: t(4), updatedAt: t(2), activationDate: t(1) }],
+      proofs: [{ status: 'Approved', amountReceived: 5000, amountPending: 4000, createdAt: t(2), reviewedAt: t(1) }],
+    });
+    const confirmed = steps.find((s) => s.key === 'payment_confirmed');
+    expect(confirmed.done).toBe(true);
+    expect(confirmed.detail).toBe('5000 received, 4000 still pending');
+    expect(new Date(confirmed.at).getTime()).toBe(t(1).getTime());
   });
 
   it('is empty without a request', () => {
