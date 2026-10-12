@@ -11,6 +11,9 @@
 const DayPlan = require('../models/DayPlan');
 const MealSlotPlan = require('../models/MealSlotPlan');
 const PlanItem = require('../models/PlanItem');
+const RecipeVersion = require('../models/RecipeVersion');
+const Recipe = require('../models/Recipe');
+const { prescribedServingLabelForVersion } = require('../utils/prescribedServing');
 
 const ACTIVATION_CALORIE_TOLERANCE = 0.05;
 
@@ -52,4 +55,38 @@ async function validatePlanForActivation(dietPlanId, targetCalories) {
   };
 }
 
-module.exports = { ACTIVATION_CALORIE_TOLERANCE, computeDayCalorieTotal, validatePlanForActivation };
+/**
+ * Plan items whose RecipeVersion has no real prescribed serving (none was
+ * computed and none was set by the dietician) - activation is blocked until
+ * each is edited, so the patient never sees a placeholder portion.
+ */
+async function findItemsMissingServing(dietPlanId) {
+  const dayPlans = await DayPlan.find({ dietPlanId }).lean();
+  const dayPlanById = new Map(dayPlans.map((dp) => [String(dp._id), dp]));
+  const mealSlots = await MealSlotPlan.find({ dayPlanId: { $in: dayPlans.map((dp) => dp._id) } }).lean();
+  const slotById = new Map(mealSlots.map((ms) => [String(ms._id), ms]));
+  const planItems = await PlanItem.find({ mealSlotId: { $in: mealSlots.map((ms) => ms._id) } }).lean();
+
+  const versions = await RecipeVersion.find({ _id: { $in: planItems.map((i) => i.recipeVersionId) } }).lean();
+  const versionById = new Map(versions.map((v) => [String(v._id), v]));
+  const recipes = await Recipe.find({ _id: { $in: versions.map((v) => v.parentRecipeId) } }).select('name').lean();
+  const recipeNameById = new Map(recipes.map((r) => [String(r._id), r.name]));
+
+  const missing = [];
+  for (const item of planItems) {
+    const version = versionById.get(String(item.recipeVersionId));
+    if (!version || prescribedServingLabelForVersion(version)) continue;
+    const slot = slotById.get(String(item.mealSlotId));
+    const dayPlan = slot && dayPlanById.get(String(slot.dayPlanId));
+    missing.push({
+      planItemId: item._id,
+      recipeName: recipeNameById.get(String(version.parentRecipeId)) || 'Recipe',
+      week: dayPlan?.week ?? null,
+      dayGroup: dayPlan?.dayGroup ?? null,
+      servingTime: slot?.servingTime ?? null,
+    });
+  }
+  return missing;
+}
+
+module.exports = { ACTIVATION_CALORIE_TOLERANCE, findItemsMissingServing, computeDayCalorieTotal, validatePlanForActivation };

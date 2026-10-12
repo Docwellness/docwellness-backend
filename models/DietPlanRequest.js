@@ -56,6 +56,9 @@ const dietPlanRequestSchema = new mongoose.Schema(
       default: null,
     },
     plansCount: { type: Number, default: 0 },
+    // Set when the patient's dietician is suspended and the admin chose to
+    // leave their clients flagged for reassignment.
+    needsReassignment: { type: Boolean, default: false },
     hasActivePlan: { type: Boolean, default: false },
     latestPaymentStatus: {
       type: String,

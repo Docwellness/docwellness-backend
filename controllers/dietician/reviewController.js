@@ -74,7 +74,8 @@ exports.getReviewsForPatient = async (req, res) => {
       return res.status(200).json({ success: true, data: { reviews: [], averageRating: 0, myReview: null } });
     }
 
-    const reviews = await Review.find({ dieticianId }).sort({ order: 1 }).lean();
+    // Reviews an admin has hidden are not shown to patients or counted.
+    const reviews = await Review.find({ dieticianId, hidden: { $ne: true } }).sort({ order: 1 }).lean();
     const averageRating = reviews.length
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : 0;

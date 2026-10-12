@@ -175,6 +175,21 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // Dietician credential verification, managed from the admin panel
+    // (openspec add-admin-panel: admin-dietician-management). Dieticians that
+    // predate this field have no `verification` and count as verified.
+    verification: {
+      status: { type: String, enum: ['pending', 'verified', 'rejected'] },
+      licenceNumber: { type: String, trim: true },
+      qualification: { type: String, trim: true },
+      specialisations: { type: [String], default: undefined },
+      languages: { type: [String], default: undefined },
+      proofUrl: { type: String },
+      note: { type: String, trim: true },
+      decidedBy: { type: String },
+      decidedAt: { type: Date },
+    },
+
     isVerified: {
       type: Boolean,
       default: false,

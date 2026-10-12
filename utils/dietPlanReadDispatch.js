@@ -16,6 +16,7 @@
 const { getFinalizedWeeks } = require('./dietPlanLegacyView');
 const { DayPlan, MealSlotPlan, PlanItem, SupplementItem, RecipeVersion, FoodItem, Recipe } = require('../models');
 const { normalize } = require('./ingredientLibrary');
+const { prescribedServingLabel } = require('./prescribedServing');
 
 // A single Recipe can be prescribed at more than one PlanItem (different
 // day/slot, or the same slot across weeks) at DIFFERENT versions - e.g. the
@@ -195,6 +196,9 @@ async function buildPlanItemPatientView(dietPlan) {
               unit: ingredient.unit,
             })),
       };
+      recipeVersionOverrides[versionedId].servingLabel = prescribedServingLabel(
+        recipeVersionOverrides[versionedId].components
+      );
     }
   }
 

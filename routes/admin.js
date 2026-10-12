@@ -11,6 +11,11 @@ const { adminAuth, requirePermission } = require('../middlewares/adminAuth');
 const account = require('../controllers/admin/accountController');
 const content = require('../controllers/admin/contentController');
 const placements = require('../controllers/admin/placementController');
+const payments = require('../controllers/admin/paymentController');
+const users = require('../controllers/admin/userController');
+const dieticians = require('../controllers/admin/dieticianController');
+const partners = require('../controllers/admin/partnerController');
+const coupons = require('../controllers/admin/couponController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -59,5 +64,53 @@ router.post(
 router.post('/placements/:id/submit', requirePermission('placements', 'edit'), placements.submitPlacement);
 router.post('/placements/:id/approve', requirePermission('placements', 'approve'), placements.approvePlacement);
 router.post('/placements/:id/cancel', requirePermission('placements', 'edit'), placements.cancelPlacement);
+
+// Payments (manual payment proofs)
+router.get('/payments/reconciliation', requirePermission('payments', 'view'), payments.reconciliation);
+router.get('/payments', requirePermission('payments', 'view'), payments.listPayments);
+router.get('/payments/:id', requirePermission('payments', 'view'), payments.getPayment);
+router.post('/payments/:id/confirm', requirePermission('payments', 'approve'), payments.confirmPayment);
+router.post('/payments/:id/reject', requirePermission('payments', 'approve'), payments.rejectPayment);
+router.post('/payments/:id/refunds', requirePermission('payments', 'edit'), payments.addRefund);
+
+// Users (patients)
+router.get('/users', requirePermission('users', 'view'), users.listUsers);
+router.get('/users/:id', requirePermission('users', 'view'), users.getUser);
+router.post('/users/:id/reveal', requirePermission('users', 'view'), users.revealField);
+router.post('/users/:id/suspend', requirePermission('users', 'edit'), users.suspendUser);
+router.post('/users/:id/reactivate', requirePermission('users', 'edit'), users.reactivateUser);
+router.post('/users/:id/extend-subscription', requirePermission('users', 'edit'), users.extendSubscription);
+
+// Dieticians
+router.get('/dieticians', requirePermission('dieticians', 'view'), dieticians.listDieticians);
+router.post('/dieticians', requirePermission('dieticians', 'create'), dieticians.createDietician);
+router.get('/dieticians/:id', requirePermission('dieticians', 'view'), dieticians.getDietician);
+router.post('/dieticians/:id/verification', requirePermission('dieticians', 'approve'), dieticians.setVerification);
+router.post('/dieticians/:id/suspend', requirePermission('dieticians', 'edit'), dieticians.suspend);
+router.post('/dieticians/:id/reactivate', requirePermission('dieticians', 'edit'), dieticians.reactivate);
+router.post('/dieticians/:id/reassign', requirePermission('dieticians', 'edit'), dieticians.reassign);
+router.get('/dieticians/:id/reviews', requirePermission('dieticians', 'view'), dieticians.listReviews);
+router.post('/dieticians/:id/reviews/:reviewId/hide', requirePermission('dieticians', 'edit'), dieticians.hideReview);
+router.post('/dieticians/:id/reviews/:reviewId/unhide', requirePermission('dieticians', 'edit'), dieticians.unhideReview);
+router.get('/dieticians/:id/earnings', requirePermission('dieticians', 'view'), dieticians.earnings);
+
+// Partner requests
+router.get('/partners/options', requirePermission('partners', 'view'), partners.reasons);
+router.get('/partners', requirePermission('partners', 'view'), partners.list);
+router.post('/partners', requirePermission('partners', 'create'), partners.create);
+router.get('/partners/:id', requirePermission('partners', 'view'), partners.get);
+router.put('/partners/:id', requirePermission('partners', 'edit'), partners.update);
+router.post('/partners/:id/stage', requirePermission('partners', 'edit'), partners.moveStage);
+router.post('/partners/:id/discard', requirePermission('partners', 'edit'), partners.discard);
+router.post('/partners/:id/restore', requirePermission('partners', 'edit'), partners.restore);
+router.post('/partners/:id/notes', requirePermission('partners', 'edit'), partners.addNote);
+router.post('/partners/:id/attachments', requirePermission('partners', 'edit'), uploadLimiter, partners.receiveFile, partners.addAttachment);
+router.get('/partners/:id/attachments/:attId/download', requirePermission('partners', 'view'), partners.downloadAttachment);
+router.post('/partners/:id/create-brand', requirePermission('partners', 'create'), partners.createBrand);
+
+// Coupons (never deleted: deactivate instead, so past discounts stay explainable)
+router.get('/coupons', requirePermission('payments', 'view'), coupons.list);
+router.post('/coupons', requirePermission('payments', 'create'), coupons.create);
+router.put('/coupons/:id', requirePermission('payments', 'edit'), coupons.update);
 
 module.exports = router;

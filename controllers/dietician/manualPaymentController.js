@@ -1,4 +1,5 @@
-const { ManualPaymentProof, DietPlan, DietPlanRequest, User } = require('../../models');
+const { ManualPaymentProof, DietPlan, DietPlanRequest } = require('../../models');
+const { settleRenewalProof } = require('../../utils/paymentSettlement');
 
 /**
  * @desc    List manual payment proofs submitted by patients
@@ -142,39 +143,11 @@ exports.confirmRenewalPayment = async (req, res, next) => {
       });
     }
 
-    proof.status = 'Approved';
-    proof.reviewedBy = req.user._id;
-    proof.reviewedAt = new Date();
-    await proof.save();
-
-    // Same settlement fields activateDietPlan sets for a fresh activation -
-    // just applied directly to the request, with no DietPlan to touch.
-    const amountPending = proof.amountPending || 0;
-    request.status = amountPending > 0 ? 'PartiallyPaid' : 'Paid';
-    request.hasActivePlan = true;
-    request.latestPaymentStatus = amountPending > 0 ? 'Pending' : 'Paid';
-    request.latestPaymentProof = proof._id;
-    request.collectedAmount = proof.amountReceived || 0;
-
-    const now = new Date();
-    request.subscriptionStartDate = now;
-    request.subscriptionExpiresAt = new Date(
-      now.getTime() + 30 * 24 * 60 * 60 * 1000
-    );
-
-    await request.save();
-
-    // Clear the same User.status flags activateDietPlan clears on a fresh
-    // activation - otherwise the "Payment Update Received" card on the
-    // profile keeps showing (it's gated on hasPaymentUpdate, not on
-    // request.status) even though there's nothing left to review.
-    await User.findByIdAndUpdate(patientId, {
-      $set: {
-        'status.requestStatus': request.status,
-        'status.hasPaymentUpdate': false,
-        'status.canSendPaymentRequest': false,
-        'status.subscriptionExpiresAt': request.subscriptionExpiresAt,
-      },
+    await settleRenewalProof({
+      proof,
+      request,
+      patientId,
+      reviewerId: req.user._id,
     });
 
     res.status(200).json({
