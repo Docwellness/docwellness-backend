@@ -35,6 +35,14 @@ const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../utils/co
 const { isCountableServing, snapHalfStep } = require('../utils/servingUnits');
 
 const NUTRITION_FIELDS = ['calories', 'protein', 'carbs', 'fats', 'fiber'];
+// fill-recipe-micronutrients (openspec): summed independently of
+// NUTRITION_FIELDS, under a stricter per-nutrient rule (see
+// computeMicronutrients below) - never gates hasUnresolvedIngredients /
+// menuGenerationService, per design.md Decision 3.
+const MICRONUTRIENT_FIELDS = [
+  'saturatedFat', 'transFat', 'sugar',
+  'cholesterol', 'sodium', 'calcium', 'iron', 'potassium', 'vitaminC',
+];
 
 // Universal cooking-measurement constants (NOT ingredient-specific data,
 // unlike FoodItem.unitConversions) - a teaspoon/tablespoon/cup is always
@@ -86,6 +94,75 @@ function resolveGramsForIngredient(foodItem, rawQuantity, unit) {
  * from only the resolved ingredients, never treated as 0 or backfilled from
  * elsewhere.
  */
+/**
+ * Sums the nine micronutrients across the same {foodItemId, rawQuantity,
+ * unit} ingredient lines, independently of computeNutritionFromIngredients'
+ * macro logic above. Deliberately STRICTER than the macros: a macro sums
+ * whatever subset of ingredients resolved and drops the rest; a micronutrient
+ * is summed only when EVERY ingredient in the list both resolves to grams and
+ * has a real (non-null) value for that specific nutrient - one ingredient
+ * missing, say, iron makes the recipe's iron null even if every other
+ * ingredient and every other nutrient resolved fine. This is design.md
+ * Decision 3's "strict and honest" rule: a partial sum would silently
+ * understate a recipe's real micronutrient content, which is worse than
+ * showing "unknown".
+ *
+ * Shared by computeNutritionFromIngredients (V1/V2+ creation) and
+ * computeMicronutrientsForVersion (the prod migration's `versions` phase
+ * micronutrient-only backfill of already-frozen versions, design.md
+ * Decision 4c) so both compute identically.
+ */
+function computeMicronutrients(ingredients, foodItemsById) {
+  const totals = {};
+  const eligible = {};
+  for (const field of MICRONUTRIENT_FIELDS) {
+    totals[field] = 0;
+    eligible[field] = true;
+  }
+  const micronutrientsIncomplete = new Set();
+  const hasIngredients = (ingredients || []).length > 0;
+
+  for (const ingredient of ingredients || []) {
+    const foodItem = foodItemsById.get(String(ingredient.foodItemId));
+    const per100g = foodItem?.nutritionPer100g;
+    const grams = foodItem ? resolveGramsForIngredient(foodItem, ingredient.rawQuantity, ingredient.unit) : null;
+
+    for (const field of MICRONUTRIENT_FIELDS) {
+      if (!eligible[field]) continue; // already disqualified by an earlier ingredient
+      const value = per100g ? per100g[field] : null;
+      if (grams === null || typeof value !== 'number') {
+        eligible[field] = false;
+        micronutrientsIncomplete.add(field);
+        continue;
+      }
+      totals[field] += (grams / 100) * value;
+    }
+  }
+
+  const micronutrients = {};
+  for (const field of MICRONUTRIENT_FIELDS) {
+    micronutrients[field] = hasIngredients && eligible[field] ? Math.round(totals[field] * 100) / 100 : null;
+  }
+  if (!hasIngredients) MICRONUTRIENT_FIELDS.forEach((field) => micronutrientsIncomplete.add(field));
+
+  return { micronutrients, micronutrientsIncomplete: Array.from(micronutrientsIncomplete) };
+}
+
+/**
+ * Recomputes ONLY the nine micronutrients for an EXISTING RecipeVersion,
+ * from that version's own frozen `ingredients[]` - never its macros,
+ * `versionNumber`, or anything else. This is the one function the prod
+ * migration script's `versions` phase (design.md Decision 4c/8) is allowed
+ * to use to backfill already-prescribed versions, because it touches nothing
+ * the freeze invariant protects (see that decision for why micronutrients
+ * are outside the invariant's scope). `version` needs only `.ingredients`;
+ * `foodItemsById` is a Map of foodItemId(string) -> FoodItem, same shape the
+ * caller already builds for computeNutritionFromIngredients.
+ */
+function computeMicronutrientsForVersion(version, foodItemsById) {
+  return computeMicronutrients(version?.ingredients, foodItemsById);
+}
+
 function computeNutritionFromIngredients(ingredients, foodItemsById) {
   const totals = { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 };
   const unresolvedIngredientNames = [];
@@ -112,11 +189,18 @@ function computeNutritionFromIngredients(ingredients, foodItemsById) {
   for (const field of NUTRITION_FIELDS) {
     nutritionPerServing[field] = anyResolved ? Math.round(totals[field] * 100) / 100 : null;
   }
+  // Micronutrients: independent strict computation, merged in. Deliberately
+  // NOT folded into hasUnresolvedIngredients/unresolvedIngredientNames below
+  // - those stay macro-only so menuGenerationService's generation gate is
+  // unaffected (design.md Decision 3).
+  const { micronutrients, micronutrientsIncomplete } = computeMicronutrients(ingredients, foodItemsById);
+  Object.assign(nutritionPerServing, micronutrients);
 
   return {
     nutritionPerServing,
     hasUnresolvedIngredients: unresolvedIngredientNames.length > 0,
     unresolvedIngredientNames,
+    micronutrientsIncomplete,
   };
 }
 
@@ -157,10 +241,11 @@ async function syncV1FromRecipe(recipe) {
       .filter((ingredient) => !foodItemsByNormalizedName.has(normalize(ingredient.name)))
       .map((ingredient) => ingredient.name);
 
-    const { nutritionPerServing, unresolvedIngredientNames: unresolvedFromNutrition } = computeNutritionFromIngredients(
-      versionIngredients,
-      foodItemsById
-    );
+    const {
+      nutritionPerServing,
+      unresolvedIngredientNames: unresolvedFromNutrition,
+      micronutrientsIncomplete,
+    } = computeNutritionFromIngredients(versionIngredients, foodItemsById);
     const allUnresolvedNames = Array.from(new Set([...unmatchedNames, ...unresolvedFromNutrition]));
 
     // Freeze semantics: only upsert V1 in place if nothing has prescribed it
@@ -190,6 +275,7 @@ async function syncV1FromRecipe(recipe) {
       nutritionPerServing,
       hasUnresolvedIngredients: allUnresolvedNames.length > 0,
       unresolvedIngredientNames: allUnresolvedNames,
+      micronutrientsIncomplete,
       mealSlotSuitability: recipe.mealSlotSuitability,
       dietaryTags: recipe.dietaryTags,
       allergens: recipe.allergens,
@@ -351,7 +437,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     };
   });
 
-  const { nutritionPerServing, hasUnresolvedIngredients, unresolvedIngredientNames } = computeNutritionFromIngredients(
+  const { nutritionPerServing, hasUnresolvedIngredients, unresolvedIngredientNames, micronutrientsIncomplete } = computeNutritionFromIngredients(
     recomputedIngredients,
     foodItemsById
   );
@@ -408,6 +494,7 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     nutritionPerServing,
     hasUnresolvedIngredients,
     unresolvedIngredientNames,
+    micronutrientsIncomplete,
     mealSlotSuitability: original.mealSlotSuitability,
     dietaryTags: original.dietaryTags,
     allergens: original.allergens,
@@ -489,10 +576,11 @@ async function createVersionFromSnapshot(originalVersionId, snapshot, { createdB
     .filter((ingredient) => !foodItemsByNormalizedName.has(normalize(ingredient.name)))
     .map((ingredient) => ingredient.name);
 
-  const { nutritionPerServing, unresolvedIngredientNames: unresolvedFromNutrition } = computeNutritionFromIngredients(
-    versionIngredients,
-    foodItemsById
-  );
+  const {
+    nutritionPerServing,
+    unresolvedIngredientNames: unresolvedFromNutrition,
+    micronutrientsIncomplete,
+  } = computeNutritionFromIngredients(versionIngredients, foodItemsById);
   const allUnresolvedNames = Array.from(new Set([...unmatchedNames, ...unresolvedFromNutrition]));
 
   const latest = await RecipeVersion.findOne({ parentRecipeId: original.parentRecipeId }).sort({ versionNumber: -1 });
@@ -511,6 +599,7 @@ async function createVersionFromSnapshot(originalVersionId, snapshot, { createdB
     nutritionPerServing,
     hasUnresolvedIngredients: allUnresolvedNames.length > 0,
     unresolvedIngredientNames: allUnresolvedNames,
+    micronutrientsIncomplete,
     mealSlotSuitability: original.mealSlotSuitability,
     dietaryTags: original.dietaryTags,
     allergens: original.allergens,
@@ -521,8 +610,11 @@ async function createVersionFromSnapshot(originalVersionId, snapshot, { createdB
 
 module.exports = {
   computeNutritionFromIngredients,
+  computeMicronutrientsForVersion,
   resolveGramsForIngredient,
   syncV1FromRecipe,
   createCustomVersion,
   createVersionFromSnapshot,
+  NUTRITION_FIELDS,
+  MICRONUTRIENT_FIELDS,
 };

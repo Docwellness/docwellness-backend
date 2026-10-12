@@ -33,6 +33,7 @@
 // patients_controller.dart.
 
 const { DAY_GROUPS, mealMatchesDayGroup } = require('./dayGroups');
+const { sponsoredLabelOf } = require('./sponsored');
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -57,7 +58,7 @@ const SIDE_SALAD_ELIGIBLE_SLOTS = new Set(['Lunch', 'Dinner']);
  */
 async function fetchRecipePoolForOptions({ Recipe, dieticianId }) {
   return Recipe.find({ dieticianId })
-    .select('name servingTime nutrition supplementFacts image ingredients servingSize secondaryComponent components tags category _id')
+    .select('name servingTime nutrition supplementFacts image imageSource sponsoredLabel ingredients servingSize secondaryComponent components tags category _id')
     .lean();
 }
 
@@ -172,6 +173,7 @@ function buildServingTimeOptionsFromDocs({
         id,
         name: recipe.name || null,
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         nutrition: recipe.nutrition || null,
         supplementFacts: recipe.supplementFacts || null,
         secondaryComponent: recipe.secondaryComponent || null,

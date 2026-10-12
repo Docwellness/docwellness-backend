@@ -284,6 +284,7 @@ async function seedGoalTimeline(dietPlan) {
 
 module.exports = {
   seedGoalTimeline,
+  resolvePlanStartDate,
   seedMilestonesForRange,
   formatDayLabel,
   formatMonthLabel,

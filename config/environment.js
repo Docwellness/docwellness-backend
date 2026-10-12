@@ -36,6 +36,18 @@ module.exports = {
   // prerequisite for the app to keep working today.
   clientOrigin: process.env.CLIENT_ORIGIN,
   dieticianOrigin: process.env.DIETICIAN_ORIGIN,
+  // Admin panel (admin.docwellness.fit) - see openspec change add-admin-panel.
+  admin: {
+    origin: process.env.ADMIN_ORIGIN || 'https://admin.docwellness.fit',
+    // Exact-match, case-insensitive allowlist of Google accounts that may use
+    // the admin API. v1 is a single administrator.
+    emails: (process.env.ADMIN_EMAILS || 'docwellness.fit@gmail.com')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+    idleMinutes: Number(process.env.ADMIN_IDLE_MINUTES) || 30,
+    absoluteHours: Number(process.env.ADMIN_ABSOLUTE_HOURS) || 12,
+  },
   // Whether app.js also initializes the legacy socket handler
   // (sockets/chatSocket.js) alongside the v1 one (chat/socket/index.js -
   // see AI_EXECUTION_PLAN.md Phase 4, P4-08). Defaults to true (both
@@ -56,10 +68,10 @@ module.exports = {
     // Resend (SPF/DKIM/DMARC records) - sandbox can only deliver to the
     // Resend account's own verified email, not real users. Override with
     // RESEND_FROM_EMAIL once the domain is verified.
-    fromAddress: process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
+    fromAddress: process.env.RESEND_FROM_EMAIL || 'Docwellness <onboarding@resend.dev>',
     // Used for onboarding-style emails (e.g. the welcome email) that should
     // come from a real person rather than a no-reply address.
-    fromAddressPersonal: process.env.RESEND_FROM_EMAIL_PERSONAL || process.env.RESEND_FROM_EMAIL || 'DocWellness <onboarding@resend.dev>',
+    fromAddressPersonal: process.env.RESEND_FROM_EMAIL_PERSONAL || process.env.RESEND_FROM_EMAIL || 'Docwellness <onboarding@resend.dev>',
   },
   // Used for links inside emails (e.g. "Go to Dashboard") - the marketing/
   // web app's own origin, not this API's.

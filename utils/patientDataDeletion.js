@@ -36,7 +36,6 @@ const {
   Chat,
   Conversation,
   CustomFoodRequest,
-  JourneyImage,
   NeedAttentionLog,
   Review,
   Nudge,
@@ -50,6 +49,19 @@ const {
   SupplementItem,
   GroceryChecklist,
 } = require('../models');
+
+// The patient-uploaded "before / after journey photos" feature was replaced by
+// dietician-curated ClientJourney stories (models/ClientJourney.js), so there is
+// no JourneyImage model any more - but old documents (patient photos) can still
+// sit in the `journeyimages` collection and must still be erased on request.
+const mongoose = require('mongoose');
+const LegacyJourneyImage =
+  mongoose.models.LegacyJourneyImage ||
+  mongoose.model(
+    'LegacyJourneyImage',
+    new mongoose.Schema({}, { strict: false }),
+    'journeyimages'
+  );
 const { getSupabaseAdmin } = require('./supabaseAuth');
 
 /**
@@ -117,7 +129,7 @@ const DIRECT_CATEGORIES = {
   progress: { coll: 'progresses', Model: Progress, filter: (ids) => ({ patientId: { $in: ids } }) },
   journeyImage: {
     coll: 'journeyimages',
-    Model: JourneyImage,
+    Model: LegacyJourneyImage,
     filter: (ids) => ({ patientId: { $in: ids } }),
   },
   firstConsultation: {

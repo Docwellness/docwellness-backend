@@ -3,6 +3,7 @@ const {
 } = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
 const { sendPushToTokens } = require('../../utils/push');
+const { sponsoredLabelOf } = require('../../utils/sponsored');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
@@ -73,7 +74,7 @@ const dateToDayKey = (dateObj) => {
  * the normal single-Active-plan case.
  */
 const RECIPE_CARD_SELECT =
-  'name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts';
+  'name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts';
 
 /** Patient-facing Recipe card (same shape getActiveDietPlanForPatient's main
  *  block builds inline) - used to merge the next renewal cycle's recipes
@@ -87,12 +88,24 @@ function toPatientRecipeCard(recipe) {
     carbs: n.carbs ?? 0,
     fats: n.fats ?? 0,
     fiber: n.fiber ?? 0,
+    // fill-recipe-micronutrients (openspec): `?? null`, not `?? 0` - see
+    // dietPlanReadDispatch.js's identical convention/rationale.
+    saturatedFat: n.saturatedFat ?? null,
+    transFat: n.transFat ?? null,
+    sugar: n.sugar ?? null,
+    cholesterol: n.cholesterol ?? null,
+    sodium: n.sodium ?? null,
+    calcium: n.calcium ?? null,
+    iron: n.iron ?? null,
+    potassium: n.potassium ?? null,
+    vitaminC: n.vitaminC ?? null,
   };
   return {
     id,
     name: recipe.name || null,
     servingTime: recipe.servingTime || null,
     image: recipe.image || null,
+    sponsoredLabel: sponsoredLabelOf(recipe),
     tags:
       recipe.category === 'Supplements'
         ? [...(recipe.tags || []), 'supplement']
@@ -292,7 +305,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts')
+        .select('name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts')
         .lean()
       : [];
 
@@ -304,6 +317,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         name: recipe.name || null,
         servingTime: recipe.servingTime || null,
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         // Lets the app surface a dedicated Supplements tab (a multivitamin
         // otherwise sits anonymously, with zeroed macros, inside whatever
         // real servingTime slot it was assigned to - e.g. Night Drink -
@@ -334,6 +348,16 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           carbs: recipe.nutrition?.carbs ?? 0,
           fats: recipe.nutrition?.fats ?? 0,
           fiber: recipe.nutrition?.fiber ?? 0,
+          // fill-recipe-micronutrients (openspec): `?? null`, not `?? 0`.
+          saturatedFat: recipe.nutrition?.saturatedFat ?? null,
+          transFat: recipe.nutrition?.transFat ?? null,
+          sugar: recipe.nutrition?.sugar ?? null,
+          cholesterol: recipe.nutrition?.cholesterol ?? null,
+          sodium: recipe.nutrition?.sodium ?? null,
+          calcium: recipe.nutrition?.calcium ?? null,
+          iron: recipe.nutrition?.iron ?? null,
+          potassium: recipe.nutrition?.potassium ?? null,
+          vitaminC: recipe.nutrition?.vitaminC ?? null,
         },
         nutrition: {
           calories: recipe.nutrition?.calories ?? 0,
@@ -341,6 +365,15 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           carbs: recipe.nutrition?.carbs ?? 0,
           fats: recipe.nutrition?.fats ?? 0,
           fiber: recipe.nutrition?.fiber ?? 0,
+          saturatedFat: recipe.nutrition?.saturatedFat ?? null,
+          transFat: recipe.nutrition?.transFat ?? null,
+          sugar: recipe.nutrition?.sugar ?? null,
+          cholesterol: recipe.nutrition?.cholesterol ?? null,
+          sodium: recipe.nutrition?.sodium ?? null,
+          calcium: recipe.nutrition?.calcium ?? null,
+          iron: recipe.nutrition?.iron ?? null,
+          potassium: recipe.nutrition?.potassium ?? null,
+          vitaminC: recipe.nutrition?.vitaminC ?? null,
         },
         ingredients: Array.isArray(recipe.ingredients)
           ? recipe.ingredients.map((ingredient) => ({
@@ -1533,7 +1566,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name image servingSize secondaryComponent components nutrition')
+        .select('name image imageSource sponsoredLabel servingSize secondaryComponent components nutrition')
         .lean()
       : [];
 
@@ -1544,6 +1577,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
         id,
         name: recipe.name || null,
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         // Raw shape computeMealRatio (utils/weekNutritionSummary.js) needs -
         // see getTodayMealLogStats' own identical fix above for why a
         // single baseQuantity/ratio here silently ignored componentServings/
@@ -1646,6 +1680,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
           recipeId: meal.recipeId.toString(),
           name: recipe.name,
           image: recipe.image,
+          sponsoredLabel: recipe.sponsoredLabel || null,
           totalWeight: assignedQuantity,
           totalWeightUnit: recipe.totalWeightUnit,
           calories: Math.round(recipe.baseCalories * ratio),
@@ -1831,8 +1866,45 @@ exports.submitMealLog = async (req, res, next) => {
       if (loggedItems.length > 0 && receiverId) {
         const recipeIds = loggedItems.map((i) => i.recipeId);
         const recipesInfo = await Recipe.find({ _id: { $in: recipeIds } })
-          .select('name image nutrition')
+          .select('name image nutrition servingSize')
           .lean();
+
+        // Real macros for what was actually eaten. caloriesConsumed is already
+        // assigned-portion calories x servings, and a recipe's macros scale
+        // with its calories, so scale the recipe's own nutrition by
+        // caloriesConsumed / recipe calories.
+        const macroTotals = { protein: 0, carbs: 0, fat: 0, fiber: 0 };
+        loggedItems.forEach((item) => {
+          const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
+          const n = recipe?.nutrition;
+          if (!n) return;
+          const scale = n.calories > 0 ? (item.caloriesConsumed || 0) / n.calories : item.servings || 0;
+          macroTotals.protein += (n.protein || 0) * scale;
+          macroTotals.carbs += (n.carbs || 0) * scale;
+          macroTotals.fat += (n.fats || 0) * scale;
+          macroTotals.fiber += (n.fiber || 0) * scale;
+        });
+
+        // Quantity label = the dietician-assigned amount x servings eaten
+        // (75g assigned, 2 servings -> "150 g"). The app sends the assigned
+        // amount shown in the Log Meal sheet; fall back to the recipe's own
+        // serving size for older clients / quick log.
+        const fmtQty = (n) => (Math.round(n * 10) / 10).toString();
+        let quantityLabel = null;
+        if (loggedItems.length === 1) {
+          const item = loggedItems[0];
+          const recipe = recipesInfo.find((r) => r._id.toString() === item.recipeId.toString());
+          const assignedQty =
+            typeof item.assignedQuantity === 'number' && item.assignedQuantity > 0
+              ? item.assignedQuantity
+              : recipe?.servingSize?.quantity;
+          const assignedUnit = item.assignedUnit || recipe?.servingSize?.unit || '';
+          quantityLabel = assignedQty
+            ? `${fmtQty(assignedQty * item.servings)} ${assignedUnit}`.trim()
+            : `${fmtQty(item.servings)}x`;
+        } else {
+          quantityLabel = `${loggedItems.length} items`;
+        }
 
         const totalCaloriesLogged = loggedItems.reduce(
           (sum, item) => sum + (item.caloriesConsumed || 0),
@@ -1873,6 +1945,11 @@ exports.submitMealLog = async (req, res, next) => {
             itemName: mealNames.join(', '),
             calories: totalCaloriesLogged,
             servings: totalServingsLogged,
+            quantityLabel,
+            protein: Math.round(macroTotals.protein * 10) / 10,
+            carbs: Math.round(macroTotals.carbs * 10) / 10,
+            fat: Math.round(macroTotals.fat * 10) / 10,
+            fiber: Math.round(macroTotals.fiber * 10) / 10,
             servingTime: loggedItems[0]?.servingTime || '',
             totalConsumed: log.totalCalories,
           },

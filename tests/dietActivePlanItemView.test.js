@@ -106,6 +106,13 @@ test('returns real (not mis-scaled) nutrition, exact ingredients/steps, and the 
   // The REAL per-ingredient nutrition (100g oats @ 389kcal/100g = 389),
   // not the base Recipe's bogus authored 999 value.
   expect(recipeInResponse.nutritionPerServing.calories).toBeCloseTo(389);
+  // fill-recipe-micronutrients (openspec): Oats has no researched
+  // micronutrient data in this test, so every new field must come through
+  // as null - never silently coerced to 0 the way the macros above default
+  // when genuinely absent (dietPlanReadDispatch.js's `?? null`, not `?? 0`).
+  expect(recipeInResponse.nutritionPerServing.iron).toBeNull();
+  expect(recipeInResponse.nutritionPerServing.sodium).toBeNull();
+  expect(recipeInResponse.nutritionPerServing.vitaminC).toBeNull();
   expect(recipeInResponse.ingredients).toEqual([{ name: 'Oats', quantity: 100, unit: 'g', image: null, isScalable: true }]);
   // components is what food_card.dart's FoodCard actually renders (it only
   // falls back to servingSize.quantity/unit when components is empty) - the

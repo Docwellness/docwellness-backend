@@ -1,0 +1,1094 @@
+{
+  "q0": {
+    "ingredient": "Carrot",
+    "nutrient": "saturatedFat",
+    "value": 0.03,
+    "unit": "g",
+    "noul": 0.52
+  },
+  "q1": {
+    "ingredient": "Carrot",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.98
+  },
+  "q2": {
+    "ingredient": "Carrot",
+    "nutrient": "sugar",
+    "value": 4.74,
+    "unit": "g",
+    "noul": 0.83
+  },
+  "q3": {
+    "ingredient": "Carrot",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.99
+  },
+  "q4": {
+    "ingredient": "Carrot",
+    "nutrient": "sodium",
+    "value": 69,
+    "unit": "mg",
+    "noul": 0.26
+  },
+  "q5": {
+    "ingredient": "Carrot",
+    "nutrient": "calcium",
+    "value": 33,
+    "unit": "mg",
+    "noul": 0.76
+  },
+  "q6": {
+    "ingredient": "Carrot",
+    "nutrient": "iron",
+    "value": 0.3,
+    "unit": "mg",
+    "noul": 0.78
+  },
+  "q7": {
+    "ingredient": "Carrot",
+    "nutrient": "potassium",
+    "value": 320,
+    "unit": "mg",
+    "noul": 0.64
+  },
+  "q8": {
+    "ingredient": "Carrot",
+    "nutrient": "vitaminC",
+    "value": 5.9,
+    "unit": "mg",
+    "noul": 0.68
+  },
+  "q9": {
+    "ingredient": "Cucumber",
+    "nutrient": "saturatedFat",
+    "value": 0.04,
+    "unit": "g",
+    "noul": 0.45
+  },
+  "q10": {
+    "ingredient": "Cucumber",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.98
+  },
+  "q11": {
+    "ingredient": "Cucumber",
+    "nutrient": "sugar",
+    "value": 1.67,
+    "unit": "g",
+    "noul": 0.62
+  },
+  "q12": {
+    "ingredient": "Cucumber",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.99
+  },
+  "q13": {
+    "ingredient": "Cucumber",
+    "nutrient": "sodium",
+    "value": 2,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q14": {
+    "ingredient": "Cucumber",
+    "nutrient": "calcium",
+    "value": 16,
+    "unit": "mg",
+    "noul": 0.76
+  },
+  "q15": {
+    "ingredient": "Cucumber",
+    "nutrient": "iron",
+    "value": 0.28,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q16": {
+    "ingredient": "Cucumber",
+    "nutrient": "potassium",
+    "value": 147,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q17": {
+    "ingredient": "Cucumber",
+    "nutrient": "vitaminC",
+    "value": 2.8,
+    "unit": "mg",
+    "noul": 0.68
+  },
+  "q18": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "saturatedFat",
+    "value": 0.052,
+    "unit": "g",
+    "noul": 0.63
+  },
+  "q19": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "sugar",
+    "value": 0.87,
+    "unit": "g",
+    "noul": 0.72
+  },
+  "q20": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q21": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "sodium",
+    "value": 46,
+    "unit": "mg",
+    "noul": 0.62
+  },
+  "q22": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "calcium",
+    "value": 67,
+    "unit": "mg",
+    "noul": 0.7
+  },
+  "q23": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "iron",
+    "value": 1.77,
+    "unit": "mg",
+    "noul": 0.76
+  },
+  "q24": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "potassium",
+    "value": 521,
+    "unit": "mg",
+    "noul": 0.62
+  },
+  "q25": {
+    "ingredient": "Coriander Leaves",
+    "nutrient": "vitaminC",
+    "value": 27,
+    "unit": "mg",
+    "noul": 0.59
+  },
+  "q26": {
+    "ingredient": "Curry Leaves",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q27": {
+    "ingredient": "Curry Leaves",
+    "nutrient": "calcium",
+    "value": 820,
+    "unit": "mg",
+    "noul": 0.41
+  },
+  "q28": {
+    "ingredient": "Curry Leaves",
+    "nutrient": "iron",
+    "value": 5.1,
+    "unit": "mg",
+    "noul": 0.68
+  },
+  "q29": {
+    "ingredient": "Curry Leaves",
+    "nutrient": "vitaminC",
+    "value": 8,
+    "unit": "mg",
+    "noul": 0.61
+  },
+  "q30": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "saturatedFat",
+    "value": 1.54,
+    "unit": "g",
+    "noul": 0.54
+  },
+  "q31": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "sugar",
+    "value": 2.25,
+    "unit": "g",
+    "noul": 0.67
+  },
+  "q32": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q33": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "sodium",
+    "value": 168,
+    "unit": "mg",
+    "noul": 0.14
+  },
+  "q34": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "calcium",
+    "value": 931,
+    "unit": "mg",
+    "noul": 0.38
+  },
+  "q35": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "iron",
+    "value": 66.4,
+    "unit": "mg",
+    "noul": 0.5
+  },
+  "q36": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "potassium",
+    "value": 1788,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q37": {
+    "ingredient": "Cumin Seeds",
+    "nutrient": "vitaminC",
+    "value": 7.7,
+    "unit": "mg",
+    "noul": 0.25
+  },
+  "q38": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "saturatedFat",
+    "value": 1.84,
+    "unit": "g",
+    "noul": 0.46
+  },
+  "q39": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "sugar",
+    "value": 3.21,
+    "unit": "g",
+    "noul": 0.59
+  },
+  "q40": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q41": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "sodium",
+    "value": 27,
+    "unit": "mg",
+    "noul": 0.75
+  },
+  "q42": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "calcium",
+    "value": 168,
+    "unit": "mg",
+    "noul": 0.72
+  },
+  "q43": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "iron",
+    "value": 55,
+    "unit": "mg",
+    "noul": 0.32
+  },
+  "q44": {
+    "ingredient": "Turmeric Powder",
+    "nutrient": "potassium",
+    "value": 2080,
+    "unit": "mg",
+    "noul": 0.67
+  },
+  "q45": {
+    "ingredient": "Cardamom",
+    "nutrient": "saturatedFat",
+    "value": 0.68,
+    "unit": "g",
+    "noul": 0.55
+  },
+  "q46": {
+    "ingredient": "Cardamom",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q47": {
+    "ingredient": "Cardamom",
+    "nutrient": "sodium",
+    "value": 18,
+    "unit": "mg",
+    "noul": 0.7
+  },
+  "q48": {
+    "ingredient": "Cardamom",
+    "nutrient": "calcium",
+    "value": 383,
+    "unit": "mg",
+    "noul": 0.59
+  },
+  "q49": {
+    "ingredient": "Cardamom",
+    "nutrient": "iron",
+    "value": 14,
+    "unit": "mg",
+    "noul": 0.5
+  },
+  "q50": {
+    "ingredient": "Cardamom",
+    "nutrient": "potassium",
+    "value": 1119,
+    "unit": "mg",
+    "noul": 0.67
+  },
+  "q51": {
+    "ingredient": "Cardamom",
+    "nutrient": "vitaminC",
+    "value": 21,
+    "unit": "mg",
+    "noul": 0.34
+  },
+  "q52": {
+    "ingredient": "Garam Masala",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q53": {
+    "ingredient": "Garam Masala",
+    "nutrient": "sodium",
+    "value": 325,
+    "unit": "mg",
+    "noul": 0.53
+  },
+  "q54": {
+    "ingredient": "Garam Masala",
+    "nutrient": "calcium",
+    "value": 50,
+    "unit": "mg",
+    "noul": 0.45
+  },
+  "q55": {
+    "ingredient": "Garam Masala",
+    "nutrient": "iron",
+    "value": 2,
+    "unit": "mg",
+    "noul": 0.36
+  },
+  "q56": {
+    "ingredient": "Garam Masala",
+    "nutrient": "vitaminC",
+    "value": 3,
+    "unit": "mg",
+    "noul": 0.53
+  },
+  "q57": {
+    "ingredient": "Lemon",
+    "nutrient": "saturatedFat",
+    "value": 0.04,
+    "unit": "g",
+    "noul": 0.65
+  },
+  "q58": {
+    "ingredient": "Lemon",
+    "nutrient": "sugar",
+    "value": 2.5,
+    "unit": "g",
+    "noul": 0.66
+  },
+  "q59": {
+    "ingredient": "Lemon",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q60": {
+    "ingredient": "Lemon",
+    "nutrient": "sodium",
+    "value": 2,
+    "unit": "mg",
+    "noul": 0.82
+  },
+  "q61": {
+    "ingredient": "Lemon",
+    "nutrient": "calcium",
+    "value": 26,
+    "unit": "mg",
+    "noul": 0.8
+  },
+  "q62": {
+    "ingredient": "Lemon",
+    "nutrient": "iron",
+    "value": 0.6,
+    "unit": "mg",
+    "noul": 0.61
+  },
+  "q63": {
+    "ingredient": "Lemon",
+    "nutrient": "potassium",
+    "value": 138,
+    "unit": "mg",
+    "noul": 0.73
+  },
+  "q64": {
+    "ingredient": "Lemon",
+    "nutrient": "vitaminC",
+    "value": 53,
+    "unit": "mg",
+    "noul": 0.51
+  },
+  "q65": {
+    "ingredient": "Milk",
+    "nutrient": "saturatedFat",
+    "value": 1.87,
+    "unit": "g",
+    "noul": 0.63
+  },
+  "q66": {
+    "ingredient": "Milk",
+    "nutrient": "sugar",
+    "value": 5.05,
+    "unit": "g",
+    "noul": 0.56
+  },
+  "q67": {
+    "ingredient": "Milk",
+    "nutrient": "cholesterol",
+    "value": 10,
+    "unit": "mg",
+    "noul": 0.64
+  },
+  "q68": {
+    "ingredient": "Milk",
+    "nutrient": "sodium",
+    "value": 43,
+    "unit": "mg",
+    "noul": 0.74
+  },
+  "q69": {
+    "ingredient": "Milk",
+    "nutrient": "calcium",
+    "value": 113,
+    "unit": "mg",
+    "noul": 0.73
+  },
+  "q70": {
+    "ingredient": "Milk",
+    "nutrient": "iron",
+    "value": 0.03,
+    "unit": "mg",
+    "noul": 0.75
+  },
+  "q71": {
+    "ingredient": "Milk",
+    "nutrient": "potassium",
+    "value": 132,
+    "unit": "mg",
+    "noul": 0.49
+  },
+  "q72": {
+    "ingredient": "Milk",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.47
+  },
+  "q73": {
+    "ingredient": "Oil",
+    "nutrient": "saturatedFat",
+    "value": 10.3,
+    "unit": "g",
+    "noul": 0.74
+  },
+  "q74": {
+    "ingredient": "Oil",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.79
+  },
+  "q75": {
+    "ingredient": "Oil",
+    "nutrient": "sugar",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.99
+  },
+  "q76": {
+    "ingredient": "Oil",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.91
+  },
+  "q77": {
+    "ingredient": "Oil",
+    "nutrient": "sodium",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.93
+  },
+  "q78": {
+    "ingredient": "Oil",
+    "nutrient": "calcium",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.93
+  },
+  "q79": {
+    "ingredient": "Oil",
+    "nutrient": "iron",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.76
+  },
+  "q80": {
+    "ingredient": "Oil",
+    "nutrient": "potassium",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.91
+  },
+  "q81": {
+    "ingredient": "Oil",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.96
+  },
+  "q82": {
+    "ingredient": "Olive Oil",
+    "nutrient": "saturatedFat",
+    "value": 13.8,
+    "unit": "g",
+    "noul": 0.42
+  },
+  "q83": {
+    "ingredient": "Olive Oil",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.88
+  },
+  "q84": {
+    "ingredient": "Olive Oil",
+    "nutrient": "sugar",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.98
+  },
+  "q85": {
+    "ingredient": "Olive Oil",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.97
+  },
+  "q86": {
+    "ingredient": "Olive Oil",
+    "nutrient": "sodium",
+    "value": 2,
+    "unit": "mg",
+    "noul": 0.79
+  },
+  "q87": {
+    "ingredient": "Olive Oil",
+    "nutrient": "calcium",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.84
+  },
+  "q88": {
+    "ingredient": "Olive Oil",
+    "nutrient": "iron",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.39
+  },
+  "q89": {
+    "ingredient": "Olive Oil",
+    "nutrient": "potassium",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.75
+  },
+  "q90": {
+    "ingredient": "Olive Oil",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.83
+  },
+  "q91": {
+    "ingredient": "Rice",
+    "nutrient": "saturatedFat",
+    "value": 0.18,
+    "unit": "g",
+    "noul": 0.54
+  },
+  "q92": {
+    "ingredient": "Rice",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.97
+  },
+  "q93": {
+    "ingredient": "Rice",
+    "nutrient": "sugar",
+    "value": 0.09,
+    "unit": "g",
+    "noul": 0.69
+  },
+  "q94": {
+    "ingredient": "Rice",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q95": {
+    "ingredient": "Rice",
+    "nutrient": "sodium",
+    "value": 1,
+    "unit": "mg",
+    "noul": 0.65
+  },
+  "q96": {
+    "ingredient": "Rice",
+    "nutrient": "calcium",
+    "value": 10,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q97": {
+    "ingredient": "Rice",
+    "nutrient": "iron",
+    "value": 0.35,
+    "unit": "mg",
+    "noul": 0.67
+  },
+  "q98": {
+    "ingredient": "Rice",
+    "nutrient": "potassium",
+    "value": 96,
+    "unit": "mg",
+    "noul": 0.56
+  },
+  "q99": {
+    "ingredient": "Rice",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.89
+  },
+  "q100": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "saturatedFat",
+    "value": 0.8,
+    "unit": "g",
+    "noul": 0.63
+  },
+  "q101": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.95
+  },
+  "q102": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "sugar",
+    "value": 10.9,
+    "unit": "g",
+    "noul": 0.12
+  },
+  "q103": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q104": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "sodium",
+    "value": 64,
+    "unit": "mg",
+    "noul": 0.77
+  },
+  "q105": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "calcium",
+    "value": 45,
+    "unit": "mg",
+    "noul": 0.6
+  },
+  "q106": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "iron",
+    "value": 4.88,
+    "unit": "mg",
+    "noul": 0.77
+  },
+  "q107": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "potassium",
+    "value": 846,
+    "unit": "mg",
+    "noul": 0.67
+  },
+  "q108": {
+    "ingredient": "Chickpea Flour (Besan)",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.78
+  },
+  "q109": {
+    "ingredient": "Moong Dal",
+    "nutrient": "saturatedFat",
+    "value": 0.384,
+    "unit": "g",
+    "noul": 0.61
+  },
+  "q110": {
+    "ingredient": "Moong Dal",
+    "nutrient": "sugar",
+    "value": 6.6,
+    "unit": "g",
+    "noul": 0.24
+  },
+  "q111": {
+    "ingredient": "Moong Dal",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q112": {
+    "ingredient": "Moong Dal",
+    "nutrient": "sodium",
+    "value": 15,
+    "unit": "mg",
+    "noul": 0.77
+  },
+  "q113": {
+    "ingredient": "Moong Dal",
+    "nutrient": "calcium",
+    "value": 132,
+    "unit": "mg",
+    "noul": 0.47
+  },
+  "q114": {
+    "ingredient": "Moong Dal",
+    "nutrient": "iron",
+    "value": 6.74,
+    "unit": "mg",
+    "noul": 0.74
+  },
+  "q115": {
+    "ingredient": "Moong Dal",
+    "nutrient": "potassium",
+    "value": 1246,
+    "unit": "mg",
+    "noul": 0.48
+  },
+  "q116": {
+    "ingredient": "Moong Dal",
+    "nutrient": "vitaminC",
+    "value": 4.8,
+    "unit": "mg",
+    "noul": 0.23
+  },
+  "q117": {
+    "ingredient": "Honey",
+    "nutrient": "saturatedFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.95
+  },
+  "q118": {
+    "ingredient": "Honey",
+    "nutrient": "sugar",
+    "value": 82.12,
+    "unit": "g",
+    "noul": 0.77
+  },
+  "q119": {
+    "ingredient": "Honey",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.96
+  },
+  "q120": {
+    "ingredient": "Honey",
+    "nutrient": "sodium",
+    "value": 4,
+    "unit": "mg",
+    "noul": 0.71
+  },
+  "q121": {
+    "ingredient": "Honey",
+    "nutrient": "calcium",
+    "value": 6,
+    "unit": "mg",
+    "noul": 0.62
+  },
+  "q122": {
+    "ingredient": "Honey",
+    "nutrient": "iron",
+    "value": 0.42,
+    "unit": "mg",
+    "noul": 0.72
+  },
+  "q123": {
+    "ingredient": "Honey",
+    "nutrient": "potassium",
+    "value": 52,
+    "unit": "mg",
+    "noul": 0.53
+  },
+  "q124": {
+    "ingredient": "Honey",
+    "nutrient": "vitaminC",
+    "value": 0.5,
+    "unit": "mg",
+    "noul": 0.51
+  },
+  "q125": {
+    "ingredient": "Jaggery",
+    "nutrient": "saturatedFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.95
+  },
+  "q126": {
+    "ingredient": "Jaggery",
+    "nutrient": "transFat",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.96
+  },
+  "q127": {
+    "ingredient": "Jaggery",
+    "nutrient": "sugar",
+    "value": 97,
+    "unit": "g",
+    "noul": 0.4
+  },
+  "q128": {
+    "ingredient": "Jaggery",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q129": {
+    "ingredient": "Jaggery",
+    "nutrient": "sodium",
+    "value": 30,
+    "unit": "mg",
+    "noul": 0.49
+  },
+  "q130": {
+    "ingredient": "Jaggery",
+    "nutrient": "calcium",
+    "value": 80,
+    "unit": "mg",
+    "noul": 0.58
+  },
+  "q131": {
+    "ingredient": "Jaggery",
+    "nutrient": "iron",
+    "value": 11,
+    "unit": "mg",
+    "noul": 0.31
+  },
+  "q132": {
+    "ingredient": "Jaggery",
+    "nutrient": "potassium",
+    "value": 110,
+    "unit": "mg",
+    "noul": 0.35
+  },
+  "q133": {
+    "ingredient": "Jaggery",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.92
+  },
+  "q134": {
+    "ingredient": "Ghee",
+    "nutrient": "saturatedFat",
+    "value": 61.9,
+    "unit": "g",
+    "noul": 0.61
+  },
+  "q135": {
+    "ingredient": "Ghee",
+    "nutrient": "sugar",
+    "value": 0,
+    "unit": "g",
+    "noul": 0.96
+  },
+  "q136": {
+    "ingredient": "Ghee",
+    "nutrient": "cholesterol",
+    "value": 256,
+    "unit": "mg",
+    "noul": 0.59
+  },
+  "q137": {
+    "ingredient": "Ghee",
+    "nutrient": "sodium",
+    "value": 2,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q138": {
+    "ingredient": "Ghee",
+    "nutrient": "calcium",
+    "value": 4,
+    "unit": "mg",
+    "noul": 0.65
+  },
+  "q139": {
+    "ingredient": "Ghee",
+    "nutrient": "iron",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.84
+  },
+  "q140": {
+    "ingredient": "Ghee",
+    "nutrient": "potassium",
+    "value": 5,
+    "unit": "mg",
+    "noul": 0.62
+  },
+  "q141": {
+    "ingredient": "Ghee",
+    "nutrient": "vitaminC",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.96
+  },
+  "q142": {
+    "ingredient": "Green Peas",
+    "nutrient": "saturatedFat",
+    "value": 0.07,
+    "unit": "g",
+    "noul": 0.73
+  },
+  "q143": {
+    "ingredient": "Green Peas",
+    "nutrient": "sugar",
+    "value": 5.67,
+    "unit": "g",
+    "noul": 0.63
+  },
+  "q144": {
+    "ingredient": "Green Peas",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q145": {
+    "ingredient": "Green Peas",
+    "nutrient": "sodium",
+    "value": 5,
+    "unit": "mg",
+    "noul": 0.77
+  },
+  "q146": {
+    "ingredient": "Green Peas",
+    "nutrient": "calcium",
+    "value": 25,
+    "unit": "mg",
+    "noul": 0.7
+  },
+  "q147": {
+    "ingredient": "Green Peas",
+    "nutrient": "iron",
+    "value": 1.47,
+    "unit": "mg",
+    "noul": 0.69
+  },
+  "q148": {
+    "ingredient": "Green Peas",
+    "nutrient": "potassium",
+    "value": 244,
+    "unit": "mg",
+    "noul": 0.68
+  },
+  "q149": {
+    "ingredient": "Green Peas",
+    "nutrient": "vitaminC",
+    "value": 40,
+    "unit": "mg",
+    "noul": 0.36
+  },
+  "q150": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "cholesterol",
+    "value": 0,
+    "unit": "mg",
+    "noul": 0.98
+  },
+  "q151": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "sodium",
+    "value": 35,
+    "unit": "mg",
+    "noul": 0.77
+  },
+  "q152": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "calcium",
+    "value": 709,
+    "unit": "mg",
+    "noul": 0.46
+  },
+  "q153": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "iron",
+    "value": 16.32,
+    "unit": "mg",
+    "noul": 0.58
+  },
+  "q154": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "potassium",
+    "value": 1267,
+    "unit": "mg",
+    "noul": 0.7
+  },
+  "q155": {
+    "ingredient": "Coriander Powder",
+    "nutrient": "vitaminC",
+    "value": 21,
+    "unit": "mg",
+    "noul": 0.18
+  }
+}

@@ -34,6 +34,11 @@ const chatSchema = new mongoose.Schema(
       itemName: String,
       calories: Number,
       servings: Number,
+      // Macros (g) for what was actually eaten in this meal_log message.
+      protein: Number,
+      carbs: Number,
+      fat: Number,
+      fiber: Number,
       servingTime: String,
       totalConsumed: Number,
       totalPlanned: Number,

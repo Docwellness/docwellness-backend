@@ -43,7 +43,10 @@ const connectDB = require('../config/database');
 const EXECUTE = process.argv.includes('--execute');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice('--only='.length) || null;
 
-const MANIFEST_PATH = path.join(__dirname, 'data', 'recipe-image-migration-batch1-100.jsonl');
+// Defaults to batch 1; pass --manifest=<file under scripts/data/> for a later batch
+// (e.g. --manifest=recipe-image-migration-batch2-5.jsonl).
+const MANIFEST_ARG = (process.argv.find((a) => a.startsWith('--manifest=')) || '').slice('--manifest='.length);
+const MANIFEST_PATH = path.join(__dirname, 'data', path.basename(MANIFEST_ARG || 'recipe-image-migration-batch1-100.jsonl'));
 
 function loadManifest() {
   const lines = fs.readFileSync(MANIFEST_PATH, 'utf8').trim().split('\n');

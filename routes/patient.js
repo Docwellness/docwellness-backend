@@ -27,7 +27,7 @@ const {
   dietPlanRequestController,
   dietController,
   waterController,
-  journeyController,
+  supplementLogController,
   firstConsultationController,
   timelineController,
   exerciseController,
@@ -175,6 +175,18 @@ router.post(
  * @desc    Delete patient account
  */
 router.delete('/profile', patientOnly, profileController.deleteAccount);
+
+/**
+ * @route   GET /api/patient/data-deletion/categories
+ * @desc    Data categories the patient can choose to delete
+ */
+router.get('/data-deletion/categories', patientOnly, profileController.getDeletableDataCategories);
+
+/**
+ * @route   POST /api/patient/data-deletion
+ * @desc    Delete selected data categories (or the whole account); password required
+ */
+router.post('/data-deletion', patientOnly, profileController.requestDataDeletion);
 
 // ==========================================
 // Health Profile Routes
@@ -351,16 +363,6 @@ router.put(
 );
 
 /**
- * @route   PATCH /api/patient/diet-plan-requests/:id/plan
- * @desc    Set the membership plan chosen for a diet plan request
- */
-router.patch(
-  '/diet-plan-requests/:id/plan',
-  patientOnly,
-  dietPlanRequestController.selectMembershipPlan
-);
-
-/**
  * @route   POST /api/patient/diet-plan-requests/:id/renew
  * @desc    Start a renewal cycle on an already-activated diet plan request
  */
@@ -517,6 +519,11 @@ router.get('/water/today', patientOnly, waterController.getToday);
 router.get('/water/history', patientOnly, waterController.getHistory);
 router.put('/water/goal', patientOnly, waterController.updateGoal);
 
+// Supplement logging (optional - never counts toward adherence)
+router.get('/supplement-log', patientOnly, supplementLogController.getSupplementLogs);
+router.post('/supplement-log', patientOnly, supplementLogController.logSupplement);
+router.delete('/supplement-log', patientOnly, supplementLogController.unlogSupplement);
+
 // ==========================================
 // Exercise Plan (patient-facing)
 // ==========================================
@@ -526,41 +533,15 @@ router.get('/exercise-log/today-stats', patientOnly, exerciseController.getToday
 router.post('/exercise-log', patientOnly, exerciseController.submitExerciseLog);
 
 // ==========================================
-// Journey Routes
+// Client Journeys (dietician-curated before/after + review)
 // ==========================================
 
 /**
- * @route   GET /api/patient/journey/auto
- * @desc    Get auto-generated journey (first body log = before, latest = after)
+ * @route   GET /api/patient/client-journeys
+ * @desc    Active client journeys from the patient's dietician
  */
-router.get('/journey/auto', patientOnly, journeyController.getAutoJourney);
-
-/**
- * @route   GET /api/patient/journey/milestones
- * @desc    Get milestone-based journey cards from body log images
- */
-router.get('/journey/milestones', patientOnly, journeyController.getJourneyMilestones);
-
-/**
- * @route   POST /api/patient/journey
- * @desc    Upload journey images (before/after) — manual override
- */
-router.post(
-  '/journey',
-  patientOnly,
-  uploadLimiter,
-  upload.fields([
-    { name: 'beforeImage', maxCount: 1 },
-    { name: 'afterImage', maxCount: 1 },
-  ]),
-  journeyController.uploadJourneyImage
-);
-
-/**
- * @route   GET /api/patient/journey
- * @desc    Get all manually uploaded journey images for the patient
- */
-router.get('/journey', patientOnly, journeyController.getJourneyImages);
+const { getActiveClientJourneysForPatient } = require('../controllers/dietician/clientJourneyController');
+router.get('/client-journeys', patientOnly, getActiveClientJourneysForPatient);
 
 // ==========================================
 // Device Token (push notifications)

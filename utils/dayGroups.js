@@ -1,6 +1,6 @@
 // Shared day-of-week grouping for diet plans: Monday's meals repeat on
 // Friday, Tuesday's on Saturday, Wednesday's on Sunday, Thursday is unique
-// (see DocWellness Diet Plan 4page-4.pdf's actual 7-day template). Used by
+// (see Docwellness Diet Plan 4page-4.pdf's actual 7-day template). Used by
 // both the dietician-side controller (building/persisting the 4 groups)
 // and the patient-side controller (resolving which group today falls
 // into), kept here to avoid cross-imports between those two controllers.

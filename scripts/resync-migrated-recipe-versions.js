@@ -34,7 +34,12 @@ const MIGRATED_RECIPE_NAMES = [
 ];
 
 async function main() {
-  await mongoose.connect(process.env.MONGODB_URI);
+  // See audit-recipe-missing-nutrition.js's matching comment - a bare
+  // mongoose.connect(process.env.MONGODB_URI) fails against prod's
+  // self-hosted instance ("self-signed certificate in certificate chain"),
+  // connectDB already knows how to load its private CA.
+  const connectDB = require('../config/database');
+  await connectDB();
   console.log(`Connected: ${mongoose.connection.host} / ${mongoose.connection.name}`);
 
   const { Recipe, RecipeVersion } = require('../models');

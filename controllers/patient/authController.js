@@ -272,7 +272,7 @@ exports.register = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Welcome to DocWellness.',
+      message: 'Registration successful! Welcome to Docwellness.',
       data: {
         _id: user._id,
         email: user.email,

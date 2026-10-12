@@ -1,0 +1,5504 @@
+{
+  "generatedAt": "2026-10-04",
+  "realFlagThreshold": 0.08,
+  "note": "Threshold is the recalibrated one from .jev-plausibility-calibration-notes.md (real absurdity, not the general 0.7 bar) - this check cannot affirm correctness, only catch gross errors.",
+  "totalCalls": 13,
+  "estimatedCostUsd": 0.003746148,
+  "realFlags": [],
+  "allResults": {
+    "Bell Pepper": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.95
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 4.2,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 4,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 7,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.34,
+        "noul": 0.95
+      },
+      "potassium": {
+        "value": 211,
+        "noul": 0.95
+      },
+      "vitaminC": {
+        "value": 80.4,
+        "noul": 0.93
+      }
+    },
+    "Potato": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.97
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 0.78,
+        "noul": 0.96
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 12,
+        "noul": 0.96
+      },
+      "iron": {
+        "value": 0.78,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 425,
+        "noul": 0.96
+      },
+      "vitaminC": {
+        "value": 19.7,
+        "noul": 0.87
+      }
+    },
+    "Spinach": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0.42,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 79,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 99,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 2.71,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 558,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 28.1,
+        "noul": 0.9
+      }
+    },
+    "Cauliflower": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.95
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 1.91,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 30,
+        "noul": 0.95
+      },
+      "calcium": {
+        "value": 22,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.42,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 299,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 48.2,
+        "noul": 0.91
+      }
+    },
+    "Beetroot": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 6.76,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 78,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 16,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.8,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 325,
+        "noul": 0.95
+      },
+      "vitaminC": {
+        "value": 4.9,
+        "noul": 0.93
+      }
+    },
+    "Green Beans": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 3.26,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 37,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 1.03,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 211,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 12.2,
+        "noul": 0.92
+      }
+    },
+    "Doodhi (Bottle Gourd)": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 1.5,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 26,
+        "noul": 0.93
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 150,
+        "noul": 0.95
+      },
+      "vitaminC": {
+        "value": 10.1,
+        "noul": 0.92
+      }
+    },
+    "Okra": {
+      "saturatedFat": {
+        "value": 0.08,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 1.48,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 8,
+        "noul": 0.95
+      },
+      "calcium": {
+        "value": 82,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 0.62,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 299,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 23,
+        "noul": 0.93
+      }
+    },
+    "Broccoli": {
+      "saturatedFat": {
+        "value": 0.04,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 1.7,
+        "noul": 0.96
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 33,
+        "noul": 0.95
+      },
+      "calcium": {
+        "value": 47,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.73,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 316,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 89.2,
+        "noul": 0.9
+      }
+    },
+    "Zucchini": {
+      "saturatedFat": {
+        "value": 0.1,
+        "noul": 0.95
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 2.5,
+        "noul": 0.96
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 8,
+        "noul": 0.95
+      },
+      "calcium": {
+        "value": 16,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.37,
+        "noul": 0.95
+      },
+      "potassium": {
+        "value": 261,
+        "noul": 0.96
+      },
+      "vitaminC": {
+        "value": 17.9,
+        "noul": 0.94
+      }
+    },
+    "Mushroom": {
+      "saturatedFat": {
+        "value": 0.05,
+        "noul": 0.95
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 2,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 3,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.5,
+        "noul": 0.95
+      },
+      "potassium": {
+        "value": 318,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 2.1,
+        "noul": 0.93
+      }
+    },
+    "Sweet Corn": {
+      "saturatedFat": {
+        "value": 0.35,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 6.26,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 15,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 2,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 0.52,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 270,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 6.8,
+        "noul": 0.94
+      }
+    },
+    "Sweet Potato": {
+      "saturatedFat": {
+        "value": 0.01,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 4.18,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 55,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 30,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 0.61,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 337,
+        "noul": 0.95
+      },
+      "vitaminC": {
+        "value": 2.4,
+        "noul": 0.9
+      }
+    },
+    "Brinjal": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 3.2,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.95
+      },
+      "calcium": {
+        "value": 9,
+        "noul": 0.96
+      },
+      "iron": {
+        "value": 0.23,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 229,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 2.2,
+        "noul": 0.95
+      }
+    },
+    "Ridge Gourd": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 2,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 3,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.5,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 140,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 12,
+        "noul": 0.86
+      }
+    },
+    "Red Onion": {
+      "saturatedFat": {
+        "value": 0.04,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 4.24,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 4,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 23,
+        "noul": 0.93
+      },
+      "iron": {
+        "value": 0.21,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 146,
+        "noul": 0.93
+      },
+      "vitaminC": {
+        "value": 7.4,
+        "noul": 0.87
+      }
+    },
+    "Spring Onion": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 2.33,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 16,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 72,
+        "noul": 0.82
+      },
+      "iron": {
+        "value": 1.48,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 276,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 18.8,
+        "noul": 0.84
+      }
+    },
+    "Lettuce": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 0.78,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 28,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 36,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 0.86,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 194,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 9.2,
+        "noul": 0.86
+      }
+    },
+    "Celery": {
+      "saturatedFat": {
+        "value": 0.04,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 1.34,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 80,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 40,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 260,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 3.1,
+        "noul": 0.95
+      }
+    },
+    "Lime": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 1.69,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 33,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 0.6,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 102,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 29.1,
+        "noul": 0.85
+      }
+    },
+    "Banana": {
+      "saturatedFat": {
+        "value": 0.11,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 12.23,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 5,
+        "noul": 0.95
+      },
+      "iron": {
+        "value": 0.26,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 358,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 8.7,
+        "noul": 0.94
+      }
+    },
+    "Pomegranate": {
+      "saturatedFat": {
+        "value": 0.12,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 13.67,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 3,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 10,
+        "noul": 0.96
+      },
+      "iron": {
+        "value": 0.3,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 236,
+        "noul": 0.93
+      },
+      "vitaminC": {
+        "value": 10.2,
+        "noul": 0.92
+      }
+    },
+    "Apple": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 10.39,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 6,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 0.12,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 107,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 4.6,
+        "noul": 0.94
+      }
+    },
+    "Avocado": {
+      "saturatedFat": {
+        "value": 2.13,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.66,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 7,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 12,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 0.55,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 485,
+        "noul": 0.95
+      },
+      "vitaminC": {
+        "value": 10,
+        "noul": 0.92
+      }
+    },
+    "Date": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 63.35,
+        "noul": 0.69
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.89
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 39,
+        "noul": 0.77
+      },
+      "iron": {
+        "value": 0.9,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 656,
+        "noul": 0.76
+      },
+      "vitaminC": {
+        "value": 0.4,
+        "noul": 0.8
+      }
+    },
+    "Fig": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 16.26,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 35,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 0.37,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 232,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 2,
+        "noul": 0.82
+      }
+    },
+    "Raisins": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 59.19,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 11,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 50,
+        "noul": 0.94
+      },
+      "iron": {
+        "value": 1.88,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 749,
+        "noul": 0.93
+      },
+      "vitaminC": {
+        "value": 2.3,
+        "noul": 0.89
+      }
+    },
+    "Watermelon": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 6.2,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 7,
+        "noul": 0.93
+      },
+      "iron": {
+        "value": 0.24,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 112,
+        "noul": 0.93
+      },
+      "vitaminC": {
+        "value": 8.1,
+        "noul": 0.87
+      }
+    },
+    "Dried Cranberries": {
+      "saturatedFat": {
+        "value": 0.03,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 65,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 3,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 10,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.4,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 40,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0.5,
+        "noul": 0.92
+      }
+    },
+    "Coconut": {
+      "saturatedFat": {
+        "value": 30.35,
+        "noul": 0.82
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 6.23,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 14,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 2.43,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 356,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 3.3,
+        "noul": 0.87
+      }
+    },
+    "Olives": {
+      "saturatedFat": {
+        "value": 1.42,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.86
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 1556,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 52,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 3.3,
+        "noul": 0.76
+      },
+      "potassium": {
+        "value": 8,
+        "noul": 0.7
+      },
+      "vitaminC": {
+        "value": 0.9,
+        "noul": 0.91
+      }
+    },
+    "Amla (Indian Gooseberry)": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 25,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.31,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 198,
+        "noul": 0.88
+      },
+      "vitaminC": {
+        "value": 445.9,
+        "noul": 0.81
+      }
+    },
+    "Amla Juice": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 15,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 80,
+        "noul": 0.81
+      },
+      "vitaminC": {
+        "value": 180,
+        "noul": 0.64
+      }
+    },
+    "Kokum": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Tamarind": {
+      "saturatedFat": {
+        "value": 0.24,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 38.1,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 28,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 74,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 2.8,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 628,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 3.5,
+        "noul": 0.92
+      }
+    },
+    "Paneer": {
+      "saturatedFat": {
+        "value": 11.2,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0.3,
+        "noul": 0.82
+      },
+      "sugar": {
+        "value": 2.6,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 68,
+        "noul": 0.89
+      },
+      "sodium": {
+        "value": 18,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 208,
+        "noul": 0.93
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 82,
+        "noul": 0.88
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Yogurt": {
+      "saturatedFat": {
+        "value": 2.1,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0.1,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 4.7,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 13,
+        "noul": 0.93
+      },
+      "sodium": {
+        "value": 46,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 121,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 0.05,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 155,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0.5,
+        "noul": 0.92
+      }
+    },
+    "Low-Fat Curd": {
+      "saturatedFat": {
+        "value": 0.8,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.91
+      },
+      "sugar": {
+        "value": 4.9,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 6,
+        "noul": 0.91
+      },
+      "sodium": {
+        "value": 50,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 130,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.06,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 160,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0.5,
+        "noul": 0.87
+      }
+    },
+    "Curd": {
+      "saturatedFat": {
+        "value": 2.1,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0.1,
+        "noul": 0.87
+      },
+      "sugar": {
+        "value": 4.7,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 13,
+        "noul": 0.9
+      },
+      "sodium": {
+        "value": 46,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 121,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 0.05,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 155,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 0.5,
+        "noul": 0.85
+      }
+    },
+    "Low-Fat Paneer": {
+      "saturatedFat": {
+        "value": 4.5,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0.1,
+        "noul": 0.83
+      },
+      "sugar": {
+        "value": 2.6,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 25,
+        "noul": 0.91
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 250,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 90,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.95
+      }
+    },
+    "Low-Fat Milk": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.93
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 5,
+        "noul": 0.9
+      },
+      "sodium": {
+        "value": 44,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 120,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 0.03,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 150,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.88
+      }
+    },
+    "Butter": {
+      "saturatedFat": {
+        "value": 51.4,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 3.3,
+        "noul": 0.81
+      },
+      "sugar": {
+        "value": 0.06,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 215,
+        "noul": 0.87
+      },
+      "sodium": {
+        "value": 11,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 24,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 0.02,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 24,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Coconut Milk": {
+      "saturatedFat": {
+        "value": 20.9,
+        "noul": 0.87
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 3.34,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 15,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 18,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 1.64,
+        "noul": 0.7
+      },
+      "potassium": {
+        "value": 263,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 2.8,
+        "noul": 0.7
+      }
+    },
+    "Almond Milk": {
+      "saturatedFat": {
+        "value": 0.06,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 0.5,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 63,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 184,
+        "noul": 0.79
+      },
+      "iron": {
+        "value": 0.4,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 66,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Coconut Oil": {
+      "saturatedFat": {
+        "value": 82.5,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 0.04,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.98
+      }
+    },
+    "Sesame Oil": {
+      "saturatedFat": {
+        "value": 14.2,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 0,
+        "noul": 0.75
+      },
+      "potassium": {
+        "value": 0,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Basmati Rice": {
+      "saturatedFat": {
+        "value": 0.15,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.1,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 0.7,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 100,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Brown Rice": {
+      "saturatedFat": {
+        "value": 0.2,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.85,
+        "noul": 0.87
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 23,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 1.47,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 223,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Rice Flour": {
+      "saturatedFat": {
+        "value": 0.14,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0.12,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 0,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 10,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 0.35,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 76,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Flattened Rice": {
+      "saturatedFat": {
+        "value": 0.19,
+        "noul": 0.87
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0.5,
+        "noul": 0.87
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 10,
+        "noul": 0.86
+      },
+      "iron": {
+        "value": 3.6,
+        "noul": 0.66
+      },
+      "potassium": {
+        "value": 100,
+        "noul": 0.81
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Puffed Rice": {
+      "saturatedFat": {
+        "value": 0.1,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 4,
+        "noul": 0.82
+      },
+      "iron": {
+        "value": 0.6,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 20,
+        "noul": 0.73
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Semolina": {
+      "saturatedFat": {
+        "value": 0.1,
+        "noul": 0.83
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.7,
+        "noul": 0.83
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 17,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 1.23,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 186,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Couscous": {
+      "saturatedFat": {
+        "value": 0.11,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 8,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 0.4,
+        "noul": 0.83
+      },
+      "potassium": {
+        "value": 58,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.95
+      }
+    },
+    "Whole Wheat Flour": {
+      "saturatedFat": {
+        "value": 0.27,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.4,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 34,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 3.6,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 405,
+        "noul": 0.86
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Broken Wheat": {
+      "saturatedFat": {
+        "value": 0.25,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.4,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 30,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 3,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 350,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Jowar Flour": {
+      "saturatedFat": {
+        "value": 0.55,
+        "noul": 0.85
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 1.98,
+        "noul": 0.81
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 27,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 4.4,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 363,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Jowar": {
+      "saturatedFat": {
+        "value": 0.55,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 1.98,
+        "noul": 0.83
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 27,
+        "noul": 0.83
+      },
+      "iron": {
+        "value": 4.4,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 363,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.95
+      }
+    },
+    "Bajra (Pearl Millet) Flour": {
+      "saturatedFat": {
+        "value": 1.06,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 1.7,
+        "noul": 0.84
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 42,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 8,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 195,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Bajra": {
+      "saturatedFat": {
+        "value": 1.06,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 1.7,
+        "noul": 0.84
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 42,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 8,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 195,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.95
+      }
+    },
+    "Ragi Flour": {
+      "saturatedFat": {
+        "value": 0.24,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0.3,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 344,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 3.9,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 408,
+        "noul": 0.88
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Oats": {
+      "saturatedFat": {
+        "value": 1.22,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0.99,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 54,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 4.72,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 429,
+        "noul": 0.86
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Quinoa": {
+      "saturatedFat": {
+        "value": 0.66,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 4.57,
+        "noul": 0.8
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 47,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 4.57,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 563,
+        "noul": 0.81
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Tapioca Pearls": {
+      "saturatedFat": {
+        "value": 0.02,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 3.4,
+        "noul": 0.73
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 1.58,
+        "noul": 0.59
+      },
+      "potassium": {
+        "value": 8,
+        "noul": 0.61
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Chapati": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 220,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 40,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 2,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 150,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Bhakri": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 200,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 35,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 2.5,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 180,
+        "noul": 0.88
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Whole Wheat Bread": {
+      "saturatedFat": {
+        "value": 0.6,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 5.6,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 400,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 107,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 2.5,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 248,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Brown Bread": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 380,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 100,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 2.3,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 230,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Whole Wheat Pita": {
+      "saturatedFat": {
+        "value": 0.35,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 1.5,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 450,
+        "noul": 0.84
+      },
+      "calcium": {
+        "value": 40,
+        "noul": 0.93
+      },
+      "iron": {
+        "value": 2.5,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 145,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Toor Dal": {
+      "saturatedFat": {
+        "value": 0.34,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 3.5,
+        "noul": 0.85
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 17,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 130,
+        "noul": 0.82
+      },
+      "iron": {
+        "value": 2.7,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 1392,
+        "noul": 0.74
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.9
+      }
+    },
+    "Urad Dal": {
+      "saturatedFat": {
+        "value": 0.26,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.1,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 38,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 138,
+        "noul": 0.83
+      },
+      "iron": {
+        "value": 3.99,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 983,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.92
+      }
+    },
+    "Chana Dal": {
+      "saturatedFat": {
+        "value": 0.6,
+        "noul": 0.78
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 3,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 24,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 57,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 4.6,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 875,
+        "noul": 0.75
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.89
+      }
+    },
+    "Masoor Dal": {
+      "saturatedFat": {
+        "value": 0.19,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 2.03,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 35,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 6.5,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 677,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 4.5,
+        "noul": 0.81
+      }
+    },
+    "Whole Masoor Dal": {
+      "saturatedFat": {
+        "value": 0.19,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 2.03,
+        "noul": 0.87
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 35,
+        "noul": 0.86
+      },
+      "iron": {
+        "value": 6.5,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 677,
+        "noul": 0.77
+      },
+      "vitaminC": {
+        "value": 4.5,
+        "noul": 0.75
+      }
+    },
+    "Chickpeas": {
+      "saturatedFat": {
+        "value": 1.24,
+        "noul": 0.78
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 10.7,
+        "noul": 0.57
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 24,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 57,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 4.31,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 875,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 4,
+        "noul": 0.9
+      }
+    },
+    "Roasted Chana": {
+      "saturatedFat": {
+        "value": 0.4,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 3,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 25,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 52,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 4.5,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 700,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.92
+      }
+    },
+    "Kala Chana": {
+      "saturatedFat": {
+        "value": 1,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 6,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 60,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 5,
+        "noul": 0.93
+      },
+      "potassium": {
+        "value": 700,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.92
+      }
+    },
+    "Red Kidney Beans": {
+      "saturatedFat": {
+        "value": 0.14,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 2.1,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 12,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 143,
+        "noul": 0.78
+      },
+      "iron": {
+        "value": 6.69,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 1359,
+        "noul": 0.69
+      },
+      "vitaminC": {
+        "value": 4.5,
+        "noul": 0.78
+      }
+    },
+    "Black Beans": {
+      "saturatedFat": {
+        "value": 0.35,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 2.12,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 5,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 123,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 5.02,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 1483,
+        "noul": 0.72
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.86
+      }
+    },
+    "Black-eyed Peas": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 6.9,
+        "noul": 0.76
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 16,
+        "noul": 0.94
+      },
+      "calcium": {
+        "value": 110,
+        "noul": 0.86
+      },
+      "iron": {
+        "value": 8.27,
+        "noul": 0.71
+      },
+      "potassium": {
+        "value": 1112,
+        "noul": 0.79
+      },
+      "vitaminC": {
+        "value": 1.5,
+        "noul": 0.93
+      }
+    },
+    "Moong Beans": {
+      "saturatedFat": {
+        "value": 0.4,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 6.6,
+        "noul": 0.77
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 15,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 132,
+        "noul": 0.83
+      },
+      "iron": {
+        "value": 6.74,
+        "noul": 0.71
+      },
+      "potassium": {
+        "value": 1246,
+        "noul": 0.74
+      },
+      "vitaminC": {
+        "value": 4.8,
+        "noul": 0.82
+      }
+    },
+    "Moong Sprouts": {
+      "saturatedFat": {
+        "value": 0.08,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 4.13,
+        "noul": 0.81
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 13,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 0.91,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 149,
+        "noul": 0.86
+      },
+      "vitaminC": {
+        "value": 13.2,
+        "noul": 0.8
+      }
+    },
+    "Mixed Sprouts": {
+      "saturatedFat": {
+        "value": 0.1,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 4,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 8,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 1.2,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 180,
+        "noul": 0.88
+      },
+      "vitaminC": {
+        "value": 12,
+        "noul": 0.82
+      }
+    },
+    "Matki (Moth Beans)": {
+      "saturatedFat": {
+        "value": 1.1,
+        "noul": 0.8
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 3,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 27,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 202,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 6.5,
+        "noul": 0.79
+      },
+      "potassium": {
+        "value": 1204,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.84
+      }
+    },
+    "Edamame": {
+      "saturatedFat": {
+        "value": 0.95,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 2.18,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 63,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 2.27,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 436,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 9.7,
+        "noul": 0.87
+      }
+    },
+    "Soya Chunks": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.75
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 24,
+        "noul": 0.82
+      },
+      "calcium": {
+        "value": 350,
+        "noul": 0.71
+      },
+      "iron": {
+        "value": 20,
+        "noul": 0.68
+      },
+      "potassium": {
+        "value": 2202,
+        "noul": 0.72
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Soya Flour": {
+      "saturatedFat": {
+        "value": 2.4,
+        "noul": 0.87
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 10.5,
+        "noul": 0.72
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 4,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 241,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 8.9,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 1797,
+        "noul": 0.86
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.92
+      }
+    },
+    "Tofu": {
+      "saturatedFat": {
+        "value": 0.36,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.62,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 7,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 350,
+        "noul": 0.73
+      },
+      "iron": {
+        "value": 5.36,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 121,
+        "noul": 0.71
+      },
+      "vitaminC": {
+        "value": 0.1,
+        "noul": 0.9
+      }
+    },
+    "Peanuts": {
+      "saturatedFat": {
+        "value": 6.28,
+        "noul": 0.81
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 4.72,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 18,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 92,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 4.58,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 705,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Almonds": {
+      "saturatedFat": {
+        "value": 3.8,
+        "noul": 0.81
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 4.35,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 269,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 3.71,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 733,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Cashews": {
+      "saturatedFat": {
+        "value": 7.78,
+        "noul": 0.74
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 5.91,
+        "noul": 0.84
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 12,
+        "noul": 0.92
+      },
+      "calcium": {
+        "value": 37,
+        "noul": 0.81
+      },
+      "iron": {
+        "value": 6.68,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 660,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 0.5,
+        "noul": 0.83
+      }
+    },
+    "Walnut": {
+      "saturatedFat": {
+        "value": 6.13,
+        "noul": 0.76
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.61,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 98,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 2.91,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 441,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 1.3,
+        "noul": 0.9
+      }
+    },
+    "Pumpkin Seeds": {
+      "saturatedFat": {
+        "value": 8.7,
+        "noul": 0.69
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 1.35,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 7,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 46,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 8.82,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 809,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 1.9,
+        "noul": 0.79
+      }
+    },
+    "Sunflower Seeds": {
+      "saturatedFat": {
+        "value": 3.8,
+        "noul": 0.8
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.62,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 9,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 78,
+        "noul": 0.83
+      },
+      "iron": {
+        "value": 5.25,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 645,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 1.4,
+        "noul": 0.89
+      }
+    },
+    "Sesame Seeds": {
+      "saturatedFat": {
+        "value": 6.96,
+        "noul": 0.79
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.3,
+        "noul": 0.79
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 11,
+        "noul": 0.93
+      },
+      "calcium": {
+        "value": 975,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 14.55,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 468,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.89
+      }
+    },
+    "Flaxseed": {
+      "saturatedFat": {
+        "value": 3.66,
+        "noul": 0.66
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 1.55,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 30,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 255,
+        "noul": 0.89
+      },
+      "iron": {
+        "value": 5.73,
+        "noul": 0.87
+      },
+      "potassium": {
+        "value": 813,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 0.6,
+        "noul": 0.86
+      }
+    },
+    "Chia Seeds": {
+      "saturatedFat": {
+        "value": 3.33,
+        "noul": 0.74
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 16,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 631,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 7.72,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 407,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 1.6,
+        "noul": 0.82
+      }
+    },
+    "Basil Seeds": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "calcium": {
+        "value": 450,
+        "noul": 0.77
+      },
+      "iron": {
+        "value": 8,
+        "noul": 0.78
+      }
+    },
+    "Makhana": {
+      "saturatedFat": {
+        "value": 0.1,
+        "noul": 0.8
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.86
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 25,
+        "noul": 0.84
+      },
+      "calcium": {
+        "value": 60,
+        "noul": 0.79
+      },
+      "iron": {
+        "value": 1.4,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 62,
+        "noul": 0.55
+      }
+    },
+    "Coriander Seeds": {
+      "saturatedFat": {
+        "value": 0.68,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.71
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 35,
+        "noul": 0.84
+      },
+      "calcium": {
+        "value": 709,
+        "noul": 0.82
+      },
+      "iron": {
+        "value": 16.32,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 1267,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 21,
+        "noul": 0.71
+      }
+    },
+    "Red Chilli Powder": {
+      "saturatedFat": {
+        "value": 1.4,
+        "noul": 0.8
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 10.34,
+        "noul": 0.75
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 30,
+        "noul": 0.84
+      },
+      "calcium": {
+        "value": 148,
+        "noul": 0.81
+      },
+      "iron": {
+        "value": 17.3,
+        "noul": 0.79
+      },
+      "potassium": {
+        "value": 2014,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 76.4,
+        "noul": 0.72
+      }
+    },
+    "Red Chilli": {
+      "saturatedFat": {
+        "value": 1.3,
+        "noul": 0.74
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 10,
+        "noul": 0.78
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 25,
+        "noul": 0.77
+      },
+      "calcium": {
+        "value": 140,
+        "noul": 0.73
+      },
+      "iron": {
+        "value": 16,
+        "noul": 0.74
+      },
+      "potassium": {
+        "value": 1950,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 70,
+        "noul": 0.8
+      }
+    },
+    "Black Pepper": {
+      "saturatedFat": {
+        "value": 1.39,
+        "noul": 0.71
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0.64,
+        "noul": 0.69
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.75
+      },
+      "calcium": {
+        "value": 443,
+        "noul": 0.72
+      },
+      "iron": {
+        "value": 9.71,
+        "noul": 0.76
+      },
+      "potassium": {
+        "value": 1259,
+        "noul": 0.75
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.82
+      }
+    },
+    "Cinnamon Powder": {
+      "saturatedFat": {
+        "value": 0.35,
+        "noul": 0.78
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.17,
+        "noul": 0.77
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 10,
+        "noul": 0.82
+      },
+      "calcium": {
+        "value": 1002,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 8.32,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 431,
+        "noul": 0.81
+      },
+      "vitaminC": {
+        "value": 3.8,
+        "noul": 0.78
+      }
+    },
+    "Cinnamon Stick": {
+      "saturatedFat": {
+        "value": 0.35,
+        "noul": 0.82
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.17,
+        "noul": 0.73
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 10,
+        "noul": 0.81
+      },
+      "calcium": {
+        "value": 1002,
+        "noul": 0.74
+      },
+      "iron": {
+        "value": 8.32,
+        "noul": 0.79
+      },
+      "potassium": {
+        "value": 431,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 3.8,
+        "noul": 0.69
+      }
+    },
+    "Cloves": {
+      "saturatedFat": {
+        "value": 5.44,
+        "noul": 0.76
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 2.38,
+        "noul": 0.77
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 277,
+        "noul": 0.72
+      },
+      "calcium": {
+        "value": 632,
+        "noul": 0.82
+      },
+      "iron": {
+        "value": 11.83,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 1020,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 0.2,
+        "noul": 0.83
+      }
+    },
+    "Nutmeg": {
+      "saturatedFat": {
+        "value": 26.6,
+        "noul": 0.7
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 2.99,
+        "noul": 0.81
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 16,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 184,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 3.04,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 350,
+        "noul": 0.86
+      },
+      "vitaminC": {
+        "value": 3,
+        "noul": 0.82
+      }
+    },
+    "Fennel Seeds": {
+      "saturatedFat": {
+        "value": 0.2,
+        "noul": 0.81
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.8
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 88,
+        "noul": 0.77
+      },
+      "calcium": {
+        "value": 1196,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 18.54,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 1694,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 21,
+        "noul": 0.71
+      }
+    },
+    "Fenugreek Seeds": {
+      "saturatedFat": {
+        "value": 0.7,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.77
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 67,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 176,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 33.53,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 770,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 3,
+        "noul": 0.8
+      }
+    },
+    "Fenugreek Leaves": {
+      "saturatedFat": {
+        "value": 0.3,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.87
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 76,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 176,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 1.93,
+        "noul": 0.83
+      },
+      "potassium": {
+        "value": 31,
+        "noul": 0.43
+      },
+      "vitaminC": {
+        "value": 52,
+        "noul": 0.76
+      }
+    },
+    "Mustard Seeds": {
+      "saturatedFat": {
+        "value": 1.6,
+        "noul": 0.78
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 3.85,
+        "noul": 0.74
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 13,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 266,
+        "noul": 0.86
+      },
+      "iron": {
+        "value": 9.21,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 738,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.89
+      }
+    },
+    "Mustard": {
+      "saturatedFat": {
+        "value": 1.6,
+        "noul": 0.6
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 3.85,
+        "noul": 0.63
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "sodium": {
+        "value": 13,
+        "noul": 0.61
+      },
+      "calcium": {
+        "value": 266,
+        "noul": 0.59
+      },
+      "iron": {
+        "value": 9.21,
+        "noul": 0.63
+      },
+      "potassium": {
+        "value": 738,
+        "noul": 0.65
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.83
+      }
+    },
+    "Ajwain": {
+      "saturatedFat": {
+        "value": 1.4,
+        "noul": 0.77
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 1590,
+        "noul": 0.7
+      },
+      "iron": {
+        "value": 25,
+        "noul": 0.73
+      },
+      "potassium": {
+        "value": 300,
+        "noul": 0.85
+      }
+    },
+    "Asafoetida": {
+      "saturatedFat": {
+        "value": 1.1,
+        "noul": 0.6
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 51,
+        "noul": 0.79
+      },
+      "calcium": {
+        "value": 690,
+        "noul": 0.67
+      },
+      "iron": {
+        "value": 39.2,
+        "noul": 0.59
+      },
+      "potassium": {
+        "value": 610,
+        "noul": 0.74
+      }
+    },
+    "Mint Leaves": {
+      "saturatedFat": {
+        "value": 0.73,
+        "noul": 0.78
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.99,
+        "noul": 0.81
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 31,
+        "noul": 0.85
+      },
+      "calcium": {
+        "value": 199,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 5.08,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 569,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 31.8,
+        "noul": 0.86
+      }
+    },
+    "Basil Leaves": {
+      "saturatedFat": {
+        "value": 0.65,
+        "noul": 0.74
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.3,
+        "noul": 0.86
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 4,
+        "noul": 0.73
+      },
+      "calcium": {
+        "value": 177,
+        "noul": 0.83
+      },
+      "iron": {
+        "value": 3.17,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 295,
+        "noul": 0.85
+      },
+      "vitaminC": {
+        "value": 18,
+        "noul": 0.83
+      }
+    },
+    "Parsley": {
+      "saturatedFat": {
+        "value": 0.13,
+        "noul": 0.87
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0.85,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 56,
+        "noul": 0.81
+      },
+      "calcium": {
+        "value": 138,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 6.2,
+        "noul": 0.86
+      },
+      "potassium": {
+        "value": 554,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 133,
+        "noul": 0.76
+      }
+    },
+    "Rosemary": {
+      "saturatedFat": {
+        "value": 3.72,
+        "noul": 0.71
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.76
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 50,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 317,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 6.65,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 668,
+        "noul": 0.75
+      },
+      "vitaminC": {
+        "value": 21.8,
+        "noul": 0.8
+      }
+    },
+    "Thyme": {
+      "saturatedFat": {
+        "value": 1.68,
+        "noul": 0.72
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 1.71,
+        "noul": 0.74
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 55,
+        "noul": 0.82
+      },
+      "calcium": {
+        "value": 405,
+        "noul": 0.81
+      },
+      "iron": {
+        "value": 17.45,
+        "noul": 0.74
+      },
+      "potassium": {
+        "value": 609,
+        "noul": 0.81
+      },
+      "vitaminC": {
+        "value": 160,
+        "noul": 0.64
+      }
+    },
+    "Bay Leaf": {
+      "saturatedFat": {
+        "value": 4.63,
+        "noul": 0.62
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.79
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 23,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 834,
+        "noul": 0.72
+      },
+      "iron": {
+        "value": 43,
+        "noul": 0.6
+      },
+      "potassium": {
+        "value": 529,
+        "noul": 0.76
+      },
+      "vitaminC": {
+        "value": 46.5,
+        "noul": 0.65
+      }
+    },
+    "Saffron": {
+      "saturatedFat": {
+        "value": 0.11,
+        "noul": 0.75
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.78
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 148,
+        "noul": 0.68
+      },
+      "calcium": {
+        "value": 111,
+        "noul": 0.7
+      },
+      "iron": {
+        "value": 11.1,
+        "noul": 0.66
+      },
+      "potassium": {
+        "value": 1724,
+        "noul": 0.7
+      },
+      "vitaminC": {
+        "value": 80.8,
+        "noul": 0.58
+      }
+    },
+    "Licorice Root": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Tulsi Leaves": {
+      "saturatedFat": {
+        "value": 0.6,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 4,
+        "noul": 0.77
+      },
+      "calcium": {
+        "value": 25,
+        "noul": 0.74
+      },
+      "iron": {
+        "value": 3,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 50,
+        "noul": 0.67
+      },
+      "vitaminC": {
+        "value": 21,
+        "noul": 0.81
+      }
+    },
+    "Black Tea Leaves": {
+      "saturatedFat": {
+        "value": 0.3,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 3,
+        "noul": 0.77
+      },
+      "potassium": {
+        "value": 1590,
+        "noul": 0.81
+      }
+    },
+    "Green Tea Leaves": {
+      "saturatedFat": {
+        "value": 0.3,
+        "noul": 0.82
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 3,
+        "noul": 0.71
+      },
+      "potassium": {
+        "value": 1400,
+        "noul": 0.78
+      }
+    },
+    "Lemongrass": {
+      "saturatedFat": {
+        "value": 0.49,
+        "noul": 0.84
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.77
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 6,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 65,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 8.17,
+        "noul": 0.74
+      },
+      "potassium": {
+        "value": 723,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 2.6,
+        "noul": 0.79
+      }
+    },
+    "Moringa Leaves": {
+      "saturatedFat": {
+        "value": 0.2,
+        "noul": 0.83
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 1.5,
+        "noul": 0.78
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 9,
+        "noul": 0.78
+      },
+      "calcium": {
+        "value": 185,
+        "noul": 0.81
+      },
+      "iron": {
+        "value": 4,
+        "noul": 0.84
+      },
+      "potassium": {
+        "value": 337,
+        "noul": 0.78
+      },
+      "vitaminC": {
+        "value": 51.7,
+        "noul": 0.79
+      }
+    },
+    "Chamomile Flowers": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Wheatgrass Juice": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.9
+      }
+    },
+    "Ashwagandha Powder": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Shatavari Powder": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Brahmi": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Shankhpushpi": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Triphala Churna": {
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Sugar": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 99.8,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 1,
+        "noul": 0.73
+      },
+      "calcium": {
+        "value": 1,
+        "noul": 0.76
+      },
+      "iron": {
+        "value": 0.01,
+        "noul": 0.81
+      },
+      "potassium": {
+        "value": 2,
+        "noul": 0.59
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Chicken Breast": {
+      "saturatedFat": {
+        "value": 1.01,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0.01,
+        "noul": 0.88
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 85,
+        "noul": 0.91
+      },
+      "sodium": {
+        "value": 74,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 15,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 1.04,
+        "noul": 0.94
+      },
+      "potassium": {
+        "value": 256,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.92
+      }
+    },
+    "Chicken Leg": {
+      "saturatedFat": {
+        "value": 2.7,
+        "noul": 0.88
+      },
+      "transFat": {
+        "value": 0.02,
+        "noul": 0.88
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 95,
+        "noul": 0.86
+      },
+      "sodium": {
+        "value": 90,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 12,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 1.3,
+        "noul": 0.92
+      },
+      "potassium": {
+        "value": 240,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.95
+      }
+    },
+    "Egg": {
+      "saturatedFat": {
+        "value": 3.1,
+        "noul": 0.7
+      },
+      "transFat": {
+        "value": 0.02,
+        "noul": 0.83
+      },
+      "sugar": {
+        "value": 0.37,
+        "noul": 0.67
+      },
+      "cholesterol": {
+        "value": 372,
+        "noul": 0.74
+      },
+      "sodium": {
+        "value": 142,
+        "noul": 0.81
+      },
+      "calcium": {
+        "value": 56,
+        "noul": 0.74
+      },
+      "iron": {
+        "value": 1.75,
+        "noul": 0.78
+      },
+      "potassium": {
+        "value": 138,
+        "noul": 0.75
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Fish": {
+      "saturatedFat": {
+        "value": 0.5,
+        "noul": 0.86
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "cholesterol": {
+        "value": 55,
+        "noul": 0.88
+      },
+      "sodium": {
+        "value": 60,
+        "noul": 0.84
+      },
+      "calcium": {
+        "value": 15,
+        "noul": 0.86
+      },
+      "iron": {
+        "value": 0.8,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 300,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.86
+      }
+    },
+    "Baking Powder": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 10600,
+        "noul": 0.79
+      },
+      "calcium": {
+        "value": 5876,
+        "noul": 0.69
+      },
+      "iron": {
+        "value": 0,
+        "noul": 0.85
+      },
+      "potassium": {
+        "value": 0,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.96
+      }
+    },
+    "Baking Soda": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 27360,
+        "noul": 0.8
+      },
+      "calcium": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "iron": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 0,
+        "noul": 0.84
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Rock Salt": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 36000,
+        "noul": 0.81
+      },
+      "calcium": {
+        "value": 30,
+        "noul": 0.8
+      },
+      "potassium": {
+        "value": 15,
+        "noul": 0.79
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.97
+      }
+    },
+    "Black Salt": {
+      "saturatedFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sugar": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 35000,
+        "noul": 0.78
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 20,
+        "noul": 0.82
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Chaat Masala": {
+      "saturatedFat": {
+        "value": 3,
+        "noul": 0.67
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.86
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sodium": {
+        "value": 8000,
+        "noul": 0.8
+      },
+      "calcium": {
+        "value": 300,
+        "noul": 0.77
+      },
+      "iron": {
+        "value": 15,
+        "noul": 0.7
+      },
+      "potassium": {
+        "value": 900,
+        "noul": 0.79
+      },
+      "vitaminC": {
+        "value": 10,
+        "noul": 0.74
+      }
+    },
+    "Sambar Powder": {
+      "saturatedFat": {
+        "value": 6,
+        "noul": 0.67
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.92
+      },
+      "sugar": {
+        "value": 3,
+        "noul": 0.83
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 900,
+        "noul": 0.83
+      },
+      "calcium": {
+        "value": 350,
+        "noul": 0.8
+      },
+      "iron": {
+        "value": 18,
+        "noul": 0.74
+      },
+      "potassium": {
+        "value": 1000,
+        "noul": 0.8
+      },
+      "vitaminC": {
+        "value": 5,
+        "noul": 0.79
+      }
+    },
+    "Pav Bhaji Masala": {
+      "saturatedFat": {
+        "value": 5,
+        "noul": 0.83
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.85
+      },
+      "sugar": {
+        "value": 4,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.91
+      },
+      "sodium": {
+        "value": 3000,
+        "noul": 0.79
+      },
+      "calcium": {
+        "value": 300,
+        "noul": 0.66
+      },
+      "iron": {
+        "value": 15,
+        "noul": 0.51
+      },
+      "potassium": {
+        "value": 900,
+        "noul": 0.77
+      },
+      "vitaminC": {
+        "value": 5,
+        "noul": 0.86
+      }
+    },
+    "Mixed Vegetables": {
+      "saturatedFat": {
+        "value": 0.05,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 3,
+        "noul": 0.93
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.99
+      },
+      "sodium": {
+        "value": 20,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 25,
+        "noul": 0.92
+      },
+      "iron": {
+        "value": 0.5,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 250,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 15,
+        "noul": 0.83
+      }
+    },
+    "Mixed Fruits": {
+      "saturatedFat": {
+        "value": 0.05,
+        "noul": 0.94
+      },
+      "sugar": {
+        "value": 10,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.98
+      },
+      "sodium": {
+        "value": 2,
+        "noul": 0.82
+      },
+      "calcium": {
+        "value": 15,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 0.3,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 200,
+        "noul": 0.9
+      },
+      "vitaminC": {
+        "value": 15,
+        "noul": 0.85
+      }
+    },
+    "Vegetable Broth": {
+      "saturatedFat": {
+        "value": 0.05,
+        "noul": 0.94
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.93
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.88
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 380,
+        "noul": 0.91
+      },
+      "calcium": {
+        "value": 8,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.89
+      },
+      "potassium": {
+        "value": 90,
+        "noul": 0.89
+      },
+      "vitaminC": {
+        "value": 1,
+        "noul": 0.91
+      }
+    },
+    "Soy Sauce": {
+      "saturatedFat": {
+        "value": 0.08,
+        "noul": 0.92
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 0.4,
+        "noul": 0.78
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 5493,
+        "noul": 0.88
+      },
+      "calcium": {
+        "value": 20,
+        "noul": 0.87
+      },
+      "iron": {
+        "value": 2.38,
+        "noul": 0.82
+      },
+      "potassium": {
+        "value": 362,
+        "noul": 0.87
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Peanut Butter": {
+      "saturatedFat": {
+        "value": 5.2,
+        "noul": 0.91
+      },
+      "transFat": {
+        "value": 0.1,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 9.2,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 426,
+        "noul": 0.89
+      },
+      "calcium": {
+        "value": 43,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 1.87,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 558,
+        "noul": 0.93
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.94
+      }
+    },
+    "Mayonnaise": {
+      "saturatedFat": {
+        "value": 4.9,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0.1,
+        "noul": 0.89
+      },
+      "sugar": {
+        "value": 1.5,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 42,
+        "noul": 0.82
+      },
+      "sodium": {
+        "value": 635,
+        "noul": 0.9
+      },
+      "calcium": {
+        "value": 8,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 0.2,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 20,
+        "noul": 0.83
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    },
+    "Dijon Mustard": {
+      "saturatedFat": {
+        "value": 0.6,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.91
+      },
+      "sugar": {
+        "value": 1,
+        "noul": 0.9
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.95
+      },
+      "sodium": {
+        "value": 1120,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 58,
+        "noul": 0.84
+      },
+      "iron": {
+        "value": 1.7,
+        "noul": 0.9
+      },
+      "potassium": {
+        "value": 130,
+        "noul": 0.91
+      },
+      "vitaminC": {
+        "value": 0.8,
+        "noul": 0.89
+      }
+    },
+    "Thai Red Curry Paste": {
+      "saturatedFat": {
+        "value": 1,
+        "noul": 0.9
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "sugar": {
+        "value": 5,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.96
+      },
+      "sodium": {
+        "value": 2000,
+        "noul": 0.87
+      },
+      "calcium": {
+        "value": 60,
+        "noul": 0.91
+      },
+      "iron": {
+        "value": 3,
+        "noul": 0.88
+      },
+      "potassium": {
+        "value": 300,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 10,
+        "noul": 0.85
+      }
+    },
+    "Miso Paste": {
+      "saturatedFat": {
+        "value": 1.03,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.88
+      },
+      "sugar": {
+        "value": 6.2,
+        "noul": 0.91
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 3728,
+        "noul": 0.86
+      },
+      "calcium": {
+        "value": 57,
+        "noul": 0.9
+      },
+      "iron": {
+        "value": 2.5,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 210,
+        "noul": 0.94
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.91
+      }
+    },
+    "Tahini": {
+      "saturatedFat": {
+        "value": 4.2,
+        "noul": 0.89
+      },
+      "transFat": {
+        "value": 0,
+        "noul": 0.9
+      },
+      "sugar": {
+        "value": 0.5,
+        "noul": 0.89
+      },
+      "cholesterol": {
+        "value": 0,
+        "noul": 0.97
+      },
+      "sodium": {
+        "value": 115,
+        "noul": 0.82
+      },
+      "calcium": {
+        "value": 426,
+        "noul": 0.85
+      },
+      "iron": {
+        "value": 4,
+        "noul": 0.91
+      },
+      "potassium": {
+        "value": 414,
+        "noul": 0.92
+      },
+      "vitaminC": {
+        "value": 0,
+        "noul": 0.93
+      }
+    }
+  }
+}

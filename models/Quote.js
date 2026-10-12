@@ -36,7 +36,7 @@ const quoteSchema = new mongoose.Schema(
     },
     author: {
       type: String,
-      default: 'DocWellness',
+      default: 'Docwellness',
       trim: true,
     },
     category: {

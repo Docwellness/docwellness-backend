@@ -156,7 +156,14 @@ async function refreshSession(refreshToken) {
   return session;
 }
 
+// True when registerTestCredentials(email, password, ...) was called with this exact pair.
+async function verifyPassword(email, password) {
+  const entry = credentials.get(String(email || '').toLowerCase());
+  return Boolean(entry && entry.password === password);
+}
+
 module.exports = {
+  verifyPassword,
   getUserFromSupabaseToken,
   verifySupabaseToken,
   signInWithPassword,

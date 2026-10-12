@@ -9,8 +9,16 @@ const { calculateBMI, calculateCalorieNeeds } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
-const { verifyPassword, getSupabaseAdmin } = require('../../utils/supabaseAuth');
+const { verifyPassword } = require('../../utils/supabaseAuth');
 const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
+const {
+  PATIENT_DATA_CATEGORIES,
+  CATEGORY_KEYS,
+  ACCOUNT_ONLY_KEYS,
+  deletePatientData,
+  erasePatientCompletely,
+} = require('../../utils/patientDataDeletion');
+const { logAuditEvent } = require('../../utils/auditLog');
 
 /**
  * @desc    Get patient profile
@@ -257,19 +265,91 @@ exports.deleteAccount = async (req, res, next) => {
       });
     }
 
-    // Soft delete or hard delete based on your requirements
-    await User.findByIdAndDelete(req.user._id);
-
-    // Also remove the Supabase identity so no orphaned auth account remains
-    if (req.user.supabaseUserId) {
-      await getSupabaseAdmin().auth.admin.deleteUser(req.user.supabaseUserId).catch((err) => {
-        console.error('Failed to delete Supabase user after account deletion:', err.message);
-      });
-    }
+    // Full erase: every data category, the User document and the Supabase
+    // identity (not just the User record, which would orphan meal logs,
+    // chats, photos, lab reports, ...).
+    const deleted = await erasePatientCompletely(req.user);
+    logAuditEvent('patient_deleted', { patientId: String(req.user._id), via: 'self_service', deleted });
 
     res.status(200).json({
       success: true,
       message: 'Account deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    List the data categories a patient can choose to delete
+ * @route   GET /api/patient/data-deletion/categories
+ * @access  Private (Patient)
+ */
+exports.getDeletableDataCategories = (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      categories: PATIENT_DATA_CATEGORIES.filter((c) => !c.accountOnly).map(({ key, label }) => ({
+        key,
+        label,
+      })),
+    },
+  });
+};
+
+/**
+ * @desc    Delete selected categories of the patient's own data, or the whole
+ *          account. Password re-entry is required; deletion is immediate.
+ * @route   POST /api/patient/data-deletion
+ * @body    { password, deleteAccount?: boolean, categories?: string[] }
+ * @access  Private (Patient)
+ */
+exports.requestDataDeletion = async (req, res, next) => {
+  try {
+    const { password, deleteAccount, categories } = req.body || {};
+
+    const wantsAccountDelete = deleteAccount === true;
+    const selected = Array.isArray(categories) ? [...new Set(categories)] : [];
+
+    const invalid = selected.filter((k) => !CATEGORY_KEYS.includes(k) || ACCOUNT_ONLY_KEYS.includes(k));
+    if (invalid.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Unknown data category: ${invalid.join(', ')}`,
+      });
+    }
+    if (!wantsAccountDelete && selected.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select at least one data category to delete.',
+      });
+    }
+
+    if (!password || !(await verifyPassword(req.user.email, password))) {
+      return res.status(401).json({ success: false, message: 'Password is incorrect' });
+    }
+
+    if (wantsAccountDelete) {
+      const deleted = await erasePatientCompletely(req.user);
+      logAuditEvent('patient_deleted', { patientId: String(req.user._id), via: 'self_service', deleted });
+      return res.status(200).json({
+        success: true,
+        message: 'Account deleted successfully',
+        data: { accountDeleted: true, deleted },
+      });
+    }
+
+    const deleted = await deletePatientData([req.user._id], selected, { execute: true });
+    logAuditEvent('patient_data_deleted', {
+      patientId: String(req.user._id),
+      via: 'self_service',
+      categories: selected,
+      deleted,
+    });
+    return res.status(200).json({
+      success: true,
+      message: 'Selected data has been deleted.',
+      data: { accountDeleted: false, deleted },
     });
   } catch (error) {
     next(error);

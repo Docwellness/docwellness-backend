@@ -21,6 +21,7 @@ const MilestoneTask = require('./MilestoneTask');
 const CheckIn = require('./CheckIn');
 const Nudge = require('./Nudge');
 const WaterLog = require('./WaterLog');
+const SupplementLog = require('./SupplementLog');
 const SocialMediaPost = require('./SocialMediaPost');
 const Article = require('./Article');
 const Review = require('./Review');
@@ -28,7 +29,7 @@ const Exercise = require('./Exercise');
 const ExercisePlan = require('./ExercisePlan');
 const ExerciseLog = require('./ExerciseLog');
 const CustomFoodRequest = require('./CustomFoodRequest');
-const JourneyImage = require('./JourneyImage');
+const ClientJourney = require('./ClientJourney');
 const NeedAttentionLog = require('./NeedAttentionLog');
 const FoodItem = require('./FoodItem');
 const RecipeVersion = require('./RecipeVersion');
@@ -62,6 +63,7 @@ module.exports = {
   CheckIn,
   Nudge,
   WaterLog,
+  SupplementLog,
   SocialMediaPost,
   Article,
   Review,
@@ -69,7 +71,7 @@ module.exports = {
   ExercisePlan,
   ExerciseLog,
   CustomFoodRequest,
-  JourneyImage,
+  ClientJourney,
   NeedAttentionLog,
   FoodItem,
   RecipeVersion,

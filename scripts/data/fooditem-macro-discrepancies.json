@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-10-04",
+  "note": "Report only, per design.md Decision 7 and tasks.md 4.4 - nothing here is applied to any FoodItem. Scope: the 5 ingredients newly researched in this pass (Cumin Powder, Kale, Papad, Paprika, Water), cross-checked against scripts/foodItemNutritionData.js's existing macro values using the same USDA-FDC / IFCT sources consulted for their micronutrients. The 26 previously-supervised ingredients and the 155 unverified-bulk ingredients are NOT covered by this report - see scripts/data/.bulk-entries-need-reresearch.md for why the bulk ones aren't trustworthy enough yet for this kind of comparison either.",
+  "checked": [
+    { "name": "Cumin Powder", "result": "consistent", "detail": "Stored {375,17.8,44.2,22.3,10.5} vs USDA-FDC 170923 {375,17.81,44.24,22.27,10.50} - effectively exact match, no discrepancy." },
+    { "name": "Kale", "result": "consistent", "detail": "Stored {49,4.3,8.8,0.9,3.6} vs USDA-FDC 168421 (well-known reference figures) - matches, no discrepancy." },
+    { "name": "Paprika", "result": "consistent", "detail": "Stored {282,14.1,53.9,12.9,34.9} vs USDA-FDC 171329 (well-known reference figures) - matches, no discrepancy." },
+    { "name": "Water", "result": "consistent", "detail": "Stored all-zero, correct for water." },
+    {
+      "name": "Papad",
+      "result": "discrepancy",
+      "detail": "Stored {calories:370, protein:24, carbs:60, fats:3, fiber:6}. Two external sources found during micronutrient research disagree with the stored figure AND with each other, consistent with papad being a highly recipe/brand-variable product (lentil type, oil content, frying vs roasting): (a) a generic/commercial papad source: {calories:371, protein:25.6, fat:3.3, carbs:59.9, fiber:18.6} - fiber is 3.1x the stored value; (b) an IFCT-tested plain urad papad: {calories:307.41, protein:15.2, fat:0.283, carbs:65.08, fiber:7.25} - fiber still >15% over stored, and protein/fat differ substantially from the stored figure in the opposite direction from source (a).",
+      "flaggedFields": ["fiber", "protein", "fats"],
+      "recommendation": "The stored fiber value (6g) looks low against both independent sources (18.6g and 7.25g) - worth a dedicated look, since both disagreeing sources at least agree stored fiber is too low. Protein/fat are harder to adjudicate given how much papad composition varies by brand/recipe; not recommending a specific correction without picking which real-world papad formulation this app means to represent."
+    }
+  ],
+  "crossReferenceNote": "scripts/data/recipe-nutrition-suspicion.json already flagged 5 recipes as macro-suspicious from a different angle (Atwater-delta based): Curd, Sprouts Salad, Bharli Vangi, Mint Chutney, Corn Pomegranate Bhutta Chaat. None of their ingredients were in this pass's 5-ingredient scope, so they remain uninvestigated from the macro-discrepancy angle - flagged for whoever continues section 4."
+}

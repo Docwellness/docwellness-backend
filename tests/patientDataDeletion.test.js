@@ -4,6 +4,7 @@ const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/test
 jest.mock('../utils/supabaseAuth');
 const {
   registerTestToken,
+  registerTestCredentials,
   clearTestTokens,
   getDeletedSupabaseUserIds,
 } = require('../utils/supabaseAuth');
@@ -276,5 +277,89 @@ describe('DELETE /api/dietician/patients/:patientId/data', () => {
       .send({ confirmEmail: patient.email, categories: [], deleteAccount: false });
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe('patient self-service deletion', () => {
+  const PASSWORD = 'correct-horse';
+
+  async function setup() {
+    const { dietician, patient } = await seedOwnedPatient();
+    await seedPatientData(patient, dietician);
+    registerTestToken('p', patient._id);
+    registerTestCredentials(patient.email, PASSWORD, {});
+    return { dietician, patient };
+  }
+
+  test('lists deletable categories without the account-only one', async () => {
+    const { patient } = await setup();
+    const res = await request(app).get('/api/patient/data-deletion/categories').set(authed('p'));
+    expect(res.status).toBe(200);
+    const keys = res.body.data.categories.map((c) => c.key);
+    expect(keys).toContain('mealLog');
+    expect(keys).not.toContain('dietPlanRequest');
+    expect(await models.User.findById(patient._id)).not.toBeNull();
+  });
+
+  test('rejects a wrong password and deletes nothing', async () => {
+    const { patient } = await setup();
+    const res = await request(app)
+      .post('/api/patient/data-deletion')
+      .set(authed('p'))
+      .send({ password: 'nope', categories: ['mealLog'] });
+    expect(res.status).toBe(401);
+    expect(await models.MealLog.countDocuments({ patientId: patient._id })).toBe(1);
+  });
+
+  test('deletes only the selected categories', async () => {
+    const { patient } = await setup();
+    const res = await request(app)
+      .post('/api/patient/data-deletion')
+      .set(authed('p'))
+      .send({ password: PASSWORD, categories: ['mealLog', 'chat'] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.accountDeleted).toBe(false);
+    expect(await models.MealLog.countDocuments({ patientId: patient._id })).toBe(0);
+    expect(await models.Chat.countDocuments({ senderId: patient._id })).toBe(0);
+    expect(await models.Progress.countDocuments({ patientId: patient._id })).toBe(1);
+    expect(await models.User.findById(patient._id)).not.toBeNull();
+  });
+
+  test('rejects empty selection and the account-only category', async () => {
+    await setup();
+    const empty = await request(app)
+      .post('/api/patient/data-deletion')
+      .set(authed('p'))
+      .send({ password: PASSWORD, categories: [] });
+    expect(empty.status).toBe(400);
+    const accountOnly = await request(app)
+      .post('/api/patient/data-deletion')
+      .set(authed('p'))
+      .send({ password: PASSWORD, categories: ['dietPlanRequest'] });
+    expect(accountOnly.status).toBe(400);
+  });
+
+  test('deleteAccount:true wipes all data, the user and the Supabase identity', async () => {
+    const { patient } = await setup();
+    const res = await request(app)
+      .post('/api/patient/data-deletion')
+      .set(authed('p'))
+      .send({ password: PASSWORD, deleteAccount: true });
+    expect(res.status).toBe(200);
+    expect(res.body.data.accountDeleted).toBe(true);
+    expect(await models.User.findById(patient._id)).toBeNull();
+    expect(await models.MealLog.countDocuments({ patientId: patient._id })).toBe(0);
+    expect(await models.Chat.countDocuments({})).toBe(0);
+  });
+
+  test('legacy DELETE /profile now cascades too', async () => {
+    const { patient } = await setup();
+    const res = await request(app)
+      .delete('/api/patient/profile')
+      .set(authed('p'))
+      .send({ password: PASSWORD });
+    expect(res.status).toBe(200);
+    expect(await models.User.findById(patient._id)).toBeNull();
+    expect(await models.Progress.countDocuments({ patientId: patient._id })).toBe(0);
   });
 });

@@ -9,7 +9,7 @@
  *   removes. It stores ONLY `sha256(token) -> supabaseUserId`.
  *
  *   It deliberately does NOT cache the resolved Mongo `User`. Per the
- *   DocWellness auth spec, a user's role / active-status / profile must be
+ *   Docwellness auth spec, a user's role / active-status / profile must be
  *   read from the database on every request, never trusted from a cached
  *   copy - so `getUserFromSupabaseToken` still does its own
  *   `User.findOne({ supabaseUserId })` on a cache hit.

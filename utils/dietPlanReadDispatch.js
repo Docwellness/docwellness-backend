@@ -169,6 +169,18 @@ async function buildPlanItemPatientView(dietPlan) {
           carbs: version.nutritionPerServing?.carbs ?? 0,
           fats: version.nutritionPerServing?.fats ?? 0,
           fiber: version.nutritionPerServing?.fiber ?? 0,
+          // fill-recipe-micronutrients (openspec): `?? null`, deliberately
+          // NOT `?? 0` like the five macros above - an unresearched
+          // micronutrient must stay visibly unknown, never a fake zero.
+          saturatedFat: version.nutritionPerServing?.saturatedFat ?? null,
+          transFat: version.nutritionPerServing?.transFat ?? null,
+          sugar: version.nutritionPerServing?.sugar ?? null,
+          cholesterol: version.nutritionPerServing?.cholesterol ?? null,
+          sodium: version.nutritionPerServing?.sodium ?? null,
+          calcium: version.nutritionPerServing?.calcium ?? null,
+          iron: version.nutritionPerServing?.iron ?? null,
+          potassium: version.nutritionPerServing?.potassium ?? null,
+          vitaminC: version.nutritionPerServing?.vitaminC ?? null,
         },
         // Prefer the version's real whole-dish serving unit (e.g. "2 piece"
         // for a paratha, "1 bowl" for khichdi) - only synthesize one

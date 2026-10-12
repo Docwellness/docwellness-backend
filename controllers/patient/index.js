@@ -11,7 +11,7 @@ const dietPlanRequestController = require('./dietPlanRequestController');
 const dietController = require('./dietController');
 const mealLogController = require('./mealLogController');
 const waterController = require('./waterController');
-const journeyController = require('./journeyController');
+const supplementLogController = require('./supplementLogController');
 const couponController = require('./couponController');
 const firstConsultationController = require('./firstConsultationController');
 const timelineController = require('./timelineController');
@@ -26,7 +26,7 @@ module.exports = {
   dietController,
   mealLogController,
   waterController,
-  journeyController,
+  supplementLogController,
   couponController,
   firstConsultationController,
   timelineController,

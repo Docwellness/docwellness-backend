@@ -98,6 +98,15 @@ async function buildWeekPlanItemsPayload(dietPlan, week) {
   ]);
   const supplementRecipeById = new Map(supplementRecipes.map((r) => [String(r._id), r]));
 
+  // Photos live only on the master Recipe (V1) - RecipeVersion never stores
+  // them, so every version (custom/AI-regenerated included) borrows its
+  // parent's main image and per-ingredient images for display.
+  const parentRecipeIds = [...new Set(recipeVersions.map((v) => String(v.parentRecipeId)).filter(Boolean))];
+  const parentRecipes = await Recipe.find({ _id: { $in: parentRecipeIds } })
+    .select('image ingredients.name ingredients.image ingredients.foodItemId')
+    .lean();
+  const parentRecipeById = new Map(parentRecipes.map((r) => [String(r._id), r]));
+
   // Join each ingredient's foodItemName/nutritionPer100g in -
   // RecipeVersion.ingredients[] only stores foodItemId, and the Ingredient
   // Editor UI needs a real name plus per-100g nutrition for its client-side
@@ -129,12 +138,25 @@ async function buildWeekPlanItemsPayload(dietPlan, week) {
 
   const recipeVersionById = new Map(
     recipeVersions.map((v) => {
+      const parent = parentRecipeById.get(String(v.parentRecipeId));
+      const imageByFoodItemId = new Map();
+      const imageByName = new Map();
+      for (const pi of parent?.ingredients || []) {
+        if (!pi.image) continue;
+        if (pi.foodItemId) imageByFoodItemId.set(String(pi.foodItemId), pi.image);
+        if (pi.name) imageByName.set(pi.name.trim().toLowerCase(), pi.image);
+      }
       const plain = {
         ...v,
+        image: parent?.image || null,
         ingredients: (v.ingredients || []).map((ing) => {
           const foodItem = foodItemById.get(String(ing.foodItemId));
           return {
             ...ing,
+            image:
+              imageByFoodItemId.get(String(ing.foodItemId)) ||
+              imageByName.get((foodItem?.name || '').trim().toLowerCase()) ||
+              null,
             foodItemName: foodItem?.name || null,
             nutritionPer100g: foodItem?.nutritionPer100g || null,
             resolvedGramsPerUnit: foodItem ? resolveGramsForIngredient(foodItem, 1, ing.unit) : null,

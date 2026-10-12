@@ -21,6 +21,7 @@ const {
   WaterLog,
   ExerciseLog,
   ExercisePlan,
+  SupplementLog,
 } = require('../models');
 const {
   MEAL_LINKED_TASK_TITLES,
@@ -79,7 +80,7 @@ async function computeTaskDoneMap(patientId, milestones) {
   const checkedInIds = new Set(checkIns.map((c) => c.taskId.toString()));
 
   const dates = milestones.map((m) => new Date(m.date)).sort((a, b) => a - b);
-  const [mealLogs, waterLogs, exerciseLogs, exercisePlan] = await Promise.all([
+  const [mealLogs, waterLogs, exerciseLogs, exercisePlan, supplementLogs] = await Promise.all([
     MealLog.find({
       patientId,
       date: { $gte: dates[0], $lte: dates[dates.length - 1] },
@@ -96,6 +97,12 @@ async function computeTaskDoneMap(patientId, milestones) {
     // (Monday/Tuesday/Wednesday/Thursday), same recurring-per-week shape
     // DietPlan uses, not one entry per calendar date.
     ExercisePlan.findOne({ patientId, status: 'Active' }).select('dailyExercises').lean(),
+    SupplementLog.find({
+      patientId,
+      date: { $gte: dateKeyUTC(dates[0]), $lte: dateKeyUTC(dates[dates.length - 1]) },
+    })
+      .select('date')
+      .lean(),
   ]);
   const dailyExercises = exercisePlan?.dailyExercises || [];
 
@@ -122,6 +129,10 @@ async function computeTaskDoneMap(patientId, milestones) {
     }
   }
   const waterByDateKey = new Map(waterLogs.map((w) => [w.date, w]));
+  const supplementsByDateKey = new Map();
+  for (const l of supplementLogs) {
+    supplementsByDateKey.set(l.date, (supplementsByDateKey.get(l.date) || 0) + 1);
+  }
 
   const exercisesByDateKey = new Map();
   for (const log of exerciseLogs) {
@@ -145,6 +156,20 @@ async function computeTaskDoneMap(patientId, milestones) {
             ? `${loggedMeal.caloriesConsumed} kcal`
             : 'Logged'
           : null,
+        progress: null,
+      });
+      continue;
+    }
+
+    // Optional - logged from the Diet Plan screen (SupplementLog). Shows as
+    // done once anything was taken that day; never counted in adherence (see
+    // computeAdherenceForMilestones).
+    if (t.title === SUPPLEMENTS_TASK_TITLE) {
+      const taken = dateKey ? supplementsByDateKey.get(dateKey) || 0 : 0;
+      result.set(t._id.toString(), {
+        done: taken > 0,
+        linked: true,
+        loggedNote: taken > 0 ? `${taken} logged` : null,
         progress: null,
       });
       continue;

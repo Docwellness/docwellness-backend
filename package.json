@@ -1,7 +1,7 @@
 {
   "name": "docwellness-backend",
   "version": "1.0.0",
-  "description": "DocWellness - Health and Wellness Application Backend API",
+  "description": "Docwellness - Health and Wellness Application Backend API",
   "main": "app.js",
   "engines": {
     "node": ">=22.0.0"

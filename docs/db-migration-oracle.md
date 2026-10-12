@@ -80,7 +80,7 @@ covering both the instance's internal FQDN and private IP as SANs:
 sudo mkdir -p /etc/mongodb-tls && cd /etc/mongodb-tls
 sudo openssl genrsa -out ca.key 4096
 sudo openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 \
-  -subj "/CN=DocWellness Internal CA" -out ca.crt
+  -subj "/CN=Docwellness Internal CA" -out ca.crt
 sudo openssl genrsa -out server.key 2048
 sudo openssl req -new -key server.key -subj "/CN=<internal-fqdn>" -out server.csr
 sudo tee server_ext.cnf > /dev/null << 'EOF'

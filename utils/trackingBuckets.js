@@ -59,8 +59,8 @@ function buildDateBuckets(rangeStart, rangeEnd) {
   const totalDays = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY) + 1;
 
   let granularity;
-  if (totalDays <= 14) granularity = 'daily';
-  else if (totalDays <= 84) granularity = 'weekly';
+  if (totalDays <= 31) granularity = 'daily';
+  else if (totalDays <= 126) granularity = 'weekly';
   else granularity = 'monthly';
 
   const buckets = [];
@@ -152,7 +152,64 @@ function resolveRequestedRange(query, resolvedPlanStart, today) {
   return { startDate, endDate, earliestAllowed };
 }
 
+// Weight trend for the Progress charts. The trend is the PLANNED trajectory
+// (goal start weight -> goal target weight, straight across the goal's span)
+// and is never re-anchored by a logged weight - re-anchoring made the line
+// jump at every submission and restart from the measured value. Real
+// measurements ride alongside as `measuredWeight` (null when no weigh-in
+// fell in that bucket) so the chart can plot them as separate points.
+function buildWeightTrend({
+  buckets,
+  loggedByDay,
+  goalStartWeight,
+  goalTargetWeight,
+  planSpanDays,
+  cumulativeStart,
+  today,
+  now,
+  currentWeight,
+}) {
+  const planStart = new Date(cumulativeStart);
+  planStart.setHours(0, 0, 0, 0);
+  const round1 = (n) => Math.round(n * 10) / 10;
+  const trendOn = (day) => {
+    const d = new Date(day);
+    d.setHours(0, 0, 0, 0);
+    const elapsed = Math.max(0, Math.round((d - planStart) / MS_PER_DAY));
+    const fraction = Math.min(elapsed, planSpanDays) / planSpanDays;
+    return round1(goalStartWeight + (goalTargetWeight - goalStartWeight) * fraction);
+  };
+
+  return buckets.map((bucket) => {
+    // Compare calendar days against `today`, not `now` - a bucket that
+    // starts today must not fall into the future branch.
+    if (bucket.start > today) {
+      return { label: bucket.label, date: '', weight: 0, measuredWeight: null };
+    }
+    const effectiveEnd = bucket.end > now ? now : bucket.end;
+    const dayStr = localDateStr(effectiveEnd);
+    const trend = trendOn(effectiveEnd);
+
+    let measuredWeight = null;
+    for (const [logDay, weight] of loggedByDay) {
+      if (logDay >= localDateStr(bucket.start) && logDay <= dayStr) {
+        if (measuredWeight === null || logDay > measuredWeight.day) {
+          measuredWeight = { day: logDay, weight };
+        }
+      }
+    }
+
+    return {
+      label: bucket.label,
+      date: dayStr,
+      weight: trend > 0 ? trend : round1(currentWeight),
+      measuredWeight: measuredWeight ? round1(measuredWeight.weight) : null,
+    };
+  });
+}
+
 module.exports = {
+  buildWeightTrend,
   MS_PER_DAY,
   localDateStr,
   formatShortDate,

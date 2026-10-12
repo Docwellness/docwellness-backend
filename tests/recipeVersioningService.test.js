@@ -15,13 +15,15 @@ let mongoose;
 let FoodItem;
 let RecipeVersion;
 let createCustomVersion;
+let computeNutritionFromIngredients;
+let computeMicronutrientsForVersion;
 let rewriteRecipeStepsForIngredients;
 
 beforeAll(async () => {
   await connectTestDb();
   mongoose = require('mongoose');
   ({ FoodItem, RecipeVersion } = require('../models'));
-  ({ createCustomVersion } = require('../services/recipeVersioningService'));
+  ({ createCustomVersion, computeNutritionFromIngredients, computeMicronutrientsForVersion } = require('../services/recipeVersioningService'));
   ({ rewriteRecipeStepsForIngredients } = require('../utils/openaiClient'));
 });
 
@@ -226,5 +228,147 @@ describe('createCustomVersion', () => {
     await expect(
       createCustomVersion(v1._id, [{ foodItemId: oats._id, rawQuantity: 40, unit: 'g' }])
     ).rejects.toThrow('not Active');
+  });
+});
+
+// fill-recipe-micronutrients (openspec): computeNutritionFromIngredients'
+// nine new micronutrient fields, summed under a stricter rule than the five
+// macros - see design.md Decision 3 and the function's own doc comment.
+describe('computeNutritionFromIngredients - micronutrients', () => {
+  test('sums a micronutrient across ingredients when every one has a real value for it', async () => {
+    const spinach = await FoodItem.create({
+      name: 'Spinach',
+      normalizedName: 'spinach',
+      nutritionPer100g: { calories: 23, protein: 3, carbs: 3, fats: 0, fiber: 2, iron: 2.7, vitaminC: 28 },
+    });
+    const lemon = await FoodItem.create({
+      name: 'Lemon',
+      normalizedName: 'lemon',
+      nutritionPer100g: { calories: 29, protein: 1, carbs: 9, fats: 0, fiber: 3, iron: 0.6, vitaminC: 53 },
+    });
+    const foodItemsById = new Map([
+      [String(spinach._id), spinach],
+      [String(lemon._id), lemon],
+    ]);
+    const ingredients = [
+      { foodItemId: spinach._id, rawQuantity: 100, unit: 'g' },
+      { foodItemId: lemon._id, rawQuantity: 50, unit: 'g' },
+    ];
+
+    const { nutritionPerServing, micronutrientsIncomplete } = computeNutritionFromIngredients(ingredients, foodItemsById);
+
+    // 100g spinach @ 2.7mg/100g = 2.7; 50g lemon @ 0.6mg/100g = 0.3 -> 3.0
+    expect(nutritionPerServing.iron).toBeCloseTo(3.0);
+    // 100g spinach @ 28mg/100g = 28; 50g lemon @ 53mg/100g = 26.5 -> 54.5
+    expect(nutritionPerServing.vitaminC).toBeCloseTo(54.5);
+    expect(micronutrientsIncomplete).not.toContain('iron');
+    expect(micronutrientsIncomplete).not.toContain('vitaminC');
+  });
+
+  test('strict-null rule: ONE ingredient missing a nutrient makes that nutrient null for the whole recipe, even though every ingredient resolves fine for macros', async () => {
+    const spinach = await FoodItem.create({
+      name: 'Spinach',
+      normalizedName: 'spinach',
+      nutritionPer100g: { calories: 23, protein: 3, carbs: 3, fats: 0, fiber: 2, iron: 2.7, vitaminC: 28 },
+    });
+    // Fully resolved for the five macros, but iron/vitaminC were never
+    // researched (still null, the schema default) - matches "a value
+    // nobody has looked up yet" from design.md Decision 5, distinct from a
+    // verified zero.
+    const oil = await FoodItem.create({
+      name: 'Oil',
+      normalizedName: 'oil',
+      nutritionPer100g: { calories: 884, protein: 0, carbs: 0, fats: 100, fiber: 0 },
+    });
+    const foodItemsById = new Map([
+      [String(spinach._id), spinach],
+      [String(oil._id), oil],
+    ]);
+    const ingredients = [
+      { foodItemId: spinach._id, rawQuantity: 100, unit: 'g' },
+      { foodItemId: oil._id, rawQuantity: 10, unit: 'g' },
+    ];
+
+    const { nutritionPerServing, hasUnresolvedIngredients, micronutrientsIncomplete } = computeNutritionFromIngredients(
+      ingredients,
+      foodItemsById
+    );
+
+    // Macros are unaffected by the missing micronutrient data - both
+    // ingredients fully resolve for calories/etc, so this must NOT be null.
+    expect(nutritionPerServing.calories).toBeCloseTo(23 + 88.4);
+    expect(hasUnresolvedIngredients).toBe(false);
+    // But iron/vitaminC are strictly null for the whole recipe, because Oil
+    // has no researched value for them - a partial sum (spinach's 2.7mg
+    // iron alone) would silently understate the real total, which
+    // design.md Decision 3 explicitly rejects.
+    expect(nutritionPerServing.iron).toBeNull();
+    expect(nutritionPerServing.vitaminC).toBeNull();
+    expect(micronutrientsIncomplete).toEqual(expect.arrayContaining(['iron', 'vitaminC']));
+  });
+
+  test('micronutrient incompleteness never sets hasUnresolvedIngredients (which stays macro-only, per design.md Decision 3, so menuGenerationService is unaffected)', async () => {
+    const oil = await FoodItem.create({
+      name: 'Oil',
+      normalizedName: 'oil-2',
+      nutritionPer100g: { calories: 884, protein: 0, carbs: 0, fats: 100, fiber: 0 }, // no micronutrients researched
+    });
+    const foodItemsById = new Map([[String(oil._id), oil]]);
+    const ingredients = [{ foodItemId: oil._id, rawQuantity: 10, unit: 'g' }];
+
+    const { hasUnresolvedIngredients, unresolvedIngredientNames, micronutrientsIncomplete } = computeNutritionFromIngredients(
+      ingredients,
+      foodItemsById
+    );
+
+    expect(hasUnresolvedIngredients).toBe(false);
+    expect(unresolvedIngredientNames).toEqual([]);
+    expect(micronutrientsIncomplete.length).toBeGreaterThan(0);
+  });
+
+  test('a verified-zero micronutrient (a real, researched 0) is summed as 0, not treated as missing', async () => {
+    // rule:plant-cholesterol - design.md Decision 5's named rule for
+    // dietary cholesterol in purely plant foods.
+    const rice = await FoodItem.create({
+      name: 'Rice',
+      normalizedName: 'rice-zero-test',
+      nutritionPer100g: { calories: 130, protein: 2.7, carbs: 28, fats: 0.3, fiber: 0.4, cholesterol: 0 },
+    });
+    const foodItemsById = new Map([[String(rice._id), rice]]);
+    const ingredients = [{ foodItemId: rice._id, rawQuantity: 150, unit: 'g' }];
+
+    const { nutritionPerServing, micronutrientsIncomplete } = computeNutritionFromIngredients(ingredients, foodItemsById);
+
+    expect(nutritionPerServing.cholesterol).toBe(0);
+    expect(micronutrientsIncomplete).not.toContain('cholesterol');
+  });
+});
+
+describe('computeMicronutrientsForVersion', () => {
+  test('recomputes only the nine micronutrients from a RecipeVersion\'s own frozen ingredients, independent of its macros', async () => {
+    const { v1, oats, milk } = await makeV1();
+    // FoodItem micronutrient data researched AFTER v1 was created - this is
+    // exactly the prod migration's `versions` phase scenario (design.md
+    // Decision 4c): backfilling micronutrients onto an already-frozen,
+    // already-prescribed version without touching anything else about it.
+    oats.nutritionPer100g.iron = 4.7;
+    await oats.save();
+    milk.nutritionPer100g.iron = 0.03;
+    await milk.save();
+    const foodItemsById = new Map([
+      [String(oats._id), oats],
+      [String(milk._id), milk],
+    ]);
+
+    const { micronutrients, micronutrientsIncomplete } = computeMicronutrientsForVersion(v1, foodItemsById);
+
+    // 40g oats @ 4.7mg/100g = 1.88; 200g milk @ 0.03mg/100g = 0.06 -> 1.94
+    expect(micronutrients.iron).toBeCloseTo(1.94);
+    expect(micronutrientsIncomplete).not.toContain('iron');
+    // Untouched: this function returns ONLY the micronutrients object, never
+    // macros/ingredients/versionNumber - the caller (the migration script)
+    // is what's responsible for a targeted $set on nutritionPerServing.<micro>
+    // paths only, never overwriting v1.nutritionPerServing.calories etc.
+    expect(micronutrients).not.toHaveProperty('calories');
   });
 });

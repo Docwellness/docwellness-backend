@@ -541,6 +541,7 @@ const {
   sumMealCalories,
   addDays,
   buildDateBuckets,
+  buildWeightTrend,
   resolvePlanStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
@@ -672,25 +673,8 @@ async function computeTrackingData(patientId, query) {
       };
     });
 
-    // Weight trend, anchored to the goal - cumulative from the plan's real
-    // start (not just the visible range's start) so a bucket partway
-    // through the plan still reflects the real trajectory, instead of one
-    // that resets at whatever start date the patient happens to have
-    // picked for this chart.
-    //
-    // A day the patient actually logged a weight on is never estimated -
-    // that real Progress entry always wins outright and re-anchors the
-    // projection from there. Any day WITHOUT a real log is projected from
-    // the most recent anchor (the last real log, or the goal's own
-    // starting weight before the first one exists yet) at the goal's own
-    // overall pace (startValue -> targetValue across the goal's full
-    // duration) - a weight-loss goal's projection dips, a weight-gain
-    // goal's climbs, a maintain goal stays flat. This replaces the old
-    // calorie-surplus simulation, which anchored the ENTIRE history to
-    // today's currentWeight and walked forward from there - so "Initial
-    // weight" was never the patient's real starting weight, just a
-    // few-days-removed estimate of today's weight, and it visibly drifted
-    // every time meal logs changed.
+    // Weight trend: the planned goal trajectory (never re-anchored by logged
+    // weights - see buildWeightTrend), plus each bucket's measured weight.
     const cumulativeStart = resolvedPlanStart || startDate;
     const activeGoal = await Goal.findOne({ patientId, status: 'active' })
       .select('startValue targetValue startDate endDate')
@@ -706,8 +690,6 @@ async function computeTrackingData(patientId, query) {
             )
           )
         : 84; // ~12 weeks - only hit when the patient has no active goal yet.
-    // Positive for a gain goal, negative for a loss goal, ~0 for maintain.
-    const dailyRate = (goalTargetWeight - goalStartWeight) / planSpanDays;
 
     const realLogs = await Progress.find({
       patientId,
@@ -724,54 +706,16 @@ async function computeTrackingData(patientId, query) {
       loggedByDay.set(localDateStr(log.date), log.weight);
     }
 
-    const dailyWeights = {};
-    let anchorWeight = goalStartWeight;
-    let anchorDate = new Date(cumulativeStart);
-    anchorDate.setHours(0, 0, 0, 0);
-    let currentDate = new Date(cumulativeStart);
-    currentDate.setHours(0, 0, 0, 0);
-
-    while (currentDate <= endDate) {
-      const dateStr = localDateStr(currentDate);
-      if (loggedByDay.has(dateStr)) {
-        // Real data always wins - snap the projection to it and re-anchor
-        // going forward from here.
-        anchorWeight = loggedByDay.get(dateStr);
-        anchorDate = new Date(currentDate);
-        dailyWeights[dateStr] = Math.round(anchorWeight * 10) / 10;
-      } else {
-        const daysSinceAnchor = Math.round((currentDate - anchorDate) / MS_PER_DAY);
-        dailyWeights[dateStr] = Math.round((anchorWeight + dailyRate * daysSinceAnchor) * 10) / 10;
-      }
-      currentDate = addDays(currentDate, 1);
-    }
-
-    const weightTrend = buckets.map((bucket, index) => {
-      // Compare calendar days, not exact instants - bucket.start is already
-      // day-normalized (see buildDateBuckets), but `now` carries a
-      // time-of-day. Comparing it against `now` directly could misfire a
-      // bucket that starts "today" into the future branch depending on the
-      // time of day, which is exactly what made a freshly-started plan's
-      // very first (and only) reading come back zeroed out instead of
-      // showing the patient's actual current weight.
-      if (bucket.start > today) {
-        return { label: bucket.label, date: '', weight: 0 };
-      }
-      const effectiveEnd = bucket.end > now ? now : bucket.end;
-      const dayStr = localDateStr(effectiveEnd);
-      // The very first reading is never allowed to come back as an unlogged
-      // zero - if this is a fresh plan's first bucket and there's no
-      // daily-weights entry for it yet, it should read as the patient's
-      // actual current weight, not nothing.
-      const weight = dailyWeights[dayStr] || currentWeight;
-      return {
-        label: bucket.label,
-        date: dayStr,
-        weight:
-          index === 0 && weight <= 0
-            ? Math.round(currentWeight * 10) / 10
-            : Math.round(weight * 10) / 10,
-      };
+    const weightTrend = buildWeightTrend({
+      buckets,
+      loggedByDay,
+      goalStartWeight,
+      goalTargetWeight,
+      planSpanDays,
+      cumulativeStart,
+      today,
+      now,
+      currentWeight,
     });
 
     // BMI trend

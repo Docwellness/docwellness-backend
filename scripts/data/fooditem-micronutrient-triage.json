@@ -1,0 +1,4822 @@
+{
+  "generatedAt": "2026-09-29T13:27:33.827Z",
+  "totalItems": 189,
+  "totalJevCalls": 13,
+  "estimatedTotalCostUsd": 0.008588076000000002,
+  "confidenceBar": 0.7,
+  "items": [
+    {
+      "name": "Onion",
+      "normalizedName": "onion",
+      "foodItemId": "6abbb9cfa9d29dc9557358a0",
+      "resolutionGap": null,
+      "recipeUsageCount": 70,
+      "sampleRecipesUsingIt": [
+        "Sambar",
+        "Turai Sabji",
+        "Tofu Bhurji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.05,
+      "sodiumSignificant": 0.06,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Tomato",
+      "normalizedName": "tomato",
+      "foodItemId": "6abbb9cfa9d29dc9557358c6",
+      "resolutionGap": null,
+      "recipeUsageCount": 58,
+      "sampleRecipesUsingIt": [
+        "Sambar",
+        "Light Dal Makhani",
+        "Turai Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.05,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Garlic",
+      "normalizedName": "garlic",
+      "foodItemId": "6abbb9cfa9d29dc9557358cf",
+      "resolutionGap": null,
+      "recipeUsageCount": 43,
+      "sampleRecipesUsingIt": [
+        "Turai Sabji",
+        "Tomato Basil Soup with Grilled Paneer",
+        "Tofu Bhurji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Ginger",
+      "normalizedName": "ginger",
+      "foodItemId": "6abbb9cfa9d29dc9557358d5",
+      "resolutionGap": null,
+      "recipeUsageCount": 53,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee",
+        "Vegetable Masala Khichdi",
+        "Light Dal Makhani"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.63
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.63 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Green Chilli",
+      "normalizedName": "green chilli",
+      "foodItemId": "6abbb9cfa9d29dc9557358d8",
+      "resolutionGap": null,
+      "recipeUsageCount": 57,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Coconut Chutney",
+        "Turai Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.92
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.76
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Carrot",
+      "normalizedName": "carrot",
+      "foodItemId": "6abbb9cfa9d29dc9557358db",
+      "resolutionGap": null,
+      "recipeUsageCount": 22,
+      "sampleRecipesUsingIt": [
+        "Sambar",
+        "Chicken Vegetable Soup",
+        "Grilled Fish with Steamed Vegetables"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Cucumber",
+      "normalizedName": "cucumber",
+      "foodItemId": "6abbb9cfa9d29dc9557358e1",
+      "resolutionGap": null,
+      "recipeUsageCount": 14,
+      "sampleRecipesUsingIt": [
+        "Cucumber Raita",
+        "Watermelon Cucumber Salad",
+        "Grilled Vegetable Sandwich"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coriander Leaves",
+      "normalizedName": "coriander leaves",
+      "foodItemId": "6abbb9cfa9d29dc9557358ff",
+      "resolutionGap": null,
+      "recipeUsageCount": 59,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Turai Sabji",
+        "Tofu Bhurji"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.83
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.85
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Curry Leaves",
+      "normalizedName": "curry leaves",
+      "foodItemId": "6abbb9cfa9d29dc955735905",
+      "resolutionGap": null,
+      "recipeUsageCount": 14,
+      "sampleRecipesUsingIt": [
+        "Coconut Chutney",
+        "Sambar",
+        "Curd Rice (Thayir Sadam)"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.65
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.55
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.65 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.55 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Cumin Seeds",
+      "normalizedName": "cumin seeds",
+      "foodItemId": "6abbb9cfa9d29dc95573590e",
+      "resolutionGap": null,
+      "recipeUsageCount": 58,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee",
+        "Vegetable Masala Khichdi",
+        "Cucumber Raita"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.53
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.88
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.53 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Turmeric Powder",
+      "normalizedName": "turmeric powder",
+      "foodItemId": "6abbb9cfa9d29dc955735914",
+      "resolutionGap": null,
+      "recipeUsageCount": 52,
+      "sampleRecipesUsingIt": [
+        "Vegetable Masala Khichdi",
+        "Turai Sabji",
+        "Tofu Bhurji"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.96
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.71
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Cardamom",
+      "normalizedName": "cardamom",
+      "foodItemId": "6abbb9cfa9d29dc95573592c",
+      "resolutionGap": null,
+      "recipeUsageCount": 13,
+      "sampleRecipesUsingIt": [
+        "Warm Almond Milk with Saffron",
+        "Saffron Cardamom Milk (Kesar)",
+        "Coconut Jaggery Ladoo"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.95
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.78
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Garam Masala",
+      "normalizedName": "garam masala",
+      "foodItemId": "6abbb9cfa9d29dc95573593c",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Baked Vegetable Cutlet",
+        "Vegetable Korma",
+        "Kala Chana Curry"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.34,
+      "sodiumSignificant": 0.81,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.34) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Lemon",
+      "normalizedName": "lemon",
+      "foodItemId": "6abbb9d0a9d29dc955735948",
+      "resolutionGap": null,
+      "recipeUsageCount": 40,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Grilled Paneer Tikka (Lemon Marinade)",
+        "Light Bhel Puri"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Milk",
+      "normalizedName": "milk",
+      "foodItemId": "6abbb9d0a9d29dc955735975",
+      "resolutionGap": null,
+      "recipeUsageCount": 14,
+      "sampleRecipesUsingIt": [
+        "Ashwagandha Nutmeg Milk",
+        "Saffron Cardamom Milk (Kesar)",
+        "Sabudana Kheer with Jaggery"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.04,
+      "transFatPossible": 0.79,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Oil",
+      "normalizedName": "oil",
+      "foodItemId": "6abbb9d0a9d29dc95573597e",
+      "resolutionGap": null,
+      "recipeUsageCount": 45,
+      "sampleRecipesUsingIt": [
+        "Coconut Chutney",
+        "Sambar",
+        "Turai Sabji"
+      ],
+      "origin": {
+        "choice": "oil_plant",
+        "confidence": 0.97
+      },
+      "cholesterolDefinitionallyZero": 0.86,
+      "transFatPossible": 0.81,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "ambiguous_name",
+        "confidence": 0.34
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.34 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Olive Oil",
+      "normalizedName": "olive oil",
+      "foodItemId": "6abbb9d0a9d29dc955735981",
+      "resolutionGap": null,
+      "recipeUsageCount": 28,
+      "sampleRecipesUsingIt": [
+        "Tofu Bhurji",
+        "Grilled Fish with Steamed Vegetables",
+        "Vegetable Soup"
+      ],
+      "origin": {
+        "choice": "oil_plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.96
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Rice",
+      "normalizedName": "rice",
+      "foodItemId": "6abbb9d0a9d29dc955735984",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Vegetable Masala Khichdi",
+        "Lauki Sabji with Moong Dal and Rice",
+        "Curd Rice (Thayir Sadam)"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.14,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.93
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Chickpea Flour (Besan)",
+      "normalizedName": "chickpea flour (besan)",
+      "foodItemId": "6abbb9d0a9d29dc955735999",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Baked Besan Pakora",
+        "Baked Vegetable Cutlet",
+        "Pithla Bhakri"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.83
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.41,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.41) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Moong Dal",
+      "normalizedName": "moong dal",
+      "foodItemId": "6abbb9d0a9d29dc9557359b1",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee",
+        "Vegetable Masala Khichdi",
+        "Vegetable Jowar Khichdi"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.38
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.38 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Honey",
+      "normalizedName": "honey",
+      "foodItemId": "6abbb9d0a9d29dc955735a05",
+      "resolutionGap": null,
+      "recipeUsageCount": 13,
+      "sampleRecipesUsingIt": [
+        "Chamomile Tea with Honey",
+        "Amla and Honey Tonic",
+        "Licorice Tea"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.5
+      },
+      "cholesterolDefinitionallyZero": 0.58,
+      "transFatPossible": 0.22,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.93
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.50 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "cholesterol_definitionally_zero: near-uncertain (0.58) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking."
+      ]
+    },
+    {
+      "name": "Jaggery",
+      "normalizedName": "jaggery",
+      "foodItemId": "6abbb9d0a9d29dc955735a08",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Coconut Jaggery Ladoo",
+        "Sabudana Kheer with Jaggery",
+        "Roasted Chana with Jaggery"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.85
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.74
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Salt",
+      "normalizedName": "salt",
+      "foodItemId": "6abbb9d0a9d29dc955735a11",
+      "resolutionGap": null,
+      "recipeUsageCount": 96,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Coconut Chutney",
+        "Sambar"
+      ],
+      "origin": {
+        "choice": "salt_mineral",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.05,
+      "sodiumSignificant": 0.99,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.64
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.64 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Ghee",
+      "normalizedName": "ghee",
+      "foodItemId": null,
+      "resolutionGap": "existing-fooditem-unit-conversion-gap",
+      "recipeUsageCount": 27,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee",
+        "Vegetable Masala Khichdi",
+        "Light Dal Makhani"
+      ],
+      "origin": {
+        "choice": "fat_animal",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.02,
+      "transFatPossible": 0.95,
+      "sodiumSignificant": 0.14,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.34
+      },
+      "researchPriorityScore": 3,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.34 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Green Peas",
+      "normalizedName": "green peas",
+      "foodItemId": "6abbb9cfa9d29dc9557358f0",
+      "resolutionGap": null,
+      "recipeUsageCount": 13,
+      "sampleRecipesUsingIt": [
+        "Bharwan Shimla Mirch",
+        "Baked Vegetable Cutlet",
+        "Vegetable Korma"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coriander Powder",
+      "normalizedName": "coriander powder",
+      "foodItemId": "6abbb9cfa9d29dc955735917",
+      "resolutionGap": null,
+      "recipeUsageCount": 19,
+      "sampleRecipesUsingIt": [
+        "Turai Sabji",
+        "Tofu Bhurji",
+        "Bharwan Shimla Mirch"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.83
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.78
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Red Chilli Powder",
+      "normalizedName": "red chilli powder",
+      "foodItemId": "6abbb9cfa9d29dc95573591d",
+      "resolutionGap": null,
+      "recipeUsageCount": 13,
+      "sampleRecipesUsingIt": [
+        "Bharwan Shimla Mirch",
+        "Masoor Dal",
+        "Bharli Vangi"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.8
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.74
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Black Pepper",
+      "normalizedName": "black pepper",
+      "foodItemId": "6abbb9cfa9d29dc955735920",
+      "resolutionGap": null,
+      "recipeUsageCount": 24,
+      "sampleRecipesUsingIt": [
+        "Grilled Paneer Tikka (Lemon Marinade)",
+        "Chicken Vegetable Soup",
+        "Masala Makhana in Ghee"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.72
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mustard Seeds",
+      "normalizedName": "mustard seeds",
+      "foodItemId": "6abbb9cfa9d29dc955735923",
+      "resolutionGap": null,
+      "recipeUsageCount": 12,
+      "sampleRecipesUsingIt": [
+        "Coconut Chutney",
+        "Sambar",
+        "Curd Rice (Thayir Sadam)"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.68
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.89
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.68 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Chaat Masala",
+      "normalizedName": "chaat masala",
+      "foodItemId": "6abbb9cfa9d29dc95573593f",
+      "resolutionGap": null,
+      "recipeUsageCount": 11,
+      "sampleRecipesUsingIt": [
+        "Light Bhel Puri",
+        "Baked Aloo Chaat",
+        "Sweet Potato Chaat"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.29,
+      "sodiumSignificant": 0.93,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.96
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Ghee",
+      "normalizedName": "ghee",
+      "foodItemId": "6abbb9d0a9d29dc95573597b",
+      "resolutionGap": null,
+      "recipeUsageCount": 27,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee",
+        "Vegetable Masala Khichdi",
+        "Light Dal Makhani"
+      ],
+      "origin": {
+        "choice": "fat_animal",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.12,
+      "transFatPossible": 0.94,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.55
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.55 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Water",
+      "normalizedName": "water",
+      "foodItemId": "6abbb9d0a9d29dc955735a0e",
+      "resolutionGap": null,
+      "recipeUsageCount": 56,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Coconut Chutney",
+        "Sambar"
+      ],
+      "origin": {
+        "choice": "water",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.04,
+      "sodiumSignificant": 0.05,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.95
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Water",
+      "normalizedName": "water",
+      "foodItemId": null,
+      "resolutionGap": "existing-fooditem-unit-conversion-gap",
+      "recipeUsageCount": 56,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Coconut Chutney",
+        "Sambar"
+      ],
+      "origin": {
+        "choice": "water",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.84,
+      "transFatPossible": 0.05,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 2.99,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Bell Pepper",
+      "normalizedName": "bell pepper",
+      "foodItemId": "6abbb9cfa9d29dc9557358e7",
+      "resolutionGap": null,
+      "recipeUsageCount": 10,
+      "sampleRecipesUsingIt": [
+        "Grilled Paneer Tikka (Lemon Marinade)",
+        "Tofu Bhurji",
+        "Bharwan Shimla Mirch"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.9
+      },
+      "researchPriorityScore": 2.97,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Makhana",
+      "normalizedName": "makhana",
+      "foodItemId": "6abbb9d0a9d29dc955735a02",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Masala Makhana in Ghee",
+        "Roasted Makhana Trail Mix",
+        "Roasted Foxnut Trail Mix"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.91
+      },
+      "cholesterolDefinitionallyZero": 0.78,
+      "transFatPossible": 0.55,
+      "sodiumSignificant": 0.21,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.54
+      },
+      "researchPriorityScore": 2.11,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.54 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.55) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Paneer",
+      "normalizedName": "paneer",
+      "foodItemId": "6abbb9d0a9d29dc95573596f",
+      "resolutionGap": null,
+      "recipeUsageCount": 6,
+      "sampleRecipesUsingIt": [
+        "Palak Paneer",
+        "Grilled Paneer Sandwich",
+        "Moong Dal Chilla"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 0.97
+      },
+      "cholesterolDefinitionallyZero": 0.04,
+      "transFatPossible": 0.76,
+      "sodiumSignificant": 0.2,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.33
+      },
+      "researchPriorityScore": 2.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.33 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Yogurt",
+      "normalizedName": "yogurt",
+      "foodItemId": "6abbb9d0a9d29dc955735978",
+      "resolutionGap": null,
+      "recipeUsageCount": 7,
+      "sampleRecipesUsingIt": [
+        "Vegetable Korma",
+        "Vegetable Biryani",
+        "Rava Idli"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.16,
+      "transFatPossible": 0.56,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.44
+      },
+      "researchPriorityScore": 2.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.44 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.56) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Peanuts",
+      "normalizedName": "peanuts",
+      "foodItemId": "6abbb9d0a9d29dc9557359f0",
+      "resolutionGap": null,
+      "recipeUsageCount": 8,
+      "sampleRecipesUsingIt": [
+        "Bharli Vangi",
+        "Lemon Rice with Peanuts",
+        "Roasted Puffed Rice with Peanuts"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.53,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.92
+      },
+      "researchPriorityScore": 2.01,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.53) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Pumpkin Seeds",
+      "normalizedName": "pumpkin seeds",
+      "foodItemId": "6abbb9d0a9d29dc9557359ff",
+      "resolutionGap": null,
+      "recipeUsageCount": 6,
+      "sampleRecipesUsingIt": [
+        "Date and Seed Energy Balls",
+        "Roasted Makhana Trail Mix",
+        "Roasted Foxnut Trail Mix"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.37,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 2.01,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.37) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Potato",
+      "normalizedName": "potato",
+      "foodItemId": "6abbb9cfa9d29dc9557358ea",
+      "resolutionGap": null,
+      "recipeUsageCount": 9,
+      "sampleRecipesUsingIt": [
+        "Bharwan Shimla Mirch",
+        "Vegetable Soup",
+        "Baked Vegetable Cutlet"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Spinach",
+      "normalizedName": "spinach",
+      "foodItemId": "6abbb9cfa9d29dc9557358f6",
+      "resolutionGap": null,
+      "recipeUsageCount": 8,
+      "sampleRecipesUsingIt": [
+        "Baked Besan Pakora",
+        "Dal Palak",
+        "Palak Dal"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.93
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mixed Vegetables",
+      "normalizedName": "mixed vegetables",
+      "foodItemId": "6abbb9cfa9d29dc9557358fc",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Vegetable Masala Khichdi",
+        "Vegetable Jowar Khichdi",
+        "Tawa Pulao"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.95
+      },
+      "cholesterolDefinitionallyZero": 0.76,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.34
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.34 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Mint Leaves",
+      "normalizedName": "mint leaves",
+      "foodItemId": "6abbb9cfa9d29dc955735902",
+      "resolutionGap": null,
+      "recipeUsageCount": 7,
+      "sampleRecipesUsingIt": [
+        "Mint Chutney",
+        "Watermelon Cucumber Salad",
+        "Grilled Vegetable Sandwich"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.84
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.95
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Cumin Powder",
+      "normalizedName": "cumin powder",
+      "foodItemId": "6abbb9cfa9d29dc955735911",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Masala Makhana in Ghee",
+        "Dahi Bhalla (Moong Dal)",
+        "Kokum Sharbat"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.95
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.75
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Cinnamon Powder",
+      "normalizedName": "cinnamon powder",
+      "foodItemId": "6abbb9cfa9d29dc95573592f",
+      "resolutionGap": null,
+      "recipeUsageCount": 6,
+      "sampleRecipesUsingIt": [
+        "Banana Jowar Pancake",
+        "Turmeric Milk",
+        "Banana with Roasted Chana and Seeds"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.61
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.61 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Ajwain",
+      "normalizedName": "ajwain",
+      "foodItemId": "6abbb9cfa9d29dc955735945",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Ajwain Digestive Water",
+        "Baked Besan Pakora",
+        "Ajwain and Jeera Water"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.55
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.21,
+      "sodiumSignificant": 0.23,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.62
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.55 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.62 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Banana",
+      "normalizedName": "banana",
+      "foodItemId": "6abbb9d0a9d29dc95573594e",
+      "resolutionGap": null,
+      "recipeUsageCount": 6,
+      "sampleRecipesUsingIt": [
+        "Fruit Chaat with Chaat Masala",
+        "Banana Jowar Pancake",
+        "Banana with Roasted Chana and Seeds"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Pomegranate",
+      "normalizedName": "pomegranate",
+      "foodItemId": "6abbb9d0a9d29dc95573595a",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Fruit Chaat with Chaat Masala",
+        "Corn Pomegranate Bhutta Chaat",
+        "Curd Poha with Pomegranate"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Low-Fat Curd",
+      "normalizedName": "low-fat curd",
+      "foodItemId": "6abbb9d0a9d29dc95573596c",
+      "resolutionGap": null,
+      "recipeUsageCount": 9,
+      "sampleRecipesUsingIt": [
+        "Cucumber Raita",
+        "Curd Rice (Thayir Sadam)",
+        "Dahi Bhalla (Moong Dal)"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.05,
+      "transFatPossible": 0.59,
+      "sodiumSignificant": 0.14,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.48
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.48 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.59) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Oats",
+      "normalizedName": "oats",
+      "foodItemId": "6abbb9d0a9d29dc955735993",
+      "resolutionGap": null,
+      "recipeUsageCount": 6,
+      "sampleRecipesUsingIt": [
+        "Oats Idli",
+        "Oats Protein Upma",
+        "Oats Khichdi"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.29,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Whole Wheat Flour",
+      "normalizedName": "whole wheat flour",
+      "foodItemId": "6abbb9d0a9d29dc955735996",
+      "resolutionGap": null,
+      "recipeUsageCount": 7,
+      "sampleRecipesUsingIt": [
+        "Methi Thepla",
+        "Chapati",
+        "Moong Dal Paratha"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.48
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.33,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.48 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.33) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Toor Dal",
+      "normalizedName": "toor dal",
+      "foodItemId": "6abbb9d0a9d29dc9557359ba",
+      "resolutionGap": null,
+      "recipeUsageCount": 7,
+      "sampleRecipesUsingIt": [
+        "Sambar",
+        "Dal Palak",
+        "Methi Dal"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.18,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.44
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.44 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Urad Dal",
+      "normalizedName": "urad dal",
+      "foodItemId": "6abbb9d0a9d29dc9557359bd",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Light Dal Makhani",
+        "Tomato Carrot Uttapam",
+        "Ragi Idli"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.28,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Chickpeas",
+      "normalizedName": "chickpeas",
+      "foodItemId": "6abbb9d0a9d29dc9557359c3",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Mediterranean Chickpea Bowl",
+        "Middle Eastern Falafel Plate",
+        "Boiled Chana Chaat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.32,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.82
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.32) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Roasted Chana",
+      "normalizedName": "roasted chana",
+      "foodItemId": "6abbb9d0a9d29dc9557359d5",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Coconut Chutney",
+        "Roasted Chana with Jaggery",
+        "Roasted Makhana and Chana"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.95
+      },
+      "cholesterolDefinitionallyZero": 0.83,
+      "transFatPossible": 0.57,
+      "sodiumSignificant": 0.35,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.7
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.57) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.35)."
+      ]
+    },
+    {
+      "name": "Egg",
+      "normalizedName": "egg",
+      "foodItemId": "6abbb9d0a9d29dc9557359de",
+      "resolutionGap": null,
+      "recipeUsageCount": 7,
+      "sampleRecipesUsingIt": [
+        "Egg Bhurji",
+        "Banana Jowar Pancake",
+        "Egg Salad"
+      ],
+      "origin": {
+        "choice": "animal_meat_fish_egg",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.01,
+      "transFatPossible": 0.24,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Sunflower Seeds",
+      "normalizedName": "sunflower seeds",
+      "foodItemId": "6abbb9d0a9d29dc9557359fc",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Date and Seed Energy Balls",
+        "Chia Pudding with Pomegranate",
+        "Roasted Chana with Makhana and Seeds"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.42,
+      "sodiumSignificant": 0.15,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.42) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Parsley",
+      "normalizedName": "parsley",
+      "foodItemId": "6abbb9d0a9d29dc955735a4a",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Vegetable Soup",
+        "Egg Salad",
+        "Continental Grilled Vegetable Plate"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.7
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 2,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Whole Wheat Bread",
+      "normalizedName": "whole wheat bread",
+      "foodItemId": "6abbb9d0a9d29dc9557359ab",
+      "resolutionGap": null,
+      "recipeUsageCount": 5,
+      "sampleRecipesUsingIt": [
+        "Whole Wheat Toast",
+        "Grilled Vegetable Sandwich",
+        "Grilled Paneer Sandwich"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.67,
+      "transFatPossible": 0.73,
+      "sodiumSignificant": 0.62,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.35
+      },
+      "researchPriorityScore": 1.99,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.35 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "cholesterol_definitionally_zero: near-uncertain (0.67) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking.",
+        "sodium_significant: near-uncertain (0.62)."
+      ]
+    },
+    {
+      "name": "Curd",
+      "normalizedName": "curd",
+      "foodItemId": null,
+      "resolutionGap": "existing-fooditem-unit-conversion-gap",
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Curd",
+        "Moong Dal Chilla",
+        "Koshimbir"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.08,
+      "transFatPossible": 0.5,
+      "sodiumSignificant": 0.34,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.57
+      },
+      "researchPriorityScore": 1.03,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.57 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.50) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.34)."
+      ]
+    },
+    {
+      "name": "Low-Fat Paneer",
+      "normalizedName": "low-fat paneer",
+      "foodItemId": "6abbb9d0a9d29dc955735972",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Grilled Paneer Tikka (Lemon Marinade)",
+        "Tomato Basil Soup with Grilled Paneer",
+        "Paneer Bhaji"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.05,
+      "transFatPossible": 0.59,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.31
+      },
+      "researchPriorityScore": 1.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.31 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.59) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Almonds",
+      "normalizedName": "almonds",
+      "foodItemId": "6abbb9d0a9d29dc9557359ea",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Roasted Makhana Trail Mix",
+        "Roasted Foxnut Trail Mix",
+        "Oats Porridge"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.31,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 1.01,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.31) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Cauliflower",
+      "normalizedName": "cauliflower",
+      "foodItemId": "6abbb9cfa9d29dc9557358de",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Vegetable Korma",
+        "Gobi Matar",
+        "Mix Veg Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.06,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Beetroot",
+      "normalizedName": "beetroot",
+      "foodItemId": "6abbb9cfa9d29dc9557358e4",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Pomegranate Beetroot Juice",
+        "Beetroot Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.95
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Green Beans",
+      "normalizedName": "green beans",
+      "foodItemId": "6abbb9cfa9d29dc9557358ed",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Chicken Vegetable Soup",
+        "Vegetable Soup",
+        "Veg Pulav"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.88
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Doodhi (Bottle Gourd)",
+      "normalizedName": "doodhi (bottle gourd)",
+      "foodItemId": "6abbb9cfa9d29dc9557358f9",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Lauki Sabji with Moong Dal and Rice",
+        "Lauki Kofta in Tomato Gravy",
+        "Doodhi Chilla"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.73
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Rosemary",
+      "normalizedName": "rosemary",
+      "foodItemId": "6abbb9cfa9d29dc955735908",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Grilled Chicken Breast Stick with Bell Peppers",
+        "Grilled Marinated Chicken Leg"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.89
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coriander Seeds",
+      "normalizedName": "coriander seeds",
+      "foodItemId": "6abbb9cfa9d29dc95573591a",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Bharli Vangi",
+        "CCF Tea (Cumin-Coriander-Fennel)",
+        "Coriander Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.69
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.91
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.69 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Fennel Seeds",
+      "normalizedName": "fennel seeds",
+      "foodItemId": "6abbb9cfa9d29dc955735926",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "CCF Tea (Cumin-Coriander-Fennel)",
+        "Fenugreek and Fennel Water",
+        "Fennel Seed Water"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.52
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.78
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Fenugreek Seeds",
+      "normalizedName": "fenugreek seeds",
+      "foodItemId": "6abbb9cfa9d29dc955735929",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Methi Soaked Water",
+        "Ragi Idli",
+        "Fenugreek and Fennel Water"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.67
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.73
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.67 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Cinnamon Stick",
+      "normalizedName": "cinnamon stick",
+      "foodItemId": "6abbb9cfa9d29dc955735932",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Cinnamon Tea",
+        "Veg Pulav"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.85
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.92
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Apple",
+      "normalizedName": "apple",
+      "foodItemId": "6abbb9d0a9d29dc95573594b",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Fruit Chaat with Chaat Masala",
+        "Oats Porridge",
+        "Apple with Roasted Sunflower Seeds and Raisins"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Avocado",
+      "normalizedName": "avocado",
+      "foodItemId": "6abbb9d0a9d29dc955735951",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Mexican Black Bean Bowl",
+        "Boiled Eggs with Brown Bread and Avocado Sandwich",
+        "Chickpeas Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.14,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Date",
+      "normalizedName": "date",
+      "foodItemId": "6abbb9d0a9d29dc955735954",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Date and Seed Energy Balls",
+        "Turmeric Milk with Dates",
+        "Warm Water with Dates, Figs, Almonds, Walnuts"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Tamarind",
+      "normalizedName": "tamarind",
+      "foodItemId": "6abbb9d0a9d29dc95573595d",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Sambar",
+        "Bharli Vangi",
+        "Kerala Fish Curry"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.17,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.76
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coconut",
+      "normalizedName": "coconut",
+      "foodItemId": "6abbb9d0a9d29dc955735963",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Coconut Chutney",
+        "Coconut Jaggery Ladoo",
+        "Date and Seed Energy Balls"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.84
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.33,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.33) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Curd",
+      "normalizedName": "curd",
+      "foodItemId": "6abbb9d0a9d29dc955735969",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Curd",
+        "Moong Dal Chilla",
+        "Koshimbir"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.04,
+      "transFatPossible": 0.67,
+      "sodiumSignificant": 0.16,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.46
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.46 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.67) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Basmati Rice",
+      "normalizedName": "basmati rice",
+      "foodItemId": "6abbb9d0a9d29dc955735987",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Tawa Pulao",
+        "Vegetable Biryani",
+        "Veg Pulav"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.96
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.88
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Rice Flour",
+      "normalizedName": "rice flour",
+      "foodItemId": "6abbb9d0a9d29dc95573598a",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Ragi Dosa",
+        "Methi Handvo (Baked)",
+        "Soya Chunks + Kala Chana + Moong Dal Dosa"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.51
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.64
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.51 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.64 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Flattened Rice",
+      "normalizedName": "flattened rice",
+      "foodItemId": "6abbb9d0a9d29dc95573598d",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Curd Poha with Pomegranate",
+        "Poha"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.69
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.22,
+      "sodiumSignificant": 0.14,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.39
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.69 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.39 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Quinoa",
+      "normalizedName": "quinoa",
+      "foodItemId": "6abbb9d0a9d29dc955735990",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Continental Grilled Vegetable Plate",
+        "Chickpeas Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Jowar Flour",
+      "normalizedName": "jowar flour",
+      "foodItemId": "6abbb9d0a9d29dc95573599c",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Pithla Bhakri",
+        "Banana Jowar Pancake",
+        "Jowar Bhakri"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.68
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.38
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.68 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.38 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Brown Bread",
+      "normalizedName": "brown bread",
+      "foodItemId": "6abbb9d0a9d29dc9557359a8",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Peanut Butter on Brown Bread",
+        "Boiled Eggs with Brown Bread and Avocado Sandwich"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.68,
+      "transFatPossible": 0.67,
+      "sodiumSignificant": 0.58,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "cholesterol_definitionally_zero: near-uncertain (0.68) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking.",
+        "trans_fat_possible: near-uncertain (0.67) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.58)."
+      ]
+    },
+    {
+      "name": "Baking Powder",
+      "normalizedName": "baking powder",
+      "foodItemId": "6abbb9d0a9d29dc9557359ae",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Middle Eastern Falafel Plate",
+        "Banana Oats Pancakes"
+      ],
+      "origin": {
+        "choice": "salt_mineral",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.68,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.46,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.92
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "cholesterol_definitionally_zero: near-uncertain (0.68) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking.",
+        "sodium_significant: near-uncertain (0.46)."
+      ]
+    },
+    {
+      "name": "Moong Sprouts",
+      "normalizedName": "moong sprouts",
+      "foodItemId": "6abbb9d0a9d29dc9557359b7",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Sprouts Salad",
+        "Moong Sprouts Chaat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.27,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.68
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.68 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Masoor Dal",
+      "normalizedName": "masoor dal",
+      "foodItemId": "6abbb9d0a9d29dc9557359c0",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Masoor Dal",
+        "Masoor Dal Khichdi",
+        "Orange Masoor Dal Chilla"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.66
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.66 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Kala Chana",
+      "normalizedName": "kala chana",
+      "foodItemId": "6abbb9d0a9d29dc9557359c6",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Kala Chana Curry",
+        "Soya Chunks + Kala Chana + Moong Dal Dosa"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.41,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.52
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.41) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Red Kidney Beans",
+      "normalizedName": "red kidney beans",
+      "foodItemId": "6abbb9d0a9d29dc9557359c9",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Light Dal Makhani",
+        "Rajma"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.22,
+      "sodiumSignificant": 0.16,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Chicken Breast",
+      "normalizedName": "chicken breast",
+      "foodItemId": "6abbb9d0a9d29dc9557359d8",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Chicken Vegetable Soup",
+        "Grilled Chicken Breast Stick with Bell Peppers",
+        "Chicken Biryani"
+      ],
+      "origin": {
+        "choice": "animal_meat_fish_egg",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.04,
+      "transFatPossible": 0.44,
+      "sodiumSignificant": 0.14,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.44) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Soya Chunks",
+      "normalizedName": "soya chunks",
+      "foodItemId": "6abbb9d0a9d29dc9557359e1",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Soya Cutlet",
+        "Soya Chunks + Kala Chana + Moong Dal Dosa",
+        "Soya Sandwich"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.53
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.43,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.49
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.53 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.49 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.43) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Chia Seeds",
+      "normalizedName": "chia seeds",
+      "foodItemId": "6abbb9d0a9d29dc9557359f6",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Chia Water",
+        "Chia Pudding with Pomegranate",
+        "Oats Pudding"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Black Tea Leaves",
+      "normalizedName": "black tea leaves",
+      "foodItemId": "6abbb9d0a9d29dc955735a14",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Adrak Chai (Ginger Tea)",
+        "Cinnamon Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.7
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.84
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coconut Milk",
+      "normalizedName": "coconut milk",
+      "foodItemId": "6abbb9d0a9d29dc955735a1a",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Vegetable Korma",
+        "Kerala Fish Curry",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.58
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.35,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.26
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.58 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.26 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.35) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Tapioca Pearls",
+      "normalizedName": "tapioca pearls",
+      "foodItemId": "6abbb9d0a9d29dc955735a1d",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Sabudana Kheer with Jaggery",
+        "Sabudana Khichdi"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.49
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.49 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Ragi Flour",
+      "normalizedName": "ragi flour",
+      "foodItemId": "6abbb9d0a9d29dc955735a23",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Ragi Jaggery Cookies (Baked)",
+        "Ragi Malt with Milk and Jaggery",
+        "Ragi Dosa"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.78
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.18,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.56
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.56 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Sweet Corn",
+      "normalizedName": "sweet corn",
+      "foodItemId": "6abbb9d0a9d29dc955735a26",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Corn Pomegranate Bhutta Chaat",
+        "Mexican Black Bean Bowl",
+        "Corn Chaat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.17,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.85
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Sweet Potato",
+      "normalizedName": "sweet potato",
+      "foodItemId": "6abbb9d0a9d29dc955735a29",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Sweet Potato Chaat",
+        "Baked Sweet Potato Chaat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.29,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.88
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Ashwagandha Powder",
+      "normalizedName": "ashwagandha powder",
+      "foodItemId": "6abbb9d0a9d29dc955735a32",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Ashwagandha Nutmeg Milk",
+        "Ashwagandha Warm Milk"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.52
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.22
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.22 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Nutmeg",
+      "normalizedName": "nutmeg",
+      "foodItemId": "6abbb9d0a9d29dc955735a35",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Ashwagandha Nutmeg Milk",
+        "Nutmeg Milk"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Saffron",
+      "normalizedName": "saffron",
+      "foodItemId": "6abbb9d0a9d29dc955735a38",
+      "resolutionGap": null,
+      "recipeUsageCount": 3,
+      "sampleRecipesUsingIt": [
+        "Warm Almond Milk with Saffron",
+        "Saffron Cardamom Milk (Kesar)",
+        "Saffron Milk"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Licorice Root",
+      "normalizedName": "licorice root",
+      "foodItemId": "6abbb9d0a9d29dc955735a3e",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Mulethi Licorice Tea",
+        "Licorice Tea"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.53
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.52
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.53 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Red Onion",
+      "normalizedName": "red onion",
+      "foodItemId": "6abbb9d0a9d29dc955735a44",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Egg Salad",
+        "Mediterranean Chickpea Bowl"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Broccoli",
+      "normalizedName": "broccoli",
+      "foodItemId": "6abbb9d0a9d29dc955735a50",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Grilled Fish with Steamed Vegetables",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Basil Leaves",
+      "normalizedName": "basil leaves",
+      "foodItemId": "6abbb9d0a9d29dc955735a56",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Tomato Basil Soup with Grilled Paneer",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.6
+      },
+      "cholesterolDefinitionallyZero": 0.85,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.95
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.60 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Lime",
+      "normalizedName": "lime",
+      "foodItemId": "6abbb9d0a9d29dc955735a59",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Mexican Black Bean Bowl",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Tofu",
+      "normalizedName": "tofu",
+      "foodItemId": "6abbb9d0a9d29dc955735a6b",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Tofu Bhurji",
+        "Japanese Miso Vegetable Soup"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.6
+      },
+      "cholesterolDefinitionallyZero": 0.78,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.22,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.60 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Soy Sauce",
+      "normalizedName": "soy sauce",
+      "foodItemId": "6abbb9d0a9d29dc955735a71",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Japanese Miso Vegetable Soup",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.82,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.96,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.85
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Zucchini",
+      "normalizedName": "zucchini",
+      "foodItemId": "6abbb9d0a9d29dc955735a77",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Continental Grilled Vegetable Plate",
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mushroom",
+      "normalizedName": "mushroom",
+      "foodItemId": "6abbb9d0a9d29dc955735a7a",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Japanese Miso Vegetable Soup",
+        "Continental Grilled Vegetable Plate"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Semolina",
+      "normalizedName": "semolina",
+      "foodItemId": "6abbb9d0a9d29dc955735a92",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Sooji Sheera with Jaggery",
+        "Vegetable Upma",
+        "Rava Idli"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.93
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.27,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.28
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.28 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Fenugreek Leaves",
+      "normalizedName": "fenugreek leaves",
+      "foodItemId": "6abbb9d0a9d29dc955735a95",
+      "resolutionGap": null,
+      "recipeUsageCount": 4,
+      "sampleRecipesUsingIt": [
+        "Methi Dal",
+        "Methi Matar Cashew Gravy",
+        "Methi Thepla"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.57
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.39
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.57 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.39 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Sesame Seeds",
+      "normalizedName": "sesame seeds",
+      "foodItemId": "6abbb9d0a9d29dc955735a9b",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Til Jaggery Ladoo",
+        "Methi Handvo (Baked)"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Chana Dal",
+      "normalizedName": "chana dal",
+      "foodItemId": "6abbb9d0a9d29dc955735a9e",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Chana Dal",
+        "Adai Dosa (Lentil Dosa)"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.2,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Puffed Rice",
+      "normalizedName": "puffed rice",
+      "foodItemId": "6abbb9d0a9d29dc955735aa7",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Light Bhel Puri",
+        "Roasted Puffed Rice with Peanuts"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.8
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.33,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.88
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.33) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Fish",
+      "normalizedName": "fish",
+      "foodItemId": "6abbb9d0a9d29dc955735ab0",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Grilled Fish with Steamed Vegetables",
+        "Kerala Fish Curry"
+      ],
+      "origin": {
+        "choice": "animal_meat_fish_egg",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.04,
+      "transFatPossible": 0.47,
+      "sodiumSignificant": 0.2,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.89
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.47) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Cashews",
+      "normalizedName": "cashews",
+      "foodItemId": "6abbb9d0a9d29dc955735ab6",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Methi Matar Cashew Gravy",
+        "Lauki Kofta in Tomato Gravy"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.29,
+      "sodiumSignificant": 0.2,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.93
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Chamomile Flowers",
+      "normalizedName": "chamomile flowers",
+      "foodItemId": "6abbb9d0a9d29dc955735ace",
+      "resolutionGap": null,
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Chamomile Tea with Honey",
+        "Chamomile Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.65
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.76
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.65 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Butter",
+      "normalizedName": "butter",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Whole Wheat Toast",
+        "Grilled Paneer Sandwich"
+      ],
+      "origin": {
+        "choice": "fat_animal",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.08,
+      "transFatPossible": 0.92,
+      "sodiumSignificant": 0.26,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Celery",
+      "normalizedName": "celery",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Vegetable Soup",
+        "Egg Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.15,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Baking Soda",
+      "normalizedName": "baking soda",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 2,
+      "sampleRecipesUsingIt": [
+        "Rava Idli",
+        "Ragi Idli"
+      ],
+      "origin": {
+        "choice": "salt_mineral",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.21,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.39
+      },
+      "researchPriorityScore": 1,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.39 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Sambar Powder",
+      "normalizedName": "sambar powder",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Sambar"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.33,
+      "sodiumSignificant": 0.67,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.82
+      },
+      "researchPriorityScore": 0.02,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.33) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.67)."
+      ]
+    },
+    {
+      "name": "Low-Fat Milk",
+      "normalizedName": "low-fat milk",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Curd"
+      ],
+      "origin": {
+        "choice": "dairy",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.11,
+      "transFatPossible": 0.67,
+      "sodiumSignificant": 0.2,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.68
+      },
+      "researchPriorityScore": 0.02,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.68 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.67) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Paprika",
+      "normalizedName": "paprika",
+      "foodItemId": "6abbb9cfa9d29dc955735942",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Grilled Marinated Chicken Leg"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.64
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.16,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.64
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.64 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.64 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Peanut Butter",
+      "normalizedName": "peanut butter",
+      "foodItemId": "6abbb9d0a9d29dc9557359f3",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Peanut Butter on Brown Bread"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.9
+      },
+      "cholesterolDefinitionallyZero": 0.85,
+      "transFatPossible": 0.6,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.43
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.43 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.60) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Flaxseed",
+      "normalizedName": "flaxseed",
+      "foodItemId": "6abbb9d0a9d29dc9557359f9",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Flaxseed Water"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Rock Salt",
+      "normalizedName": "rock salt",
+      "foodItemId": "6abbb9d0a9d29dc955735a2c",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Roasted Foxnut Trail Mix"
+      ],
+      "origin": {
+        "choice": "salt_mineral",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.9,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.22
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.22 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Thai Red Curry Paste",
+      "normalizedName": "thai red curry paste",
+      "foodItemId": "6abbb9d0a9d29dc955735a53",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Thai Vegetable Curry"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.8
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.45,
+      "sodiumSignificant": 0.66,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.45) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.66)."
+      ]
+    },
+    {
+      "name": "Okra",
+      "normalizedName": "okra",
+      "foodItemId": "6abbb9d0a9d29dc955735aad",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Bhindi Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.14,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.56
+      },
+      "researchPriorityScore": 0.01,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.56 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Kale",
+      "normalizedName": "kale",
+      "foodItemId": "6abbb9cfa9d29dc9557358f3",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Chickpeas Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.95
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Tulsi Leaves",
+      "normalizedName": "tulsi leaves",
+      "foodItemId": "6abbb9cfa9d29dc95573590b",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Tulsi Tea"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.6
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.45
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.60 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.45 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Cloves",
+      "normalizedName": "cloves",
+      "foodItemId": "6abbb9cfa9d29dc955735935",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Veg Pulav"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.88
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.91
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Bay Leaf",
+      "normalizedName": "bay leaf",
+      "foodItemId": "6abbb9cfa9d29dc955735938",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Veg Pulav"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.73
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.84
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Fig",
+      "normalizedName": "fig",
+      "foodItemId": "6abbb9d0a9d29dc955735957",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Warm Water with Dates, Figs, Almonds, Walnuts"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Raisins",
+      "normalizedName": "raisins",
+      "foodItemId": "6abbb9d0a9d29dc955735960",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Apple with Roasted Sunflower Seeds and Raisins"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.94,
+      "transFatPossible": 0.17,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mixed Fruits",
+      "normalizedName": "mixed fruits",
+      "foodItemId": "6abbb9d0a9d29dc955735966",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Oats Pudding"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.79,
+      "transFatPossible": 0.26,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.62
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.62 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Bajra (Pearl Millet) Flour",
+      "normalizedName": "bajra (pearl millet) flour",
+      "foodItemId": "6abbb9d0a9d29dc95573599f",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Bajra Bhakri"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.93
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.27,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.33
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.33 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Bhakri",
+      "normalizedName": "bhakri",
+      "foodItemId": "6abbb9d0a9d29dc9557359a2",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Egg Curry"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.59
+      },
+      "cholesterolDefinitionallyZero": 0.42,
+      "transFatPossible": 0.48,
+      "sodiumSignificant": 0.31,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.6
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.59 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.60 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "cholesterol_definitionally_zero: near-uncertain (0.42) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking.",
+        "trans_fat_possible: near-uncertain (0.48) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.31)."
+      ]
+    },
+    {
+      "name": "Chapati",
+      "normalizedName": "chapati",
+      "foodItemId": "6abbb9d0a9d29dc9557359a5",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Egg Chapati Rolls"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.7
+      },
+      "cholesterolDefinitionallyZero": 0.55,
+      "transFatPossible": 0.44,
+      "sodiumSignificant": 0.34,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.43
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.43 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "cholesterol_definitionally_zero: near-uncertain (0.55) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking.",
+        "trans_fat_possible: near-uncertain (0.44) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.34)."
+      ]
+    },
+    {
+      "name": "Moong Beans",
+      "normalizedName": "moong beans",
+      "foodItemId": "6abbb9d0a9d29dc9557359b4",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Veg Usal"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.63
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.63 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Black-eyed Peas",
+      "normalizedName": "black-eyed peas",
+      "foodItemId": "6abbb9d0a9d29dc9557359cc",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Chavli and Potato Mix Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.23,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.71
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Matki (Moth Beans)",
+      "normalizedName": "matki (moth beans)",
+      "foodItemId": "6abbb9d0a9d29dc9557359cf",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Matki Usal"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.29,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.57
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.57 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Edamame",
+      "normalizedName": "edamame",
+      "foodItemId": "6abbb9d0a9d29dc9557359d2",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Edamame Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.24,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.92
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Chicken Leg",
+      "normalizedName": "chicken leg",
+      "foodItemId": "6abbb9d0a9d29dc9557359db",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Grilled Marinated Chicken Leg"
+      ],
+      "origin": {
+        "choice": "animal_meat_fish_egg",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.01,
+      "transFatPossible": 0.54,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.54) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Soya Flour",
+      "normalizedName": "soya flour",
+      "foodItemId": "6abbb9d0a9d29dc9557359e4",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Soya Chilla"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.47
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.24,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.52
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.47 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Mixed Sprouts",
+      "normalizedName": "mixed sprouts",
+      "foodItemId": "6abbb9d0a9d29dc9557359e7",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Sprouts Chaat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.12,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.43
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.43 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Walnut",
+      "normalizedName": "walnut",
+      "foodItemId": "6abbb9d0a9d29dc9557359ed",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Warm Water with Dates, Figs, Almonds, Walnuts"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mustard",
+      "normalizedName": "mustard",
+      "foodItemId": "6abbb9d0a9d29dc955735a0b",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Chickpeas Salad"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.36
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.34,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.63
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.36 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.63 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.34) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Triphala Churna",
+      "normalizedName": "triphala churna",
+      "foodItemId": "6abbb9d0a9d29dc955735a17",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Triphala Night Drink"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.87
+      },
+      "cholesterolDefinitionallyZero": 0.89,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.58
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.58 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Lettuce",
+      "normalizedName": "lettuce",
+      "foodItemId": "6abbb9d0a9d29dc955735a20",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Vegetable Sandwich"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 1
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Black Salt",
+      "normalizedName": "black salt",
+      "foodItemId": "6abbb9d0a9d29dc955735a2f",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Warm Amla Water"
+      ],
+      "origin": {
+        "choice": "salt_mineral",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.84,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.94,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.19
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.19 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Amla (Indian Gooseberry)",
+      "normalizedName": "amla (indian gooseberry)",
+      "foodItemId": "6abbb9d0a9d29dc955735a3b",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Warm Amla Water"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.95,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.8
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Sugar",
+      "normalizedName": "sugar",
+      "foodItemId": "6abbb9d0a9d29dc955735a41",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Nutmeg Milk"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.91
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.87
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Olives",
+      "normalizedName": "olives",
+      "foodItemId": "6abbb9d0a9d29dc955735a47",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Mediterranean Chickpea Bowl"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.24,
+      "sodiumSignificant": 0.77,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Couscous",
+      "normalizedName": "couscous",
+      "foodItemId": "6abbb9d0a9d29dc955735a4d",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Mediterranean Chickpea Bowl"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.56
+      },
+      "cholesterolDefinitionallyZero": 0.79,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.91
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.56 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Black Beans",
+      "normalizedName": "black beans",
+      "foodItemId": "6abbb9d0a9d29dc955735a5c",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Mexican Black Bean Bowl"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.14,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Brown Rice",
+      "normalizedName": "brown rice",
+      "foodItemId": "6abbb9d0a9d29dc955735a5f",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Mexican Black Bean Bowl"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Tahini",
+      "normalizedName": "tahini",
+      "foodItemId": "6abbb9d0a9d29dc955735a62",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Middle Eastern Falafel Plate"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.46
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.42,
+      "sodiumSignificant": 0.17,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.65
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.46 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.65 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.42) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Whole Wheat Pita",
+      "normalizedName": "whole wheat pita",
+      "foodItemId": "6abbb9d0a9d29dc955735a65",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Middle Eastern Falafel Plate"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.49,
+      "sodiumSignificant": 0.27,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.49) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Miso Paste",
+      "normalizedName": "miso paste",
+      "foodItemId": "6abbb9d0a9d29dc955735a68",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Japanese Miso Vegetable Soup"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.56,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.85,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.86
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "cholesterol_definitionally_zero: near-uncertain (0.56) - decide explicitly during research, don't treat as a rule:plant-cholesterol match without checking."
+      ]
+    },
+    {
+      "name": "Spring Onion",
+      "normalizedName": "spring onion",
+      "foodItemId": "6abbb9d0a9d29dc955735a6e",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Japanese Miso Vegetable Soup"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.94
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Sesame Oil",
+      "normalizedName": "sesame oil",
+      "foodItemId": "6abbb9d0a9d29dc955735a74",
+      "resolutionGap": null,
+      "recipeUsageCount": 0,
+      "sampleRecipesUsingIt": [],
+      "origin": {
+        "choice": "oil_plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.51,
+      "sodiumSignificant": 0.09,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.71
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.51) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Thyme",
+      "normalizedName": "thyme",
+      "foodItemId": "6abbb9d0a9d29dc955735a7d",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Continental Grilled Vegetable Plate"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.97
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.14,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Amla Juice",
+      "normalizedName": "amla juice",
+      "foodItemId": "6abbb9d0a9d29dc955735a80",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Amla and Honey Tonic"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.8
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.19,
+      "sodiumSignificant": 0.16,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.24
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.24 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Kokum",
+      "normalizedName": "kokum",
+      "foodItemId": "6abbb9d0a9d29dc955735a83",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Kokum Sharbat"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.96
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.2,
+      "sodiumSignificant": 0.2,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.44
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.44 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Lemongrass",
+      "normalizedName": "lemongrass",
+      "foodItemId": "6abbb9d0a9d29dc955735a86",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Lemongrass Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.85
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.15,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.9
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Moringa Leaves",
+      "normalizedName": "moringa leaves",
+      "foodItemId": "6abbb9d0a9d29dc955735a89",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Moringa Leaf Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.9
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.16,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.37
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.37 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Basil Seeds",
+      "normalizedName": "basil seeds",
+      "foodItemId": "6abbb9d0a9d29dc955735a8c",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Sabja Basil Seed Water"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.18,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.54
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.54 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Wheatgrass Juice",
+      "normalizedName": "wheatgrass juice",
+      "foodItemId": "6abbb9d0a9d29dc955735a8f",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Wheatgrass Juice with Lemon"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.71
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.12,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.32
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.32 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Broken Wheat",
+      "normalizedName": "broken wheat",
+      "foodItemId": "6abbb9d0a9d29dc955735a98",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Vegetable Daliya"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.1,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.41
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.41 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Red Chilli",
+      "normalizedName": "red chilli",
+      "foodItemId": "6abbb9d0a9d29dc955735aa1",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Adai Dosa (Lentil Dosa)"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.83
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.11,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.89
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Dried Cranberries",
+      "normalizedName": "dried cranberries",
+      "foodItemId": "6abbb9d0a9d29dc955735aa4",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Roasted Makhana Trail Mix"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.95
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.27,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.97
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Watermelon",
+      "normalizedName": "watermelon",
+      "foodItemId": "6abbb9d0a9d29dc955735aaa",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Watermelon Cucumber Salad"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.08,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Whole Masoor Dal",
+      "normalizedName": "whole masoor dal",
+      "foodItemId": "6abbb9d0a9d29dc955735ab3",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Whole Masoor Dal"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.18,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.81
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Pav Bhaji Masala",
+      "normalizedName": "pav bhaji masala",
+      "foodItemId": "6abbb9d0a9d29dc955735ab9",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Tawa Pulao"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.96
+      },
+      "cholesterolDefinitionallyZero": 0.83,
+      "transFatPossible": 0.56,
+      "sodiumSignificant": 0.9,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.99
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.56) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Brinjal",
+      "normalizedName": "brinjal",
+      "foodItemId": "6abbb9d0a9d29dc955735abc",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Bharli Vangi"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.93,
+      "transFatPossible": 0.06,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.43
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.43 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Green Tea Leaves",
+      "normalizedName": "green tea leaves",
+      "foodItemId": "6abbb9d0a9d29dc955735abf",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Green Tea with Ginger"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.74
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.08,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.76
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Papad",
+      "normalizedName": "papad",
+      "foodItemId": "6abbb9d0a9d29dc955735ac2",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Masala Roasted Papad"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.96
+      },
+      "cholesterolDefinitionallyZero": 0.79,
+      "transFatPossible": 0.76,
+      "sodiumSignificant": 0.71,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.65
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.65 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Jowar",
+      "normalizedName": "jowar",
+      "foodItemId": "6abbb9d0a9d29dc955735ac5",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Vegetable Jowar Khichdi"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.61
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.61 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Ridge Gourd",
+      "normalizedName": "ridge gourd",
+      "foodItemId": "6abbb9d0a9d29dc955735ac8",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Turai Sabji"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.07,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.59
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.59 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Bajra",
+      "normalizedName": "bajra",
+      "foodItemId": "6abbb9d0a9d29dc955735acb",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Bajra Khichdi with Ghee"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.87,
+      "transFatPossible": 0.25,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.52
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.52 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Shatavari Powder",
+      "normalizedName": "shatavari powder",
+      "foodItemId": "6abbb9d0a9d29dc955735ad1",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Shatavari Milk"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.71
+      },
+      "cholesterolDefinitionallyZero": 0.88,
+      "transFatPossible": 0.16,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.62
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.62 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Almond Milk",
+      "normalizedName": "almond milk",
+      "foodItemId": "6abbb9d0a9d29dc955735ad4",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Warm Almond Milk with Saffron"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.34
+      },
+      "cholesterolDefinitionallyZero": 0.81,
+      "transFatPossible": 0.32,
+      "sodiumSignificant": 0.1,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.31
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.34 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.31 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "trans_fat_possible: near-uncertain (0.32) - check a source rather than assuming either way."
+      ]
+    },
+    {
+      "name": "Brahmi",
+      "normalizedName": "brahmi",
+      "foodItemId": "6abbb9d0a9d29dc955735ad7",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Brahmi Shankhpushpi Tea"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.5
+      },
+      "cholesterolDefinitionallyZero": 0.92,
+      "transFatPossible": 0.13,
+      "sodiumSignificant": 0.11,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.69
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.50 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.69 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Shankhpushpi",
+      "normalizedName": "shankhpushpi",
+      "foodItemId": "6abbb9d0a9d29dc955735ada",
+      "resolutionGap": null,
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Brahmi Shankhpushpi Tea"
+      ],
+      "origin": {
+        "choice": "plant",
+        "confidence": 0.54
+      },
+      "cholesterolDefinitionallyZero": 0.9,
+      "transFatPossible": 0.2,
+      "sodiumSignificant": 0.13,
+      "lookupRoute": {
+        "choice": "regional_indian",
+        "confidence": 0.6
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "origin: Jev confidence 0.54 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted.",
+        "lookup_route: Jev confidence 0.60 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    },
+    {
+      "name": "Vegetable Broth",
+      "normalizedName": "vegetable broth",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Vegetable Soup"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.72,
+      "transFatPossible": 0.09,
+      "sodiumSignificant": 0.97,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 1
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Coconut Oil",
+      "normalizedName": "coconut oil",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Kerala Fish Curry"
+      ],
+      "origin": {
+        "choice": "oil_plant",
+        "confidence": 1
+      },
+      "cholesterolDefinitionallyZero": 0.91,
+      "transFatPossible": 0.3,
+      "sodiumSignificant": 0.07,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.85
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Mayonnaise",
+      "normalizedName": "mayonnaise",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Egg Salad"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.98
+      },
+      "cholesterolDefinitionallyZero": 0.09,
+      "transFatPossible": 0.86,
+      "sodiumSignificant": 0.72,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.98
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": []
+    },
+    {
+      "name": "Dijon Mustard",
+      "normalizedName": "dijon mustard",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Egg Salad"
+      ],
+      "origin": {
+        "choice": "processed_packaged",
+        "confidence": 0.97
+      },
+      "cholesterolDefinitionallyZero": 0.72,
+      "transFatPossible": 0.38,
+      "sodiumSignificant": 0.63,
+      "lookupRoute": {
+        "choice": "branded_or_blend",
+        "confidence": 0.87
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "trans_fat_possible: near-uncertain (0.38) - check a source rather than assuming either way.",
+        "sodium_significant: near-uncertain (0.63)."
+      ]
+    },
+    {
+      "name": "Asafoetida",
+      "normalizedName": "asafoetida",
+      "foodItemId": null,
+      "resolutionGap": "missing-fooditem",
+      "recipeUsageCount": 1,
+      "sampleRecipesUsingIt": [
+        "Varan"
+      ],
+      "origin": {
+        "choice": "spice_blend",
+        "confidence": 0.99
+      },
+      "cholesterolDefinitionallyZero": 0.82,
+      "transFatPossible": 0.16,
+      "sodiumSignificant": 0.19,
+      "lookupRoute": {
+        "choice": "standard_raw_food",
+        "confidence": 0.3
+      },
+      "researchPriorityScore": 0,
+      "lowConfidenceNotes": [
+        "lookup_route: Jev confidence 0.30 < 0.7 - needs a Claude-session decision before/while researching, not auto-trusted."
+      ]
+    }
+  ]
+}
