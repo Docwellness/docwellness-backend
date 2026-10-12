@@ -11,6 +11,8 @@ const { adminAuth, requirePermission } = require('../middlewares/adminAuth');
 const account = require('../controllers/admin/accountController');
 const content = require('../controllers/admin/contentController');
 const placements = require('../controllers/admin/placementController');
+const payments = require('../controllers/admin/paymentController');
+const users = require('../controllers/admin/userController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -59,5 +61,21 @@ router.post(
 router.post('/placements/:id/submit', requirePermission('placements', 'edit'), placements.submitPlacement);
 router.post('/placements/:id/approve', requirePermission('placements', 'approve'), placements.approvePlacement);
 router.post('/placements/:id/cancel', requirePermission('placements', 'edit'), placements.cancelPlacement);
+
+// Payments (manual payment proofs)
+router.get('/payments/reconciliation', requirePermission('payments', 'view'), payments.reconciliation);
+router.get('/payments', requirePermission('payments', 'view'), payments.listPayments);
+router.get('/payments/:id', requirePermission('payments', 'view'), payments.getPayment);
+router.post('/payments/:id/confirm', requirePermission('payments', 'approve'), payments.confirmPayment);
+router.post('/payments/:id/reject', requirePermission('payments', 'approve'), payments.rejectPayment);
+router.post('/payments/:id/refunds', requirePermission('payments', 'edit'), payments.addRefund);
+
+// Users (patients)
+router.get('/users', requirePermission('users', 'view'), users.listUsers);
+router.get('/users/:id', requirePermission('users', 'view'), users.getUser);
+router.post('/users/:id/reveal', requirePermission('users', 'view'), users.revealField);
+router.post('/users/:id/suspend', requirePermission('users', 'edit'), users.suspendUser);
+router.post('/users/:id/reactivate', requirePermission('users', 'edit'), users.reactivateUser);
+router.post('/users/:id/extend-subscription', requirePermission('users', 'edit'), users.extendSubscription);
 
 module.exports = router;
