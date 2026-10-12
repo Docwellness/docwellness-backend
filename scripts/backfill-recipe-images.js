@@ -26,6 +26,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const { generateAndStoreRecipeImage } = require('../utils/recipeImageGenerator');
+const connectDB = require('../config/database');
 
 const EXECUTE = process.argv.includes('--execute');
 const FORCE = process.argv.includes('--force');
@@ -54,7 +55,7 @@ async function main() {
   }
 
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(process.env.MONGODB_URI);
+  await connectDB();
   console.log('Connected.');
 
   try {
