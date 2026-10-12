@@ -1,7 +1,10 @@
 const fs = require('fs');
 const cloudinary = require('../../config/cloudinary');
 const Recipe = require('../../models/Recipe');
+const mongoose = require('mongoose');
+const User = require('../../models/User');
 const { audited } = require('../../utils/adminAudit');
+const { sponsoredLabelOf } = require('../../utils/sponsored');
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -55,6 +58,33 @@ exports.listRecipes = async (req, res, next) => {
       translations: { Hindi: hasTranslation(r, 'Hindi'), Marathi: hasTranslation(r, 'Marathi') },
     }));
     res.json({ success: true, data: { items, total, page, limit } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/admin/content/recipes/:id  - everything the dietician app shows on a recipe, read-only
+exports.getRecipe = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid recipe id' });
+    }
+    const recipe = await Recipe.findById(req.params.id).lean();
+    if (!recipe) return res.status(404).json({ success: false, message: 'Recipe not found' });
+    const owner = await User.findById(recipe.dieticianId).select('profile.fullName').lean();
+    const translations = Object.fromEntries(
+      recipe.translations instanceof Map ? recipe.translations : Object.entries(recipe.translations || {})
+    );
+    const data = {
+      ...recipe,
+      translations,
+      cookingSteps: recipe.instructions || [],
+      sponsoredLabel: sponsoredLabelOf(recipe),
+      ownerName: owner?.profile?.fullName || '',
+    };
+    delete data.instructions;
+    delete data.dieticianId;
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

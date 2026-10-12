@@ -37,6 +37,7 @@ router.get('/audit/export', requirePermission('audit', 'export'), account.export
 router.get('/content/recipes/summary', requirePermission('content', 'view'), content.recipeSummary);
 router.get('/content/categories', requirePermission('content', 'view'), content.recipeCategories);
 router.get('/content/recipes', requirePermission('content', 'view'), content.listRecipes);
+router.get('/content/recipes/:id', requirePermission('content', 'view'), content.getRecipe);
 router.post(
   '/content/recipes/:id/image',
   requirePermission('content', 'edit'),
