@@ -21,51 +21,12 @@
 require('dotenv').config({ quiet: true });
 const mongoose = require('mongoose');
 const connectDB = require('../config/database');
+const { rewriteStepQuantities } = require('../utils/recipeStepQuantities');
 
 const EXECUTE = process.argv.includes('--execute');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice('--only='.length) || null;
 
-const UNIT_ALIASES = {
-  g: 'g', gm: 'g', gram: 'g', grams: 'g',
-  ml: 'ml',
-  tsp: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
-  tbsp: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
-  cup: 'cup', cups: 'cup',
-  piece: 'piece', pieces: 'piece', nos: 'nos', bowl: 'bowl', bowls: 'bowl',
-  egg: 'egg', eggs: 'egg', slice: 'slice', slices: 'slice',
-};
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const fmt = (n) => String(Math.round(n * 100) / 100);
-const close = (a, b) => Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.005);
-
-const UNIT_RE = Object.keys(UNIT_ALIASES).sort((a, b) => b.length - a.length).join('|');
-
-function fixStep(step, ingredients, skip = new Set(), counts = null) {
-  let text = step;
-  const changes = [];
-  const manual = [];
-  for (const ing of ingredients) {
-    // "<qty> <unit> [(parenthetical)] [of] [the] <name>"
-    const re = new RegExp(`(\\d+(?:\\.\\d+)?)(\\s*)(${UNIT_RE})\\b(\\s*(?:\\([^)]*\\)\\s*)?(?:of\\s+)?(?:the\\s+)?${esc(ing.name)}\\b)`, 'gi');
-    text = text.replace(re, (m, qty, sp, unitWord, tail) => {
-      if (counts) counts.set(ing.name, (counts.get(ing.name) || 0) + 1);
-      if (skip.has(ing.name)) {
-        manual.push(`"${m}" - ingredient is quoted in several steps (split use?), ingredient total ${fmt(ing.quantity)} ${ing.unit}`);
-        return m;
-      }
-      const unit = UNIT_ALIASES[unitWord.toLowerCase()];
-      if (unit !== ing.unit) {
-        manual.push(`"${m}" (ingredient is ${fmt(ing.quantity)} ${ing.unit})`);
-        return m;
-      }
-      if (close(parseFloat(qty), ing.quantity)) return m;
-      const out = `${fmt(ing.quantity)}${sp}${unitWord}${tail}`;
-      changes.push(`${m}  ->  ${out}`);
-      return out;
-    });
-  }
-  return { text, changes, manual };
-}
 
 async function main() {
   await connectDB();
@@ -88,17 +49,11 @@ async function main() {
         .map((i) => ({ name: nameById.get(String(i.foodItemId)), quantity: i.rawQuantity, unit: i.unit }))
         .filter((i) => i.name && i.quantity > 0)
         .sort((a, b) => b.name.length - a.name.length);
-      const counts = new Map();
-      (v.steps || []).forEach((step) => fixStep(step, ingredients, new Set(), counts));
-      const skip = new Set([...counts].filter(([, n]) => n > 1).map(([name]) => name));
-      const newSteps = [];
-      const lines = [];
-      (v.steps || []).forEach((step, idx) => {
-        const r = fixStep(step, ingredients, skip);
-        newSteps.push(r.text);
-        r.changes.forEach((c) => lines.push(`  step ${idx + 1}: ${c}`));
-        r.manual.forEach((m) => manualAll.push(`${v.name} v${v.versionNumber} step ${idx + 1}: ${m}`));
+      const { steps: newSteps, changes } = rewriteStepQuantities(v.steps || [], ingredients, {
+        onSkip: ({ stepIndex, text, reason, ingredient }) =>
+          manualAll.push(`${v.name} v${v.versionNumber} step ${stepIndex + 1}: "${text}" - ${reason} (ingredient is ${ingredient.quantity} ${ingredient.unit})`),
       });
+      const lines = changes.map((c) => `  step ${c.stepIndex + 1}: ${c.before}  ->  ${c.after}`);
       if (!lines.length) continue;
       affected++;
       stepsFixed += lines.length;
@@ -109,7 +64,7 @@ async function main() {
 
     console.log(`\n${EXECUTE ? 'UPDATED' : 'DRY RUN'}: ${affected} of ${versions.length} versions, ${stepsFixed} quantity mentions`);
     if (manualAll.length) {
-      console.log(`\nNeeds manual review (unit differs, or ingredient quoted in several steps; not rewritten): ${manualAll.length}`);
+      console.log(`\nNeeds manual review (not rewritten): ${manualAll.length}`);
       manualAll.forEach((m) => console.log('  ' + m));
     }
   } finally {
