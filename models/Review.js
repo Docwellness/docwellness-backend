@@ -36,6 +36,12 @@ const reviewSchema = new mongoose.Schema(
       type: Number,
       default: () => Date.now(),
     },
+    // Hidden by an admin (openspec add-admin-panel: admin-dietician-management).
+    // Hidden reviews are not shown to patients and do not count in the average.
+    hidden: { type: Boolean, default: false },
+    hiddenReason: { type: String, trim: true },
+    hiddenAt: { type: Date },
+    hiddenBy: { type: String },
   },
   { timestamps: true }
 );

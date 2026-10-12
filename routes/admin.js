@@ -13,6 +13,7 @@ const content = require('../controllers/admin/contentController');
 const placements = require('../controllers/admin/placementController');
 const payments = require('../controllers/admin/paymentController');
 const users = require('../controllers/admin/userController');
+const dieticians = require('../controllers/admin/dieticianController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -77,5 +78,18 @@ router.post('/users/:id/reveal', requirePermission('users', 'view'), users.revea
 router.post('/users/:id/suspend', requirePermission('users', 'edit'), users.suspendUser);
 router.post('/users/:id/reactivate', requirePermission('users', 'edit'), users.reactivateUser);
 router.post('/users/:id/extend-subscription', requirePermission('users', 'edit'), users.extendSubscription);
+
+// Dieticians
+router.get('/dieticians', requirePermission('dieticians', 'view'), dieticians.listDieticians);
+router.post('/dieticians', requirePermission('dieticians', 'create'), dieticians.createDietician);
+router.get('/dieticians/:id', requirePermission('dieticians', 'view'), dieticians.getDietician);
+router.post('/dieticians/:id/verification', requirePermission('dieticians', 'approve'), dieticians.setVerification);
+router.post('/dieticians/:id/suspend', requirePermission('dieticians', 'edit'), dieticians.suspend);
+router.post('/dieticians/:id/reactivate', requirePermission('dieticians', 'edit'), dieticians.reactivate);
+router.post('/dieticians/:id/reassign', requirePermission('dieticians', 'edit'), dieticians.reassign);
+router.get('/dieticians/:id/reviews', requirePermission('dieticians', 'view'), dieticians.listReviews);
+router.post('/dieticians/:id/reviews/:reviewId/hide', requirePermission('dieticians', 'edit'), dieticians.hideReview);
+router.post('/dieticians/:id/reviews/:reviewId/unhide', requirePermission('dieticians', 'edit'), dieticians.unhideReview);
+router.get('/dieticians/:id/earnings', requirePermission('dieticians', 'view'), dieticians.earnings);
 
 module.exports = router;
