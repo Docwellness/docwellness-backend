@@ -15,7 +15,7 @@ jest.mock('../middlewares/adminAuth', () => ({
 
 let request, app;
 let createPatient, createDietician, createDietPlanRequest;
-let User, DietPlanRequest, AdminAuditLog;
+let User, DietPlanRequest, DietPlan, ManualPaymentProof, AdminAuditLog;
 const DAY = 86400_000;
 
 beforeAll(async () => {
@@ -23,7 +23,7 @@ beforeAll(async () => {
   request = require('supertest');
   app = require('../config/createApp')();
   ({ createPatient, createDietician, createDietPlanRequest } = require('./helpers/factories'));
-  ({ User, DietPlanRequest } = require('../models'));
+  ({ User, DietPlanRequest, DietPlan, ManualPaymentProof } = require('../models'));
   AdminAuditLog = require('../models/AdminAuditLog');
 });
 afterEach(async () => {
@@ -201,5 +201,83 @@ describe('extend subscription', () => {
     const patient = await seedPatient();
     const r = await post(`/users/${patient._id}/extend-subscription`, { days: 7, reason: 'x' });
     expect(r.status).toBe(409);
+  });
+});
+
+describe('journey stage', () => {
+  let dietician;
+  async function patientAt(name, requestOver, { draftPlan = false, proof = null } = {}) {
+    const patient = await seedPatient({ name });
+    const dpr = await createDietPlanRequest(patient, dietician, { membershipPlan: '3 months', membershipAmount: 9000, ...requestOver });
+    if (draftPlan) await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id, status: 'Draft', activationDate: new Date() });
+    if (proof) await ManualPaymentProof.create({ request: dpr._id, patient: patient._id, amountReceived: 9000, amountPending: 0, status: proof });
+    return { patient, dpr };
+  }
+
+  beforeEach(async () => {
+    dietician = await createDietician();
+  });
+
+  async function seedAll() {
+    const ids = {};
+    ids.none = (await seedPatient({ name: 'P None' }))._id;
+    ids.requested = (await patientAt('P Requested', { status: 'Unpaid' })).patient._id;
+    ids.diet = (await patientAt('P Diet', { status: 'Unpaid' }, { draftPlan: true })).patient._id;
+    ids.payReq = (await patientAt('P PayReq', { status: 'PaymentRequested' }, { draftPlan: true })).patient._id;
+    ids.paySub = (await patientAt('P PaySub', { status: 'PaymentSubmitted' }, { draftPlan: true, proof: 'Submitted' })).patient._id;
+    ids.active = (
+      await patientAt('P Active', { status: 'Paid', hasActivePlan: true, subscriptionStartDate: new Date(), subscriptionExpiresAt: new Date(Date.now() + 30 * DAY) })
+    ).patient._id;
+    return ids;
+  }
+
+  it('shows the real stage and the chosen plan for each patient, not "never subscribed"', async () => {
+    await seedAll();
+    const items = (await get('/users?limit=50')).body.data.items;
+    const by = Object.fromEntries(items.map((i) => [i.name, i]));
+    expect(by['P None'].stage).toBe('none');
+    expect(by['P Requested']).toMatchObject({ stage: 'requested', plan: { name: '3 months', amount: 9000 } });
+    expect(by['P Diet'].stage).toBe('diet_in_progress');
+    expect(by['P PayReq'].stage).toBe('payment_requested');
+    expect(by['P PaySub'].stage).toBe('payment_submitted');
+    expect(by['P Active'].stage).toBe('active');
+  });
+
+  it('filters by stage', async () => {
+    await seedAll();
+    const names = async (stage) => (await get(`/users?stage=${stage}`)).body.data.items.map((i) => i.name).sort();
+    expect(await names('requested')).toEqual(['P Requested']);
+    expect(await names('diet_in_progress')).toEqual(['P Diet']);
+    expect(await names('payment_requested')).toEqual(['P PayReq']);
+    expect(await names('payment_submitted')).toEqual(['P PaySub']);
+    expect(await names('active')).toEqual(['P Active']);
+    expect(await names('none')).toEqual(['P None']);
+    expect((await get('/users?stage=nonsense')).body.data.total).toBe(6); // unknown stage is ignored
+  });
+
+  it('detail returns the journey timeline and the plan chosen before any payment', async () => {
+    const ids = await seedAll();
+    const early = (await get(`/users/${ids.requested}`)).body.data;
+    expect(early.stage).toBe('requested');
+    expect(early.plan).toMatchObject({ name: '3 months', amount: 9000, status: 'Unpaid', hasActivePlan: false });
+    expect(early.journey.map((s) => [s.key, s.done])).toEqual([
+      ['requested', true],
+      ['diet_created', false],
+      ['diet_ready', false],
+      ['payment_requested', false],
+      ['payment_submitted', false],
+      ['started', false],
+    ]);
+    expect(early.journey[0].detail).toBe('Chose 3 months (9000)');
+
+    const waiting = (await get(`/users/${ids.paySub}`)).body.data;
+    expect(waiting.stage).toBe('payment_submitted');
+    expect(waiting.journey.find((s) => s.key === 'diet_created').done).toBe(true);
+    expect(waiting.journey.find((s) => s.key === 'payment_submitted').done).toBe(true);
+    expect(waiting.journey.find((s) => s.key === 'started').done).toBe(false);
+
+    const running = (await get(`/users/${ids.active}`)).body.data;
+    expect(running.stage).toBe('active');
+    expect(running.journey.find((s) => s.key === 'started').done).toBe(true);
   });
 });

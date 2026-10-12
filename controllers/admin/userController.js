@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { User, DietPlanRequest, ManualPaymentProof } = require('../../models');
+const { User, DietPlanRequest, ManualPaymentProof, DietPlan } = require('../../models');
+const { STAGES, computeStage, buildJourney } = require('../../utils/patientJourney');
 const { audited, writeAudit } = require('../../utils/adminAudit');
 const { maskPhone, maskEmail, maskDob } = require('../../utils/piiMask');
 
@@ -21,8 +22,39 @@ function subscriptionState(expiresAt, now = Date.now()) {
   return 'active';
 }
 
-function presentRow(u) {
+/** Latest diet plan request per patient (all patients when `ids` is null). */
+async function latestRequests(ids) {
+  const match = ids ? { patient: { $in: ids } } : {};
+  const rows = await DietPlanRequest.aggregate([
+    { $match: match },
+    { $sort: { createdAt: -1 } },
+    { $group: { _id: '$patient', doc: { $first: '$$ROOT' } } },
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r.doc]));
+}
+
+/** Patients whose diet plan is being built or is finalized but not yet running. */
+async function draftPlanPatients(ids) {
+  const filter = { status: { $in: ['Draft', 'Finalized'] } };
+  if (ids) filter.patientId = { $in: ids };
+  const found = await DietPlan.distinct('patientId', filter);
+  return new Set(found.map(String));
+}
+
+function journeyOf(userId, requests, drafts) {
+  const request = requests.get(String(userId)) || null;
+  const result = computeStage({ request, hasDraftPlan: drafts.has(String(userId)) });
   return {
+    ...result,
+    plan: request
+      ? { name: request.membershipPlan || '', amount: request.membershipAmount ?? null, requestStatus: request.status }
+      : null,
+  };
+}
+
+function presentRow(u, journey) {
+  return {
+    ...(journey || {}),
     _id: u._id,
     name: nameOf(u),
     phone: maskPhone(u.profile?.whatsappNumber),
@@ -68,6 +100,21 @@ exports.listUsers = async (req, res, next) => {
       default:
         break;
     }
+    // Journey stage (request sent, diet in progress, payment, active ...)
+    if (STAGES.includes(req.query.stage)) {
+      const [requests, drafts] = await Promise.all([latestRequests(null), draftPlanPatients(null)]);
+      if (req.query.stage === 'none') {
+        and.push({ _id: { $nin: [...requests.keys()].map((k) => new mongoose.Types.ObjectId(k)) } });
+      } else {
+        const ids = [];
+        for (const [pid, request] of requests) {
+          if (computeStage({ request, hasDraftPlan: drafts.has(pid) }).stage === req.query.stage) {
+            ids.push(new mongoose.Types.ObjectId(pid));
+          }
+        }
+        and.push({ _id: { $in: ids } });
+      }
+    }
     if (req.query.account === 'suspended') and.push({ isActive: false });
     if (req.query.account === 'active') and.push({ isActive: { $ne: false } });
 
@@ -81,7 +128,12 @@ exports.listUsers = async (req, res, next) => {
         .lean(),
       User.countDocuments(filter),
     ]);
-    res.json({ success: true, data: { items: rows.map(presentRow), total, page, limit } });
+    const pageIds = rows.map((r) => r._id);
+    const [requests, drafts] = await Promise.all([latestRequests(pageIds), draftPlanPatients(pageIds)]);
+    res.json({
+      success: true,
+      data: { items: rows.map((r) => presentRow(r, journeyOf(r._id, requests, drafts))), total, page, limit },
+    });
   } catch (err) {
     next(err);
   }
@@ -101,16 +153,20 @@ exports.getUser = async (req, res, next) => {
     const u = await loadPatient(req.params.id);
     if (!u) return res.status(404).json({ success: false, message: 'Patient not found' });
 
-    const [request, proofs] = await Promise.all([
+    const [request, proofs, plans] = await Promise.all([
       DietPlanRequest.findOne({ patient: u._id }).sort({ createdAt: -1 }).lean(),
-      ManualPaymentProof.find({ patient: u._id }).sort({ createdAt: -1 }).limit(5).select('status amountReceived createdAt').lean(),
+      ManualPaymentProof.find({ patient: u._id }).sort({ createdAt: -1 }).select('status amountReceived createdAt reviewedAt').lean(),
+      DietPlan.find({ patientId: u._id }).select('status createdAt updatedAt activationDate').lean(),
     ]);
+    const hasDraftPlan = plans.some((p) => ['Draft', 'Finalized'].includes(p.status));
+    const stageInfo = computeStage({ request, hasDraftPlan });
     const dietician = request?.dieticianId ? await User.findById(request.dieticianId).select('profile.fullName').lean() : null;
 
     res.json({
       success: true,
       data: {
-        ...presentRow(u),
+        ...presentRow(u, { ...stageInfo, plan: null }),
+        journey: buildJourney({ request, plans, proofs }),
         gender: u.profile?.gender || '',
         goal: u.healthProfile?.primaryGoal || request?.primaryGoal || '',
         weight: u.healthProfile?.weight ?? null,
@@ -122,11 +178,13 @@ exports.getUser = async (req, res, next) => {
               amount: request.membershipAmount ?? null,
               status: request.status,
               hasActivePlan: Boolean(request.hasActivePlan),
+              requestedAt: request.createdAt,
+              paymentRequestedAt: request.paymentRequestedAt || null,
               startedAt: request.subscriptionStartDate || null,
               expiresAt: request.subscriptionExpiresAt || u.status?.subscriptionExpiresAt || null,
             }
           : null,
-        recentPayments: proofs.map((p) => ({ _id: p._id, status: p.status, amount: p.amountReceived, createdAt: p.createdAt })),
+        recentPayments: proofs.slice(0, 5).map((p) => ({ _id: p._id, status: p.status, amount: p.amountReceived, createdAt: p.createdAt })),
       },
     });
   } catch (err) {
