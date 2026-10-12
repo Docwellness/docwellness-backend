@@ -14,6 +14,7 @@ const placements = require('../controllers/admin/placementController');
 const payments = require('../controllers/admin/paymentController');
 const users = require('../controllers/admin/userController');
 const dieticians = require('../controllers/admin/dieticianController');
+const partners = require('../controllers/admin/partnerController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -91,5 +92,19 @@ router.get('/dieticians/:id/reviews', requirePermission('dieticians', 'view'), d
 router.post('/dieticians/:id/reviews/:reviewId/hide', requirePermission('dieticians', 'edit'), dieticians.hideReview);
 router.post('/dieticians/:id/reviews/:reviewId/unhide', requirePermission('dieticians', 'edit'), dieticians.unhideReview);
 router.get('/dieticians/:id/earnings', requirePermission('dieticians', 'view'), dieticians.earnings);
+
+// Partner requests
+router.get('/partners/options', requirePermission('partners', 'view'), partners.reasons);
+router.get('/partners', requirePermission('partners', 'view'), partners.list);
+router.post('/partners', requirePermission('partners', 'create'), partners.create);
+router.get('/partners/:id', requirePermission('partners', 'view'), partners.get);
+router.put('/partners/:id', requirePermission('partners', 'edit'), partners.update);
+router.post('/partners/:id/stage', requirePermission('partners', 'edit'), partners.moveStage);
+router.post('/partners/:id/discard', requirePermission('partners', 'edit'), partners.discard);
+router.post('/partners/:id/restore', requirePermission('partners', 'edit'), partners.restore);
+router.post('/partners/:id/notes', requirePermission('partners', 'edit'), partners.addNote);
+router.post('/partners/:id/attachments', requirePermission('partners', 'edit'), uploadLimiter, partners.receiveFile, partners.addAttachment);
+router.get('/partners/:id/attachments/:attId/download', requirePermission('partners', 'view'), partners.downloadAttachment);
+router.post('/partners/:id/create-brand', requirePermission('partners', 'create'), partners.createBrand);
 
 module.exports = router;
