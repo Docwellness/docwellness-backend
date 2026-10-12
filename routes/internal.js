@@ -14,6 +14,7 @@ const { runRenewalReminderSweep } = require('../controllers/internal/renewalRemi
 const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeController');
 const { runMealReminderSweep } = require('../controllers/internal/mealReminderController');
 const { runWaterReminderSweep } = require('../controllers/internal/waterReminderController');
+const { runPlacementSweep } = require('../utils/placementEngine');
 const { drainJobs, stats: jobQueueStats } = require('../utils/jobQueue');
 const requestMetrics = require('../utils/requestMetrics');
 
@@ -41,6 +42,21 @@ function requireCronSecret(req, res, next) {
 router.post('/cron/renewal-reminders', requireCronSecret, async (req, res, next) => {
   try {
     const result = await runRenewalReminderSweep();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/internal/cron/placements
+ * @desc    Every ~10 minutes: start scheduled product placements whose start
+ *          date has arrived and expire active ones whose end date has passed
+ *          (restoring the entry's previous main image). Idempotent.
+ */
+router.post('/cron/placements', requireCronSecret, async (req, res, next) => {
+  try {
+    const result = await runPlacementSweep();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

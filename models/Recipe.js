@@ -246,6 +246,9 @@ const recipeSchema = new mongoose.Schema(
       enum: ['dietician-uploaded', 'ai-generated', 'admin-uploaded', 'commercial'],
       default: null,
     },
+    // Disclosure shown with the image while a paid product placement is live
+    // (imageSource === 'commercial'). Unset otherwise. Apps display this label.
+    sponsoredLabel: { type: String, default: undefined },
     // Previous main images replaced from the admin panel, newest first, so a
     // replacement is always reversible (admin panel: content management).
     imageHistory: {
