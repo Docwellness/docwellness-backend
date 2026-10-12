@@ -46,6 +46,7 @@ function journeyOf(userId, requests, drafts) {
   const result = computeStage({ request, hasDraftPlan: drafts.has(String(userId)) });
   return {
     ...result,
+    dieticianId: request?.dieticianId || null,
     plan: request
       ? { name: request.membershipPlan || '', amount: request.membershipAmount ?? null, requestStatus: request.status }
       : null,
@@ -115,6 +116,15 @@ exports.listUsers = async (req, res, next) => {
         and.push({ _id: { $in: ids } });
       }
     }
+    // Owning dietician = the one on the patient's latest request.
+    if (mongoose.Types.ObjectId.isValid(String(req.query.dietician || ''))) {
+      const requests = await latestRequests(null);
+      const ids = [];
+      for (const [pid, request] of requests) {
+        if (String(request.dieticianId) === String(req.query.dietician)) ids.push(new mongoose.Types.ObjectId(pid));
+      }
+      and.push({ _id: { $in: ids } });
+    }
     if (req.query.account === 'suspended') and.push({ isActive: false });
     if (req.query.account === 'active') and.push({ isActive: { $ne: false } });
 
@@ -130,9 +140,20 @@ exports.listUsers = async (req, res, next) => {
     ]);
     const pageIds = rows.map((r) => r._id);
     const [requests, drafts] = await Promise.all([latestRequests(pageIds), draftPlanPatients(pageIds)]);
+    const ownerIds = [...new Set([...requests.values()].map((r) => String(r.dieticianId || '')).filter(Boolean))];
+    const owners = await User.find({ _id: { $in: ownerIds } }).select('profile.fullName').lean();
+    const ownerName = new Map(owners.map((o) => [String(o._id), nameOf(o)]));
     res.json({
       success: true,
-      data: { items: rows.map((r) => presentRow(r, journeyOf(r._id, requests, drafts))), total, page, limit },
+      data: {
+        items: rows.map((r) => {
+          const j = journeyOf(r._id, requests, drafts);
+          return { ...presentRow(r, j), dieticianName: j.dieticianId ? ownerName.get(String(j.dieticianId)) || '' : '' };
+        }),
+        total,
+        page,
+        limit,
+      },
     });
   } catch (err) {
     next(err);
@@ -172,6 +193,7 @@ exports.getUser = async (req, res, next) => {
         weight: u.healthProfile?.weight ?? null,
         height: u.healthProfile?.height ?? null,
         dieticianName: nameOf(dietician),
+        dieticianId: request?.dieticianId || null,
         plan: request
           ? {
               name: request.membershipPlan || '',

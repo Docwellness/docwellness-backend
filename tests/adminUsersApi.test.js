@@ -284,3 +284,28 @@ describe('journey stage', () => {
     expect(running.journey.find((s) => s.key === 'payment_confirmed').done).toBe(true); // request is Paid
   });
 });
+
+describe('owning dietician', () => {
+  it('shows the dietician on each row and detail, and filters by dietician', async () => {
+    const a = await createDietician();
+    const b = await createDietician();
+    await User.updateOne({ _id: a._id }, { $set: { 'profile.fullName': 'Dr Asha' } });
+    const p1 = await seedPatient({ name: 'Mine 1' });
+    const p2 = await seedPatient({ name: 'Mine 2' });
+    const p3 = await seedPatient({ name: 'Theirs' });
+    await seedPatient({ name: 'No dietician' });
+    await createDietPlanRequest(p1, a, {});
+    await createDietPlanRequest(p2, a, {});
+    await createDietPlanRequest(p3, b, {});
+
+    const rows = (await get('/users?limit=50')).body.data.items;
+    const by = Object.fromEntries(rows.map((r) => [r.name, r]));
+    expect(by['Mine 1']).toMatchObject({ dieticianName: 'Dr Asha', dieticianId: String(a._id) });
+    expect(by['No dietician'].dieticianName).toBe('');
+
+    const mine = (await get(`/users?dietician=${a._id}`)).body.data.items.map((r) => r.name).sort();
+    expect(mine).toEqual(['Mine 1', 'Mine 2']);
+    expect((await get('/users?dietician=not-an-id')).body.data.total).toBe(4); // ignored
+    expect((await get(`/users/${p1._id}`)).body.data).toMatchObject({ dieticianName: 'Dr Asha', dieticianId: String(a._id) });
+  });
+});
