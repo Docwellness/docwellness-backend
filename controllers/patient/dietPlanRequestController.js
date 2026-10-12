@@ -1,7 +1,7 @@
 const { DietPlanRequest, User, ManualPaymentProof, Notification } = require('../../models');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { parseFlexibleDate } = require('../../utils/dateUtils');
-const { getMembershipPrice } = require('../../utils/membershipTiers');
+const { getMembershipPrice, getMembershipTier } = require('../../utils/membershipTiers');
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
 
@@ -85,10 +85,21 @@ exports.createDietPlanRequest = async (req, res, next) => {
       activityLevel,
       healthConcerns,
       primaryGoal: requestedPrimaryGoal,
+      membershipPlan,
     } = req.body || {};
 
     const metricsPayload = { weight, height, bmi, weightIndex };
     normalizeHealthProfileNumbers(metricsPayload);
+
+    // A request only exists once the patient has picked a plan - it is
+    // created by the plan screen's button, never before. The price is
+    // server-owned, so membershipAmount from the client is ignored.
+    if (!getMembershipTier(membershipPlan)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid membershipPlan is required',
+      });
+    }
 
     if (!startDateForDiet) {
       return res.status(400).json({
@@ -203,6 +214,8 @@ exports.createDietPlanRequest = async (req, res, next) => {
       healthConcerns: Array.isArray(healthConcerns)
         ? healthConcerns
         : patient.healthProfile.healthConcerns || [],
+      membershipPlan,
+      membershipAmount: getMembershipPrice(membershipPlan),
     };
 
     // Reuse the patient's current request rather than piling up duplicate
@@ -210,11 +223,10 @@ exports.createDietPlanRequest = async (req, res, next) => {
     //  - an Unpaid one is an in-flight request being edited ("Update Plan
     //    Request", or the renewal form before submit) - overwrite it;
     //  - a Paid/PartiallyPaid one with an active plan is a RENEWAL in
-    //    progress - overwrite the snapshot too, but DON'T reset its
-    //    status/payment here. The renewal only becomes real (status flips
-    //    to Unpaid, dietician notified) once the patient has picked a plan
-    //    and completed the order - see selectMembershipPlan. Nothing about
-    //    the renewal surfaces to the dietician before that.
+    //    progress - overwrite the snapshot and flip it to a fresh Unpaid
+    //    cycle below, notifying the dietician. That only happens here, i.e.
+    //    once the patient has picked a plan, so nothing about an abandoned
+    //    renewal surfaces to the dietician.
     let request = await DietPlanRequest.findOne({
       patient: patient._id,
       completedAt: null,
@@ -245,9 +257,25 @@ exports.createDietPlanRequest = async (req, res, next) => {
       }
     }
 
+    const isRenewalConfirmation =
+      !!request &&
+      request.hasActivePlan === true &&
+      ['Paid', 'PartiallyPaid'].includes(request.status);
+
     if (request) {
       Object.assign(request, snapshot);
+      if (isRenewalConfirmation) {
+        request.status = 'Unpaid';
+        request.paymentRequested = false;
+        request.paymentRequestedAt = null;
+        request.latestPaymentStatus = null;
+        request.latestPaymentProof = null;
+        request.collectedAmount = 0;
+      }
       await request.save();
+      if (isRenewalConfirmation) {
+        await notifyDieticianOfRenewal(request, patient.profile.fullName);
+      }
     } else {
       request = await DietPlanRequest.create({
         patient: patient._id,
@@ -263,85 +291,6 @@ exports.createDietPlanRequest = async (req, res, next) => {
         requestId: request._id,
         startDateForDiet: request.startDateForDiet,
         primaryGoal: request.primaryGoal,
-        status: request.status,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Set the membership plan chosen for a diet plan request
- * @route   PATCH /api/patient/diet-plan-requests/:id/plan
- * @access  Private (Patient)
- */
-exports.selectMembershipPlan = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { membershipPlan, membershipAmount } = req.body || {};
-
-    if (!membershipPlan || membershipAmount === undefined || membershipAmount === null) {
-      return res.status(400).json({
-        success: false,
-        message: 'membershipPlan and membershipAmount are required',
-      });
-    }
-
-    const amount = Number(membershipAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'membershipAmount must be a positive number',
-      });
-    }
-
-    const request = await DietPlanRequest.findOne({ _id: id, patient: req.user._id });
-
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Diet plan request not found',
-      });
-    }
-
-    // A renewal only becomes real at this point - the patient has picked a
-    // plan and completed the order. This is where the request flips from
-    // the running cycle's Paid state to a fresh Unpaid renewal cycle and
-    // the dietician is told; createDietPlanRequest deliberately does none
-    // of that so nothing surfaces to the dietician on a half-finished
-    // renewal the patient abandoned at the edit form.
-    const isRenewalConfirmation =
-      request.hasActivePlan === true &&
-      ['Paid', 'PartiallyPaid'].includes(request.status);
-
-    request.membershipPlan = membershipPlan;
-    // Known tiers use the canonical price; the client value only applies to
-    // plan names we don't recognise.
-    request.membershipAmount = getMembershipPrice(membershipPlan) ?? amount;
-
-    if (isRenewalConfirmation) {
-      request.status = 'Unpaid';
-      request.paymentRequested = false;
-      request.paymentRequestedAt = null;
-      request.latestPaymentStatus = null;
-      request.latestPaymentProof = null;
-      request.collectedAmount = 0;
-    }
-
-    await request.save();
-
-    if (isRenewalConfirmation) {
-      const patient = await User.findById(req.user._id)
-        .select('profile.fullName')
-        .lean();
-      await notifyDieticianOfRenewal(request, patient?.profile?.fullName);
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        requestId: request._id,
         membershipPlan: request.membershipPlan,
         membershipAmount: request.membershipAmount,
         status: request.status,
@@ -368,7 +317,7 @@ exports.selectMembershipPlan = async (req, res, next) => {
  *
  *          membershipPlan/membershipAmount and subscriptionStartDate/
  *          subscriptionExpiresAt are intentionally left untouched here - the
- *          patient re-picks a plan next via selectMembershipPlan, and the
+ *          patient re-picks a plan next (createDietPlanRequest), and the
  *          old cycle's real expiry stays visible/correct until the new
  *          cycle's activateDietPlan overwrites it.
  * @route   POST /api/patient/diet-plan-requests/:id/renew

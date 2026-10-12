@@ -363,16 +363,6 @@ router.put(
 );
 
 /**
- * @route   PATCH /api/patient/diet-plan-requests/:id/plan
- * @desc    Set the membership plan chosen for a diet plan request
- */
-router.patch(
-  '/diet-plan-requests/:id/plan',
-  patientOnly,
-  dietPlanRequestController.selectMembershipPlan
-);
-
-/**
  * @route   POST /api/patient/diet-plan-requests/:id/renew
  * @desc    Start a renewal cycle on an already-activated diet plan request
  */

@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const { ManualPaymentProof, DietPlanRequest, User } = require('../../models');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
+const { getMembershipTier } = require('../../utils/membershipTiers');
 
 
 /**
@@ -56,6 +57,14 @@ exports.submitManualPaymentProof = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'You cannot submit proof for this request',
+      });
+    }
+
+    if (!getMembershipTier(dietPlanRequest.membershipPlan)) {
+      if (req.file?.path) await fs.unlink(req.file.path).catch(() => { });
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a membership plan before submitting payment',
       });
     }
 

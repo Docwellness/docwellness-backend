@@ -122,7 +122,7 @@ exports.getPatientProfile = async (req, res, next) => {
     ]);
 
     // Payment summary + history across renewal cycles. The DietPlanRequest
-    // is reused across renewals (see createDietPlanRequest/selectMembershipPlan),
+    // is reused across renewals (see createDietPlanRequest),
     // so a ManualPaymentProof from an OLD cycle and one from the current
     // cycle both point at the same `request` id - aggregating "every proof
     // this request has ever had" (the old behavior) would double-count a

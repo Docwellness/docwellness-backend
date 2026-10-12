@@ -807,6 +807,14 @@ exports.sendPaymentRequest = async (req, res, next) => {
       });
     }
 
+    if (!getMembershipTier(dietPlanRequest.membershipPlan)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'The patient has not selected a membership plan yet - a payment request cannot be sent until they do.',
+      });
+    }
+
     if (dietPlanRequest.status === 'Paid') {
       return res.status(400).json({
         success: false,
