@@ -3,6 +3,7 @@ const {
 } = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
 const { sendPushToTokens } = require('../../utils/push');
+const { sponsoredLabelOf } = require('../../utils/sponsored');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
@@ -73,7 +74,7 @@ const dateToDayKey = (dateObj) => {
  * the normal single-Active-plan case.
  */
 const RECIPE_CARD_SELECT =
-  'name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts';
+  'name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts';
 
 /** Patient-facing Recipe card (same shape getActiveDietPlanForPatient's main
  *  block builds inline) - used to merge the next renewal cycle's recipes
@@ -104,6 +105,7 @@ function toPatientRecipeCard(recipe) {
     name: recipe.name || null,
     servingTime: recipe.servingTime || null,
     image: recipe.image || null,
+    sponsoredLabel: sponsoredLabelOf(recipe),
     tags:
       recipe.category === 'Supplements'
         ? [...(recipe.tags || []), 'supplement']
@@ -303,7 +305,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name servingTime nutrition image ingredients servingSize components instructions language translations tags category supplementFacts')
+        .select('name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts')
         .lean()
       : [];
 
@@ -315,6 +317,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         name: recipe.name || null,
         servingTime: recipe.servingTime || null,
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         // Lets the app surface a dedicated Supplements tab (a multivitamin
         // otherwise sits anonymously, with zeroed macros, inside whatever
         // real servingTime slot it was assigned to - e.g. Night Drink -
@@ -1563,7 +1566,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
 
     const recipeDocs = recipeIds.size
       ? await Recipe.find({ _id: { $in: Array.from(recipeIds) } })
-        .select('name image servingSize secondaryComponent components nutrition')
+        .select('name image imageSource sponsoredLabel servingSize secondaryComponent components nutrition')
         .lean()
       : [];
 
@@ -1574,6 +1577,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
         id,
         name: recipe.name || null,
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         // Raw shape computeMealRatio (utils/weekNutritionSummary.js) needs -
         // see getTodayMealLogStats' own identical fix above for why a
         // single baseQuantity/ratio here silently ignored componentServings/
@@ -1676,6 +1680,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
           recipeId: meal.recipeId.toString(),
           name: recipe.name,
           image: recipe.image,
+          sponsoredLabel: recipe.sponsoredLabel || null,
           totalWeight: assignedQuantity,
           totalWeightUnit: recipe.totalWeightUnit,
           calories: Math.round(recipe.baseCalories * ratio),

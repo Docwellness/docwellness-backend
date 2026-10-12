@@ -19,6 +19,7 @@ const { checkNutritionPlausibility } = require('../../utils/recipeNutritionValid
 const { resolveTopCategoryFilter, intersectCategoryFilter } = require('../../utils/recipeCategoryGroups');
 const { SIDE_SALAD_ELIGIBLE_SLOTS } = require('../../utils/dietPlanOptions');
 const cloudinary = require('../../config/cloudinary');
+const { sponsoredLabelOf } = require('../../utils/sponsored');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getOrCreateIngredientImage } = require('../../utils/ingredientLibrary');
 const { generateAndStoreRecipeImage } = require('../../utils/recipeImageGenerator');
@@ -946,7 +947,7 @@ exports.listRecipesByServingTime = async (req, res, next) => {
     // Query with lean() for performance
     const query = Recipe.find(filter)
       .select(
-        '_id name image servingTime cuisine ingredients nutrition.calories tagline description createdAt'
+        '_id name image imageSource sponsoredLabel servingTime cuisine ingredients nutrition.calories tagline description createdAt'
       )
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -960,6 +961,7 @@ exports.listRecipesByServingTime = async (req, res, next) => {
       _id: recipe._id,
       name: recipe.name || null,
       image: recipe.image || null,
+      sponsoredLabel: sponsoredLabelOf(recipe),
       servingTime: recipe.servingTime || null,
       cuisine: recipe.cuisine || null,
       ingredientsCount: Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0,
@@ -1158,7 +1160,7 @@ exports.listRecipes = async (req, res, next) => {
       Recipe.countDocuments(filter),
       Recipe.find(filter)
         .select(
-          '_id name image category cuisine servingTime servings ingredients nutrition.calories description createdAt tags'
+          '_id name image imageSource sponsoredLabel category cuisine servingTime servings ingredients nutrition.calories description createdAt tags'
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -1195,6 +1197,7 @@ exports.listRecipes = async (req, res, next) => {
         id: recipe._id,
         name: recipe.name || '',
         image: recipe.image || null,
+        sponsoredLabel: sponsoredLabelOf(recipe),
         category: recipe.category || 'Other',
         cuisine: recipe.cuisine || '',
         servingTime: recipe.servingTime || '',
@@ -1421,6 +1424,8 @@ exports.getRecipeById = async (req, res, next) => {
     const responseData = {
       ...recipe,
       cookingSteps: recipe.instructions || [],
+      // Computed, so a stale stored label can never be shown.
+      sponsoredLabel: sponsoredLabelOf(recipe),
     };
     delete responseData.instructions;
 
