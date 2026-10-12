@@ -15,6 +15,7 @@ const payments = require('../controllers/admin/paymentController');
 const users = require('../controllers/admin/userController');
 const dieticians = require('../controllers/admin/dieticianController');
 const partners = require('../controllers/admin/partnerController');
+const coupons = require('../controllers/admin/couponController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -106,5 +107,10 @@ router.post('/partners/:id/notes', requirePermission('partners', 'edit'), partne
 router.post('/partners/:id/attachments', requirePermission('partners', 'edit'), uploadLimiter, partners.receiveFile, partners.addAttachment);
 router.get('/partners/:id/attachments/:attId/download', requirePermission('partners', 'view'), partners.downloadAttachment);
 router.post('/partners/:id/create-brand', requirePermission('partners', 'create'), partners.createBrand);
+
+// Coupons (never deleted: deactivate instead, so past discounts stay explainable)
+router.get('/coupons', requirePermission('payments', 'view'), coupons.list);
+router.post('/coupons', requirePermission('payments', 'create'), coupons.create);
+router.put('/coupons/:id', requirePermission('payments', 'edit'), coupons.update);
 
 module.exports = router;
