@@ -19,7 +19,8 @@ const { DAY_GROUPS } = require('../../utils/dayGroups');
 const { generateMenu } = require('../../services/menuGenerationService');
 const { createCustomVersion, resolveGramsForIngredient, createVersionFromSnapshot } = require('../../services/recipeVersioningService');
 const { autoBalanceIngredients, autoBalanceDay, autoBalanceWeek, autoBalancePlan } = require('../../services/ingredientAutoBalanceService');
-const { validatePlanForActivation } = require('../../services/planActivationService');
+const { validatePlanForActivation, findItemsMissingServing } = require('../../services/planActivationService');
+const { prescribedServingLabelForVersion } = require('../../utils/prescribedServing');
 const { swapToRecipe } = require('../../services/recipeVersionSwapService');
 
 async function loadPlanItemDietPlan(req, res) {
@@ -202,6 +203,10 @@ async function buildWeekPlanItemsPayload(dietPlan, week) {
         locked: item.locked,
         pinned: item.pinned,
         calculatedNutrition: item.calculatedNutrition,
+        // null = no real serving was computed; the dietician must set one.
+        servingLabel: recipeVersionById.get(String(item.recipeVersionId))
+          ? prescribedServingLabelForVersion(recipeVersionById.get(String(item.recipeVersionId)))
+          : null,
         isLinkedComponent: item.isLinkedComponent,
         parentRecipeId: item.parentRecipeId,
       }));
@@ -720,6 +725,17 @@ exports.finalizePlanItemWeek = async (req, res, next) => {
     const targetCalories = dietPlan.calorieStrategy?.calorieBudget;
     if (!(targetCalories > 0)) {
       return res.status(400).json({ success: false, message: 'This plan has no calorie target set (Step 1) - cannot validate activation.' });
+    }
+
+    const itemsMissingServing = await findItemsMissingServing(dietPlan._id);
+    if (itemsMissingServing.length > 0) {
+      const names = [...new Set(itemsMissingServing.map((i) => i.recipeName))];
+      return res.status(422).json({
+        success: false,
+        code: 'missing_serving',
+        message: `Set the serving for ${names.join(', ')} before activating - no serving was calculated for ${names.length === 1 ? 'it' : 'them'}.`,
+        data: { items: itemsMissingServing },
+      });
     }
 
     const validation = await validatePlanForActivation(dietPlan._id, targetCalories);

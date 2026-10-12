@@ -431,7 +431,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
         instructions: override.steps,
         nutritionPerServing: override.nutritionPerServing,
         nutrition: override.nutritionPerServing,
-        servingSize: { ...baseRecipe.servingSize, quantity: 1 },
+        servingSize: { ...baseRecipe.servingSize, quantity: 1, label: override.servingLabel },
         components: override.components,
       };
     });
@@ -629,7 +629,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             instructions: override.steps,
             nutritionPerServing: override.nutritionPerServing,
             nutrition: override.nutritionPerServing,
-            servingSize: { ...base.servingSize, quantity: 1 },
+            servingSize: { ...base.servingSize, quantity: 1, label: override.servingLabel },
             components: override.components,
           };
         });
