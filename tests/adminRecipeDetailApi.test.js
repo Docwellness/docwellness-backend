@@ -54,6 +54,7 @@ describe('recipe detail', () => {
     expect(d1.cookingSteps).toEqual(['Wash the dal', 'Pressure cook']);
     expect(d1.instructions).toBeUndefined();
     expect(d1.dieticianId).toBeUndefined();
+    expect(d1.ownerId).toBe(String(d._id));
     expect(d1.ingredients[0]).toMatchObject({ name: 'Moong dal', quantity: 100, role: 'core' });
     expect(d1.nutrition.calories).toBe(420);
     expect(d1.translations.Hindi.name).toBe('मूंग दाल खिचड़ी');
@@ -66,5 +67,26 @@ describe('recipe detail', () => {
 
   it('is not shadowed by the summary route', async () => {
     expect((await get('/content/recipes/summary')).status).toBe(200);
+  });
+});
+
+describe('recipe list filtered by owner (dietician recipe book)', () => {
+  it('returns only the recipes owned by that dietician, with calories', async () => {
+    const a = await f.createDietician();
+    const b = await f.createDietician();
+    await Recipe.create({ dieticianId: a._id, name: 'A One', servingTime: 'Lunch', servings: 1, nutrition: { calories: 250 } });
+    await Recipe.create({ dieticianId: a._id, name: 'A Two', servingTime: 'Lunch', servings: 1 });
+    await Recipe.create({ dieticianId: b._id, name: 'B One', servingTime: 'Lunch', servings: 1 });
+
+    const res = await get(`/content/recipes?dieticianId=${a._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.total).toBe(2);
+    expect(res.body.data.items.map((i) => i.name)).toEqual(['A One', 'A Two']);
+    expect(res.body.data.items[0].calories).toBe(250);
+    expect(res.body.data.items[1].calories).toBeNull();
+  });
+
+  it('rejects an invalid dietician id', async () => {
+    expect((await get('/content/recipes?dieticianId=nope')).status).toBe(400);
   });
 });

@@ -35,12 +35,18 @@ exports.listRecipes = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
     const and = [imageStatusFilter(req.query.imageStatus)];
     if (req.query.category) and.push({ category: req.query.category });
+    if (req.query.dieticianId) {
+      if (!mongoose.Types.ObjectId.isValid(req.query.dieticianId)) {
+        return res.status(400).json({ success: false, message: 'Invalid dietician id' });
+      }
+      and.push({ dieticianId: req.query.dieticianId });
+    }
     if (req.query.q) and.push({ name: new RegExp(escapeRegex(String(req.query.q).slice(0, 80)), 'i') });
     const filter = { $and: and };
 
     const [rows, total] = await Promise.all([
       Recipe.find(filter)
-        .select('name category image imageSource servingTime dieticianId translations')
+        .select('name category image imageSource servingTime dieticianId translations nutrition.calories')
         .sort({ name: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -53,6 +59,7 @@ exports.listRecipes = async (req, res, next) => {
       name: r.name,
       category: r.category,
       servingTime: r.servingTime,
+      calories: r.nutrition?.calories ?? null,
       image: r.image || null,
       imageSource: r.imageSource || null,
       translations: { Hindi: hasTranslation(r, 'Hindi'), Marathi: hasTranslation(r, 'Marathi') },
@@ -81,6 +88,7 @@ exports.getRecipe = async (req, res, next) => {
       cookingSteps: recipe.instructions || [],
       sponsoredLabel: sponsoredLabelOf(recipe),
       ownerName: owner?.profile?.fullName || '',
+      ownerId: recipe.dieticianId ? String(recipe.dieticianId) : null,
     };
     delete data.instructions;
     delete data.dieticianId;
