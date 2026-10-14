@@ -156,6 +156,41 @@ function ev(key, name, audience, trigger, defaults, match) {
   return { key, name, kind: 'event', audience, editable: false, trigger, schedule: [], placeholders: [], sample: {}, defaults, match };
 }
 
+/**
+ * Who a notification reaches, by subscription state - the same three groups
+ * the Users tab filters on (status.subscriptionExpiresAt). A rule with no
+ * segments is addressed to dieticians, not patients.
+ */
+const SEGMENTS = {
+  signed_up: { label: 'Signed up', description: 'Registered but never subscribed' },
+  subscribed: { label: 'Subscribed members', description: 'Subscription is running' },
+  lapsed: { label: 'Plan completed, not renewed', description: 'Subscription has ended and no new plan has started' },
+};
+
+// Derived from each sweep's / call site's own recipient query, not from its name:
+//  - meal and water sweeps read DietPlan status 'Active', and plans are marked Completed when they end.
+//  - renewal sweep needs hasActivePlan and an expiry within 3 days.
+//  - goal nudge looks only at goals past their end date; it does not check subscription state, so a
+//    member who is still subscribed can get it too.
+//  - payment / consultation messages go to anyone with a request open, which is a first plan or a renewal.
+//  - quotes, dietician messages and chat go to any patient with (or, for the default dietician, without) a dietician.
+const RULE_SEGMENTS = {
+  meal_reminder: ['subscribed'],
+  water_reminder: ['subscribed'],
+  renewal_reminder: ['subscribed'],
+  goal_nudge: ['lapsed', 'subscribed'],
+  diet_plan_ready: ['subscribed'],
+  payment_requested: ['signed_up', 'lapsed'],
+  payment_confirmed: ['signed_up', 'lapsed'],
+  payment_rejected: ['signed_up', 'lapsed'],
+  consultation_review: ['signed_up'],
+  quote: ['signed_up', 'subscribed', 'lapsed'],
+  subscription_pause: ['subscribed'],
+  dietician_message: ['signed_up', 'subscribed', 'lapsed'],
+  chat_message: ['signed_up', 'subscribed', 'lapsed'],
+};
+for (const rule of RULES) rule.segments = RULE_SEGMENTS[rule.key] || [];
+
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));
 const getRuleDef = (key) => BY_KEY.get(key) || null;
 
@@ -211,4 +246,4 @@ function validateEdit(def, { title, message, pushBody }) {
   return check('Title', title, TITLE_MAX) || check('Message', message, MESSAGE_MAX) || check('Push text', pushBody, MESSAGE_MAX);
 }
 
-module.exports = { RULES, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };
+module.exports = { RULES, SEGMENTS, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };

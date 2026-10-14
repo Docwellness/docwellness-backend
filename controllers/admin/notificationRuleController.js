@@ -1,6 +1,7 @@
 const Notification = require('../../models/Notification');
 const NotificationRule = require('../../models/NotificationRule');
-const { RULES, getRuleDef, validateEdit, TITLE_MAX, MESSAGE_MAX } = require('../../utils/notificationRules');
+const User = require('../../models/User');
+const { RULES, SEGMENTS, getRuleDef, validateEdit, TITLE_MAX, MESSAGE_MAX } = require('../../utils/notificationRules');
 const { audited } = require('../../utils/adminAudit');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -32,6 +33,7 @@ function present(def, override, stats) {
     name: def.name,
     kind: def.kind,
     audience: def.audience,
+    segments: def.segments,
     editable: def.editable,
     trigger: def.trigger,
     schedule: def.schedule,
@@ -50,19 +52,32 @@ function present(def, override, stats) {
   };
 }
 
+/** Patients in each subscription group, using the same rule as the Users tab. */
+async function segmentCounts(now = new Date()) {
+  const patient = { role: 'patient' };
+  const [signed_up, subscribed, lapsed] = await Promise.all([
+    User.countDocuments({ ...patient, $or: [{ 'status.subscriptionExpiresAt': null }, { 'status.subscriptionExpiresAt': { $exists: false } }] }),
+    User.countDocuments({ ...patient, 'status.subscriptionExpiresAt': { $gte: now } }),
+    User.countDocuments({ ...patient, 'status.subscriptionExpiresAt': { $lt: now } }),
+  ]);
+  return { signed_up, subscribed, lapsed };
+}
+
 // GET /api/admin/notification-rules
 exports.list = async (req, res, next) => {
   try {
     const now = Date.now();
-    const [overrides, stats] = await Promise.all([
+    const [overrides, stats, counts] = await Promise.all([
       NotificationRule.find({}).lean(),
       Promise.all(RULES.map((d) => sentStats(d, now))),
+      segmentCounts(new Date(now)),
     ]);
     const byKey = new Map(overrides.map((o) => [o.key, o]));
     res.json({
       success: true,
       data: {
         limits: { title: TITLE_MAX, message: MESSAGE_MAX },
+        segments: Object.entries(SEGMENTS).map(([key, v]) => ({ key, ...v, patients: counts[key] })),
         items: RULES.map((d, i) => present(d, byKey.get(d.key), stats[i])),
       },
     });

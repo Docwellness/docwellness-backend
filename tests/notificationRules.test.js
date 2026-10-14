@@ -111,6 +111,23 @@ describe('admin notification-rules API', () => {
     expect(res.body.data.items.find((i) => i.key === 'water_reminder').stats.last7d).toBe(1);
   });
 
+  test('tags each rule with the subscription groups it reaches and counts patients per group', async () => {
+    const { User } = require('../models');
+    const [never, active, ended] = [await createPatient(), await createPatient(), await createPatient()];
+    await User.updateOne({ _id: active._id }, { $set: { 'status.subscriptionExpiresAt': daysFromNow(20) } });
+    await User.updateOne({ _id: ended._id }, { $set: { 'status.subscriptionExpiresAt': daysFromNow(-5) } });
+    void never;
+
+    const { data } = (await request(app).get('/api/admin/notification-rules').expect(200)).body;
+
+    expect(Object.fromEntries(data.segments.map((s) => [s.key, s.patients]))).toEqual({ signed_up: 1, subscribed: 1, lapsed: 1 });
+    const segs = (key) => data.items.find((i) => i.key === key).segments;
+    expect(segs('meal_reminder')).toEqual(['subscribed']);
+    expect(segs('goal_nudge')).toEqual(expect.arrayContaining(['lapsed']));
+    expect(segs('consultation_review')).toEqual(['signed_up']);
+    expect(segs('meal_logged')).toEqual([]); // addressed to dieticians
+  });
+
   test('saves an edit, audits it, and restore returns to defaults', async () => {
     const put = (body) => request(app).put('/api/admin/notification-rules/water_reminder').send(body);
 
