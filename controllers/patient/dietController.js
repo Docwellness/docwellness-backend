@@ -1607,6 +1607,10 @@ exports.getMealLogScreenData = async (req, res, next) => {
         baseCalories: override.nutritionPerServing?.calories ?? baseRecipe.baseCalories,
         components: override.components || baseRecipe.components,
         servingSize: { ...(baseRecipe.servingSize || {}), quantity: 1 },
+        // Same prescribed label the Diet Plan/recipe screens show (e.g.
+        // "83.3 g") - quantity is pinned to 1 above, so without this Log Meal
+        // could only render a meaningless "1 g".
+        servingLabel: override.servingLabel || null,
       };
     });
 
@@ -1683,6 +1687,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
           sponsoredLabel: recipe.sponsoredLabel || null,
           totalWeight: assignedQuantity,
           totalWeightUnit: recipe.totalWeightUnit,
+          totalWeightLabel: isVersioned ? recipe.servingLabel || null : null,
           calories: Math.round(recipe.baseCalories * ratio),
           // Portion is a multiplier of the assigned serving above (1 = ate
           // exactly what was prescribed). Unlogged items must start at 0 -
