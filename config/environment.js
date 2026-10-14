@@ -56,6 +56,12 @@ module.exports = {
   // socket events (msg.*, conv.*, chat.*, presence.*).
   legacySocketCompat: process.env.LEGACY_SOCKET_COMPAT !== 'false',
   mongodbUri: process.env.MONGODB_URI,
+  // Lowest patient-app build number (pubspec's number after '+', i.e. the
+  // Android versionCode) still allowed to run. Builds below it are forced onto
+  // Play's blocking in-app update. 0 (unset) forces nothing.
+  patientApp: {
+    minBuildNumber: Number(process.env.PATIENT_APP_MIN_BUILD) || 0,
+  },
   jwtSecret: process.env.JWT_SECRET,
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   supabase: {
