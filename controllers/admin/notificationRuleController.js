@@ -1,7 +1,7 @@
 const Notification = require('../../models/Notification');
 const NotificationRule = require('../../models/NotificationRule');
 const User = require('../../models/User');
-const { RULES, SEGMENTS, getRuleDef, validateEdit, TITLE_MAX, MESSAGE_MAX } = require('../../utils/notificationRules');
+const { RULES, SEGMENTS, getRuleDef, validateEdit, validateVariants, VARIANTS_MAX, TITLE_MAX, MESSAGE_MAX } = require('../../utils/notificationRules');
 const { audited } = require('../../utils/adminAudit');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -26,8 +26,14 @@ async function sentStats(def, now) {
 }
 
 function present(def, override, stats) {
-  const title = override?.title || def.defaults.title;
-  const message = override?.message || def.defaults.message;
+  const rotating = Boolean(def.defaults.variants);
+  const variants = rotating
+    ? override?.variants?.length
+      ? override.variants.map((v) => ({ title: v.title, message: v.message }))
+      : def.defaults.variants
+    : undefined;
+  const title = rotating ? variants[0].title : override?.title || def.defaults.title;
+  const message = rotating ? variants[0].message : override?.message || def.defaults.message;
   return {
     key: def.key,
     name: def.name,
@@ -37,6 +43,8 @@ function present(def, override, stats) {
     editable: def.editable,
     trigger: def.trigger,
     schedule: def.schedule,
+    rotating,
+    variants,
     placeholders: def.placeholders,
     sample: def.sample,
     enabled: override ? override.enabled !== false : true,
@@ -45,7 +53,7 @@ function present(def, override, stats) {
     // Only goal_nudge ships a separate push text; everything else pushes the message.
     pushBody: def.defaults.pushBody ? override?.pushBody || (override?.message ? override.message : def.defaults.pushBody) : undefined,
     defaults: def.defaults,
-    customised: Boolean(override && (override.title || override.message || override.pushBody)),
+    customised: Boolean(override && (override.title || override.message || override.pushBody || override.variants?.length)),
     updatedAt: override?.updatedAt || null,
     updatedByEmail: override?.updatedByEmail || null,
     stats,
@@ -76,7 +84,7 @@ exports.list = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        limits: { title: TITLE_MAX, message: MESSAGE_MAX },
+        limits: { title: TITLE_MAX, message: MESSAGE_MAX, variants: VARIANTS_MAX },
         segments: Object.entries(SEGMENTS).map(([key, v]) => ({ key, ...v, patients: counts[key] })),
         items: RULES.map((d, i) => present(d, byKey.get(d.key), stats[i])),
       },
@@ -95,12 +103,24 @@ exports.update = async (req, res, next) => {
 
     const body = req.body || {};
     const existing = await NotificationRule.findOne({ key: def.key }).lean();
-    const before = { enabled: existing ? existing.enabled !== false : true, title: existing?.title, message: existing?.message, pushBody: existing?.pushBody };
+    const before = { enabled: existing ? existing.enabled !== false : true, title: existing?.title, message: existing?.message, pushBody: existing?.pushBody, variants: existing?.variants };
 
     let set;
     if (body.reset === true) {
       // Back to shipped wording. The on/off switch is a separate decision and is kept.
-      set = { title: null, message: null, pushBody: null };
+      set = { title: null, message: null, pushBody: null, variants: null };
+    } else if (def.defaults.variants) {
+      // A rotating rule is edited as a whole list of wordings.
+      set = {};
+      if (body.variants !== undefined) {
+        const variants = Array.isArray(body.variants)
+          ? body.variants.map((v) => ({ title: String(v?.title ?? '').trim(), message: String(v?.message ?? '').trim() }))
+          : body.variants;
+        const err = validateVariants(def, variants);
+        if (err) return bad(res, err);
+        set.variants = variants;
+      }
+      if (body.enabled !== undefined) set.enabled = body.enabled === true;
     } else {
       const text = {};
       for (const f of ['title', 'message', 'pushBody']) if (body[f] !== undefined) text[f] = String(body[f]).trim();
@@ -122,7 +142,7 @@ exports.update = async (req, res, next) => {
           // $unset (not $set null) so "no override" really means absent.
           {
             $set: { ...Object.fromEntries(Object.entries(set).filter(([, v]) => v !== null)), updatedByEmail: req.admin?.email },
-            ...(body.reset === true ? { $unset: { title: '', message: '', pushBody: '' } } : {}),
+            ...(body.reset === true ? { $unset: { title: '', message: '', pushBody: '', variants: '' } } : {}),
           },
           { upsert: true }
         )

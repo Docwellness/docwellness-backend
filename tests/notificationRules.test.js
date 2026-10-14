@@ -98,7 +98,7 @@ describe('admin notification-rules API', () => {
     const res = await request(app).get('/api/admin/notification-rules').expect(200);
     const items = res.body.data.items;
     expect(items.filter((i) => i.editable).map((i) => i.key).sort()).toEqual(
-      ['goal_nudge', 'meal_reminder', 'renewal_reminder', 'water_reminder']
+      ['goal_nudge', 'meal_reminder', 'renewal_reminder', 'request_plan_nudge', 'water_reminder']
     );
     expect(items.every((i) => i.stats && typeof i.stats.last30d === 'number')).toBe(true);
     expect(items.find((i) => i.key === 'chat_message').editable).toBe(false);

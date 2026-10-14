@@ -104,6 +104,38 @@ const RULES = [
     match: { type: 'milestone', title: "Let's get back on track" },
   },
 
+  {
+    key: 'request_plan_nudge',
+    name: 'Request your diet plan',
+    kind: 'scheduled',
+    audience: 'Patients',
+    editable: true,
+    // Several wordings, used in turn: each person is sent the next one after the last they received.
+    rotating: true,
+    trigger:
+      'Daily check. Goes to patients who signed up at least a day ago, never subscribed and have not requested a diet plan. Each person gets one every 2 days at first, then weekly, with the wording changing every time. Stops for a person once they request a plan.',
+    schedule: [istTime('30 12 * * *')],
+    placeholders: ['name', 'goal', 'days'],
+    sample: { name: 'Asha', goal: 'lose weight', days: '3' },
+    defaults: {
+      title: 'Your diet plan is one tap away',
+      message: 'A plan to help you {goal} is ready when you are. Request your diet plan and take the first step today.',
+      variants: [
+        { title: '{name}, your plan is one tap away', message: 'A diet plan built to help you {goal} is ready when you are. Request it and take the first step today.' },
+        { title: 'Ready to {goal}?', message: "{name}, you don't have to figure it out alone. Request your personalised diet plan and a real dietician will build it around you." },
+        { title: 'Small step, big change', message: 'Requesting your diet plan takes about a minute and costs nothing. Your dietician takes it from there.' },
+        { title: 'Every goal starts with a first step', message: "Yours is requesting your diet plan, {name}. It's quick, and it could be the start of something good." },
+        { title: 'Meals made for you, {name}', message: 'No more guessing what to eat. Get a plan built around your tastes, your schedule and your wish to {goal}.' },
+        { title: "It's been {days} days since you joined", message: 'Today is a great day to turn intent into action. Request your diet plan and let your dietician get started.' },
+        { title: 'Hungry for results?', message: 'Your dietician is ready to design a plan to help you {goal}. All you need to do is ask for it.' },
+        { title: 'Still thinking it over, {name}?', message: "That's okay. When you're ready, requesting your diet plan takes a minute and costs nothing." },
+        { title: 'Your goal deserves a plan', message: '{name}, you want to {goal}. A plan from a real dietician is the next step. Request yours now.' },
+        { title: 'Eat well without the guesswork', message: 'Personalised meals, a dietician in your corner and a plan that fits your life. Request your diet plan today.' },
+      ],
+    },
+    match: { type: 'diet_plan_nudge' },
+  },
+
   // Sent when something happens, not on a clock. Read-only here.
   ev('diet_plan_ready', 'Diet plan ready', 'Patients', 'A dietician activates the patient\'s diet plan.', {
     title: 'Your diet plan is ready',
@@ -175,6 +207,7 @@ const SEGMENTS = {
 //  - payment / consultation messages go to anyone with a request open, which is a first plan or a renewal.
 //  - quotes, dietician messages and chat go to any patient with (or, for the default dietician, without) a dietician.
 const RULE_SEGMENTS = {
+  request_plan_nudge: ['signed_up'],
   meal_reminder: ['subscribed'],
   water_reminder: ['subscribed'],
   renewal_reminder: ['subscribed'],
@@ -215,11 +248,17 @@ async function loadRule(key) {
   } catch (err) {
     console.error(`[notificationRules] could not load "${key}", using defaults:`, err.message);
   }
-  const title = row?.title || def.defaults.title;
-  const message = row?.message || def.defaults.message;
+  const variants = def.defaults.variants
+    ? row?.variants?.length
+      ? row.variants.map((v) => ({ title: v.title, message: v.message }))
+      : def.defaults.variants
+    : undefined;
+  const title = variants ? variants[0].title : row?.title || def.defaults.title;
+  const message = variants ? variants[0].message : row?.message || def.defaults.message;
   return {
     key,
     enabled: row ? row.enabled !== false : true,
+    variants,
     title,
     message,
     // The push text follows the in-app text unless the rule ships a separate one.
@@ -246,4 +285,17 @@ function validateEdit(def, { title, message, pushBody }) {
   return check('Title', title, TITLE_MAX) || check('Message', message, MESSAGE_MAX) || check('Push text', pushBody, MESSAGE_MAX);
 }
 
-module.exports = { RULES, SEGMENTS, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };
+const VARIANTS_MAX = 20;
+
+/** Validates the wording list of a rotating rule. Returns an error string, or null. */
+function validateVariants(def, variants) {
+  if (!Array.isArray(variants) || variants.length === 0) return 'Add at least one wording';
+  if (variants.length > VARIANTS_MAX) return `Use ${VARIANTS_MAX} wordings or fewer`;
+  for (const [i, v] of variants.entries()) {
+    const err = validateEdit(def, { title: v?.title ?? '', message: v?.message ?? '' });
+    if (err) return `Wording ${i + 1}: ${err}`;
+  }
+  return null;
+}
+
+module.exports = { RULES, SEGMENTS, validateVariants, VARIANTS_MAX, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };

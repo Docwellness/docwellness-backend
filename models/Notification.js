@@ -32,6 +32,7 @@ const notificationSchema = new mongoose.Schema(
         'meal_reminder',
         'water_reminder',
         'subscription_pause',
+        'diet_plan_nudge',
       ],
       default: 'system',
     },

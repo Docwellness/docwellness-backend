@@ -13,6 +13,8 @@ const notificationRuleSchema = new mongoose.Schema(
     title: { type: String, trim: true },
     message: { type: String, trim: true },
     pushBody: { type: String, trim: true },
+    // Rotating rules only: the wordings to cycle through. Unset means "use the shipped list".
+    variants: [{ _id: false, title: { type: String, trim: true }, message: { type: String, trim: true } }],
     updatedByEmail: { type: String, trim: true },
   },
   { timestamps: true }

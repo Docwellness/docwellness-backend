@@ -14,6 +14,7 @@ const { runRenewalReminderSweep } = require('../controllers/internal/renewalRemi
 const { runGoalNudgeSweep } = require('../controllers/internal/goalNudgeController');
 const { runMealReminderSweep } = require('../controllers/internal/mealReminderController');
 const { runWaterReminderSweep } = require('../controllers/internal/waterReminderController');
+const { runRequestPlanNudgeSweep } = require('../controllers/internal/requestPlanNudgeController');
 const { runPlacementSweep } = require('../utils/placementEngine');
 const { drainJobs, stats: jobQueueStats } = require('../utils/jobQueue');
 const requestMetrics = require('../utils/requestMetrics');
@@ -100,6 +101,20 @@ router.post('/cron/meal-reminder', requireCronSecret, async (req, res, next) => 
 router.post('/cron/water-reminder', requireCronSecret, async (req, res, next) => {
   try {
     const result = await runWaterReminderSweep({ checkpoint: req.query.checkpoint });
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/internal/cron/request-plan-nudges
+ * @desc    Daily sweep: encourage signed-up patients who have not requested a
+ *          diet plan to do so, with a different wording each time.
+ */
+router.post('/cron/request-plan-nudges', requireCronSecret, async (req, res, next) => {
+  try {
+    const result = await runRequestPlanNudgeSweep();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

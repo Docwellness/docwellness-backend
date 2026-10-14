@@ -14,6 +14,10 @@
       "path": "/api/internal/cron/goal-nudges",
       "schedule": "30 3 * * *"
     },
+    {
+      "path": "/api/internal/cron/request-plan-nudges",
+      "schedule": "30 12 * * *"
+    },
     { "path": "/api/internal/cron/meal-reminder?slot=Morning%20Drink", "schedule": "0 1 * * *" },
     { "path": "/api/internal/cron/meal-reminder?slot=Breakfast", "schedule": "0 3 * * *" },
     { "path": "/api/internal/cron/meal-reminder?slot=Brunch", "schedule": "0 5 * * *" },
