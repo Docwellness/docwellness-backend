@@ -4,6 +4,7 @@ const { parseFlexibleDate } = require('../../utils/dateUtils');
 const { getMembershipPrice, getMembershipTier } = require('../../utils/membershipTiers');
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 
 /**
  * Tell the dietician a patient wants a renewal so they can start building
@@ -14,8 +15,7 @@ const { sendPushToTokens } = require('../../utils/push');
  */
 async function notifyDieticianOfRenewal(request, patientName) {
   try {
-    const title = `${patientName || 'A patient'} requested a plan renewal`;
-    const body = "Build their next diet & exercise plan when you're ready.";
+    const { title, message: body } = await resolveText('renewal_requested', { patient: patientName || 'A patient' });
     const notif = await Notification.create({
       userId: request.dieticianId,
       title,
@@ -23,7 +23,7 @@ async function notifyDieticianOfRenewal(request, patientName) {
       type: 'membership_renewal',
       referenceId: request._id,
       referenceModel: 'DietPlanRequest',
-      data: { patientId: String(request.patient) },
+      data: { patientId: String(request.patient), ruleKey: 'renewal_requested' },
     });
 
     const io = getChatIO();

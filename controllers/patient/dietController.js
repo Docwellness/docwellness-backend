@@ -3,6 +3,7 @@ const {
 } = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 const { sponsoredLabelOf } = require('../../utils/sponsored');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
@@ -1978,51 +1979,54 @@ exports.submitMealLog = async (req, res, next) => {
         try {
           const patient = await User.findById(senderId).select('profile.fullName deviceTokens').lean();
           const patientName = patient?.profile?.fullName || 'A patient';
-          const notifTitle = `${patientName} logged a meal`;
-          const notifBody = `${chatText} · ${Math.round(totalCaloriesLogged)} kcal`;
-          const notif = await Notification.create({
-            userId: receiverId,
-            title: notifTitle,
-            message: notifBody,
-            type: 'progress',
-            referenceId: conversation._id,
-            referenceModel: 'Chat',
-            // patientId here (referenceId is the *conversation*) so the
-            // bell-list tap can open this patient's "Client Logged Data"
-            // sheet directly - same pattern as the renewal notification's
-            // { patientId }. See NotificationItem.fromJson in the app.
-            data: { patientId: String(senderId), patientName },
-          });
-          if (io) {
-            io.to(`user:${receiverId}`).emit('notification.new', {
-              id: notif._id,
-              title: notif.title,
-              message: notif.message,
-              type: notif.type,
-              referenceId: notif.referenceId?.toString(),
-              data: { patientId: String(senderId), patientName },
-              createdAt: notif.createdAt,
-            });
-          }
-          const dietician = await User.findById(receiverId).select('deviceTokens').lean();
-          const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
-          sendPushToTokens(
-            tokens,
-            {
+          const mealText = await resolveText('meal_logged', { patient: patientName });
+          if (mealText.enabled) {
+            const notifTitle = mealText.title;
+            const notifBody = `${chatText} · ${Math.round(totalCaloriesLogged)} kcal`;
+            const notif = await Notification.create({
+              userId: receiverId,
               title: notifTitle,
-              body: notifBody,
-              data: {
-                deepLink: 'docwellness://logged-data',
-                patientId: String(senderId),
-              },
-            },
-            (deadToken) => {
-              User.updateOne(
-                { _id: receiverId },
-                { $pull: { deviceTokens: { token: deadToken } } }
-              ).catch(() => {});
+              message: notifBody,
+              type: 'progress',
+              referenceId: conversation._id,
+              referenceModel: 'Chat',
+              // patientId here (referenceId is the *conversation*) so the
+              // bell-list tap can open this patient's "Client Logged Data"
+              // sheet directly - same pattern as the renewal notification's
+              // { patientId }. See NotificationItem.fromJson in the app.
+              data: { patientId: String(senderId), patientName },
+            });
+            if (io) {
+              io.to(`user:${receiverId}`).emit('notification.new', {
+                id: notif._id,
+                title: notif.title,
+                message: notif.message,
+                type: notif.type,
+                referenceId: notif.referenceId?.toString(),
+                data: { patientId: String(senderId), patientName },
+                createdAt: notif.createdAt,
+              });
             }
-          );
+            const dietician = await User.findById(receiverId).select('deviceTokens').lean();
+            const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+            sendPushToTokens(
+              tokens,
+              {
+                title: notifTitle,
+                body: notifBody,
+                data: {
+                  deepLink: 'docwellness://logged-data',
+                  patientId: String(senderId),
+                },
+              },
+              (deadToken) => {
+                User.updateOne(
+                  { _id: receiverId },
+                  { $pull: { deviceTokens: { token: deadToken } } }
+                ).catch(() => {});
+              }
+            );
+          }
         } catch (notifErr) {
           console.error('Meal-log dietician notification error (non-fatal):', notifErr);
         }

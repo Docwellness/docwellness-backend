@@ -94,14 +94,28 @@ describe('sweeps honour admin overrides', () => {
 });
 
 describe('admin notification-rules API', () => {
-  test('lists every rule, scheduled first-class and event ones read-only', async () => {
+  test('lists every rule, leaving those built from user-written content read-only', async () => {
     const res = await request(app).get('/api/admin/notification-rules').expect(200);
     const items = res.body.data.items;
     expect(items.filter((i) => i.editable).map((i) => i.key).sort()).toEqual(
-      ['goal_nudge', 'meal_reminder', 'renewal_reminder', 'request_plan_nudge', 'water_reminder']
+      [
+        'chat_message',
+        'consultation_review',
+        'consultation_updated',
+        'diet_plan_ready',
+        'goal_nudge',
+        'meal_logged',
+        'meal_reminder',
+        'payment_confirmed',
+        'payment_requested',
+        'renewal_reminder',
+        'renewal_requested',
+        'request_plan_nudge',
+        'water_reminder',
+      ]
     );
     expect(items.every((i) => i.stats && typeof i.stats.last30d === 'number')).toBe(true);
-    expect(items.find((i) => i.key === 'chat_message').editable).toBe(false);
+    expect(items.find((i) => i.key === 'payment_rejected').editable).toBe(false);
   });
 
   test('counts sent notifications per rule', async () => {
@@ -168,5 +182,61 @@ describe('admin notification-rules API', () => {
     await put('chat_message', { enabled: false }).expect(400);
     await put('nope', { enabled: false }).expect(404);
     expect(await NotificationRule.countDocuments()).toBe(0);
+  });
+});
+
+describe('event-driven rules', () => {
+  const put = (key, body) => request(app).put(`/api/admin/notification-rules/${key}`).send(body);
+  const { resolveText } = require('../utils/notificationRules');
+
+  test('fixed-wording events edit title and message; title-only events edit the title alone', async () => {
+    const ok = await put('diet_plan_ready', { title: 'Plan time! 🎉', message: 'Go see your meals.' }).expect(200);
+    expect(ok.body.data).toMatchObject({ title: 'Plan time! 🎉', titleOnly: false, canDisable: false });
+
+    const chat = await put('chat_message', { title: '💬 {sender} wrote to you' }).expect(200);
+    expect(chat.body.data).toMatchObject({ titleOnly: true, title: '💬 {sender} wrote to you' });
+    expect((await put('chat_message', { message: 'hello' }).expect(400)).body.message).toMatch(/title/i);
+  });
+
+  test('validates placeholders per rule', async () => {
+    expect((await put('chat_message', { title: '{patient} wrote' }).expect(400)).body.message).toMatch(/\{patient\}/);
+    expect((await put('renewal_requested', { title: '{patient} wants to renew', message: 'Hi {sender}' }).expect(400)).body.message).toMatch(/\{sender\}/);
+    await put('diet_plan_ready', { title: 'Hi {name}' }).expect(400);
+  });
+
+  test('only "patient logged a meal" can be turned off; critical ones cannot', async () => {
+    expect((await put('meal_logged', { enabled: false }).expect(200)).body.data.enabled).toBe(false);
+    expect((await put('payment_requested', { enabled: false }).expect(400)).body.message).toMatch(/cannot be turned off/);
+    expect((await put('diet_plan_ready', { enabled: false }).expect(400)).body.message).toMatch(/cannot be turned off/);
+    await put('payment_rejected', { title: 'x' }).expect(400); // not editable at all
+  });
+
+  test('resolveText: edited wording with values filled in, shipped wording otherwise', async () => {
+    expect(await resolveText('chat_message', { sender: 'Dr. Mehta' })).toMatchObject({ title: 'New message from Dr. Mehta', enabled: true });
+
+    await put('chat_message', { title: '💬 {sender} says hi' }).expect(200);
+    expect((await resolveText('chat_message', { sender: 'Dr. Mehta' })).title).toBe('💬 Dr. Mehta says hi');
+  });
+
+  test('a stored "off" is ignored for rules that cannot be turned off', async () => {
+    await NotificationRule.create({ key: 'payment_requested', enabled: false });
+    expect((await resolveText('payment_requested')).enabled).toBe(true);
+  });
+
+  test('a value containing braces is not re-interpreted', async () => {
+    expect((await resolveText('chat_message', { sender: '{patient}' })).title).toBe('New message from {patient}');
+  });
+
+  test('consultation notifications are counted separately by their rule tag', async () => {
+    const patient = await createPatient();
+    const mk = (title, ruleKey) => Notification.create({ userId: patient._id, title, message: 'x', type: 'consultation', data: { ruleKey } });
+    await mk('A reworded first title', 'consultation_review');
+    await mk('A reworded update title', 'consultation_updated');
+    await mk('A reworded update title', 'consultation_updated');
+
+    const { items } = (await request(app).get('/api/admin/notification-rules').expect(200)).body.data;
+    const sent = (k) => items.find((i) => i.key === k).stats.last7d;
+    expect(sent('consultation_review')).toBe(1);
+    expect(sent('consultation_updated')).toBe(2);
   });
 });

@@ -17,6 +17,7 @@ const config = require('../../config/environment');
 const Notification = require('../../models/Notification');
 const { getUserFromSupabaseToken } = require('../../utils/supabaseAuth');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 
 const { EVENTS } = ChatLogger;
 
@@ -348,7 +349,7 @@ function initializeChatSocketV1(io) {
             const senderRole = socket.user.role;
             const senderName =
               sender?.profile?.fullName || (senderRole === 'patient' ? 'Patient' : 'Doctor');
-            const notifTitle = `New message from ${senderName}`;
+            const notifTitle = (await resolveText('chat_message', { sender: senderName })).title;
             const msgType = result.message.type;
             const notifMessage =
               msgType === 'image'

@@ -47,7 +47,9 @@ function present(def, override, stats) {
     variants,
     placeholders: def.placeholders,
     sample: def.sample,
-    enabled: override ? override.enabled !== false : true,
+    enabled: def.canDisable === false ? true : override ? override.enabled !== false : true,
+    canDisable: def.canDisable !== false,
+    titleOnly: Boolean(def.titleOnly),
     title,
     message,
     // Only goal_nudge ships a separate push text; everything else pushes the message.
@@ -102,6 +104,8 @@ exports.update = async (req, res, next) => {
     if (!def.editable) return bad(res, 'This notification is sent by the app and cannot be changed here');
 
     const body = req.body || {};
+    if (body.enabled !== undefined && def.canDisable === false) return bad(res, 'This notification cannot be turned off');
+    if (def.titleOnly && body.message !== undefined) return bad(res, 'Only the title of this notification can be changed');
     const existing = await NotificationRule.findOne({ key: def.key }).lean();
     const before = { enabled: existing ? existing.enabled !== false : true, title: existing?.title, message: existing?.message, pushBody: existing?.pushBody, variants: existing?.variants };
 

@@ -84,7 +84,7 @@ const RULES = [
       message: 'Your subscription ends on {date}. Renew now to keep your diet plan, and your momentum, going without a break.',
     },
     // Not by title, so an edited or reworded title keeps counting. The dietician-facing renewal request shares this type.
-    match: { type: 'membership_renewal', title: { $not: /requested a plan renewal$/ } },
+    match: { type: 'membership_renewal', title: { $not: /requested a plan renewal$/ }, 'data.ruleKey': { $ne: 'renewal_requested' } },
   },
   {
     key: 'goal_nudge',
@@ -138,28 +138,33 @@ const RULES = [
     match: { type: 'diet_plan_nudge' },
   },
 
-  // Sent when something happens, not on a clock. Read-only here.
+  // Sent when something happens, not on a clock. The editable ones have fixed wording an admin can
+  // change; the rest are built from someone's own content (a quote, a note, the dates of a pause).
   ev('diet_plan_ready', 'Diet plan ready', 'Patients', 'A dietician activates the patient\'s diet plan.', {
     title: 'Your diet plan is ready',
     message: "Your dietician has activated your diet plan - tap to see this week's meals.",
-  }, { type: 'diet_plan' }),
+  }, { type: 'diet_plan' }, { editable: true }),
   ev('payment_requested', 'Payment requested', 'Patients', 'A dietician requests payment for a diet plan.', {
     title: 'Payment requested for your diet plan',
     message:
       'Your dietician has requested payment for your diet plan. Tap to review the amount and share your payment details.',
-  }, { type: 'payment', title: 'Payment requested for your diet plan' }),
+  }, { type: 'payment', $or: [{ title: 'Payment requested for your diet plan' }, { 'data.ruleKey': 'payment_requested' }] }, { editable: true }),
   ev('payment_confirmed', 'Payment confirmed', 'Patients', 'An admin confirms a manual payment proof.', {
     title: 'Payment confirmed',
     message: 'Your payment was received and your membership is active.',
-  }, { type: 'payment', title: 'Payment confirmed' }),
+  }, { type: 'payment', $or: [{ title: 'Payment confirmed' }, { 'data.ruleKey': 'payment_confirmed' }] }, { editable: true }),
   ev('payment_rejected', 'Payment not accepted', 'Patients', 'An admin rejects a manual payment proof. The message is the admin\'s note.', {
     title: 'Payment not accepted',
     message: "The admin's reason for rejecting the proof.",
   }, { type: 'payment', title: 'Payment not accepted' }),
-  ev('consultation_review', 'First consultation to review', 'Patients', 'A dietician saves a first consultation for the patient to review and consent to.', {
+  ev('consultation_review', 'First consultation to review', 'Patients', 'A dietician saves a first consultation for the patient to review and consent to for the first time.', {
     title: 'Review your first consultation',
     message: 'Your dietician has completed your first consultation. Please review it and provide your consent to continue.',
-  }, { type: 'consultation' }),
+  }, { type: 'consultation', $or: [{ title: 'Review your first consultation' }, { 'data.ruleKey': 'consultation_review' }] }, { editable: true }),
+  ev('consultation_updated', 'First consultation updated', 'Patients', 'A dietician changes a first consultation the patient had already consented to, so they must review and consent again.', {
+    title: 'Your first consultation was updated',
+    message: 'Your dietician updated your first consultation. Please review it again and re-submit your consent.',
+  }, { type: 'consultation', $or: [{ title: 'Your first consultation was updated' }, { 'data.ruleKey': 'consultation_updated' }] }, { editable: true }),
   ev('quote', 'New quote', 'Patients', 'A dietician publishes a quote.', {
     title: 'New quote from your dietician',
     message: 'The text of the quote.',
@@ -172,22 +177,38 @@ const RULES = [
     title: 'Message from your dietician',
     message: 'The text the dietician wrote.',
   }, { type: 'milestone', title: 'Message from your dietician' }),
-  ev('chat_message', 'New chat message', 'Patients and dieticians', 'Someone sends a chat message while the other side is not reading it.', {
+  ev('chat_message', 'New chat message', 'Patients and dieticians', 'Someone sends a chat message. Only the title can be changed; the message is what they wrote.', {
     title: 'New message from {sender}',
     message: 'The first 100 characters of the message.',
-  }, { type: 'chat' }),
-  ev('meal_logged', 'Patient logged a meal', 'Dieticians', 'A patient logs a meal.', {
+  }, { type: 'chat' }, { editable: true, titleOnly: true, placeholders: ['sender'], sample: { sender: 'Dr. Mehta' } }),
+  ev('meal_logged', 'Patient logged a meal', 'Dieticians', 'A patient logs a meal. Only the title can be changed; the message is what they ate and the calories.', {
     title: '{patient} logged a meal',
     message: 'What they ate and the calories.',
-  }, { type: 'progress' }),
+  }, { type: 'progress' }, { editable: true, titleOnly: true, canDisable: true, placeholders: ['patient'], sample: { patient: 'Asha' } }),
   ev('renewal_requested', 'Patient asked to renew', 'Dieticians', 'A patient requests a plan renewal.', {
     title: '{patient} requested a plan renewal',
     message: "Build their next diet & exercise plan when you're ready.",
-  }, { type: 'membership_renewal', title: /requested a plan renewal$/ }),
+  }, { type: 'membership_renewal', $or: [{ title: /requested a plan renewal$/ }, { 'data.ruleKey': 'renewal_requested' }] }, { editable: true, placeholders: ['patient'], sample: { patient: 'Asha' } }),
 ];
 
-function ev(key, name, audience, trigger, defaults, match) {
-  return { key, name, kind: 'event', audience, editable: false, trigger, schedule: [], placeholders: [], sample: {}, defaults, match };
+function ev(key, name, audience, trigger, defaults, match, opts = {}) {
+  return {
+    key,
+    name,
+    kind: 'event',
+    audience,
+    editable: Boolean(opts.editable),
+    // Only the title is a template; the message is the sender's own content.
+    titleOnly: Boolean(opts.titleOnly),
+    // Turning most of these off could strand a patient (no payment request, no plan ready).
+    canDisable: Boolean(opts.canDisable),
+    trigger,
+    schedule: [],
+    placeholders: opts.placeholders || [],
+    sample: opts.sample || {},
+    defaults,
+    match,
+  };
 }
 
 /**
@@ -219,6 +240,7 @@ const RULE_SEGMENTS = {
   payment_confirmed: ['signed_up', 'lapsed'],
   payment_rejected: ['signed_up', 'lapsed'],
   consultation_review: ['signed_up'],
+  consultation_updated: ['signed_up', 'subscribed', 'lapsed'],
   quote: ['signed_up', 'subscribed', 'lapsed'],
   subscription_pause: ['subscribed'],
   dietician_message: ['signed_up', 'subscribed', 'lapsed'],
@@ -259,7 +281,8 @@ async function loadRule(key) {
   const message = variants ? variants[0].message : row?.message || def.defaults.message;
   return {
     key,
-    enabled: row ? row.enabled !== false : true,
+    // A rule that cannot be turned off stays on whatever is stored.
+    enabled: def.canDisable === false ? true : row ? row.enabled !== false : true,
     variants,
     title,
     message,
@@ -287,6 +310,16 @@ function validateEdit(def, { title, message, pushBody }) {
   return check('Title', title, TITLE_MAX) || check('Message', message, MESSAGE_MAX) || check('Push text', pushBody, MESSAGE_MAX);
 }
 
+/**
+ * Title and message for an event-driven notification, with the admin's wording if any
+ * and `{placeholders}` filled from `vars`. `enabled` is false only for rules that can be
+ * turned off. Never throws on a database problem: it falls back to the shipped wording.
+ */
+async function resolveText(key, vars = {}) {
+  const rule = await loadRule(key);
+  return { enabled: rule.enabled, title: render(rule.title, vars), message: render(rule.message, vars) };
+}
+
 const VARIANTS_MAX = 20;
 
 /** Validates the wording list of a rotating rule. Returns an error string, or null. */
@@ -300,4 +333,4 @@ function validateVariants(def, variants) {
   return null;
 }
 
-module.exports = { RULES, SEGMENTS, validateVariants, VARIANTS_MAX, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };
+module.exports = { RULES, SEGMENTS, resolveText, validateVariants, VARIANTS_MAX, getRuleDef, loadRule, render, validateEdit, TITLE_MAX, MESSAGE_MAX };
