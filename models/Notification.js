@@ -73,5 +73,7 @@ const notificationSchema = new mongoose.Schema(
 
 // Index for efficient querying
 notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+// Admin panel "automated notifications" counts, per type over a recent window.
+notificationSchema.index({ type: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

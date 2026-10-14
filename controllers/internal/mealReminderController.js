@@ -3,6 +3,7 @@ const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/day
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
 const { enqueue } = require('../../utils/jobQueue');
+const { loadRule, render } = require('../../utils/notificationRules');
 
 const normalizeDate = (dateObj) =>
   new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
@@ -28,6 +29,8 @@ const dayKeyFor = (dateObj) => {
  */
 async function runMealReminderSweep({ slot, now = new Date() } = {}) {
   if (!slot) return { checked: 0, notified: 0 };
+  const rule = await loadRule('meal_reminder');
+  if (!rule.enabled) return { checked: 0, notified: 0, disabled: true };
 
   const today = normalizeDate(now);
   const dayKey = dayKeyFor(today);
@@ -40,8 +43,8 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
     .populate('request', 'startDateForDiet')
     .lean();
 
-  const title = `Time for ${slot}`;
-  const message = `Don't forget to log your ${slot} once you've had it.`;
+  const title = render(rule.title, { slot });
+  const message = render(rule.message, { slot });
 
   // 1. Pure-JS pass: which active-plan patients actually have `slot` on their
   //    plan today? De-duped on patientId - a patient could (rarely) hold more

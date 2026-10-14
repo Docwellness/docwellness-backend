@@ -1,5 +1,6 @@
 const { Goal, Notification, User, Progress } = require('../../models');
 const { enqueue } = require('../../utils/jobQueue');
+const { loadRule, render } = require('../../utils/notificationRules');
 
 /**
  * Direction-agnostic 0..1 progress toward a goal's target - matches the
@@ -29,6 +30,9 @@ function computeProgress(startValue, currentValue, targetValue) {
  * utils/goalAdherence.js already relies on.
  */
 async function runGoalNudgeSweep({ now = new Date() } = {}) {
+  // Off means off: goals are left unstamped, so turning the rule back on nudges them then.
+  const rule = await loadRule('goal_nudge');
+  if (!rule.enabled) return { checked: 0, created: 0, disabled: true };
   const candidates = await Goal.find({
     status: 'active',
     endDate: { $lt: now },
@@ -70,8 +74,8 @@ async function runGoalNudgeSweep({ now = new Date() } = {}) {
     await Notification.insertMany(
       toNudge.map((goal) => ({
         userId: goal.patientId,
-        title: "Let's get back on track",
-        message: `You're close to reaching "${goal.title}" - don't stop now. Continue your diet journey and rebook your subscription to keep going.`,
+        title: render(rule.title, { goal: goal.title }),
+        message: render(rule.message, { goal: goal.title }),
         type: 'milestone',
         referenceId: goal._id,
         referenceModel: 'Goal',
@@ -97,8 +101,8 @@ async function runGoalNudgeSweep({ now = new Date() } = {}) {
         patientId: pid,
         tokens,
         notification: {
-          title: "Let's get back on track",
-          body: `Continue your diet journey and rebook your subscription to reach "${goal.title}".`,
+          title: render(rule.title, { goal: goal.title }),
+          body: render(rule.pushBody, { goal: goal.title }),
           data: { deepLink: 'docwellness://timeline', goalId: String(goal._id) },
         },
       });
