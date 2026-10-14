@@ -48,8 +48,8 @@ const RULES = [
     placeholders: ['slot'],
     sample: { slot: 'Lunch' },
     defaults: {
-      title: 'Time for {slot}',
-      message: "Don't forget to log your {slot} once you've had it.",
+      title: '🍽️ {slot} time!',
+      message: 'Your {slot} is waiting. Enjoy it, then log it in a tap so your dietician can cheer you on.',
     },
     match: { type: 'meal_reminder' },
   },
@@ -64,8 +64,8 @@ const RULES = [
     placeholders: ['remaining'],
     sample: { remaining: '1.2' },
     defaults: {
-      title: 'Stay hydrated',
-      message: "You've got {remaining}L left to reach today's water goal.",
+      title: '💧 Sip sip hooray!',
+      message: "{remaining}L to go to hit today's water goal. Grab a glass and let's close the gap!",
     },
     match: { type: 'water_reminder' },
   },
@@ -80,10 +80,11 @@ const RULES = [
     placeholders: ['date'],
     sample: { date: '20 Oct 2026' },
     defaults: {
-      title: 'Your membership is expiring soon',
-      message: 'Your subscription expires on {date}. Renew now to keep your diet plan active.',
+      title: '⏳ Your plan is nearing the finish line',
+      message: 'Your subscription ends on {date}. Renew now to keep your diet plan, and your momentum, going without a break.',
     },
-    match: { type: 'membership_renewal', title: 'Your membership is expiring soon' },
+    // Not by title, so an edited or reworded title keeps counting. The dietician-facing renewal request shares this type.
+    match: { type: 'membership_renewal', title: { $not: /requested a plan renewal$/ } },
   },
   {
     key: 'goal_nudge',
@@ -96,12 +97,13 @@ const RULES = [
     placeholders: ['goal'],
     sample: { goal: 'Lose 5 kg' },
     defaults: {
-      title: "Let's get back on track",
+      title: '🎯 Your goal is still waiting',
       message:
-        'You\'re close to reaching "{goal}" - don\'t stop now. Continue your diet journey and rebook your subscription to keep going.',
-      pushBody: 'Continue your diet journey and rebook your subscription to reach "{goal}".',
+        'Your goal "{goal}" is still waiting for you. Rebook your subscription and let\'s pick up your diet journey right where you left off.',
+      pushBody: '"{goal}" is still within reach. Rebook and finish what you started. 💪',
     },
-    match: { type: 'milestone', title: "Let's get back on track" },
+    // Not by title, so an edited or reworded title keeps counting. Dietician timeline messages share this type.
+    match: { type: 'milestone', title: { $ne: 'Message from your dietician' } },
   },
 
   {
@@ -121,16 +123,16 @@ const RULES = [
       title: 'Your diet plan is one tap away',
       message: 'A plan to help you {goal} is ready when you are. Request your diet plan and take the first step today.',
       variants: [
-        { title: '{name}, your plan is one tap away', message: 'A diet plan built to help you {goal} is ready when you are. Request it and take the first step today.' },
-        { title: 'Ready to {goal}?', message: "{name}, you don't have to figure it out alone. Request your personalised diet plan and a real dietician will build it around you." },
-        { title: 'Small step, big change', message: 'Requesting your diet plan takes about a minute and costs nothing. Your dietician takes it from there.' },
-        { title: 'Every goal starts with a first step', message: "Yours is requesting your diet plan, {name}. It's quick, and it could be the start of something good." },
-        { title: 'Meals made for you, {name}', message: 'No more guessing what to eat. Get a plan built around your tastes, your schedule and your wish to {goal}.' },
-        { title: "It's been {days} days since you joined", message: 'Today is a great day to turn intent into action. Request your diet plan and let your dietician get started.' },
-        { title: 'Hungry for results?', message: 'Your dietician is ready to design a plan to help you {goal}. All you need to do is ask for it.' },
-        { title: 'Still thinking it over, {name}?', message: "That's okay. When you're ready, requesting your diet plan takes a minute and costs nothing." },
-        { title: 'Your goal deserves a plan', message: '{name}, you want to {goal}. A plan from a real dietician is the next step. Request yours now.' },
-        { title: 'Eat well without the guesswork', message: 'Personalised meals, a dietician in your corner and a plan that fits your life. Request your diet plan today.' },
+        { title: '🥗 {name}, your plate has a plan waiting', message: 'A diet plan to help you {goal} is one tap away. Request it and let your dietician do the heavy lifting.' },
+        { title: 'Pop quiz: ready to {goal}? 🤔', message: 'The right answer is yes! Tap to request your diet plan and a real dietician will build it around you, {name}.' },
+        { title: '☕ One minute. That is all it takes.', message: 'Requesting your diet plan is quicker than a chai break. Your dietician takes it from there.' },
+        { title: '🚀 Day {days}: the first step is yours', message: '{name}, every goal starts with one tap. Request your diet plan and let us get you moving.' },
+        { title: '🍛 Meals made for you, {name}', message: 'Imagine never wondering what to eat again. Get a plan built around your tastes, your schedule and your wish to {goal}.' },
+        { title: '👀 Psst, {name}... ready when you are', message: 'Your dietician is ready to start on a plan to help you {goal}. Tap to request it and say hello!' },
+        { title: '🏁 Ready, set... request!', message: "You've been here {days} days. Today is a great day to go from thinking about it to doing it. Request your diet plan." },
+        { title: "🤝 Let's make a deal, {name}", message: 'You tap once to request your diet plan. A real dietician does the rest, built around your goal to {goal}.' },
+        { title: '🌱 Tiny step, big glow-up', message: 'Starting is the hardest part, and it is just one tap. Request your diet plan and watch it grow from there.' },
+        { title: '🍎 Still thinking it over?', message: 'No pressure, {name}. Whenever you are ready, your diet plan is one request away. We will be here.' },
       ],
     },
     match: { type: 'diet_plan_nudge' },

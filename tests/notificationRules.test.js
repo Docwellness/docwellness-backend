@@ -88,8 +88,8 @@ describe('sweeps honour admin overrides', () => {
     await runWaterReminderSweep({ checkpoint: '1', now });
 
     const [n] = await Notification.find({ type: 'water_reminder' }).lean();
-    expect(n.title).toBe('Stay hydrated');
-    expect(n.message).toBe("You've got 2.0L left to reach today's water goal.");
+    expect(n.title).toBe('💧 Sip sip hooray!');
+    expect(n.message).toBe("2.0L to go to hit today's water goal. Grab a glass and let's close the gap!");
   });
 });
 
@@ -106,9 +106,26 @@ describe('admin notification-rules API', () => {
 
   test('counts sent notifications per rule', async () => {
     const patient = await createPatient();
-    await Notification.create({ userId: patient._id, title: 'Stay hydrated', message: 'x', type: 'water_reminder' });
+    await Notification.create({ userId: patient._id, title: '💧 Sip sip hooray!', message: 'x', type: 'water_reminder' });
     const res = await request(app).get('/api/admin/notification-rules').expect(200);
     expect(res.body.data.items.find((i) => i.key === 'water_reminder').stats.last7d).toBe(1);
+  });
+
+  test('counts by type, so reworded or edited titles keep counting and look-alike types stay separate', async () => {
+    const patient = await createPatient();
+    const mk = (title, type) => Notification.create({ userId: patient._id, title, message: 'x', type });
+    await mk('Some reworded renewal title', 'membership_renewal');
+    await mk('Asha requested a plan renewal', 'membership_renewal'); // sent to the dietician
+    await mk('A reworded goal title', 'milestone');
+    await mk('Message from your dietician', 'milestone');
+
+    const { items } = (await request(app).get('/api/admin/notification-rules').expect(200)).body.data;
+    const sent = (key) => items.find((i) => i.key === key).stats.last7d;
+
+    expect(sent('renewal_reminder')).toBe(1);
+    expect(sent('renewal_requested')).toBe(1);
+    expect(sent('goal_nudge')).toBe(1);
+    expect(sent('dietician_message')).toBe(1);
   });
 
   test('tags each rule with the subscription groups it reaches and counts patients per group', async () => {
@@ -140,7 +157,7 @@ describe('admin notification-rules API', () => {
     expect(off.body.data.title).toBe('Drink up');
 
     const reset = await put({ reset: true }).expect(200);
-    expect(reset.body.data).toMatchObject({ title: 'Stay hydrated', customised: false, enabled: false });
+    expect(reset.body.data).toMatchObject({ title: '💧 Sip sip hooray!', customised: false, enabled: false });
   });
 
   test('rejects unknown placeholders, empty text, overlong text and event rules', async () => {

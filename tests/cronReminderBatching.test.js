@@ -84,7 +84,7 @@ describe('runMealReminderSweep', () => {
     const notifs = await Notification.find({ type: 'meal_reminder' }).lean();
     expect(notifs).toHaveLength(1);
     expect(notifs[0].userId.toString()).toBe(unlogged._id.toString());
-    expect(notifs[0].title).toBe('Time for Breakfast');
+    expect(notifs[0].title).toBe('🍽️ Breakfast time!');
   });
 
   test('is idempotent - a second run the same day notifies nobody again', async () => {

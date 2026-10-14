@@ -114,7 +114,7 @@ describe('runMealReminderSweep -> push queue', () => {
     expect(job.payload.patientId).toBe(withTokens._id.toString());
     expect(job.payload.tokens).toEqual(['tok-A', 'tok-B']);
     expect(job.payload.notification).toMatchObject({
-      title: 'Time for Breakfast',
+      title: '🍽️ Breakfast time!',
       data: { deepLink: 'docwellness://timeline', servingTime: 'Breakfast' },
     });
   });
