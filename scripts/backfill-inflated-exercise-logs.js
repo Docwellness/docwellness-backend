@@ -3,23 +3,27 @@
  * what this corrects and why. Dry run by default (prints what would change):
  *   node scripts/backfill-inflated-exercise-logs.js
  * Apply the correction:
- *   node scripts/backfill-inflated-exercise-logs.js --apply
+ *   node scripts/backfill-inflated-exercise-logs.js --execute
+ *
+ * Connects via connectDB() (config/database.js), not a raw mongoose.connect()
+ * - required for prod's self-hosted Mongo's custom TLS CA
+ * (MONGODB_TLS_CA_BASE64), same as the other prod scripts.
  */
-require('dns').setServers(['8.8.8.8', '1.1.1.1']);
-
 require('dotenv').config();
 const mongoose = require('mongoose');
-const config = require('../config/environment');
+const connectDB = require('../config/database');
 const { backfillInflatedExerciseLogs } = require('../utils/backfillInflatedExerciseLogs');
 
+const EXECUTE = process.argv.includes('--execute') || process.argv.includes('--apply');
+
 async function run() {
-  const apply = process.argv.includes('--apply');
   try {
-    await mongoose.connect(config.mongoUri || process.env.MONGODB_URI);
-    const result = await backfillInflatedExerciseLogs({ apply });
+    console.log(EXECUTE ? '=== EXECUTING exercise log backfill ===' : '=== DRY RUN (pass --execute to write) ===');
+    await connectDB();
+    const result = await backfillInflatedExerciseLogs({ apply: EXECUTE });
     console.log(
-      `${apply ? 'APPLIED' : 'DRY RUN'}: ${result.entriesAffected} inflated entr${result.entriesAffected === 1 ? 'y' : 'ies'}` +
-        (apply ? ` across ${result.logsTouched} log(s) corrected.` : ' would be corrected (re-run with --apply).')
+      `${EXECUTE ? 'APPLIED' : 'DRY RUN'}: ${result.entriesAffected} inflated entr${result.entriesAffected === 1 ? 'y' : 'ies'}` +
+        (EXECUTE ? ` across ${result.logsTouched} log(s) corrected.` : ' would be corrected (re-run with --execute).')
     );
     for (const c of result.changes) {
       console.log(
@@ -27,6 +31,7 @@ async function run() {
           `${c.caloriesFrom} -> ${c.caloriesTo} kcal (sets=${c.sets})`
       );
     }
+    await mongoose.disconnect();
     process.exit(0);
   } catch (error) {
     console.error('Backfill failed:', error);
