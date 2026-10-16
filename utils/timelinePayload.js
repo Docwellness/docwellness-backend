@@ -10,6 +10,7 @@ const {
   computeMilestoneStatus,
   computeTaskDoneMap,
 } = require('./goalAdherence');
+const { weeklyCheckpoints } = require('./weeklyCheckpoints');
 const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
 const { formatDayLabel, formatMonthLabel, resolvePlanStartDate } = require('./seedGoalTimeline');
 
@@ -166,13 +167,11 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   // falls inside the 7 days the checkpoint closes out.
   const weeklyMilestones = milestones.filter((m) => m.type === 'weekly');
   const weightLoggedWeeks = new Set();
+  const weekNumberById = new Map();
   let weightLogDates = [];
   if (weeklyMilestones.length > 0) {
-    const allWeekly = await Milestone.find({ goalId: goal._id, type: 'weekly' })
-      .sort({ date: 1 })
-      .select('_id')
-      .lean();
-    const ordinalById = new Map(allWeekly.map((w, i) => [w._id.toString(), i + 1]));
+    const checkpoints = await weeklyCheckpoints(goal._id, planStart);
+    for (const c of checkpoints) weekNumberById.set(c.id, c.weekNumber);
     const logs = await Progress.find({
       patientId,
       weight: { $exists: true, $ne: null },
@@ -181,10 +180,10 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       .lean();
     weightLogDates = logs.filter((l) => !l.week).map((l) => new Date(l.date));
     for (const l of logs) if (l.week) weightLoggedWeeks.add(l.week);
-    for (const m of weeklyMilestones) m._weekOrdinal = ordinalById.get(m._id.toString());
   }
   function weeklyWeightLogged(m) {
-    if (m._weekOrdinal && weightLoggedWeeks.has(m._weekOrdinal)) return true;
+    const weekNumber = weekNumberById.get(m._id.toString());
+    if (weekNumber && weightLoggedWeeks.has(weekNumber)) return true;
     const weekEnd = new Date(m.date);
     const weekStart = new Date(weekEnd.getTime() - 6 * MS_PER_DAY);
     const windowEnd = new Date(weekEnd.getTime() + MS_PER_DAY);
@@ -223,6 +222,7 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
           ? 'completed'
           : status;
       })(),
+      weekNumber: m.type === 'weekly' ? weekNumberById.get(m._id.toString()) ?? null : null,
       adherence: adherenceEntry?.adherence ?? 0,
       tasks: tasksByMilestone.get(m._id.toString()) || [],
     };

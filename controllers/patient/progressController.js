@@ -9,6 +9,7 @@ const { calculateBMI } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelpers');
+const { weeklyCheckpoints } = require('../../utils/weeklyCheckpoints');
 const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 
 /**
@@ -677,7 +678,7 @@ async function computeTrackingData(patientId, query) {
     // weights - see buildWeightTrend), plus each bucket's measured weight.
     const cumulativeStart = resolvedPlanStart || startDate;
     const activeGoal = await Goal.findOne({ patientId, status: 'active' })
-      .select('startValue targetValue startDate endDate')
+      .select('_id startValue targetValue startDate endDate')
       .lean();
     const goalStartWeight = activeGoal?.startValue ?? currentWeight;
     const goalTargetWeight = activeGoal?.targetValue ?? (targetWeight || goalStartWeight);
@@ -697,13 +698,25 @@ async function computeTrackingData(patientId, query) {
       date: { $gte: cumulativeStart, $lte: endDate },
     })
       .sort({ date: 1 })
-      .select('date weight')
+      .select('date weight week')
       .lean();
+    // A weigh-in logged for a weekly checkpoint belongs to that checkpoint's
+    // date, not the day it was typed in (e.g. Week 3's weight entered on the
+    // 15th still plots on the 11th checkpoint) - unless it was entered before
+    // that date, then the real day wins.
+    const checkpointDateByWeek = new Map();
+    if (activeGoal?._id) {
+      const checkpoints = await weeklyCheckpoints(activeGoal._id, resolvedPlanStart);
+      for (const c of checkpoints) checkpointDateByWeek.set(c.weekNumber, new Date(c.date));
+    }
     // One entry per calendar day - a same-day resubmission (editing that
     // week's log) keeps only the latest write for that day.
     const loggedByDay = new Map();
     for (const log of realLogs) {
-      loggedByDay.set(localDateStr(log.date), log.weight);
+      let day = new Date(log.date);
+      const checkpoint = log.week ? checkpointDateByWeek.get(log.week) : null;
+      if (checkpoint && checkpoint < day) day = checkpoint;
+      loggedByDay.set(localDateStr(day), log.weight);
     }
 
     const weightTrend = buildWeightTrend({
