@@ -158,6 +158,39 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     return { tasksTotal, tasksDone, adherence: tasksTotal === 0 ? 0 : tasksDone / tasksTotal };
   }
 
+  // A weekly checkpoint's own to-do is the week's weigh-in (Log My Body), so a
+  // logged weight must close it out with a green check no matter how the
+  // week's daily tasks went. A weigh-in counts when it is tagged with this
+  // checkpoint's week number (Progress.week - the ordinal among the goal's
+  // weekly milestones, see createProgress) or, for untagged entries, when it
+  // falls inside the 7 days the checkpoint closes out.
+  const weeklyMilestones = milestones.filter((m) => m.type === 'weekly');
+  const weightLoggedWeeks = new Set();
+  let weightLogDates = [];
+  if (weeklyMilestones.length > 0) {
+    const allWeekly = await Milestone.find({ goalId: goal._id, type: 'weekly' })
+      .sort({ date: 1 })
+      .select('_id')
+      .lean();
+    const ordinalById = new Map(allWeekly.map((w, i) => [w._id.toString(), i + 1]));
+    const logs = await Progress.find({
+      patientId,
+      weight: { $exists: true, $ne: null },
+    })
+      .select('date week')
+      .lean();
+    weightLogDates = logs.filter((l) => !l.week).map((l) => new Date(l.date));
+    for (const l of logs) if (l.week) weightLoggedWeeks.add(l.week);
+    for (const m of weeklyMilestones) m._weekOrdinal = ordinalById.get(m._id.toString());
+  }
+  function weeklyWeightLogged(m) {
+    if (m._weekOrdinal && weightLoggedWeeks.has(m._weekOrdinal)) return true;
+    const weekEnd = new Date(m.date);
+    const weekStart = new Date(weekEnd.getTime() - 6 * MS_PER_DAY);
+    const windowEnd = new Date(weekEnd.getTime() + MS_PER_DAY);
+    return weightLogDates.some((d) => d >= weekStart && d < windowEnd);
+  }
+
   const shapedMilestones = milestones.map((m) => {
     const adherenceEntry =
       m.type === 'weekly' ? weeklyAdherenceEntry(m) : adherenceMap.get(m._id.toString());
@@ -184,7 +217,12 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       title,
       subtitle,
       date: m.date,
-      status: computeMilestoneStatus(m, adherenceEntry, today),
+      status: (() => {
+        const status = computeMilestoneStatus(m, adherenceEntry, today);
+        return m.type === 'weekly' && status !== 'upcoming' && weeklyWeightLogged(m)
+          ? 'completed'
+          : status;
+      })(),
       adherence: adherenceEntry?.adherence ?? 0,
       tasks: tasksByMilestone.get(m._id.toString()) || [],
     };
