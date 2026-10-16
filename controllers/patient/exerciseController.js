@@ -243,6 +243,7 @@ exports.submitExerciseLog = async (req, res, next) => {
         const exerciseDoc = exerciseById.get(item.exerciseId);
         const estimated = estimateDurationMinutes({
           planDurationMinutes: planEntry?.durationMinutes ?? null,
+          planSets: planEntry?.sets ?? null,
           sets,
           reps,
           secondsPerRep: exerciseDoc?.secondsPerRep ?? null,

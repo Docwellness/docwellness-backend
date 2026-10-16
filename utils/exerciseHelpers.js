@@ -48,18 +48,24 @@ const DEFAULT_SECONDS_PER_REP = 3;
  * A session's duration in minutes, estimated when the patient leaves the
  * log-time duration field blank. Priority: the dietician's own plan figure
  * (durationMinutes on the ExercisePlan entry) is authored per-set once sets
- * is also assigned - see ExercisePlan.js's own comment - so it's multiplied
- * by sets; with no sets it's already a flat total (e.g. "10 min jump
- * rope"). Falls back to reps * secondsPerRep (the exercise catalog's own
+ * is also assigned on the PLAN entry - see ExercisePlan.js's own comment -
+ * so it's multiplied by the number of sets; with no sets on the plan it's
+ * already a flat total (e.g. "20 min jump rope") and is never multiplied.
+ * Only the plan's own sets decide that: the client's `sets` is merely how
+ * many sets were done, and the log dialog used to send a default of 3 for
+ * every exercise, which turned a flat 20 minutes into 60 (3x the calories). Falls back to reps * secondsPerRep (the exercise catalog's own
  * AI-estimated value when present, else DEFAULT_SECONDS_PER_REP above) only
  * when the plan gives no duration at all. Returns null only when there's
  * genuinely nothing to estimate from at all - no plan duration and no reps
  * (a pure time-based exercise, e.g. a plank/hold with no rep count of its
  * own) - callers should still require a manual duration in that case.
  */
-function estimateDurationMinutes({ planDurationMinutes, sets, reps, secondsPerRep }) {
+function estimateDurationMinutes({ planDurationMinutes, planSets, sets, reps, secondsPerRep }) {
   if (typeof planDurationMinutes === 'number' && planDurationMinutes > 0) {
-    return typeof sets === 'number' && sets > 0 ? planDurationMinutes * sets : planDurationMinutes;
+    const planIsPerSet = typeof planSets === 'number' && planSets > 0;
+    return planIsPerSet && typeof sets === 'number' && sets > 0
+      ? planDurationMinutes * sets
+      : planDurationMinutes;
   }
   if (typeof reps === 'number' && reps > 0) {
     const perRep =
