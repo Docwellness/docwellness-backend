@@ -30,7 +30,10 @@ const KNOWN_EXERCISES = {
   'bicycle crunches': { type: TRACKING_REPS, spr: 2 },
   'tricep dips (chair)': { type: TRACKING_REPS, spr: 3 },
   burpees: { type: TRACKING_REPS, spr: 5 },
-  'sun salutations (surya namaskar)': { type: TRACKING_REPS, spr: 45 }, // one rep = one round
+  // A continuous flow counted in rounds, not sets with rests between them: a
+  // patient logging 13 rounds as "13 sets x 1 rep" got 9 phantom minutes of rest.
+  // Timed, so the patient enters the minutes the flow took.
+  'sun salutations (surya namaskar)': { type: TRACKING_DURATION },
   plank: { type: TRACKING_DURATION },
   'wall sit': { type: TRACKING_DURATION },
   'jump rope (skipping)': { type: TRACKING_DURATION },

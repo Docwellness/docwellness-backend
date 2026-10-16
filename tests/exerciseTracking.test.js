@@ -17,12 +17,19 @@ describe('resolveTrackingType', () => {
     'Bicycle Crunches',
     'Tricep Dips (Chair)',
     'Burpees',
-    'Sun Salutations (Surya Namaskar)',
   ])('%s is logged as sets x reps', (name) => {
     expect(resolveTrackingType({ name, category: 'Strength' })).toBe(TRACKING_REPS);
   });
 
-  test.each(['Plank', 'Wall Sit', 'Jump Rope (Skipping)', 'High Knees', 'Jumping Jacks', 'Mountain Climbers'])(
+  test.each([
+    'Plank',
+    'Wall Sit',
+    'Jump Rope (Skipping)',
+    'High Knees',
+    'Jumping Jacks',
+    'Mountain Climbers',
+    'Sun Salutations (Surya Namaskar)',
+  ])(
     '%s is logged as a duration',
     (name) => {
       // Plank / Wall Sit are 'Strength' by category but are timed holds.
