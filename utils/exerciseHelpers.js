@@ -5,6 +5,7 @@
 
 const { Progress, User, ExerciseLog } = require('../models');
 const { normalizeDate } = require('./dietPlanWeek');
+const { DEFAULT_SECONDS_PER_REP } = require('./exerciseTracking');
 
 /**
  * caloriesBurned = MET * weightKg * durationHours - the standard exercise-
@@ -42,7 +43,6 @@ function calcCaloriesBurned({ met, weightKg, durationMinutes }) {
 // comfortably falls within this schema's own secondsPerRep range (1-60) -
 // not exact for every exercise, but a reasonable default beats blocking
 // the log outright for data this codebase should have generated already.
-const DEFAULT_SECONDS_PER_REP = 3;
 
 /**
  * A session's duration in minutes, estimated when the patient leaves the
@@ -60,6 +60,36 @@ const DEFAULT_SECONDS_PER_REP = 3;
  * (a pure time-based exercise, e.g. a plank/hold with no rep count of its
  * own) - callers should still require a manual duration in that case.
  */
+// Rest between sets of a reps-type exercise. The Compendium MET values for
+// calisthenics / resistance work are averages over the whole session
+// including the pauses between sets, so the elapsed time used for calories
+// must include them too - counting only the seconds spent moving would
+// under-count (3 x 12 dips is ~1.8 min of movement but ~3.3 min elapsed).
+const REST_SECONDS_BETWEEN_SETS = 45;
+const DEFAULT_SETS = 3;
+const DEFAULT_REPS = 12;
+
+/**
+ * Elapsed minutes for a sets x reps exercise: time under tension
+ * (sets * reps * secondsPerRep) plus the rest between sets. Never uses a
+ * plan duration - a reps-type exercise is logged by what was done, not by a
+ * time block.
+ */
+function estimateRepsDurationMinutes({
+  sets,
+  reps,
+  secondsPerRep,
+  restSeconds = REST_SECONDS_BETWEEN_SETS,
+}) {
+  const s = typeof sets === 'number' && sets > 0 ? sets : DEFAULT_SETS;
+  const r = typeof reps === 'number' && reps > 0 ? reps : DEFAULT_REPS;
+  const perRep =
+    typeof secondsPerRep === 'number' && secondsPerRep > 0 ? secondsPerRep : DEFAULT_SECONDS_PER_REP;
+  const activeSeconds = s * r * perRep;
+  const restTotal = Math.max(0, s - 1) * restSeconds;
+  return (activeSeconds + restTotal) / 60;
+}
+
 function estimateDurationMinutes({ planDurationMinutes, planSets, sets, reps, secondsPerRep }) {
   if (typeof planDurationMinutes === 'number' && planDurationMinutes > 0) {
     const planIsPerSet = typeof planSets === 'number' && planSets > 0;
@@ -131,6 +161,10 @@ async function sumCaloriesBurnedForDate(patientId, date) {
 module.exports = {
   calcCaloriesBurned,
   estimateDurationMinutes,
+  estimateRepsDurationMinutes,
+  REST_SECONDS_BETWEEN_SETS,
+  DEFAULT_SETS,
+  DEFAULT_REPS,
   resolvePatientWeightKg,
   DEFAULT_FALLBACK_WEIGHT_KG,
   sumCaloriesBurnedForDate,
