@@ -70,6 +70,42 @@ exports.listRecipes = async (req, res, next) => {
   }
 };
 
+// GET /api/admin/content/ingredients?dieticianId=&q=
+// Every distinct ingredient across a dietician's recipes. Names are compared
+// case-insensitively with whitespace collapsed, so "Ragi flour" and "Ragi Flour" are one row.
+exports.listIngredients = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.query.dieticianId)) {
+      return res.status(400).json({ success: false, message: 'Invalid dietician id' });
+    }
+    const q = req.query.q ? String(req.query.q).trim().slice(0, 80) : '';
+    const recipes = await Recipe.find({ dieticianId: req.query.dieticianId })
+      .select('ingredients.name ingredients.category ingredients.image')
+      .lean();
+    const needle = q.toLowerCase();
+    const byKey = new Map();
+    for (const r of recipes) {
+      const seenInRecipe = new Set();
+      for (const i of r.ingredients || []) {
+        const name = String(i.name || '').trim().replace(/\s+/g, ' ');
+        const key = name.toLowerCase();
+        if (!key || (needle && !key.includes(needle))) continue;
+        const row = byKey.get(key) || { key, name, category: i.category || null, image: null, recipeCount: 0 };
+        if (!row.image && i.image) row.image = i.image;
+        if (!seenInRecipe.has(key)) {
+          seenInRecipe.add(key);
+          row.recipeCount += 1;
+        }
+        byKey.set(key, row);
+      }
+    }
+    const rows = [...byKey.values()].sort((x, y) => x.name.localeCompare(y.name, 'en', { sensitivity: 'base' }));
+    res.json({ success: true, data: { items: rows, total: rows.length } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/admin/content/recipes/:id  - everything the dietician app shows on a recipe, read-only
 exports.getRecipe = async (req, res, next) => {
   try {
