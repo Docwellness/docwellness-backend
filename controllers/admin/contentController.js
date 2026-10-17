@@ -80,7 +80,7 @@ exports.listIngredients = async (req, res, next) => {
     }
     const q = req.query.q ? String(req.query.q).trim().slice(0, 80) : '';
     const recipes = await Recipe.find({ dieticianId: req.query.dieticianId })
-      .select('ingredients.name ingredients.category ingredients.image')
+      .select('ingredients.name ingredients.category ingredients.image ingredients.buyLink')
       .lean();
     const needle = q.toLowerCase();
     const byKey = new Map();
@@ -90,8 +90,9 @@ exports.listIngredients = async (req, res, next) => {
         const name = String(i.name || '').trim().replace(/\s+/g, ' ');
         const key = name.toLowerCase();
         if (!key || (needle && !key.includes(needle))) continue;
-        const row = byKey.get(key) || { key, name, category: i.category || null, image: null, recipeCount: 0 };
+        const row = byKey.get(key) || { key, name, category: i.category || null, image: null, buyLink: null, recipeCount: 0 };
         if (!row.image && i.image) row.image = i.image;
+        if (!row.buyLink && i.buyLink) row.buyLink = i.buyLink;
         if (!seenInRecipe.has(key)) {
           seenInRecipe.add(key);
           row.recipeCount += 1;
@@ -114,7 +115,21 @@ const INGREDIENT_CATEGORIES = Recipe.schema.path('ingredients').schema.path('cat
 const ingredientNameRegex = (key) =>
   new RegExp('^\\s*' + String(key).trim().split(/\s+/).map(escapeRegex).join('\\s+') + '\\s*$', 'i');
 
-// PATCH /api/admin/content/ingredients  (multipart: dieticianId, key, name?, category?, image?)
+// A sponsor link is opened straight from the apps, so only plain http(s) URLs are accepted
+// (no javascript:, data:, intent: ...). Returns the normalised URL, '' to clear, or null if invalid.
+function parseBuyLink(raw) {
+  const v = String(raw ?? '').trim();
+  if (!v) return '';
+  if (v.length > 500) return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+// PATCH /api/admin/content/ingredients  (multipart: dieticianId, key, name?, category?, buyLink?, image?)
 // Applies to every occurrence of that ingredient across the dietician's recipes.
 exports.updateIngredient = async (req, res, next) => {
   const tmp = req.file?.path;
@@ -131,7 +146,11 @@ exports.updateIngredient = async (req, res, next) => {
     if (category && !INGREDIENT_CATEGORIES.includes(category)) {
       return res.status(400).json({ success: false, message: 'Unknown category' });
     }
-    if (name === undefined && !category && !req.file) {
+    const buyLink = req.body.buyLink === undefined ? undefined : parseBuyLink(req.body.buyLink);
+    if (buyLink === null) {
+      return res.status(400).json({ success: false, message: 'The buy link must be a valid http(s) URL' });
+    }
+    if (name === undefined && !category && !req.file && buyLink === undefined) {
       return res.status(400).json({ success: false, message: 'Nothing to change' });
     }
 
@@ -151,10 +170,13 @@ exports.updateIngredient = async (req, res, next) => {
     }
 
     const set = {};
+    const unset = {};
+    if (buyLink) set['ingredients.$[i].buyLink'] = buyLink;
+    else if (buyLink === '') unset['ingredients.$[i].buyLink'] = '';
     if (name !== undefined) set['ingredients.$[i].name'] = name;
     if (category) set['ingredients.$[i].category'] = category;
     if (image) set['ingredients.$[i].image'] = image;
-    const after = { ...(name !== undefined && { name }), ...(category && { category }), ...(image && { image }) };
+    const after = { ...(name !== undefined && { name }), ...(category && { category }), ...(image && { image }), ...(buyLink !== undefined && { buyLink: buyLink || null }) };
 
     await audited(
       req,
@@ -166,7 +188,10 @@ exports.updateIngredient = async (req, res, next) => {
         meta: { dieticianId, recipes: affected },
       },
       async () => {
-        await Recipe.updateMany(matching, { $set: set }, { arrayFilters: [{ 'i.name': rx }] });
+        const update = {};
+        if (Object.keys(set).length) update.$set = set;
+        if (Object.keys(unset).length) update.$unset = unset;
+        await Recipe.updateMany(matching, update, { arrayFilters: [{ 'i.name': rx }] });
         if (name !== undefined) {
           // Keep component labels that are just the ingredient's name in step with the rename.
           await Recipe.updateMany(

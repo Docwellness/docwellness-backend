@@ -77,6 +77,23 @@ const dateToDayKey = (dateObj) => {
 const RECIPE_CARD_SELECT =
   'name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts';
 
+/**
+ * A plan-item plan serves the exact prescribed (versioned) ingredients, which
+ * are frozen copies without the admin-set sponsor link. Carry each link over
+ * from the base recipe's ingredient of the same name.
+ */
+function withBuyLinks(versionIngredients, baseIngredients) {
+  const links = new Map();
+  (baseIngredients || []).forEach((i) => {
+    if (i && i.buyLink && i.name) links.set(String(i.name).trim().toLowerCase(), i.buyLink);
+  });
+  if (!links.size || !Array.isArray(versionIngredients)) return versionIngredients;
+  return versionIngredients.map((i) => ({
+    ...i,
+    buyLink: i.buyLink || links.get(String(i.name || '').trim().toLowerCase()) || null,
+  }));
+}
+
 /** Patient-facing Recipe card (same shape getActiveDietPlanForPatient's main
  *  block builds inline) - used to merge the next renewal cycle's recipes
  *  into the continuous Week 1-8 timeline. */
@@ -127,6 +144,7 @@ function toPatientRecipeCard(recipe) {
         quantity: typeof i.quantity === 'number' ? i.quantity : null,
         unit: i.unit || null,
         image: i.image || null,
+        buyLink: i.buyLink || null,
         isScalable: typeof i.isScalable === 'boolean' ? i.isScalable : true,
         role: i.role === 'core' ? 'core' : 'sub',
       }))
@@ -383,6 +401,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             quantity: typeof ingredient.quantity === 'number' ? ingredient.quantity : null,
             unit: ingredient.unit || null,
             image: ingredient.image || null,
+            buyLink: ingredient.buyLink || null,
             isScalable: typeof ingredient.isScalable === 'boolean' ? ingredient.isScalable : true,
             role: ingredient.role === 'core' ? 'core' : 'sub',
           }))
@@ -428,7 +447,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       recipes[versionedId] = {
         ...baseRecipe,
         id: versionedId,
-        ingredients: override.ingredients,
+        ingredients: withBuyLinks(override.ingredients, baseRecipe.ingredients),
         instructions: override.steps,
         nutritionPerServing: override.nutritionPerServing,
         nutrition: override.nutritionPerServing,
@@ -626,7 +645,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           recipes[versionedId] = {
             ...base,
             id: versionedId,
-            ingredients: override.ingredients,
+            ingredients: withBuyLinks(override.ingredients, base.ingredients),
             instructions: override.steps,
             nutritionPerServing: override.nutritionPerServing,
             nutrition: override.nutritionPerServing,
@@ -931,6 +950,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
               recipesUsedIn: [],
               purchased: false,
               image: ingredient.image || null,
+              buyLink: ingredient.buyLink || null,
               isSupplement: true,
               _recipeUsage: {}, // recipeId -> accumulated entry, see below
             };
@@ -961,6 +981,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
             recipesUsedIn: [],
             purchased: false,
             image: registryEntry?.image || ingredient.image || null,
+            buyLink: ingredient.buyLink || null,
             isSupplement: false,
             _conversionIncomplete: false,
             _recipeUsage: {}, // recipeId -> accumulated entry, see below
@@ -980,6 +1001,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
           };
         }
         const item = groceryMap[key];
+        if (!item.buyLink && ingredient.buyLink) item.buyLink = ingredient.buyLink;
 
         if (typeof ingredient.quantity === 'number') {
           if (ingredient.unit) {
