@@ -106,6 +106,104 @@ exports.listIngredients = async (req, res, next) => {
   }
 };
 
+const Ingredient = require('../../models/Ingredient');
+
+const INGREDIENT_CATEGORIES = Recipe.schema.path('ingredients').schema.path('category').enumValues;
+
+// Case/whitespace-insensitive exact match for an ingredient name, the same rule listIngredients groups by.
+const ingredientNameRegex = (key) =>
+  new RegExp(`^\s*${String(key).trim().split(/\s+/).map(escapeRegex).join('\s+')}\s*$`, 'i');
+
+// PATCH /api/admin/content/ingredients  (multipart: dieticianId, key, name?, category?, image?)
+// Applies to every occurrence of that ingredient across the dietician's recipes.
+exports.updateIngredient = async (req, res, next) => {
+  const tmp = req.file?.path;
+  try {
+    const { dieticianId, key } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(dieticianId) || !key || !String(key).trim()) {
+      return res.status(400).json({ success: false, message: 'dieticianId and key are required' });
+    }
+    const name = req.body.name === undefined ? undefined : String(req.body.name).trim().replace(/\s+/g, ' ');
+    if (name !== undefined && (name.length < 1 || name.length > 80)) {
+      return res.status(400).json({ success: false, message: 'Name must be 1-80 characters' });
+    }
+    const category = req.body.category || undefined;
+    if (category && !INGREDIENT_CATEGORIES.includes(category)) {
+      return res.status(400).json({ success: false, message: 'Unknown category' });
+    }
+    if (name === undefined && !category && !req.file) {
+      return res.status(400).json({ success: false, message: 'Nothing to change' });
+    }
+
+    const owner = new mongoose.Types.ObjectId(dieticianId);
+    const rx = ingredientNameRegex(key);
+    const matching = { dieticianId: owner, ingredients: { $elemMatch: { name: rx } } };
+    const affected = await Recipe.countDocuments(matching);
+    if (!affected) return res.status(404).json({ success: false, message: 'Ingredient not found' });
+
+    let image;
+    if (req.file) {
+      const upload = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'docwellness/admin/recipes/ingredients',
+      });
+      image = upload.secure_url || upload.url;
+      if (!image) throw new Error('Image upload returned no URL');
+    }
+
+    const set = {};
+    if (name !== undefined) set['ingredients.$[i].name'] = name;
+    if (category) set['ingredients.$[i].category'] = category;
+    if (image) set['ingredients.$[i].image'] = image;
+    const after = { ...(name !== undefined && { name }), ...(category && { category }), ...(image && { image }) };
+
+    await audited(
+      req,
+      {
+        action: 'content.ingredient.update',
+        targetType: 'ingredient',
+        targetId: String(key).trim().toLowerCase().slice(0, 80),
+        after,
+        meta: { dieticianId, recipes: affected },
+      },
+      async () => {
+        await Recipe.updateMany(matching, { $set: set }, { arrayFilters: [{ 'i.name': rx }] });
+        if (name !== undefined) {
+          // Keep component labels that are just the ingredient's name in step with the rename.
+          await Recipe.updateMany(
+            { dieticianId: owner, components: { $elemMatch: { label: rx } } },
+            { $set: { 'components.$[c].label': name } },
+            { arrayFilters: [{ 'c.label': rx }] }
+          );
+        }
+        // The canonical per-dietician registry row, when there is one.
+        const canon = { ...(category && { category }), ...(image && { image }) };
+        const normalizedKey = String(key).trim().toLowerCase().replace(/\s+/g, ' ');
+        const row = await Ingredient.findOne({ dieticianId: owner, normalizedName: normalizedKey }).lean();
+        if (row) {
+          if (name !== undefined) {
+            const clash = await Ingredient.exists({
+              dieticianId: owner,
+              normalizedName: name.toLowerCase(),
+              _id: { $ne: row._id },
+            });
+            if (!clash) Object.assign(canon, { name, normalizedName: name.toLowerCase() });
+          }
+          if (Object.keys(canon).length) await Ingredient.updateOne({ _id: row._id }, { $set: canon });
+        }
+      }
+    );
+
+    res.json({ success: true, data: { key: (name ?? String(key)).toLowerCase(), recipes: affected, ...after } });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (tmp) fs.unlink(tmp, () => {});
+  }
+};
+
+// GET /api/admin/content/ingredient-categories
+exports.ingredientCategories = (req, res) => res.json({ success: true, data: INGREDIENT_CATEGORIES });
+
 // GET /api/admin/content/recipes/:id  - everything the dietician app shows on a recipe, read-only
 exports.getRecipe = async (req, res, next) => {
   try {

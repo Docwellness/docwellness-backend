@@ -39,6 +39,14 @@ router.get('/content/recipes/summary', requirePermission('content', 'view'), con
 router.get('/content/categories', requirePermission('content', 'view'), content.recipeCategories);
 router.get('/content/recipes', requirePermission('content', 'view'), content.listRecipes);
 router.get('/content/ingredients', requirePermission('content', 'view'), content.listIngredients);
+router.get('/content/ingredient-categories', requirePermission('content', 'view'), content.ingredientCategories);
+router.patch(
+  '/content/ingredients',
+  requirePermission('content', 'edit'),
+  uploadLimiter,
+  upload.single('image'),
+  content.updateIngredient
+);
 router.get('/content/recipes/:id', requirePermission('content', 'view'), content.getRecipe);
 router.post(
   '/content/recipes/:id/image',
