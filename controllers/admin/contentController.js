@@ -112,7 +112,7 @@ const INGREDIENT_CATEGORIES = Recipe.schema.path('ingredients').schema.path('cat
 
 // Case/whitespace-insensitive exact match for an ingredient name, the same rule listIngredients groups by.
 const ingredientNameRegex = (key) =>
-  new RegExp(`^\s*${String(key).trim().split(/\s+/).map(escapeRegex).join('\s+')}\s*$`, 'i');
+  new RegExp('^\\s*' + String(key).trim().split(/\s+/).map(escapeRegex).join('\\s+') + '\\s*$', 'i');
 
 // PATCH /api/admin/content/ingredients  (multipart: dieticianId, key, name?, category?, image?)
 // Applies to every occurrence of that ingredient across the dietician's recipes.
