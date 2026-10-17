@@ -613,11 +613,17 @@ async function computeTrackingData(patientId, query) {
     // living (renewal-overlap - see dietController.retireEndedPredecessorPlans).
     const activePlan = await DietPlan.findOne({ patientId, status: 'Active' })
       .sort({ cycleNumber: 1 })
-      .select('totalCalories weeksSummary activationDate weekSchedule')
+      .select('totalCalories weeksSummary activationDate weekSchedule calorieStrategy')
       .lean();
 
+    // calorieStrategy.calorieBudget is the target the dietician set (and what
+    // the dietician app reads); totalCalories is empty on plans from the
+    // current engine, which used to drop everyone onto the 2000 fallback.
     const plannedDailyCalories =
-      activePlan?.totalCalories || activePlan?.weeksSummary?.[0]?.totalCalories || 2000;
+      activePlan?.calorieStrategy?.calorieBudget ||
+      activePlan?.totalCalories ||
+      activePlan?.weeksSummary?.[0]?.totalCalories ||
+      2000;
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
