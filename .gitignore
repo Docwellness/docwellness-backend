@@ -64,3 +64,7 @@ finalize-*.js
 !.env.example
 !docs/SECURITY.md
 !RELEASE_CHECKLIST.md
+
+# dw agentic setup: these two are code-repo guidance for agents and reviewers, so keep them versioned
+!CLAUDE.md
+!REVIEW.md
