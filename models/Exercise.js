@@ -39,6 +39,16 @@ const exerciseSchema = new mongoose.Schema(
     // estimateDurationMinutes) to approximate a session's duration from
     // sets/reps when neither the dietician's plan nor the patient supplies
     // an explicit duration at log time.
+    // How this exercise is prescribed and logged: 'reps' (sets x repetitions)
+    // or 'duration' (minutes / a timed hold). Optional - when unset it's
+    // inferred (utils/exerciseTracking.js: built-in catalog table, then the
+    // category), so existing catalog entries behave correctly without a
+    // migration.
+    trackingType: {
+      type: String,
+      enum: ['reps', 'duration'],
+      default: undefined,
+    },
     secondsPerRep: {
       type: Number,
       default: null,

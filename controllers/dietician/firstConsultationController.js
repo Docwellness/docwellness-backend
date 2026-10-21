@@ -4,6 +4,7 @@ const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 
 // Only the patient can set these, via the patient-facing submitConsent
 // endpoint - a dietician's save must never be able to write them, and any
@@ -143,17 +144,16 @@ exports.upsertFirstConsultation = async (req, res, next) => {
     // Notification + socket push always; real FCM push is best-effort and
     // never blocks or fails the save (same convention as activateDietPlan).
     try {
+      const ruleKey = hadConsent ? 'consultation_updated' : 'consultation_review';
+      const text = await resolveText(ruleKey);
       const notif = await Notification.create({
         userId: patientId,
-        title: hadConsent
-          ? 'Your first consultation was updated'
-          : 'Review your first consultation',
-        message: hadConsent
-          ? 'Your dietician updated your first consultation. Please review it again and re-submit your consent.'
-          : 'Your dietician has completed your first consultation. Please review it and provide your consent to continue.',
+        title: text.title,
+        message: text.message,
         type: 'consultation',
         referenceId: consultation._id,
         referenceModel: 'FirstConsultation',
+        data: { ruleKey },
       });
 
       const ioRef = getChatIO();

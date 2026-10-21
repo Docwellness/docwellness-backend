@@ -1,6 +1,7 @@
 const { DietPlan, User, Notification } = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { enqueue } = require('../../utils/jobQueue');
+const { loadRule, render } = require('../../utils/notificationRules');
 
 /**
  * Fixed-time water reminder (see vercel.json's 4 checkpoints spread across
@@ -19,6 +20,8 @@ const { enqueue } = require('../../utils/jobQueue');
  * `now` is injectable so tests can simulate a specific point in time.
  */
 async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
+  const rule = await loadRule('water_reminder');
+  if (!rule.enabled) return { checked: 0, notified: 0, disabled: true };
   const dateStr = now.toISOString().split('T')[0];
   // Dedupe window scoped to "this checkpoint's own run" (not the whole day -
   // checkpoints are ~3 hours apart and each one is meant to fire), so only a
@@ -34,7 +37,7 @@ async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
     .lean();
   const waterLogByPatient = new Map(waterLogs.map((w) => [w.patientId.toString(), w]));
 
-  const title = 'Stay hydrated';
+  const title = rule.title;
 
   // Patients still short of today's goal at this checkpoint, keyed to the
   // message tailored to how much they have left.
@@ -47,7 +50,7 @@ async function runWaterReminderSweep({ checkpoint, now = new Date() } = {}) {
     const remainingLiters = ((goal - totalAmount) / 1000).toFixed(1);
     shortfall.set(
       patientId.toString(),
-      `You've got ${remainingLiters}L left to reach today's water goal.`
+      render(rule.message, { remaining: remainingLiters })
     );
   }
   if (shortfall.size === 0) return { checked: activePatientIds.length, notified: 0 };

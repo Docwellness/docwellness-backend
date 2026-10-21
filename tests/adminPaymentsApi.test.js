@@ -107,6 +107,15 @@ describe('confirm', () => {
     expect(audit).toMatchObject({ targetId: String(proof._id), reason: 'Matches bank statement', outcome: 'success' });
   });
 
+  it('sends the admin-edited wording and tags the notification with its rule', async () => {
+    await require('../models/NotificationRule').create({ key: 'payment_confirmed', title: 'Paid, thank you!', message: 'You are all set.' });
+    const { proof, patient } = await seed();
+    expect((await post(`/payments/${proof._id}/confirm`)).status).toBe(200);
+
+    const note = await Notification.findOne({ userId: patient._id, type: 'payment' }).lean();
+    expect(note).toMatchObject({ title: 'Paid, thank you!', message: 'You are all set.', data: { ruleKey: 'payment_confirmed' } });
+  });
+
   it('a partial payment leaves the request PartiallyPaid', async () => {
     const { proof, dpr } = await seed({ amountReceived: 3000, amountPending: 2000 });
     expect((await post(`/payments/${proof._id}/confirm`)).status).toBe(200);

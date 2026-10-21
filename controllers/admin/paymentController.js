@@ -3,6 +3,7 @@ const { ManualPaymentProof, DietPlan, DietPlanRequest, User, Notification } = re
 const PaymentRefund = require('../../models/PaymentRefund');
 const { audited, writeAudit } = require('../../utils/adminAudit');
 const { settleRenewalProof } = require('../../utils/paymentSettlement');
+const { resolveText } = require('../../utils/notificationRules');
 
 const bad = (res, message, extra = {}) => res.status(400).json({ success: false, message, ...extra });
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -26,7 +27,7 @@ async function refundsFor(proofIds) {
 const refundedTotal = (list = []) => list.reduce((sum, r) => sum + (r.amount || 0), 0);
 
 /** Notifies the patient in-app. Never blocks or fails the decision itself. */
-async function notifyPatient(proof, request, title, message) {
+async function notifyPatient(proof, request, title, message, ruleKey) {
   try {
     await Notification.create({
       userId: proof.patient,
@@ -35,6 +36,7 @@ async function notifyPatient(proof, request, title, message) {
       type: 'payment',
       referenceId: request?._id,
       referenceModel: request ? 'DietPlanRequest' : undefined,
+      data: ruleKey ? { ruleKey } : undefined,
     });
   } catch (err) {
     console.error('admin payment notification failed:', err.message);
@@ -233,7 +235,8 @@ exports.confirmPayment = async (req, res, next) => {
         await settleRenewalProof({ proof, request, patientId: proof.patient, reviewerId: req.admin.user._id });
       }
     );
-    await notifyPatient(proof, request, 'Payment confirmed', 'Your payment was received and your membership is active.');
+    const confirmed = await resolveText('payment_confirmed');
+    await notifyPatient(proof, request, confirmed.title, confirmed.message, 'payment_confirmed');
     res.json({ success: true, data: present(await loadDetail(proof._id)) });
   } catch (err) {
     next(err);

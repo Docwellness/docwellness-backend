@@ -169,6 +169,19 @@ describe('createCustomVersion', () => {
     expect(rewriteRecipeStepsForIngredients).not.toHaveBeenCalled();
   });
 
+  test('rewrites quantities quoted in copied steps to match the new ingredients, without the AI rewrite', async () => {
+    const { v1, oats, milk } = await makeV1();
+    await RecipeVersion.updateOne({ _id: v1._id }, { $set: { steps: ['Boil 200 g of Milk', 'Add 40 g of Oats'] } });
+
+    const v2 = await createCustomVersion(v1._id, [
+      { foodItemId: oats._id, rawQuantity: 25, unit: 'g' },
+      { foodItemId: milk._id, rawQuantity: 120, unit: 'g' },
+    ]);
+
+    expect(v2.toObject().steps).toEqual(['Boil 120 g of Milk', 'Add 25 g of Oats']);
+    expect(rewriteRecipeStepsForIngredients).not.toHaveBeenCalled();
+  });
+
   test('regenerateSteps: true calls the AI rewrite with the new named ingredients and uses its result', async () => {
     const { v1, oats, milk } = await makeV1();
     rewriteRecipeStepsForIngredients.mockResolvedValue(['Boil 200g milk', 'Add 50g oats']);

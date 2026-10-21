@@ -3,6 +3,7 @@ const {
 } = require('../../models');
 const CustomFoodRequest = require('../../models/CustomFoodRequest');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 const { sponsoredLabelOf } = require('../../utils/sponsored');
 const config = require('../../config/environment');
 const cloudinary = require('../../config/cloudinary');
@@ -76,6 +77,23 @@ const dateToDayKey = (dateObj) => {
 const RECIPE_CARD_SELECT =
   'name servingTime nutrition image imageSource sponsoredLabel ingredients servingSize components instructions language translations tags category supplementFacts';
 
+/**
+ * A plan-item plan serves the exact prescribed (versioned) ingredients, which
+ * are frozen copies without the admin-set sponsor link. Carry each link over
+ * from the base recipe's ingredient of the same name.
+ */
+function withBuyLinks(versionIngredients, baseIngredients) {
+  const links = new Map();
+  (baseIngredients || []).forEach((i) => {
+    if (i && i.buyLink && i.name) links.set(String(i.name).trim().toLowerCase(), i.buyLink);
+  });
+  if (!links.size || !Array.isArray(versionIngredients)) return versionIngredients;
+  return versionIngredients.map((i) => ({
+    ...i,
+    buyLink: i.buyLink || links.get(String(i.name || '').trim().toLowerCase()) || null,
+  }));
+}
+
 /** Patient-facing Recipe card (same shape getActiveDietPlanForPatient's main
  *  block builds inline) - used to merge the next renewal cycle's recipes
  *  into the continuous Week 1-8 timeline. */
@@ -126,6 +144,7 @@ function toPatientRecipeCard(recipe) {
         quantity: typeof i.quantity === 'number' ? i.quantity : null,
         unit: i.unit || null,
         image: i.image || null,
+        buyLink: i.buyLink || null,
         isScalable: typeof i.isScalable === 'boolean' ? i.isScalable : true,
         role: i.role === 'core' ? 'core' : 'sub',
       }))
@@ -382,6 +401,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
             quantity: typeof ingredient.quantity === 'number' ? ingredient.quantity : null,
             unit: ingredient.unit || null,
             image: ingredient.image || null,
+            buyLink: ingredient.buyLink || null,
             isScalable: typeof ingredient.isScalable === 'boolean' ? ingredient.isScalable : true,
             role: ingredient.role === 'core' ? 'core' : 'sub',
           }))
@@ -427,7 +447,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
       recipes[versionedId] = {
         ...baseRecipe,
         id: versionedId,
-        ingredients: override.ingredients,
+        ingredients: withBuyLinks(override.ingredients, baseRecipe.ingredients),
         instructions: override.steps,
         nutritionPerServing: override.nutritionPerServing,
         nutrition: override.nutritionPerServing,
@@ -625,7 +645,7 @@ exports.getActiveDietPlanForPatient = async (req, res, next) => {
           recipes[versionedId] = {
             ...base,
             id: versionedId,
-            ingredients: override.ingredients,
+            ingredients: withBuyLinks(override.ingredients, base.ingredients),
             instructions: override.steps,
             nutritionPerServing: override.nutritionPerServing,
             nutrition: override.nutritionPerServing,
@@ -930,6 +950,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
               recipesUsedIn: [],
               purchased: false,
               image: ingredient.image || null,
+              buyLink: ingredient.buyLink || null,
               isSupplement: true,
               _recipeUsage: {}, // recipeId -> accumulated entry, see below
             };
@@ -960,6 +981,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
             recipesUsedIn: [],
             purchased: false,
             image: registryEntry?.image || ingredient.image || null,
+            buyLink: ingredient.buyLink || null,
             isSupplement: false,
             _conversionIncomplete: false,
             _recipeUsage: {}, // recipeId -> accumulated entry, see below
@@ -979,6 +1001,7 @@ const buildGroceryItemsForWeek = (week, recipes, registry, { exactQuantities = f
           };
         }
         const item = groceryMap[key];
+        if (!item.buyLink && ingredient.buyLink) item.buyLink = ingredient.buyLink;
 
         if (typeof ingredient.quantity === 'number') {
           if (ingredient.unit) {
@@ -1607,6 +1630,10 @@ exports.getMealLogScreenData = async (req, res, next) => {
         baseCalories: override.nutritionPerServing?.calories ?? baseRecipe.baseCalories,
         components: override.components || baseRecipe.components,
         servingSize: { ...(baseRecipe.servingSize || {}), quantity: 1 },
+        // Same prescribed label the Diet Plan/recipe screens show (e.g.
+        // "83.3 g") - quantity is pinned to 1 above, so without this Log Meal
+        // could only render a meaningless "1 g".
+        servingLabel: override.servingLabel || null,
       };
     });
 
@@ -1683,6 +1710,7 @@ exports.getMealLogScreenData = async (req, res, next) => {
           sponsoredLabel: recipe.sponsoredLabel || null,
           totalWeight: assignedQuantity,
           totalWeightUnit: recipe.totalWeightUnit,
+          totalWeightLabel: isVersioned ? recipe.servingLabel || null : null,
           calories: Math.round(recipe.baseCalories * ratio),
           // Portion is a multiplier of the assigned serving above (1 = ate
           // exactly what was prescribed). Unlogged items must start at 0 -
@@ -1973,51 +2001,54 @@ exports.submitMealLog = async (req, res, next) => {
         try {
           const patient = await User.findById(senderId).select('profile.fullName deviceTokens').lean();
           const patientName = patient?.profile?.fullName || 'A patient';
-          const notifTitle = `${patientName} logged a meal`;
-          const notifBody = `${chatText} · ${Math.round(totalCaloriesLogged)} kcal`;
-          const notif = await Notification.create({
-            userId: receiverId,
-            title: notifTitle,
-            message: notifBody,
-            type: 'progress',
-            referenceId: conversation._id,
-            referenceModel: 'Chat',
-            // patientId here (referenceId is the *conversation*) so the
-            // bell-list tap can open this patient's "Client Logged Data"
-            // sheet directly - same pattern as the renewal notification's
-            // { patientId }. See NotificationItem.fromJson in the app.
-            data: { patientId: String(senderId), patientName },
-          });
-          if (io) {
-            io.to(`user:${receiverId}`).emit('notification.new', {
-              id: notif._id,
-              title: notif.title,
-              message: notif.message,
-              type: notif.type,
-              referenceId: notif.referenceId?.toString(),
-              data: { patientId: String(senderId), patientName },
-              createdAt: notif.createdAt,
-            });
-          }
-          const dietician = await User.findById(receiverId).select('deviceTokens').lean();
-          const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
-          sendPushToTokens(
-            tokens,
-            {
+          const mealText = await resolveText('meal_logged', { patient: patientName });
+          if (mealText.enabled) {
+            const notifTitle = mealText.title;
+            const notifBody = `${chatText} · ${Math.round(totalCaloriesLogged)} kcal`;
+            const notif = await Notification.create({
+              userId: receiverId,
               title: notifTitle,
-              body: notifBody,
-              data: {
-                deepLink: 'docwellness://logged-data',
-                patientId: String(senderId),
-              },
-            },
-            (deadToken) => {
-              User.updateOne(
-                { _id: receiverId },
-                { $pull: { deviceTokens: { token: deadToken } } }
-              ).catch(() => {});
+              message: notifBody,
+              type: 'progress',
+              referenceId: conversation._id,
+              referenceModel: 'Chat',
+              // patientId here (referenceId is the *conversation*) so the
+              // bell-list tap can open this patient's "Client Logged Data"
+              // sheet directly - same pattern as the renewal notification's
+              // { patientId }. See NotificationItem.fromJson in the app.
+              data: { patientId: String(senderId), patientName },
+            });
+            if (io) {
+              io.to(`user:${receiverId}`).emit('notification.new', {
+                id: notif._id,
+                title: notif.title,
+                message: notif.message,
+                type: notif.type,
+                referenceId: notif.referenceId?.toString(),
+                data: { patientId: String(senderId), patientName },
+                createdAt: notif.createdAt,
+              });
             }
-          );
+            const dietician = await User.findById(receiverId).select('deviceTokens').lean();
+            const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+            sendPushToTokens(
+              tokens,
+              {
+                title: notifTitle,
+                body: notifBody,
+                data: {
+                  deepLink: 'docwellness://logged-data',
+                  patientId: String(senderId),
+                },
+              },
+              (deadToken) => {
+                User.updateOne(
+                  { _id: receiverId },
+                  { $pull: { deviceTokens: { token: deadToken } } }
+                ).catch(() => {});
+              }
+            );
+          }
         } catch (notifErr) {
           console.error('Meal-log dietician notification error (non-fatal):', notifErr);
         }

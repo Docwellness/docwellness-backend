@@ -17,6 +17,7 @@ const {
   ExercisePlan,
 } = require('../../models');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 const { getChatIO } = require('../../chat');
 const config = require('../../config/environment');
 const { generateDietPlanWithAI } = require('../../utils/openaiClient');
@@ -725,10 +726,8 @@ exports.listDietPlanRequestsForDietician = async (req, res, next) => {
  * first-consultation review nudge). Swallows its own errors.
  */
 async function notifyPatientOfPaymentRequest(patientId, dietPlanRequestId) {
-  const title = 'Payment requested for your diet plan';
-  const message =
-    'Your dietician has requested payment for your diet plan. Tap to review the amount and share your payment details.';
   try {
+    const { title, message } = await resolveText('payment_requested');
     const notif = await Notification.create({
       userId: patientId,
       title,
@@ -736,6 +735,7 @@ async function notifyPatientOfPaymentRequest(patientId, dietPlanRequestId) {
       type: 'payment',
       referenceId: dietPlanRequestId,
       referenceModel: 'DietPlanRequest',
+      data: { ruleKey: 'payment_requested' },
     });
 
     const ioRef = getChatIO();
@@ -2765,13 +2765,15 @@ exports.activateDietPlan = async (req, res, next) => {
     // next manual pull-to-refresh or app foreground, so the pre-activation
     // "Request diet plan" button (and stale expiry) can sit there
     // indefinitely even though the new cycle is already Active server-side.
+    const readyText = await resolveText('diet_plan_ready');
     Notification.create({
       userId: patientId,
-      title: 'Your diet plan is ready',
-      message: 'Your dietician has activated your diet plan - tap to see this week\'s meals.',
+      title: readyText.title,
+      message: readyText.message,
       type: 'diet_plan',
       referenceId: dietPlan._id,
       referenceModel: 'DietPlan',
+      data: { ruleKey: 'diet_plan_ready' },
     })
       .then(async (notif) => {
         const ioRef = getChatIO();
@@ -2790,8 +2792,8 @@ exports.activateDietPlan = async (req, res, next) => {
         return sendPushToTokens(
           tokens,
           {
-            title: 'Your diet plan is ready',
-            body: "Your dietician has activated your diet plan - tap to see this week's meals.",
+            title: readyText.title,
+            body: readyText.message,
             data: { deepLink: 'docwellness://diet', dietPlanId: String(dietPlan._id) },
           },
           (deadToken) => {

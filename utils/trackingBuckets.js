@@ -184,7 +184,7 @@ function buildWeightTrend({
     // Compare calendar days against `today`, not `now` - a bucket that
     // starts today must not fall into the future branch.
     if (bucket.start > today) {
-      return { label: bucket.label, date: '', weight: 0, measuredWeight: null };
+      return { label: bucket.label, date: '', weight: 0, measuredWeight: null, measuredDate: null };
     }
     const effectiveEnd = bucket.end > now ? now : bucket.end;
     const dayStr = localDateStr(effectiveEnd);
@@ -204,6 +204,9 @@ function buildWeightTrend({
       date: dayStr,
       weight: trend > 0 ? trend : round1(currentWeight),
       measuredWeight: measuredWeight ? round1(measuredWeight.weight) : null,
+      // Day the weigh-in was actually logged (the bucket's own `date` is just
+      // its end), so the chart can plot the real point at its real date.
+      measuredDate: measuredWeight ? measuredWeight.day : null,
     };
   });
 }

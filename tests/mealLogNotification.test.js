@@ -120,3 +120,35 @@ describe('meal-log dietician notification', () => {
     expect(notif.userId.toString()).toBe(fallback._id.toString());
   });
 });
+
+describe('meal-log notification wording and switch (admin editable)', () => {
+  const NotificationRule = () => require('../models/NotificationRule');
+
+  async function setup() {
+    const dietician = await createDefaultDietician();
+    const patient = await createPatient();
+    await createActiveDietPlan(patient, dietician);
+    const recipe = await createRecipe(dietician);
+    registerTestToken('patient-token', patient._id);
+    return { patient, recipe };
+  }
+
+  test('uses the edited title with the patient name filled in', async () => {
+    const { patient, recipe } = await setup();
+    await NotificationRule().create({ key: 'meal_logged', title: '{patient} just ate!' });
+
+    expect((await logMeal('patient-token', recipe._id)).status).toBe(200);
+
+    const notif = await Notification.findOne({ type: 'progress' });
+    expect(notif.title).toBe(`${patient.profile?.fullName || 'A patient'} just ate!`);
+  });
+
+  test('sends nothing to the dietician when the rule is switched off, but still logs the meal', async () => {
+    const { recipe } = await setup();
+    await NotificationRule().create({ key: 'meal_logged', enabled: false });
+
+    expect((await logMeal('patient-token', recipe._id)).status).toBe(200);
+
+    expect(await Notification.countDocuments({ type: 'progress' })).toBe(0);
+  });
+});

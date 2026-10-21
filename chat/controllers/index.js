@@ -17,6 +17,7 @@ const { User, Conversation } = require('../../models');
 const Notification = require('../../models/Notification');
 const { ConversationV1 } = require('../models');
 const { getOrSetJSON } = require('../../utils/cache');
+const { resolveText } = require('../../utils/notificationRules');
 
 const { EVENTS } = ChatLogger;
 
@@ -328,7 +329,7 @@ exports.sendMessage = async (req, res, next) => {
         const sender = await User.findById(req.user._id).select('profile.fullName role').lean();
         const senderName = sender?.profile?.fullName || 'User';
         const msgType = result.message.type;
-        const notifTitle = `New message from ${senderName}`;
+        const notifTitle = (await resolveText('chat_message', { sender: senderName })).title;
         const notifMessage =
           msgType === 'image' ? '📷 Sent a photo' : (result.message.content || '').slice(0, 100);
 

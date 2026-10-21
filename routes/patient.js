@@ -56,6 +56,19 @@ router.param('taskId', validateObjectIdParam);
 // ==========================================
 
 /**
+ * @route   GET /api/patient/app-config
+ * @desc    Public runtime config for the patient app - currently just the
+ *          minimum supported build number (PATIENT_APP_MIN_BUILD) that
+ *          drives forced in-app updates.
+ */
+router.get('/app-config', (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: { minBuildNumber: require('../config/environment').patientApp.minBuildNumber },
+  });
+});
+
+/**
  * @route   POST /api/patient/auth/signup-request
  * @desc    Creates the Supabase identity (unconfirmed) and emails a
  *          verification code via Resend. The app then verifies that code

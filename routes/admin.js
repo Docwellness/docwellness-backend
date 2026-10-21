@@ -16,6 +16,7 @@ const users = require('../controllers/admin/userController');
 const dieticians = require('../controllers/admin/dieticianController');
 const partners = require('../controllers/admin/partnerController');
 const coupons = require('../controllers/admin/couponController');
+const notificationRules = require('../controllers/admin/notificationRuleController');
 
 const router = express.Router();
 router.param('id', validateObjectIdParam);
@@ -37,6 +38,16 @@ router.get('/audit/export', requirePermission('audit', 'export'), account.export
 router.get('/content/recipes/summary', requirePermission('content', 'view'), content.recipeSummary);
 router.get('/content/categories', requirePermission('content', 'view'), content.recipeCategories);
 router.get('/content/recipes', requirePermission('content', 'view'), content.listRecipes);
+router.get('/content/ingredients', requirePermission('content', 'view'), content.listIngredients);
+router.get('/content/ingredient-categories', requirePermission('content', 'view'), content.ingredientCategories);
+router.patch(
+  '/content/ingredients',
+  requirePermission('content', 'edit'),
+  uploadLimiter,
+  upload.single('image'),
+  content.updateIngredient
+);
+router.get('/content/recipes/:id', requirePermission('content', 'view'), content.getRecipe);
 router.post(
   '/content/recipes/:id/image',
   requirePermission('content', 'edit'),
@@ -112,5 +123,9 @@ router.post('/partners/:id/create-brand', requirePermission('partners', 'create'
 router.get('/coupons', requirePermission('payments', 'view'), coupons.list);
 router.post('/coupons', requirePermission('payments', 'create'), coupons.create);
 router.put('/coupons/:id', requirePermission('payments', 'edit'), coupons.update);
+
+// Automated notifications: what the system sends on its own, and the wording / on-off of the scheduled ones
+router.get('/notification-rules', requirePermission('notifications', 'view'), notificationRules.list);
+router.put('/notification-rules/:key', requirePermission('notifications', 'edit'), notificationRules.update);
 
 module.exports = router;

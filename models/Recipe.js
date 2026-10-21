@@ -186,6 +186,10 @@ const recipeSchema = new mongoose.Schema(
         },
         description: { type: String, default: '' },
         image: String,
+        // Optional sponsor / affiliate "where to buy" link, set by an admin
+        // (PATCH /api/admin/content/ingredients). http(s) only - validated
+        // at write time; apps open it in the external browser.
+        buyLink: { type: String, trim: true, maxlength: 500 },
         isScalable: { type: Boolean, default: true },
         // v4.0: optional link to the global FoodItem nutrition record for
         // this ingredient. NOT backfilled onto existing recipes' history -

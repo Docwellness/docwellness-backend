@@ -10,6 +10,7 @@ const { Chat, Conversation, Notification, User } = require('../../models'); // U
 const ChatLogger = require('./ChatLogger');
 const config = require('../../config/environment');
 const { sendPushToTokens } = require('../../utils/push');
+const { resolveText } = require('../../utils/notificationRules');
 const { resolvePatientDieticianId } = require('../../utils/resolvePatientDieticianId');
 
 const { EVENTS } = ChatLogger;
@@ -271,45 +272,49 @@ class MealLogSyncService {
         // happens, push is independently best-effort" convention as every
         // other push call site in this codebase.
         try {
-          const notif = await Notification.create({
-            userId: dieticianId,
-            title: 'New meal logged',
-            message: newMessage.message,
-            type: 'progress',
-            referenceId: convId,
-            referenceModel: 'Chat',
-            data: { patientId: String(actor_user_id) },
-          });
-
-          if (ioInstance) {
-            ioInstance.to(`user:${dieticianId}`).emit('notification.new', {
-              id: notif._id,
-              title: notif.title,
-              message: notif.message,
-              type: notif.type,
-              referenceId: convId?.toString(),
+          const patientDoc = await User.findById(actor_user_id).select('profile.fullName').lean();
+          const mealText = await resolveText('meal_logged', { patient: patientDoc?.profile?.fullName || 'A patient' });
+          if (mealText.enabled) {
+            const notif = await Notification.create({
+              userId: dieticianId,
+              title: mealText.title,
+              message: newMessage.message,
+              type: 'progress',
+              referenceId: convId,
+              referenceModel: 'Chat',
               data: { patientId: String(actor_user_id) },
-              createdAt: notif.createdAt,
             });
-          }
 
-          const dietician = await User.findById(dieticianId).select('deviceTokens').lean();
-          const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
-          sendPushToTokens(
-            tokens,
-            {
-              title: 'New meal logged',
-              body: newMessage.message,
-              data: { deepLink: 'docwellness://chat', conversationId: String(convId) },
-            },
-            (deadToken) => {
-              User.updateOne({ _id: dieticianId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
-                () => {}
-              );
+            if (ioInstance) {
+              ioInstance.to(`user:${dieticianId}`).emit('notification.new', {
+                id: notif._id,
+                title: notif.title,
+                message: notif.message,
+                type: notif.type,
+                referenceId: convId?.toString(),
+                data: { patientId: String(actor_user_id) },
+                createdAt: notif.createdAt,
+              });
             }
-          ).catch((err) =>
-            ChatLogger.error('push_send_error', { ...logContext, meal_log_id, error: err.message })
-          );
+
+            const dietician = await User.findById(dieticianId).select('deviceTokens').lean();
+            const tokens = (dietician?.deviceTokens || []).map((t) => t.token);
+            sendPushToTokens(
+              tokens,
+              {
+                title: mealText.title,
+                body: newMessage.message,
+                data: { deepLink: 'docwellness://chat', conversationId: String(convId) },
+              },
+              (deadToken) => {
+                User.updateOne({ _id: dieticianId }, { $pull: { deviceTokens: { token: deadToken } } }).catch(
+                  () => {}
+                );
+              }
+            ).catch((err) =>
+              ChatLogger.error('push_send_error', { ...logContext, meal_log_id, error: err.message })
+            );
+          }
         } catch (notifErr) {
           ChatLogger.error('notification_create_error', { ...logContext, meal_log_id, error: notifErr });
         }

@@ -13,7 +13,15 @@ const {
   estimateDurationMinutes,
   resolvePatientWeightKg,
   DEFAULT_FALLBACK_WEIGHT_KG,
+  estimateRepsDurationMinutes,
+  DEFAULT_SETS,
+  DEFAULT_REPS,
 } = require('../../utils/exerciseHelpers');
+const {
+  TRACKING_REPS,
+  resolveTrackingType,
+  resolveSecondsPerRep,
+} = require('../../utils/exerciseTracking');
 
 // UTC-based, not local-timezone-based - same fix, same reasoning as
 // dietController.js's normalizeDate: dates travel between client/server as
@@ -105,6 +113,7 @@ exports.getTodayExerciseStats = async (req, res, next) => {
         videoUrl: entry.exerciseId?.videoUrl || null,
         instructions: entry.exerciseId?.instructions || [],
         translations: entry.exerciseId?.translations || {},
+        trackingType: resolveTrackingType(entry.exerciseId),
         durationMinutes: entry.durationMinutes,
         sets: entry.sets,
         reps: entry.reps,
@@ -202,7 +211,7 @@ exports.submitExerciseLog = async (req, res, next) => {
     }
 
     const exerciseIds = [...new Set(exercises.map((e) => e.exerciseId))];
-    const exerciseDocs = await Exercise.find({ _id: { $in: exerciseIds } }).select('met secondsPerRep').lean();
+    const exerciseDocs = await Exercise.find({ _id: { $in: exerciseIds } }).select('name category trackingType met secondsPerRep').lean();
     const exerciseById = new Map(exerciseDocs.map((e) => [e._id.toString(), e]));
 
     const activePlan = await ExercisePlan.findOne({ patientId, status: 'Active' }).select('dailyExercises').lean();
@@ -232,28 +241,46 @@ exports.submitExerciseLog = async (req, res, next) => {
       }
 
       const planEntry = planEntryByExerciseId.get(item.exerciseId);
-      const sets = item.sets ?? planEntry?.sets ?? null;
-      const reps = item.reps ?? planEntry?.reps ?? null;
+      const exerciseDoc = exerciseById.get(item.exerciseId);
+      const trackingType = resolveTrackingType(exerciseDoc);
+      let sets = item.sets ?? planEntry?.sets ?? null;
+      let reps = item.reps ?? planEntry?.reps ?? null;
 
       let durationMinutes = typeof item.durationMinutes === 'number' && item.durationMinutes > 0
         ? item.durationMinutes
         : null;
 
       if (durationMinutes == null) {
-        const exerciseDoc = exerciseById.get(item.exerciseId);
-        const estimated = estimateDurationMinutes({
-          planDurationMinutes: planEntry?.durationMinutes ?? null,
-          sets,
-          reps,
-          secondsPerRep: exerciseDoc?.secondsPerRep ?? null,
-        });
-        if (estimated == null) {
-          return res.status(400).json({
-            success: false,
-            message: 'Enter how many minutes you did this exercise for',
+        if (trackingType === TRACKING_REPS) {
+          // A reps-type exercise (push-ups, squats, dips...) is logged by
+          // what was done: elapsed time = time under tension for
+          // sets x reps plus the rest between sets. The plan's duration
+          // (often a generic "20 min" block) is deliberately ignored - 3 x 12
+          // dips are a few minutes, not twenty.
+          sets = sets ?? DEFAULT_SETS;
+          reps = reps ?? DEFAULT_REPS;
+          const estimated = estimateRepsDurationMinutes({
+            sets,
+            reps,
+            secondsPerRep: resolveSecondsPerRep(exerciseDoc),
           });
+          durationMinutes = Math.max(0.5, Math.round(estimated * 10) / 10);
+        } else {
+          const estimated = estimateDurationMinutes({
+            planDurationMinutes: planEntry?.durationMinutes ?? null,
+            planSets: planEntry?.sets ?? null,
+            sets,
+            reps,
+            secondsPerRep: resolveSecondsPerRep(exerciseDoc),
+          });
+          if (estimated == null) {
+            return res.status(400).json({
+              success: false,
+              message: 'Enter how many minutes you did this exercise for',
+            });
+          }
+          durationMinutes = Math.max(1, Math.round(estimated));
         }
-        durationMinutes = Math.max(1, Math.round(estimated));
       }
 
       resolvedExercises.push({ ...item, durationMinutes, sets, reps });

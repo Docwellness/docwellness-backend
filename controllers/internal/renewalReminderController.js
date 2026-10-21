@@ -1,4 +1,5 @@
 const { DietPlanRequest, Notification } = require('../../models');
+const { loadRule, render } = require('../../utils/notificationRules');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const REMINDER_WINDOW_DAYS = 3;
@@ -30,6 +31,8 @@ function formatDate(date) {
  * to approach expiry.
  */
 async function runRenewalReminderSweep({ now = new Date() } = {}) {
+  const rule = await loadRule('renewal_reminder');
+  if (!rule.enabled) return { checked: 0, created: 0, disabled: true };
   const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_DAYS * MS_PER_DAY);
 
   const candidates = await DietPlanRequest.find({
@@ -46,8 +49,8 @@ async function runRenewalReminderSweep({ now = new Date() } = {}) {
   await Notification.insertMany(
     candidates.map((request) => ({
       userId: request.patient,
-      title: 'Your membership is expiring soon',
-      message: `Your subscription expires on ${formatDate(request.subscriptionExpiresAt)}. Renew now to keep your diet plan active.`,
+      title: render(rule.title, { date: formatDate(request.subscriptionExpiresAt) }),
+      message: render(rule.message, { date: formatDate(request.subscriptionExpiresAt) }),
       type: 'membership_renewal',
       referenceId: request._id,
       referenceModel: 'DietPlanRequest',

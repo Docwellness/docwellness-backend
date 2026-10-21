@@ -7,8 +7,29 @@ describe('estimateDurationMinutes', () => {
     );
   });
 
-  test('multiplies plan duration by sets when both are assigned', () => {
-    expect(estimateDurationMinutes({ planDurationMinutes: 1, sets: 3, reps: null, secondsPerRep: null })).toBe(3);
+  test('multiplies plan duration by sets when the plan itself assigns both', () => {
+    expect(
+      estimateDurationMinutes({ planDurationMinutes: 1, planSets: 3, sets: 3, reps: null, secondsPerRep: null })
+    ).toBe(3);
+    // The patient did 4 sets of a per-set plan - the count they logged wins.
+    expect(
+      estimateDurationMinutes({ planDurationMinutes: 1, planSets: 3, sets: 4, reps: null, secondsPerRep: null })
+    ).toBe(4);
+  });
+
+  test('never multiplies a flat plan duration by the client-sent sets (20 min jump rope stays 20)', () => {
+    // Regression: the app's log dialog sends sets=3 reps=12 by default even for a
+    // plan item that is just "20 min" - that used to become 60 minutes and 3x the
+    // calories (748 kcal instead of ~249 for an 11-MET, 68 kg session).
+    const minutes = estimateDurationMinutes({
+      planDurationMinutes: 20,
+      planSets: null,
+      sets: 3,
+      reps: 12,
+      secondsPerRep: null,
+    });
+    expect(minutes).toBe(20);
+    expect(calcCaloriesBurned({ met: 11, weightKg: 68, durationMinutes: minutes })).toBe(249);
   });
 
   test('falls back to reps * DEFAULT_SECONDS_PER_REP when secondsPerRep is missing (the catalog default today)', () => {

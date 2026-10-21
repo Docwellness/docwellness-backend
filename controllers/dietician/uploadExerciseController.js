@@ -11,6 +11,7 @@ const GenerationLog = require('../../models/GenerationLog');
 const config = require('../../config/environment');
 const { generateExerciseWithAI } = require('../../utils/openaiClient');
 const { calcCaloriesBurned, DEFAULT_FALLBACK_WEIGHT_KG } = require('../../utils/exerciseHelpers');
+const { resolveTrackingType } = require('../../utils/exerciseTracking');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const crypto = require('crypto');
@@ -159,6 +160,7 @@ exports.createExercise = async (req, res, next) => {
       category,
       met,
       secondsPerRep,
+      trackingType,
       description,
       instructions,
       equipment,
@@ -184,6 +186,7 @@ exports.createExercise = async (req, res, next) => {
       category,
       met,
       secondsPerRep,
+      trackingType,
       description,
       instructions,
       equipment,
@@ -209,6 +212,14 @@ exports.createExercise = async (req, res, next) => {
  * @route   GET /api/dietician/exercises
  * @access  Private (Dietician)
  */
+// The catalog entry plus its effective trackingType ('reps' | 'duration'),
+// so the plan editor can ask for sets/reps or minutes - see
+// utils/exerciseTracking.js for how it's resolved when not set explicitly.
+const withResolvedTracking = (exercise) => ({
+  ...exercise,
+  trackingType: resolveTrackingType(exercise),
+});
+
 exports.listExercises = async (req, res, next) => {
   try {
     const dieticianId = req.user._id;
@@ -231,7 +242,7 @@ exports.listExercises = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      data: exercises,
+      data: exercises.map(withResolvedTracking),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -263,7 +274,7 @@ exports.getExerciseById = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      data: exercise,
+      data: withResolvedTracking(exercise),
     });
   } catch (error) {
     next(error);
@@ -275,6 +286,7 @@ const DIRECT_UPDATE_FIELDS = [
   'category',
   'met',
   'secondsPerRep',
+  'trackingType',
   'description',
   'instructions',
   'equipment',

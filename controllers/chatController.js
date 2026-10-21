@@ -11,6 +11,7 @@ const { ConversationV1, MessageV1 } = require('../chat/models');
 const Notification = require('../models/Notification');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { sendPushToTokens } = require('../utils/push');
+const { resolveText } = require('../utils/notificationRules');
 
 // Chat Controller Version: 2.3.0
 // Last Updated: 2026-01-22
@@ -605,7 +606,7 @@ exports.sendMessage = async (req, res, next) => {
       const sender = await User.findById(senderId).select('profile.fullName role').lean();
       const senderName =
         sender?.profile?.fullName || (senderRole === 'patient' ? 'Patient' : 'Doctor');
-      const notifTitle = `New message from ${senderName}`;
+      const notifTitle = (await resolveText('chat_message', { sender: senderName })).title;
       const notifMessage =
         messageType === 'image' ? '📷 Sent a photo'
           : messageType === 'confession_box' ? '🍕 Confession Box'

@@ -31,6 +31,7 @@ const FoodItem = require('../models/FoodItem');
 const PlanItem = require('../models/PlanItem');
 const { normalize } = require('../utils/ingredientLibrary');
 const { rewriteRecipeStepsForIngredients } = require('../utils/openaiClient');
+const { rewriteStepQuantities } = require('../utils/recipeStepQuantities');
 const { applyCoreIngredientHeuristic, hasCoreIngredient } = require('../utils/coreIngredientHeuristic');
 const { isCountableServing, snapHalfStep } = require('../utils/servingUnits');
 
@@ -467,18 +468,25 @@ async function createCustomVersion(originalVersionId, updatedIngredients, { crea
     };
   });
 
+  const namedIngredients = recomputedIngredients.map((ingredient) => {
+    const foodItem = foodItemsById.get(String(ingredient.foodItemId));
+    return {
+      name: foodItem?.name || 'Unknown ingredient',
+      quantity: ingredient.rawQuantity,
+      unit: ingredient.unit,
+      ...(ingredient.preparation ? { preparation: ingredient.preparation } : {}),
+    };
+  });
+
   let steps = original.steps;
   if (regenerateSteps && Array.isArray(original.steps) && original.steps.length > 0) {
-    const namedIngredients = recomputedIngredients.map((ingredient) => {
-      const foodItem = foodItemsById.get(String(ingredient.foodItemId));
-      return {
-        name: foodItem?.name || 'Unknown ingredient',
-        quantity: ingredient.rawQuantity,
-        unit: ingredient.unit,
-        ...(ingredient.preparation ? { preparation: ingredient.preparation } : {}),
-      };
-    });
     steps = await rewriteRecipeStepsForIngredients({ name: original.name, ingredients: namedIngredients, steps: original.steps });
+  }
+  // Always (not just when regenerateSteps): the quantities quoted in the step
+  // prose must match this version's ingredients, including after the AI
+  // rewrite above. Deterministic and offline - see utils/recipeStepQuantities.js.
+  if (Array.isArray(steps) && steps.length > 0) {
+    steps = rewriteStepQuantities(steps, namedIngredients).steps;
   }
 
   return RecipeVersion.create({
