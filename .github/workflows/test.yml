@@ -1,0 +1,44 @@
+name: Test backend
+
+# CI means tests passed. Runs the Jest suite on every pull request and on
+# pushes to the long-lived branches. It holds no secrets and deploys nothing.
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        env:
+          CI: 'true'
+          NODE_ENV: test
+          # Placeholders only: the tests use an in-memory database and stub every
+          # outside service. Without these, modules that build a client at load
+          # time (OpenAI, JWT) throw before any test runs.
+          OPENAI_API_KEY: test-key
+          JWT_SECRET: test-secret
+          TYPESAFE_API_KEY: test-key
+          RESEND_API_KEY: test-key
+          SUPABASE_URL: http://localhost
+          SUPABASE_SERVICE_ROLE_KEY: test-key
+        run: npm test

@@ -8,6 +8,9 @@ name: Deploy backend (dev - Vercel)
 on:
   push:
     branches: [dev]
+  # Manual start from the Actions tab (or `gh workflow run`). This is the one
+  # trigger the release agent may use; it deploys the dev API only.
+  workflow_dispatch:
 
 jobs:
   deploy:
