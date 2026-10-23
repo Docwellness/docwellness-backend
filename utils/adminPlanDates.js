@@ -142,12 +142,12 @@ function buildGoals(goals, unionPauses, plans) {
       dietPlanId: idOrNull(g.dietPlanId),
       // The plan the goal was seeded from, only when that plan was loaded.
       seededFromCycle: seed ? (seed.cycleNumber ?? 1) : null,
-      seededFromRequestId: seed ? idOrNull(seed.request) : null,
     };
   });
 }
 
-// Actor and reason are shown only to an admin who may view the audit log.
+// Actor and reason are shown only to an admin who may view the audit log;
+// `restricted` says so explicitly, so an empty reason is never read as hidden.
 function buildExtensions(entries, canViewAudit) {
   const list = Array.isArray(entries) ? entries : [];
   const failedIds = new Set(
@@ -163,6 +163,7 @@ function buildExtensions(entries, canViewAudit) {
       after: istDayKey(e.after?.subscriptionExpiresAt),
       reason: canViewAudit ? String(e.reason ?? '').slice(0, REASON_MAX) : null,
       applied: !(e.requestId && failedIds.has(String(e.requestId))),
+      restricted: !canViewAudit,
     }));
 }
 

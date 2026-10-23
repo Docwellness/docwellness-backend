@@ -183,12 +183,11 @@ describe('membership end and goals', () => {
         shownEnd: '2026-10-23',
         dietPlanId: 'plan1',
         seededFromCycle: null,
-        seededFromRequestId: null,
       },
     ]);
   });
 
-  it('names the cycle and request of the plan a goal was seeded from, when that plan is loaded', () => {
+  it('names the cycle of the plan a goal was seeded from, when that plan is loaded', () => {
     const result = build({
       requests: [request()],
       plans: [plan({ _id: 'plan1', cycleNumber: 2 })],
@@ -198,11 +197,7 @@ describe('membership end and goals', () => {
         { status: 'completed', endDate: d('2026-10-04') },
       ],
     });
-    expect(result.goals.map((g) => [g.seededFromCycle, g.seededFromRequestId])).toEqual([
-      [2, 'req1'],
-      [null, null],
-      [null, null],
-    ]);
+    expect(result.goals.map((g) => g.seededFromCycle)).toEqual([2, null, null]);
   });
 
   it('gives goals [] when there is no goal', () => {
@@ -360,6 +355,7 @@ describe('extensions', () => {
       after: '2026-10-26',
       reason: null,
       applied: true,
+      restricted: true,
     });
     expect(JSON.stringify(hidden)).not.toMatch(/admin@example\.com|Missed two weeks/);
   });
@@ -373,8 +369,15 @@ describe('extensions', () => {
         after: '2026-10-26',
         reason: 'Missed two weeks',
         applied: true,
+        restricted: false,
       },
     ]);
+  });
+
+  it('keeps an empty reason as an empty string, not restricted, for an admin who may view the audit log', () => {
+    const [row] = extensionsOf([entry({ reason: undefined })]);
+    expect(row.reason).toBe('');
+    expect(row.restricted).toBe(false);
   });
 
   it('marks a success followed by a failed entry with the same request id as not applied', () => {
@@ -411,7 +414,7 @@ describe('extensions', () => {
 
   it('returns nothing else from the audit row', () => {
     const [row] = extensionsOf([entry({ ip: '10.1.2.3', userAgent: 'Mozilla/9' })]);
-    expect(Object.keys(row).sort()).toEqual(['actorEmail', 'after', 'applied', 'at', 'before', 'reason']);
+    expect(Object.keys(row).sort()).toEqual(['actorEmail', 'after', 'applied', 'at', 'before', 'reason', 'restricted']);
     expect(JSON.stringify(row)).not.toMatch(/10\.1\.2\.3|Mozilla|r-1/);
   });
 });

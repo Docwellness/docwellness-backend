@@ -130,12 +130,12 @@ describe('GET /api/admin/users/:id/plan-dates', () => {
     const viewer = await get(patient._id, 'viewer');
     expect(viewer.status).toBe(200);
     expect(viewer.body.data.extensions).toEqual([
-      { at: expect.any(String), actorEmail: null, before: '2026-10-12', after: '2026-10-26', reason: null, applied: true },
+      { at: expect.any(String), actorEmail: null, before: '2026-10-12', after: '2026-10-26', reason: null, applied: true, restricted: true },
     ]);
     expect(JSON.stringify(viewer.body)).not.toMatch(/admin@example\.com|Missed two weeks/);
 
     const superAdmin = await get(patient._id, 'super_admin');
-    expect(superAdmin.body.data.extensions[0]).toMatchObject({ actorEmail: 'admin@example.com', reason: 'Missed two weeks' });
+    expect(superAdmin.body.data.extensions[0]).toMatchObject({ actorEmail: 'admin@example.com', reason: 'Missed two weeks', restricted: false });
   });
 
   it('contains no personal or clinical value of the patient', async () => {

@@ -2,7 +2,6 @@
  * Read-only plan dates for one patient (openspec admin-plan-dates-timeline).
  * Only `find` reads: no save, no update, and no audit entry for viewing.
  */
-const mongoose = require('mongoose');
 const { User, DietPlan, DietPlanRequest, Goal } = require('../../models');
 const AdminAuditLog = require('../../models/AdminAuditLog');
 const { loadPatientPauses } = require('../../utils/patientPauseGuard');
@@ -13,9 +12,8 @@ const { can } = require('../../utils/adminPermissions');
 exports.getPlanDates = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const patient = mongoose.Types.ObjectId.isValid(String(id))
-      ? await User.findOne({ _id: id, role: 'patient' }).select('_id').lean()
-      : null;
+    // A malformed id never gets here: router.param('id') in routes/admin.js answers 400.
+    const patient = await User.findOne({ _id: id, role: 'patient' }).select('_id').lean();
     if (!patient) return res.status(404).json({ success: false, message: 'Patient not found' });
 
     const [plans, requests, goals, extensionEntries, unionPauses] = await Promise.all([
