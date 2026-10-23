@@ -175,6 +175,7 @@ describe('GET /api/admin/users/:id/plan-dates', () => {
       appliedPauseDays: 0,
       requests: [],
       unlinkedCycles: [],
+      olderCycles: [],
       goals: [],
       extensions: [],
     });
@@ -197,6 +198,71 @@ describe('GET /api/admin/users/:id/plan-dates', () => {
     const r = await get(patient._id);
     expect(r.status).toBe(200);
     expect(r.body.data.requests[0].cycles[0].weeks[0]).toMatchObject({ storedEnd: null, shownEnd: null });
+  });
+
+  it('reads at most 50 plans, 20 requests and 20 goals', async () => {
+    const patient = await createPatient();
+    const dietician = await createDietician();
+    const plan = (i) => ({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'Active',
+      cycleNumber: i + 1,
+      weekSchedule: [],
+      pauses: [],
+    });
+    await DietPlan.collection.insertMany(Array.from({ length: 51 }, (_, i) => plan(i)));
+    await DietPlanRequest.collection.insertMany(
+      Array.from({ length: 21 }, (_, i) => ({ patient: patient._id, dietician: dietician._id, status: 'Completed', createdAt: new Date(Date.UTC(2026, 0, 1 + i)) }))
+    );
+    await Goal.collection.insertMany(
+      Array.from({ length: 21 }, (_, i) => ({ patientId: patient._id, status: 'completed', createdAt: new Date(Date.UTC(2026, 0, 1 + i)) }))
+    );
+    const data = (await get(patient._id)).body.data;
+    const cycles = data.requests.reduce((n, g) => n + g.cycles.length, 0) + data.unlinkedCycles.length + data.olderCycles.length;
+    expect(cycles).toBe(50);
+    expect(data.requests).toHaveLength(20);
+    expect(data.goals).toHaveLength(20);
+  });
+
+  it('keeps the newest 100 extension entries, oldest first', async () => {
+    const patient = await createPatient();
+    await AdminAuditLog.insertMany(
+      Array.from({ length: 101 }, (_, i) => ({
+        action: 'user.extend_subscription',
+        outcome: 'success',
+        targetType: 'user',
+        targetId: String(patient._id),
+        actorEmail: 'admin@example.com',
+        reason: `n${i}`,
+        requestId: `req-${i}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
+      }))
+    );
+    const { extensions } = (await get(patient._id)).body.data;
+    expect(extensions).toHaveLength(100);
+    expect(extensions[0].reason).toBe('n1');
+    expect(extensions[99].reason).toBe('n100');
+  });
+
+  it('marks an extension as not applied when the real audited() wrapper wrote a failed entry for the same request', async () => {
+    const { audited } = require('../utils/adminAudit');
+    const patient = await createPatient();
+    const req = { id: 'req-audited-1', ip: '127.0.0.1', headers: {}, admin: { email: 'admin@example.com', user: { _id: '000000000000000000000009' } } };
+    const target = { action: 'user.extend_subscription', targetType: 'user', targetId: String(patient._id) };
+    await expect(
+      audited(
+        req,
+        { ...target, before: { subscriptionExpiresAt: day('2026-10-12') }, after: { subscriptionExpiresAt: ENDS }, reason: 'Missed two weeks' },
+        async () => {
+          throw new Error('save failed');
+        }
+      )
+    ).rejects.toThrow('save failed');
+    expect(await AdminAuditLog.countDocuments({ targetId: String(patient._id) })).toBe(2);
+    const { extensions } = (await get(patient._id)).body.data;
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0]).toMatchObject({ before: '2026-10-12', after: '2026-10-26', applied: false });
   });
 
   it('refuses a role without users:view exactly as the detail route does', async () => {

@@ -38,10 +38,12 @@ exports.getPlanDates = async (req, res, next) => {
         targetId: String(patient._id),
         outcome: { $in: ['success', 'failed'] },
       })
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: -1 })
         .limit(100)
         .select('outcome createdAt actorEmail before after reason requestId')
-        .lean(),
+        .lean()
+        // Newest 100 are kept; the builder lists them oldest first.
+        .then((rows) => rows.reverse()),
       loadPatientPauses(patient._id),
     ]);
 

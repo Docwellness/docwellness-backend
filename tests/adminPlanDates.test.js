@@ -31,7 +31,7 @@ const request = (over = {}) => ({
 const build = (input) => buildPlanDates({ now: NOW, ...input });
 const pausesOf = (result) => result.requests[0].cycles[0].pauses;
 
-// This builder keeps its own istDayKey (design D2 says import utils/planEnd.js); the table pins the +05:30 offset.
+// This builder keeps its own istDayKey (design D2 now keeps it, not an import from utils/planEnd.js); the table pins the +05:30 offset.
 describe('istDayKey', () => {
   it.each([
     ['2026-10-25T19:00:00.000Z', '2026-10-26'],
@@ -277,6 +277,23 @@ describe('grouping and summary', () => {
     expect(withUnlinked.unlinkedCycles.map((c) => c.planId)).toEqual(['loose']);
     expect(withUnlinked.requests[0].cycles).toEqual([]);
     expect(withUnlinked.requests[0].pauseDaysIncluded).toBe(0);
+    expect(withUnlinked.olderCycles).toEqual([]);
+  });
+
+  it('lists a plan whose request is not loaded under olderCycles, newest cycle first, not under unlinkedCycles', () => {
+    const withOlder = build({
+      requests: [request()],
+      plans: [
+        plan({ _id: 'old1', request: 'reqGone', cycleNumber: 1, pauses: [pause('2026-10-14', '2026-10-19')] }),
+        plan({ _id: 'old2', request: 'reqGone', cycleNumber: 2 }),
+        plan({ _id: 'loose', request: null, cycleNumber: 1 }),
+      ],
+      unionPauses: normalizePauses([pause('2026-10-14', '2026-10-19')]),
+    });
+    expect(withOlder.olderCycles.map((c) => c.planId)).toEqual(['old2', 'old1']);
+    expect(withOlder.unlinkedCycles.map((c) => c.planId)).toEqual(['loose']);
+    expect(withOlder.requests[0].cycles).toEqual([]);
+    expect(withOlder.requests[0].pauseDaysIncluded).toBe(0);
   });
 
   it('sets the summary from the latest request and the highest cycle with a schedule', () => {
@@ -323,6 +340,7 @@ describe('grouping and summary', () => {
     const empty = build({});
     expect(empty.requests).toEqual([]);
     expect(empty.unlinkedCycles).toEqual([]);
+    expect(empty.olderCycles).toEqual([]);
     expect(empty.summary).toEqual({
       requestId: null,
       membershipEndDay: null,

@@ -236,8 +236,9 @@ function buildPlanDates({
   );
   // A plan whose request is not among the loaded requests is still listed, never dropped.
   const knownIds = new Set(requests.map((r) => String(r._id)));
+  const older = [];
   for (const [key, orphans] of plansByRequest) {
-    if (!knownIds.has(key)) unlinked.push(...orphans);
+    if (!knownIds.has(key)) older.push(...orphans);
   }
 
   const goalRows = buildGoals(goals, union, plans);
@@ -248,6 +249,8 @@ function buildPlanDates({
     summary: buildSummary(requestRows[0], goalRows),
     requests: requestRows,
     unlinkedCycles: unlinked.map((p) => buildCycle(p, union, today)).sort(byCycleNumber),
+    // Plans of a request outside the loaded window, newest cycle first.
+    olderCycles: older.map((p) => buildCycle(p, union, today)).sort((a, b) => b.cycleNumber - a.cycleNumber),
     goals: goalRows,
     extensions: buildExtensions(extensionEntries, canViewAudit),
   };
