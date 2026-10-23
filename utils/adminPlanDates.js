@@ -130,17 +130,25 @@ function buildRequest(request, index, plansOfRequest, unionPauses, today) {
   };
 }
 
-function buildGoals(goals, unionPauses) {
-  return (Array.isArray(goals) ? goals : []).map((g) => ({
-    status: g.status ?? null,
-    storedStart: dayKey(g.startDate),
-    storedEnd: dayKey(g.endDate),
-    shownEnd: g.endDate ? dayKey(shiftDateForPauses(unionPauses, g.endDate)) : null,
-    dietPlanId: idOrNull(g.dietPlanId),
-  }));
+function buildGoals(goals, unionPauses, plans) {
+  const plansById = new Map(plans.map((p) => [String(p._id), p]));
+  return (Array.isArray(goals) ? goals : []).map((g) => {
+    const seed = g.dietPlanId ? plansById.get(String(g.dietPlanId)) : null;
+    return {
+      status: g.status ?? null,
+      storedStart: dayKey(g.startDate),
+      storedEnd: dayKey(g.endDate),
+      shownEnd: g.endDate ? dayKey(shiftDateForPauses(unionPauses, g.endDate)) : null,
+      dietPlanId: idOrNull(g.dietPlanId),
+      // The plan the goal was seeded from, only when that plan was loaded.
+      seededFromCycle: seed ? (seed.cycleNumber ?? 1) : null,
+      seededFromRequestId: seed ? idOrNull(seed.request) : null,
+    };
+  });
 }
 
-function buildExtensions(entries) {
+// Actor and reason are shown only to an admin who may view the audit log.
+function buildExtensions(entries, canViewAudit) {
   const list = Array.isArray(entries) ? entries : [];
   const failedIds = new Set(
     list.filter((e) => e.outcome === 'failed' && e.requestId).map((e) => String(e.requestId))
@@ -150,10 +158,10 @@ function buildExtensions(entries) {
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     .map((e) => ({
       at: isoOrNull(e.createdAt),
-      actorEmail: e.actorEmail ?? null,
+      actorEmail: canViewAudit ? (e.actorEmail ?? null) : null,
       before: istDayKey(e.before?.subscriptionExpiresAt),
       after: istDayKey(e.after?.subscriptionExpiresAt),
-      reason: String(e.reason ?? '').slice(0, REASON_MAX),
+      reason: canViewAudit ? String(e.reason ?? '').slice(0, REASON_MAX) : null,
       applied: !(e.requestId && failedIds.has(String(e.requestId))),
     }));
 }
@@ -196,6 +204,7 @@ function buildSummary(latest, goals) {
  * @param {object[]} input.extensionEntries AdminAuditLog rows, outcome success or failed
  * @param {object[]} input.unionPauses the patient's pause union across all cycles
  * @param {Date} [input.now]
+ * @param {boolean} [input.canViewAudit] true when the admin has audit:view; else extension actor and reason are null
  */
 function buildPlanDates({
   plans = [],
@@ -204,6 +213,7 @@ function buildPlanDates({
   extensionEntries = [],
   unionPauses = [],
   now = new Date(),
+  canViewAudit = false,
 }) {
   const today = normDate(now);
   const union = normalizePauses(unionPauses);
@@ -229,7 +239,7 @@ function buildPlanDates({
     if (!knownIds.has(key)) unlinked.push(...orphans);
   }
 
-  const goalRows = buildGoals(goals, union);
+  const goalRows = buildGoals(goals, union, plans);
 
   return {
     today: dayKey(today),
@@ -238,8 +248,8 @@ function buildPlanDates({
     requests: requestRows,
     unlinkedCycles: unlinked.map((p) => buildCycle(p, union, today)).sort(byCycleNumber),
     goals: goalRows,
-    extensions: buildExtensions(extensionEntries),
+    extensions: buildExtensions(extensionEntries, canViewAudit),
   };
 }
 
-module.exports = { buildPlanDates };
+module.exports = { buildPlanDates, istDayKey };

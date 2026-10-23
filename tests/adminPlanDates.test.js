@@ -1,7 +1,7 @@
 /**
  * Plan dates builder (openspec admin-plan-dates-timeline). Pure function, no database.
  */
-const { buildPlanDates } = require('../utils/adminPlanDates');
+const { buildPlanDates, istDayKey } = require('../utils/adminPlanDates');
 const { normalizePauses } = require('../utils/subscriptionPause');
 
 const d = (s) => new Date(`${s}T00:00:00.000Z`);
@@ -30,6 +30,23 @@ const request = (over = {}) => ({
 
 const build = (input) => buildPlanDates({ now: NOW, ...input });
 const pausesOf = (result) => result.requests[0].cycles[0].pauses;
+
+// This builder keeps its own istDayKey (design D2 says import utils/planEnd.js); the table pins the +05:30 offset.
+describe('istDayKey', () => {
+  it.each([
+    ['2026-10-25T19:00:00.000Z', '2026-10-26'],
+    ['2026-10-25T18:29:59.000Z', '2026-10-25'],
+    ['2026-10-25T18:30:00.000Z', '2026-10-26'],
+    [new Date('2026-10-25T06:00:00.000Z'), '2026-10-25'],
+    [null, null],
+    [undefined, null],
+    ['', null],
+    ['not a date', null],
+    [new Date('invalid'), null],
+  ])('reads %p as IST day %p', (input, expected) => {
+    expect(istDayKey(input)).toBe(expected);
+  });
+});
 
 describe('pause windows', () => {
   it('marks running, scheduled and ended windows against today', () => {
@@ -159,7 +176,32 @@ describe('membership end and goals', () => {
       unionPauses: normalizePauses([pause('2026-10-14', '2026-10-19')]),
     });
     expect(result.goals).toEqual([
-      { status: 'active', storedStart: '2026-10-04', storedEnd: '2026-10-18', shownEnd: '2026-10-23', dietPlanId: 'plan1' },
+      {
+        status: 'active',
+        storedStart: '2026-10-04',
+        storedEnd: '2026-10-18',
+        shownEnd: '2026-10-23',
+        dietPlanId: 'plan1',
+        seededFromCycle: null,
+        seededFromRequestId: null,
+      },
+    ]);
+  });
+
+  it('names the cycle and request of the plan a goal was seeded from, when that plan is loaded', () => {
+    const result = build({
+      requests: [request()],
+      plans: [plan({ _id: 'plan1', cycleNumber: 2 })],
+      goals: [
+        { status: 'active', endDate: d('2026-10-18'), dietPlanId: 'plan1' },
+        { status: 'completed', endDate: d('2026-10-04'), dietPlanId: 'gone' },
+        { status: 'completed', endDate: d('2026-10-04') },
+      ],
+    });
+    expect(result.goals.map((g) => [g.seededFromCycle, g.seededFromRequestId])).toEqual([
+      [2, 'req1'],
+      [null, null],
+      [null, null],
     ]);
   });
 
@@ -307,7 +349,20 @@ describe('extensions', () => {
     requestId: 'r-1',
     ...over,
   });
-  const extensionsOf = (extensionEntries) => build({ extensionEntries }).extensions;
+  const extensionsOf = (extensionEntries) => build({ extensionEntries, canViewAudit: true }).extensions;
+
+  it('sends actor and reason as null unless the admin may view the audit log', () => {
+    const [hidden] = build({ extensionEntries: [entry()] }).extensions;
+    expect(hidden).toEqual({
+      at: '2026-10-10T08:00:00.000Z',
+      actorEmail: null,
+      before: '2026-10-12',
+      after: '2026-10-26',
+      reason: null,
+      applied: true,
+    });
+    expect(JSON.stringify(hidden)).not.toMatch(/admin@example\.com|Missed two weeks/);
+  });
 
   it('lists one applied extension with before and after days', () => {
     expect(extensionsOf([entry()])).toEqual([

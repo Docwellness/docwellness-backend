@@ -7,6 +7,7 @@ const { User, DietPlan, DietPlanRequest, Goal } = require('../../models');
 const AdminAuditLog = require('../../models/AdminAuditLog');
 const { loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { buildPlanDates } = require('../../utils/adminPlanDates');
+const { can } = require('../../utils/adminPermissions');
 
 // GET /api/admin/users/:id/plan-dates
 exports.getPlanDates = async (req, res, next) => {
@@ -19,6 +20,7 @@ exports.getPlanDates = async (req, res, next) => {
 
     const [plans, requests, goals, extensionEntries, unionPauses] = await Promise.all([
       DietPlan.find({ patientId: patient._id })
+        .limit(50)
         .select('request cycleNumber status activationDate weekSchedule pauses')
         .lean(),
       DietPlanRequest.find({ patient: patient._id })
@@ -45,7 +47,15 @@ exports.getPlanDates = async (req, res, next) => {
       loadPatientPauses(patient._id),
     ]);
 
-    const data = buildPlanDates({ plans, requests, goals, extensionEntries, unionPauses, now: new Date() });
+    const data = buildPlanDates({
+      plans,
+      requests,
+      goals,
+      extensionEntries,
+      unionPauses,
+      now: new Date(),
+      canViewAudit: can(req.admin?.permissions, 'audit', 'view'),
+    });
     res.json({ success: true, data: { generatedFor: String(patient._id), ...data } });
   } catch (err) {
     next(err);
