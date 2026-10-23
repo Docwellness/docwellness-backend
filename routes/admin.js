@@ -13,6 +13,7 @@ const content = require('../controllers/admin/contentController');
 const placements = require('../controllers/admin/placementController');
 const payments = require('../controllers/admin/paymentController');
 const users = require('../controllers/admin/userController');
+const planDates = require('../controllers/admin/planDatesController');
 const dieticians = require('../controllers/admin/dieticianController');
 const partners = require('../controllers/admin/partnerController');
 const coupons = require('../controllers/admin/couponController');
@@ -87,6 +88,7 @@ router.post('/payments/:id/refunds', requirePermission('payments', 'edit'), paym
 // Users (patients)
 router.get('/users', requirePermission('users', 'view'), users.listUsers);
 router.get('/users/:id', requirePermission('users', 'view'), users.getUser);
+router.get('/users/:id/plan-dates', requirePermission('users', 'view'), planDates.getPlanDates);
 router.post('/users/:id/reveal', requirePermission('users', 'view'), users.revealField);
 router.post('/users/:id/suspend', requirePermission('users', 'edit'), users.suspendUser);
 router.post('/users/:id/reactivate', requirePermission('users', 'edit'), users.reactivateUser);
