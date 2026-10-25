@@ -1,8 +1,12 @@
 /**
- * Plan end maths. A patient's plan "ends" on the Asia/Kolkata calendar day of
- * their latest DietPlanRequest.subscriptionExpiresAt. That timestamp already
- * includes any dietician pause shift (subscriptionPauseController adds the
- * pause length to it), so it is NOT shifted again here.
+ * Plan end maths. A patient's plan "ends" on the last day of the current diet
+ * plan's last scheduled week, shifted by the patient's pause windows (the same
+ * "shown in the apps" date the admin Plan dates panel calls the last plan
+ * week), NOT on the membership expiry: the membership (activation + 30 days)
+ * can run up to ~8 days past the last week when a plan is activated mid-week.
+ * A plan with no week schedule falls back to the Asia/Kolkata day of
+ * DietPlanRequest.subscriptionExpiresAt, which already includes the pause
+ * shift and so is not shifted again.
  *
  * The end day itself stays fully loggable. After it only one more weigh-in
  * is allowed: the earliest weekly Goal Journey milestone (pause-shifted)
@@ -13,8 +17,8 @@
  * calendar comparison.
  */
 
-const { DietPlanRequest, Goal, Milestone } = require('../models');
-const { normDate, addDays, shiftDateForPauses } = require('./subscriptionPause');
+const { DietPlan, DietPlanRequest, Goal, Milestone } = require('../models');
+const { normDate, addDays, shiftDateForPauses, shiftWeekRangeForPauses } = require('./subscriptionPause');
 const { loadPatientPauses } = require('./patientPauseGuard');
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -32,6 +36,36 @@ function istDayKey(date) {
 /** The plan end day key for a stored expiry timestamp, or null when unknown. */
 function endDayOf(subscriptionExpiresAt) {
   return istDayKey(subscriptionExpiresAt);
+}
+
+/**
+ * The plan's last scheduled week end as a pause-shifted 'YYYY-MM-DD', or null
+ * when the plan has no dated week.
+ */
+function lastWeekEndDayOf(weekSchedule, pauses = []) {
+  let last = null;
+  for (const week of Array.isArray(weekSchedule) ? weekSchedule : []) {
+    const start = normDate(week?.startDate);
+    const end = normDate(week?.endDate);
+    if (!start || !end) continue;
+    const shifted = shiftWeekRangeForPauses(pauses, start, end).endDate;
+    if (shifted && (!last || shifted > last)) last = shifted;
+  }
+  return last ? utcDayKey(last) : null;
+}
+
+/**
+ * The plan the patient is on: the lowest-cycle Active plan (a renewal's
+ * earlier cycle stays Active until its last week finishes), else the newest.
+ */
+async function loadCurrentPlan(patientId) {
+  const select = 'weekSchedule cycleNumber';
+  const active = await DietPlan.findOne({ patientId, status: 'Active' })
+    .sort({ cycleNumber: 1 })
+    .select(select)
+    .lean();
+  if (active) return active;
+  return DietPlan.findOne({ patientId }).sort({ cycleNumber: -1, createdAt: -1 }).select(select).lean();
 }
 
 /**
@@ -58,9 +92,9 @@ const NO_PLAN_END = Object.freeze({
 });
 
 /**
- * The patient's plan end from the latest request. The weekly milestones and
- * pauses are only read once the end day is today or past, so a running plan
- * costs one indexed query.
+ * The patient's plan end from the current plan's weeks (membership expiry as
+ * the fallback). The weekly milestones are only read once the end day is today
+ * or past.
  *
  * @returns {Promise<{ endDay: string|null, lastWeighInDate: string|null,
  *   requestId: object|null, hasActivePlan: boolean }>}
@@ -73,15 +107,13 @@ async function loadPlanEnd(patientId, now = new Date()) {
   if (!request) return NO_PLAN_END;
 
   const base = { requestId: request._id, hasActivePlan: Boolean(request.hasActivePlan) };
-  const endDay = endDayOf(request.subscriptionExpiresAt);
+  const [plan, pauses] = await Promise.all([loadCurrentPlan(patientId), loadPatientPauses(patientId)]);
+  const endDay = lastWeekEndDayOf(plan?.weekSchedule, pauses) || endDayOf(request.subscriptionExpiresAt);
   if (!endDay) return { ...NO_PLAN_END, ...base };
   if (endDay > istDayKey(now)) return { ...NO_PLAN_END, ...base, endDay };
 
   const goal = await Goal.findOne({ patientId, status: 'active' }).sort({ createdAt: -1 }).select('_id').lean();
-  const [milestones, pauses] = await Promise.all([
-    goal ? Milestone.find({ goalId: goal._id, type: 'weekly' }).select('date').lean() : [],
-    loadPatientPauses(patientId),
-  ]);
+  const milestones = goal ? await Milestone.find({ goalId: goal._id, type: 'weekly' }).select('date').lean() : [];
   const lastWeighInDate = computeLastWeighInDate({
     endDay,
     weeklyMilestoneDates: milestones.map((m) => m.date),
@@ -103,6 +135,7 @@ function isWeightClosed(planEnd, todayDayKey) {
 module.exports = {
   istDayKey,
   endDayOf,
+  lastWeekEndDayOf,
   computeLastWeighInDate,
   loadPlanEnd,
   isNonWeightLogClosed,

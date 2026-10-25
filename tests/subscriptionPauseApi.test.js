@@ -210,11 +210,26 @@ describe('PATCH / DELETE subscription/pause', () => {
 describe('patient logging is blocked during a pause', () => {
   // seedActivePlan's fixed expiry is in the past by now, which the plan-end
   // guard (utils/planEnd.js) would refuse before the pause gate is reached.
-  const keepPlanRunning = (dpRequest) =>
-    models.DietPlanRequest.updateOne(
+  // The plan end follows the last scheduled week (utils/planEnd.js), so the
+  // seeded weeks are moved forward along with the membership expiry.
+  const keepPlanRunning = async (dpRequest) => {
+    await models.DietPlanRequest.updateOne(
       { _id: dpRequest._id },
       { subscriptionExpiresAt: new Date(Date.now() + 30 * 86400000) }
     );
+    await models.DietPlan.updateMany(
+      { request: dpRequest._id },
+      {
+        weekSchedule: [
+          {
+            week: 1,
+            startDate: new Date(Date.now() - 7 * 86400000),
+            endDate: new Date(Date.now() + 30 * 86400000),
+          },
+        ],
+      }
+    );
+  };
 
   test('POST /api/patient/meal-log 403s while paused', async () => {
     const { patient, plan, dpRequest } = await seedActivePlan();

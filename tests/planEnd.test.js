@@ -1,12 +1,12 @@
 const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/testDb');
 
-let planEnd, Goal, Milestone, createPatient, createDietician, createDietPlanRequest;
+let planEnd, Goal, Milestone, createPatient, createDietician, createDietPlanRequest, createActiveDietPlan;
 
 beforeAll(async () => {
   await connectTestDb();
   planEnd = require('../utils/planEnd');
   ({ Goal, Milestone } = require('../models'));
-  ({ createPatient, createDietician, createDietPlanRequest } = require('./helpers/factories'));
+  ({ createPatient, createDietician, createDietPlanRequest, createActiveDietPlan } = require('./helpers/factories'));
 });
 afterEach(async () => clearTestDb());
 afterAll(async () => disconnectTestDb());
@@ -185,3 +185,49 @@ describe('loadPlanEnd', () => {
     expect(result.endDay).toBe('2026-11-18');
   });
 });
+
+describe('loadPlanEnd follows the last plan week, not the membership expiry', () => {
+  const week = (n, start, end) => ({ week: n, startDate: D(start), endDate: D(end) });
+  const weeks = [
+    week(1, '2026-09-21', '2026-09-27'),
+    week(2, '2026-09-28', '2026-10-04'),
+    week(3, '2026-10-05', '2026-10-11'),
+    week(4, '2026-10-12', '2026-10-18'),
+  ];
+
+  async function setup(planOverrides = {}) {
+    const dietician = await createDietician();
+    const patient = await createPatient();
+    await createDietPlanRequest(patient, dietician, {
+      status: 'Paid',
+      hasActivePlan: true,
+      subscriptionExpiresAt: new Date('2026-10-26T06:28:32.726Z'),
+    });
+    await createActiveDietPlan(patient, dietician, { weekSchedule: weeks, ...planOverrides });
+    return patient;
+  }
+
+  test('ends on 18 Oct although the membership runs to 26 Oct', async () => {
+    const patient = await setup();
+    const result = await planEnd.loadPlanEnd(patient._id, new Date('2026-10-25T06:00:00.000Z'));
+    expect(result.endDay).toBe('2026-10-18');
+    expect(result.lastWeighInDate).toBe('2026-10-19');
+  });
+
+  test('a pause shifts the last week end', () => {
+    const pauses = [{ startDate: D('2026-10-05'), resumeDate: D('2026-10-08') }];
+    expect(planEnd.lastWeekEndDayOf(weeks, pauses)).toBe('2026-10-21');
+  });
+
+  test('no week schedule falls back to the membership expiry', async () => {
+    const patient = await setup({ weekSchedule: [] });
+    const result = await planEnd.loadPlanEnd(patient._id, new Date('2026-10-20T06:00:00.000Z'));
+    expect(result.endDay).toBe('2026-10-26');
+  });
+
+  test('lastWeekEndDayOf ignores undated weeks', () => {
+    expect(planEnd.lastWeekEndDayOf([{ week: 1 }], [])).toBeNull();
+    expect(planEnd.lastWeekEndDayOf(undefined, [])).toBeNull();
+  });
+});
+
