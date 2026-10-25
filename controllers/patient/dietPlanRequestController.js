@@ -5,6 +5,7 @@ const { getMembershipPrice, getMembershipTier } = require('../../utils/membershi
 const { getChatIO } = require('../../chat');
 const { sendPushToTokens } = require('../../utils/push');
 const { resolveText } = require('../../utils/notificationRules');
+const { loadPlanEnd } = require('../../utils/planEnd');
 
 /**
  * Tell the dietician a patient wants a renewal so they can start building
@@ -465,13 +466,20 @@ exports.getRequestStatus = async (req, res, next) => {
           hasRequest: false,
           status: null,
           message: 'No diet plan request found',
+          planEnd: { endDate: null, weightLastDate: null },
         },
       });
     }
 
+    const { endDay, lastWeighInDate } = await loadPlanEnd(patientId);
     res.status(200).json({
       success: true,
-      data: await buildRequestDetail(latestRequest, patientId),
+      data: {
+        ...(await buildRequestDetail(latestRequest, patientId)),
+        // Plan end day and last allowed weigh-in date (IST day keys, null when
+        // unknown) - see utils/planEnd.js. Additive: old app builds ignore it.
+        planEnd: { endDate: endDay, weightLastDate: lastWeighInDate },
+      },
     });
   } catch (error) {
     next(error);

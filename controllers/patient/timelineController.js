@@ -7,6 +7,38 @@ const { buildTimelinePayload, shapeGoal, getDayLogs } = require('../../utils/tim
 const { MEAL_LINKED_TASK_TITLES, WATER_TASK_TITLE } = require('../../utils/seedGoalTimeline');
 const { getChatIO } = require('../../chat');
 const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
+const { istDayKey, loadPlanEnd } = require('../../utils/planEnd');
+const { computeGoalOutcome } = require('../../utils/goalOutcome');
+
+/**
+ * Adds `outcome` to a { goal, stats } payload: null until the plan has ended
+ * (same end day as the logging guard, utils/planEnd.js), then the numbers the
+ * app words the Goal Journey card with. Patient-only on purpose - the shared
+ * buildTimelinePayload also feeds the dietician app, which must see nothing new.
+ * A payload with no goal is returned untouched. The values are never logged.
+ */
+async function withGoalOutcome(patientId, payload) {
+  if (!payload.goal || !payload.stats) return payload;
+  const { endDay } = await loadPlanEnd(patientId);
+  if (!endDay || istDayKey(new Date()) <= endDay) return { ...payload, outcome: null };
+
+  const { stats, goal } = payload;
+  // goal.currentValue falls back to the goal-creation snapshot when no weight was ever logged;
+  // the outcome must come from a real weigh-in only, so read it directly (no weight -> neutral state).
+  const latestWeightLog = await Progress.findOne({ patientId, weight: { $exists: true, $ne: null } })
+    .sort({ date: -1 })
+    .select('weight')
+    .lean();
+  // adherence30d reads 0 both for "no daily milestones in the window" and for a real 0%.
+  const hasNoMilestones = stats.weekTotal === 0 && stats.adherence30d === 0;
+  const outcome = computeGoalOutcome({
+    startValue: goal.startValue,
+    targetValue: goal.targetValue,
+    currentValue: latestWeightLog?.weight ?? null,
+    adherence30d: hasNoMilestones ? null : stats.adherence30d,
+  });
+  return { ...payload, outcome };
+}
 
 /**
  * @route   GET /api/patient/timeline?from=-14&to=30
@@ -18,7 +50,7 @@ exports.getTimeline = asyncHandler(async (req, res) => {
     from: req.query.from,
     to: req.query.to,
   });
-  return sendSuccess(res, { data: payload });
+  return sendSuccess(res, { data: await withGoalOutcome(req.user._id, payload) });
 });
 
 /**
@@ -52,7 +84,10 @@ exports.getTimelineSummary = asyncHandler(async (req, res) => {
         .sort({ date: -1 })
         .select('weight')
         .lean();
-      return { goal: shapeGoal(goal, effectiveEndDate, latestWeightLog?.weight ?? null), stats };
+      return withGoalOutcome(req.user._id, {
+        goal: shapeGoal(goal, effectiveEndDate, latestWeightLog?.weight ?? null),
+        stats,
+      });
     }
   );
   return sendSuccess(res, { data });

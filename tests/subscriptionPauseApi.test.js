@@ -208,8 +208,17 @@ describe('PATCH / DELETE subscription/pause', () => {
 });
 
 describe('patient logging is blocked during a pause', () => {
+  // seedActivePlan's fixed expiry is in the past by now, which the plan-end
+  // guard (utils/planEnd.js) would refuse before the pause gate is reached.
+  const keepPlanRunning = (dpRequest) =>
+    models.DietPlanRequest.updateOne(
+      { _id: dpRequest._id },
+      { subscriptionExpiresAt: new Date(Date.now() + 30 * 86400000) }
+    );
+
   test('POST /api/patient/meal-log 403s while paused', async () => {
-    const { patient, plan } = await seedActivePlan();
+    const { patient, plan, dpRequest } = await seedActivePlan();
+    await keepPlanRunning(dpRequest);
     const today = new Date();
     plan.pauses.push({
       startDate: new Date(today.getTime() - 86400000),
@@ -228,7 +237,8 @@ describe('patient logging is blocked during a pause', () => {
   });
 
   test('meal logging is not pause-blocked once the pause has passed', async () => {
-    const { patient, plan } = await seedActivePlan();
+    const { patient, plan, dpRequest } = await seedActivePlan();
+    await keepPlanRunning(dpRequest);
     plan.pauses.push({ startDate: D('2026-01-01'), resumeDate: D('2026-01-04') });
     await plan.save();
     registerTestToken('p', patient._id);

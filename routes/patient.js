@@ -41,6 +41,7 @@ const upload = require('../middlewares/upload');
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
 const { authLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
 const { loginRole, deviceRiskGate } = require('../middlewares/deviceRisk');
+const { requireLoggingOpen, requireWeightWindowOpen } = require('../middlewares/planEndGuard');
 
 // Middleware to check if user is a patient
 const patientOnly = [authenticate, roleCheck('patient')];
@@ -221,9 +222,10 @@ router.get('/meal-log/screen-data', patientOnly, dietController.getMealLogScreen
 
 router.get('/meal-log/today-stats', patientOnly, dietController.getTodayMealLogStats);
 
-router.post('/meal-log', patientOnly, dietController.submitMealLog);
+router.post('/meal-log', patientOnly, requireLoggingOpen, dietController.submitMealLog);
 
-router.post('/meal-log/add-note', patientOnly, uploadLimiter, upload.single('file'), dietController.addMealNote);
+// requireLoggingOpen sits after multer so a multipart `date` is parsed before the guard reads it.
+router.post('/meal-log/add-note', patientOnly, uploadLimiter, upload.single('file'), requireLoggingOpen, dietController.addMealNote);
 
 // ==========================================
 // Tracking Data (Charts - calorie, weight, BMI trends)
@@ -241,6 +243,7 @@ router.get('/tracking-data', patientOnly, progressController.getTrackingData);
 router.post(
   '/progress',
   patientOnly,
+  requireWeightWindowOpen,
   uploadLimiter,
   upload.fields([
     { name: 'bodyImage', maxCount: 1 },
@@ -283,6 +286,7 @@ router.get('/progress/:id', patientOnly, progressController.getProgressById);
 router.put(
   '/progress/:id',
   patientOnly,
+  requireWeightWindowOpen,
   uploadLimiter,
   upload.fields([
     { name: 'bodyImage', maxCount: 1 },
@@ -300,6 +304,7 @@ router.put(
 router.post(
   '/progress/:id/images',
   patientOnly,
+  requireWeightWindowOpen,
   uploadLimiter,
   upload.fields([
     { name: 'beforeImage', maxCount: 1 },
@@ -312,7 +317,7 @@ router.post(
  * @route   DELETE /api/patient/progress/:id
  * @desc    Delete progress entry
  */
-router.delete('/progress/:id', patientOnly, progressController.deleteProgress);
+router.delete('/progress/:id', patientOnly, requireWeightWindowOpen, progressController.deleteProgress);
 
 // ==========================================
 // Payment Routes
@@ -413,7 +418,7 @@ router.get('/diet/groceries/checked', patientOnly, dietController.getGroceryChec
  * @route   PATCH /api/patient/diet/groceries/checked
  * @desc    Tick/untick grocery items: { week, items: [{ key, purchased }] }
  */
-router.patch('/diet/groceries/checked', patientOnly, dietController.updateGroceryChecklist);
+router.patch('/diet/groceries/checked', patientOnly, requireLoggingOpen, dietController.updateGroceryChecklist);
 
 /**
  * @route   POST /api/patient/payments/manual-proof
@@ -518,24 +523,29 @@ router.get('/meal-logs/today', patientOnly, mealLogController.getTodayMealLogs);
 router.get('/meal-logs/stats', patientOnly, mealLogController.getMealLogStats);
 router.get('/meal-logs/calorie-trend', patientOnly, mealLogController.getCalorieTrend);
 router.get('/meal-logs', patientOnly, mealLogController.getAllMealLogs);
-router.post('/meal-logs', patientOnly, mealLogController.createMealLog);
-router.put('/meal-logs/:id/meal/:mealIndex', patientOnly, mealLogController.updateMealLog);
-router.delete('/meal-logs/:id/meal/:mealIndex', patientOnly, mealLogController.deleteMealLog);
-router.post('/meal-logs/:id/meal/:mealIndex/complete', patientOnly, mealLogController.completeMeal);
-router.post('/meal-notes', patientOnly, uploadLimiter, upload.single('image'), mealLogController.addMealNote);
+router.post('/meal-logs', patientOnly, requireLoggingOpen, mealLogController.createMealLog);
+router.put('/meal-logs/:id/meal/:mealIndex', patientOnly, requireLoggingOpen, mealLogController.updateMealLog);
+router.delete('/meal-logs/:id/meal/:mealIndex', patientOnly, requireLoggingOpen, mealLogController.deleteMealLog);
+router.post(
+  '/meal-logs/:id/meal/:mealIndex/complete',
+  patientOnly,
+  requireLoggingOpen,
+  mealLogController.completeMeal
+);
+router.post('/meal-notes', patientOnly, uploadLimiter, upload.single('image'), requireLoggingOpen, mealLogController.addMealNote);
 
 // ==========================================
 // Water Intake Routes
 // ==========================================
-router.post('/water/log', patientOnly, waterController.logWater);
+router.post('/water/log', patientOnly, requireLoggingOpen, waterController.logWater);
 router.get('/water/today', patientOnly, waterController.getToday);
 router.get('/water/history', patientOnly, waterController.getHistory);
 router.put('/water/goal', patientOnly, waterController.updateGoal);
 
 // Supplement logging (optional - never counts toward adherence)
 router.get('/supplement-log', patientOnly, supplementLogController.getSupplementLogs);
-router.post('/supplement-log', patientOnly, supplementLogController.logSupplement);
-router.delete('/supplement-log', patientOnly, supplementLogController.unlogSupplement);
+router.post('/supplement-log', patientOnly, requireLoggingOpen, supplementLogController.logSupplement);
+router.delete('/supplement-log', patientOnly, requireLoggingOpen, supplementLogController.unlogSupplement);
 
 // ==========================================
 // Exercise Plan (patient-facing)
@@ -543,7 +553,7 @@ router.delete('/supplement-log', patientOnly, supplementLogController.unlogSuppl
 
 router.get('/exercise/active', patientOnly, exerciseController.getActiveExercisePlanForPatient);
 router.get('/exercise-log/today-stats', patientOnly, exerciseController.getTodayExerciseStats);
-router.post('/exercise-log', patientOnly, exerciseController.submitExerciseLog);
+router.post('/exercise-log', patientOnly, requireLoggingOpen, exerciseController.submitExerciseLog);
 
 // ==========================================
 // Client Journeys (dietician-curated before/after + review)
@@ -595,13 +605,13 @@ router.get('/timeline/days/:date/logs', patientOnly, timelineController.getMyDay
  * @route   POST /api/patient/check-ins
  * @desc    Mark a task done for today
  */
-router.post('/check-ins', patientOnly, timelineController.createCheckIn);
+router.post('/check-ins', patientOnly, requireLoggingOpen, timelineController.createCheckIn);
 
 /**
  * @route   DELETE /api/patient/check-ins/today/:taskId
  * @desc    Uncheck a task for today
  */
-router.delete('/check-ins/today/:taskId', patientOnly, timelineController.deleteTodayCheckIn);
+router.delete('/check-ins/today/:taskId', patientOnly, requireLoggingOpen, timelineController.deleteTodayCheckIn);
 
 // ==========================================
 // Videos Routes (visible videos from dietician)
