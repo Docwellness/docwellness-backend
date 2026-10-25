@@ -22,10 +22,7 @@ const { normalizePauses, isPausedOn, currentOrUpcomingPause } = require('./subsc
  * that silently stopped applying). Reading the union keeps a pause visible
  * regardless of which cycle it physically lives on.
  */
-async function loadPatientPauses(patientId) {
-  const plans = await DietPlan.find({ patientId, 'pauses.0': { $exists: true } })
-    .select('pauses')
-    .lean();
+function mergePlanPauses(plans) {
   const seen = new Set();
   const merged = [];
   for (const plan of plans) {
@@ -38,6 +35,13 @@ async function loadPatientPauses(patientId) {
     }
   }
   return normalizePauses(merged);
+}
+
+async function loadPatientPauses(patientId) {
+  const plans = await DietPlan.find({ patientId, 'pauses.0': { $exists: true } })
+    .select('pauses')
+    .lean();
+  return mergePlanPauses(plans);
 }
 
 /**
@@ -75,4 +79,4 @@ async function rejectIfPaused(res, patientId, when = new Date()) {
   return true;
 }
 
-module.exports = { loadPatientPauses, getPauseStateForLogging, rejectIfPaused };
+module.exports = { loadPatientPauses, mergePlanPauses, getPauseStateForLogging, rejectIfPaused };

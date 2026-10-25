@@ -14,6 +14,7 @@
  */
 
 const DAY = 24 * 3600 * 1000;
+const IST_OFFSET_MS = 5.5 * 3600 * 1000;
 
 const STAGES = [
   'none', // never sent a request
@@ -30,19 +31,27 @@ const STAGES = [
  * @param {object} args
  * @param {object|null} args.request   latest DietPlanRequest (lean) or null
  * @param {boolean} args.hasDraftPlan  patient has a Draft or Finalized plan that is not yet active
+ * @param {string|null} [args.endDay] plan end day 'YYYY-MM-DD' (utils/planEnd.js, the last plan
+ *   week). When given it replaces the membership expiry: expired from the day after it,
+ *   ending soon from 7 days before it.
  * @param {Date} [args.now]
  */
-function computeStage({ request, hasDraftPlan = false, now = new Date() }) {
+function computeStage({ request, hasDraftPlan = false, endDay = null, now = new Date() }) {
   if (!request) return { stage: 'none', pendingBalance: false, renewalInProgress: false };
 
   const t = new Date(now).getTime();
   const expires = request.subscriptionExpiresAt ? new Date(request.subscriptionExpiresAt).getTime() : null;
   const pendingBalance = request.status === 'PartiallyPaid';
+  const todayKey = new Date(t + IST_OFFSET_MS).toISOString().slice(0, 10);
+  const ended = endDay ? todayKey > endDay : expires !== null && expires < t;
+  const endsSoon = endDay
+    ? new Date(`${endDay}T00:00:00Z`).getTime() - new Date(`${todayKey}T00:00:00Z`).getTime() < 7 * DAY
+    : expires !== null && expires < t + 7 * DAY;
 
   if (request.hasActivePlan) {
     let stage = 'active';
-    if (expires !== null && expires < t) stage = 'expired';
-    else if (expires !== null && expires < t + 7 * DAY) stage = 'expiring';
+    if (ended) stage = 'expired';
+    else if (endsSoon) stage = 'expiring';
     // A running member who is renewing: payment asked for or sent for the next cycle.
     const renewalInProgress = ['PaymentRequested', 'PaymentSubmitted'].includes(request.status);
     return { stage, pendingBalance, renewalInProgress };
@@ -52,7 +61,7 @@ function computeStage({ request, hasDraftPlan = false, now = new Date() }) {
   if (request.status === 'PaymentRequested') return { stage: 'payment_requested', pendingBalance, renewalInProgress: false };
   if (hasDraftPlan) return { stage: 'diet_in_progress', pendingBalance, renewalInProgress: false };
   // Paid / PartiallyPaid without an active plan (e.g. a lapsed, completed cycle).
-  if (expires !== null && expires < t && ['Paid', 'PartiallyPaid'].includes(request.status)) {
+  if (ended && ['Paid', 'PartiallyPaid'].includes(request.status)) {
     return { stage: 'expired', pendingBalance, renewalInProgress: false };
   }
   return { stage: 'requested', pendingBalance, renewalInProgress: false };

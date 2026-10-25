@@ -19,7 +19,7 @@
 
 const { DietPlan, DietPlanRequest, Goal, Milestone } = require('../models');
 const { normDate, addDays, shiftDateForPauses, shiftWeekRangeForPauses } = require('./subscriptionPause');
-const { loadPatientPauses } = require('./patientPauseGuard');
+const { loadPatientPauses, mergePlanPauses } = require('./patientPauseGuard');
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
@@ -58,6 +58,16 @@ function lastWeekEndDayOf(weekSchedule, pauses = []) {
  * The plan the patient is on: the lowest-cycle Active plan (a renewal's
  * earlier cycle stays Active until its last week finishes), else the newest.
  */
+function pickCurrentPlan(plans) {
+  const active = plans.filter((p) => p.status === 'Active').sort((a, b) => (a.cycleNumber || 1) - (b.cycleNumber || 1));
+  if (active.length) return active[0];
+  return (
+    [...plans].sort(
+      (a, b) => (b.cycleNumber || 1) - (a.cycleNumber || 1) || new Date(b.createdAt) - new Date(a.createdAt)
+    )[0] || null
+  );
+}
+
 async function loadCurrentPlan(patientId) {
   const select = 'weekSchedule cycleNumber';
   const active = await DietPlan.findOne({ patientId, status: 'Active' })
@@ -122,6 +132,38 @@ async function loadPlanEnd(patientId, now = new Date()) {
   return { ...base, endDay, lastWeighInDate };
 }
 
+/**
+ * Plan end day per patient for many patients at once (admin lists), same rule
+ * as loadPlanEnd. `requests` maps patient id string to the latest request.
+ * One DietPlan query for all of them.
+ * @returns {Promise<Map<string, string|null>>}
+ */
+async function loadPlanEndDays(patientIds, requests) {
+  const plans = patientIds.length
+    ? await DietPlan.find({ patientId: { $in: patientIds } })
+        .select('patientId status cycleNumber createdAt weekSchedule pauses')
+        .lean()
+    : [];
+  const byPatient = new Map();
+  for (const plan of plans) {
+    const key = String(plan.patientId);
+    if (!byPatient.has(key)) byPatient.set(key, []);
+    byPatient.get(key).push(plan);
+  }
+  const result = new Map();
+  for (const id of patientIds) {
+    const key = String(id);
+    const patientPlans = byPatient.get(key) || [];
+    const current = pickCurrentPlan(patientPlans);
+    result.set(
+      key,
+      lastWeekEndDayOf(current?.weekSchedule, mergePlanPauses(patientPlans)) ||
+        endDayOf(requests.get(key)?.subscriptionExpiresAt)
+    );
+  }
+  return result;
+}
+
 /** True when `targetDayKey` is after the end day (no meal/water/exercise logging). */
 function isNonWeightLogClosed(planEnd, targetDayKey) {
   return Boolean(planEnd?.endDay) && targetDayKey > planEnd.endDay;
@@ -136,6 +178,7 @@ module.exports = {
   istDayKey,
   endDayOf,
   lastWeekEndDayOf,
+  loadPlanEndDays,
   computeLastWeighInDate,
   loadPlanEnd,
   isNonWeightLogClosed,

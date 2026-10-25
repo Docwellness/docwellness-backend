@@ -116,3 +116,32 @@ describe('buildJourney', () => {
     expect(buildJourney({ request: null })).toEqual([]);
   });
 });
+
+describe('computeStage with a plan end day (last plan week)', () => {
+  const live = { status: 'Paid', hasActivePlan: true, subscriptionExpiresAt: new Date('2026-10-26T06:00:00.000Z') };
+  const at = (iso) => new Date(iso);
+
+  it('is expired the day after the end day even though the membership runs on', () => {
+    const r = computeStage({ request: req(live), endDay: '2026-10-18', now: at('2026-10-25T06:00:00.000Z') });
+    expect(r.stage).toBe('expired');
+  });
+
+  it('the end day itself is not expired yet and is ending soon', () => {
+    const r = computeStage({ request: req(live), endDay: '2026-10-25', now: at('2026-10-25T06:00:00.000Z') });
+    expect(r.stage).toBe('expiring');
+  });
+
+  it('ending soon only inside 7 days of the end day', () => {
+    expect(computeStage({ request: req(live), endDay: '2026-11-01', now: at('2026-10-25T06:00:00.000Z') }).stage).toBe('active');
+    expect(computeStage({ request: req(live), endDay: '2026-10-31', now: at('2026-10-25T06:00:00.000Z') }).stage).toBe('expiring');
+  });
+
+  it('a lapsed paid cycle without an active plan is expired by the end day too', () => {
+    const r = computeStage({ request: req({ status: 'Paid', hasActivePlan: false, subscriptionExpiresAt: live.subscriptionExpiresAt }), endDay: '2026-10-18', now: at('2026-10-25T06:00:00.000Z') });
+    expect(r.stage).toBe('expired');
+  });
+
+  it('without an end day the membership expiry still decides', () => {
+    expect(computeStage({ request: req(live), now: at('2026-10-25T06:00:00.000Z') }).stage).toBe('expiring');
+  });
+});

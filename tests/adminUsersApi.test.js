@@ -88,6 +88,31 @@ describe('directory', () => {
     expect((await get('/users')).body.data.total).toBe(2);
   });
 
+  it('marks a patient expired once the last plan week is over, while the membership still runs', async () => {
+    const dietician = await createDietician();
+    const patient = await seedPatient({ name: 'Mid Week Start' });
+    const iso = (offsetDays) => new Date(Date.now() + offsetDays * DAY);
+    const dpr = await createDietPlanRequest(patient, dietician, {
+      status: 'Paid',
+      hasActivePlan: true,
+      subscriptionExpiresAt: iso(1),
+    });
+    await DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      status: 'Active',
+      startDate: iso(-28),
+      request: dpr._id,
+      weekSchedule: [{ week: 1, startDate: iso(-28), endDate: iso(-8) }],
+    });
+
+    const row = (await get('/users')).body.data.items.find((i) => i.name === 'Mid Week Start');
+    expect(row.stage).toBe('expired');
+    expect(row.subscription).toBe('expired');
+    expect((await get(`/users/${patient._id}`)).body.data.stage).toBe('expired');
+    expect((await get('/users?stage=expired')).body.data.items.map((i) => i.name)).toEqual(['Mid Week Start']);
+  });
+
   it('filters by subscription state and by account status', async () => {
     await seedPatient({ name: 'Expiring Soon', expiresInDays: 3 });
     await seedPatient({ name: 'Running Long', expiresInDays: 60 });

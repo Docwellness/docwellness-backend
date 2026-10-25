@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { User, DietPlanRequest, ManualPaymentProof, DietPlan } = require('../../models');
 const { STAGES, computeStage, buildJourney } = require('../../utils/patientJourney');
+const { loadPlanEndDays } = require('../../utils/planEnd');
 const { audited, writeAudit } = require('../../utils/adminAudit');
 const { maskPhone, maskEmail, maskDob } = require('../../utils/piiMask');
 
@@ -14,7 +15,15 @@ const nameOf = (u) => u?.profile?.fullName || '';
 const LIST_FIELDS =
   'profile.fullName profile.whatsappNumber profile.profileImage email isActive lastLogin createdAt status.subscriptionExpiresAt';
 
-function subscriptionState(expiresAt, now = Date.now()) {
+// `endDay` is the plan end day (utils/planEnd.js, the last plan week); when
+// known it decides expired / expiring, and the membership expiry is the fallback.
+function subscriptionState(expiresAt, now = Date.now(), endDay = null) {
+  if (endDay) {
+    const todayKey = new Date(now + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    if (todayKey > endDay) return 'expired';
+    const daysLeft = (new Date(`${endDay}T00:00:00Z`) - new Date(`${todayKey}T00:00:00Z`)) / DAY;
+    return daysLeft < 7 ? 'expiring' : 'active';
+  }
   if (!expiresAt) return 'never';
   const t = new Date(expiresAt).getTime();
   if (t < now) return 'expired';
@@ -41,9 +50,13 @@ async function draftPlanPatients(ids) {
   return new Set(found.map(String));
 }
 
-function journeyOf(userId, requests, drafts) {
+function journeyOf(userId, requests, drafts, endDays) {
   const request = requests.get(String(userId)) || null;
-  const result = computeStage({ request, hasDraftPlan: drafts.has(String(userId)) });
+  const result = computeStage({
+    request,
+    hasDraftPlan: drafts.has(String(userId)),
+    endDay: endDays?.get(String(userId)) || null,
+  });
   return {
     ...result,
     dieticianId: request?.dieticianId || null,
@@ -53,7 +66,7 @@ function journeyOf(userId, requests, drafts) {
   };
 }
 
-function presentRow(u, journey) {
+function presentRow(u, journey, endDay = null) {
   return {
     ...(journey || {}),
     _id: u._id,
@@ -61,7 +74,7 @@ function presentRow(u, journey) {
     phone: maskPhone(u.profile?.whatsappNumber),
     email: maskEmail(u.email),
     isActive: u.isActive !== false,
-    subscription: subscriptionState(u.status?.subscriptionExpiresAt),
+    subscription: subscriptionState(u.status?.subscriptionExpiresAt, Date.now(), endDay),
     subscriptionExpiresAt: u.status?.subscriptionExpiresAt || null,
     lastLogin: u.lastLogin || null,
     createdAt: u.createdAt,
@@ -104,12 +117,13 @@ exports.listUsers = async (req, res, next) => {
     // Journey stage (request sent, diet in progress, payment, active ...)
     if (STAGES.includes(req.query.stage)) {
       const [requests, drafts] = await Promise.all([latestRequests(null), draftPlanPatients(null)]);
+      const endDays = await loadPlanEndDays([...requests.keys()], requests);
       if (req.query.stage === 'none') {
         and.push({ _id: { $nin: [...requests.keys()].map((k) => new mongoose.Types.ObjectId(k)) } });
       } else {
         const ids = [];
         for (const [pid, request] of requests) {
-          if (computeStage({ request, hasDraftPlan: drafts.has(pid) }).stage === req.query.stage) {
+          if (computeStage({ request, hasDraftPlan: drafts.has(pid), endDay: endDays.get(pid) || null }).stage === req.query.stage) {
             ids.push(new mongoose.Types.ObjectId(pid));
           }
         }
@@ -140,6 +154,7 @@ exports.listUsers = async (req, res, next) => {
     ]);
     const pageIds = rows.map((r) => r._id);
     const [requests, drafts] = await Promise.all([latestRequests(pageIds), draftPlanPatients(pageIds)]);
+    const endDays = await loadPlanEndDays(pageIds, new Map([...requests].map(([k, v]) => [String(k), v])));
     const ownerIds = [...new Set([...requests.values()].map((r) => String(r.dieticianId || '')).filter(Boolean))];
     const owners = await User.find({ _id: { $in: ownerIds } }).select('profile.fullName').lean();
     const ownerName = new Map(owners.map((o) => [String(o._id), nameOf(o)]));
@@ -147,8 +162,8 @@ exports.listUsers = async (req, res, next) => {
       success: true,
       data: {
         items: rows.map((r) => {
-          const j = journeyOf(r._id, requests, drafts);
-          return { ...presentRow(r, j), dieticianName: j.dieticianId ? ownerName.get(String(j.dieticianId)) || '' : '' };
+          const j = journeyOf(r._id, requests, drafts, endDays);
+          return { ...presentRow(r, j, endDays.get(String(r._id)) || null), dieticianName: j.dieticianId ? ownerName.get(String(j.dieticianId)) || '' : '' };
         }),
         total,
         page,
@@ -180,13 +195,14 @@ exports.getUser = async (req, res, next) => {
       DietPlan.find({ patientId: u._id }).select('status createdAt updatedAt activationDate').lean(),
     ]);
     const hasDraftPlan = plans.some((p) => ['Draft', 'Finalized'].includes(p.status));
-    const stageInfo = computeStage({ request, hasDraftPlan });
+    const endDay = (await loadPlanEndDays([u._id], new Map(request ? [[String(u._id), request]] : []))).get(String(u._id)) || null;
+    const stageInfo = computeStage({ request, hasDraftPlan, endDay });
     const dietician = request?.dieticianId ? await User.findById(request.dieticianId).select('profile.fullName').lean() : null;
 
     res.json({
       success: true,
       data: {
-        ...presentRow(u, { ...stageInfo, plan: null }),
+        ...presentRow(u, { ...stageInfo, plan: null }, endDay),
         journey: buildJourney({ request, plans, proofs }),
         gender: u.profile?.gender || '',
         goal: u.healthProfile?.primaryGoal || request?.primaryGoal || '',
