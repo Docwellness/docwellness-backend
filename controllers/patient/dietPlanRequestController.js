@@ -1,4 +1,10 @@
-const { DietPlanRequest, User, ManualPaymentProof, Notification } = require('../../models');
+const { DietPlanRequest, DietPlan, User, ManualPaymentProof, Notification } = require('../../models');
+const {
+  parsePastOrderId,
+  pastCyclePlans,
+  pastOrderRow,
+  pastOrderDetailOverrides,
+} = require('../../utils/pastOrders');
 const { normalizeHealthProfileNumbers } = require('../../utils/healthProfileUtils');
 const { parseFlexibleDate } = require('../../utils/dateUtils');
 const { getMembershipPrice, getMembershipTier } = require('../../utils/membershipTiers');
@@ -500,17 +506,35 @@ exports.listRequests = async (req, res, next) => {
       .select('status createdAt startDateForDiet membershipPlan membershipAmount')
       .lean();
 
+    // A repurchase reuses the same request row (see utils/pastOrders.js), so
+    // the earlier cycles only survive as DietPlans - list them as past orders
+    // under the current one.
+    const plans = requests.length
+      ? await DietPlan.find({
+          patientId: req.user._id,
+          request: { $in: requests.map((r) => r._id) },
+          status: { $ne: 'Draft' },
+        })
+          .select('request cycleNumber membershipPlan startDate weekSchedule activationDate createdAt')
+          .lean()
+      : [];
+
     res.status(200).json({
       success: true,
-      data: requests.map((r) => ({
-        requestId: r._id,
-        status: r.status,
-        isEditable: r.status === 'Unpaid',
-        createdAt: r.createdAt,
-        startDateForDiet: r.startDateForDiet,
-        membershipPlan: r.membershipPlan || null,
-        membershipAmount: r.membershipAmount ?? null,
-      })),
+      data: requests.flatMap((r) => [
+        {
+          requestId: r._id,
+          status: r.status,
+          isEditable: r.status === 'Unpaid',
+          createdAt: r.createdAt,
+          startDateForDiet: r.startDateForDiet,
+          membershipPlan: r.membershipPlan || null,
+          membershipAmount: r.membershipAmount ?? null,
+        },
+        ...pastCyclePlans(r, plans)
+          .reverse() // newest past cycle first
+          .map((p) => pastOrderRow(r, p)),
+      ]),
     });
   } catch (error) {
     next(error);
@@ -525,8 +549,11 @@ exports.listRequests = async (req, res, next) => {
  */
 exports.getRequestById = async (req, res, next) => {
   try {
+    // `<requestId>~c<cycle>` is a past (renewed-over) order from the list.
+    const past = parsePastOrderId(req.params.id);
+
     const request = await DietPlanRequest.findOne({
-      _id: req.params.id,
+      _id: past ? past.requestId : req.params.id,
       patient: req.user._id,
     }).select(REQUEST_DETAIL_SELECT);
 
@@ -537,9 +564,29 @@ exports.getRequestById = async (req, res, next) => {
       });
     }
 
+    const detail = await buildRequestDetail(request, req.user._id);
+    if (!past) {
+      return res.status(200).json({ success: true, data: detail });
+    }
+
+    const plan = await DietPlan.findOne({
+      patientId: req.user._id,
+      request: request._id,
+      cycleNumber: past.cycleNumber,
+      status: { $ne: 'Draft' },
+    })
+      .select('request cycleNumber membershipPlan startDate weekSchedule activationDate createdAt')
+      .lean();
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Diet plan request not found',
+      });
+    }
+
     res.status(200).json({
       success: true,
-      data: await buildRequestDetail(request, req.user._id),
+      data: { ...detail, ...pastOrderDetailOverrides(request, plan) },
     });
   } catch (error) {
     next(error);
