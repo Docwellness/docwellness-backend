@@ -1,4 +1,13 @@
-const { MealLog, DietPlan, User, Goal, Progress, ExercisePlan, ExerciseLog } = require('../../models');
+const {
+  MealLog,
+  DietPlan,
+  DietPlanRequest,
+  User,
+  Goal,
+  Progress,
+  ExercisePlan,
+  ExerciseLog,
+} = require('../../models');
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
 const {
@@ -39,6 +48,16 @@ exports.getPatientTrackingData = async (req, res, next) => {
 
     if (!patient) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    // Same relationship rule as the patient profile endpoint
+    // (patientController's assertDieticianOwnsPatient): a dietician only sees
+    // tracking data of patients they have a diet-plan request with.
+    if (!(await DietPlanRequest.exists({ patient: patient._id, dieticianId: req.user._id }))) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to access this patient',
+      });
     }
 
     const healthProfile = patient.healthProfile || {};

@@ -132,21 +132,22 @@ exports.getPatientProfile = async (req, res, next) => {
     // the previous cycle's payment is already fully resolved (Paid +
     // hasActivePlan), so a cycle's proofs are always created before the
     // next cycle's DietPlan exists.
-    const allCyclePlans = latestRequest?._id
-      ? await DietPlan.find({ patientId: patient._id, request: latestRequest._id })
-        .select('_id cycleNumber membershipPlan status activationDate createdAt')
-        .sort({ cycleNumber: 1, createdAt: 1 })
-        .lean()
-      : [];
-
-    const allProofsForRequest = latestRequest?._id
-      ? await ManualPaymentProof.find({ request: latestRequest._id })
-        .select(
-          'amountReceived amountPending totalAmount status couponCode discountPercentage originalAmount pendingPaymentDate reviewedAt createdAt'
-        )
-        .sort({ createdAt: 1 })
-        .lean()
-      : [];
+    const [allCyclePlans, allProofsForRequest] = await Promise.all([
+      latestRequest?._id
+        ? DietPlan.find({ patientId: patient._id, request: latestRequest._id })
+          .select('_id cycleNumber membershipPlan status activationDate createdAt')
+          .sort({ cycleNumber: 1, createdAt: 1 })
+          .lean()
+        : [],
+      latestRequest?._id
+        ? ManualPaymentProof.find({ request: latestRequest._id })
+          .select(
+            'amountReceived amountPending totalAmount status couponCode discountPercentage originalAmount pendingPaymentDate reviewedAt createdAt'
+          )
+          .sort({ createdAt: 1 })
+          .lean()
+        : [],
+    ]);
 
     const proofsForCycle = (idx) => {
       const start = allCyclePlans[idx]?.createdAt
@@ -308,32 +309,45 @@ exports.getPatientProfile = async (req, res, next) => {
     // pointed at the *live* cycle (the new build is status.pendingDietPlanId,
     // handled separately below). Falls back to the newest Finalized/Active
     // plan for older records predating this being set unconditionally.
-    let dietPlanForSummary = null;
-    if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
-      dietPlanForSummary = await DietPlan.findById(statusSnapshot.activeDietPlanId)
-        .select(DIET_PLAN_SUMMARY_SELECT)
-        .lean();
-    }
-    if (!dietPlanForSummary) {
-      dietPlanForSummary = await DietPlan.findOne({
-        patientId: patient._id,
-        status: { $in: ['Finalized', 'Active'] },
-      })
-        .sort({ createdAt: -1 })
-        .select(DIET_PLAN_SUMMARY_SELECT)
-        .lean();
-    }
+    const findSummaryPlan = async () => {
+      let plan = null;
+      if (statusSnapshot.activeDietPlanId && mongoose.Types.ObjectId.isValid(statusSnapshot.activeDietPlanId)) {
+        plan = await DietPlan.findById(statusSnapshot.activeDietPlanId)
+          .select(DIET_PLAN_SUMMARY_SELECT)
+          .lean();
+      }
+      if (!plan) {
+        plan = await DietPlan.findOne({
+          patientId: patient._id,
+          status: { $in: ['Finalized', 'Active'] },
+        })
+          .sort({ createdAt: -1 })
+          .select(DIET_PLAN_SUMMARY_SELECT)
+          .lean();
+      }
+      return plan;
+    };
 
-    const activeWeeks = await deriveWeeksForPlan(dietPlanForSummary);
-    const weeklyDietPlans = activeWeeks.weeklyDietPlans;
-    const generatedWeekNumbers = activeWeeks.generatedWeekNumbers;
+    // The next cycle's raw plan (see pendingCycle below) - fetched alongside
+    // the active plan, not after it, since neither lookup needs the other.
+    const findPendingPlan = () =>
+      statusSnapshot.pendingDietPlanId &&
+      mongoose.Types.ObjectId.isValid(statusSnapshot.pendingDietPlanId)
+        ? DietPlan.findById(statusSnapshot.pendingDietPlanId)
+          .select(DIET_PLAN_SUMMARY_SELECT)
+          .lean()
+        : null;
 
     // The subscription pause can live on any of the patient's diet-plan
     // cycles - it's stored on whichever was current when the dietician
     // scheduled it, and a renewal sweep can since have retired that cycle
     // (see loadPatientPauses). Read the union across every cycle so the
     // dietician sees exactly the window the patient app gets.
-    const mergedPauses = await loadPatientPauses(patient._id);
+    const [dietPlanForSummary, pendingPlanDoc, mergedPauses] = await Promise.all([
+      findSummaryPlan(),
+      findPendingPlan(),
+      loadPatientPauses(patient._id),
+    ]);
 
     // Weekly Diet Plan cards show each week's date range. A subscription
     // pause shifts plan content forward (virtual calendar shift - the stored
@@ -360,45 +374,22 @@ exports.getPatientProfile = async (req, res, next) => {
     // even after that plan is activated, until the running cycle actually
     // ends and getActiveDietPlanForPatient's sweep hands over. Null in the
     // normal single-cycle case.
-    let pendingCycle = null;
-    if (
-      statusSnapshot.pendingDietPlanId &&
-      mongoose.Types.ObjectId.isValid(statusSnapshot.pendingDietPlanId)
-    ) {
-      const pendingPlan = await DietPlan.findById(statusSnapshot.pendingDietPlanId)
-        .select(DIET_PLAN_SUMMARY_SELECT)
-        .lean();
-      if (pendingPlan && pendingPlan._id?.toString() !== dietPlanForSummary?._id?.toString()) {
-        const pendingWeeks = await deriveWeeksForPlan(pendingPlan);
-        pendingCycle = {
-          dietPlanId: pendingPlan._id,
-          status: pendingPlan.status || null,
-          workflowStatus: pendingPlan.workflowStatus || null,
-          dataModel: pendingPlan.dataModel || null,
-          cycleNumber: pendingPlan.cycleNumber || 1,
-          membershipPlan: pendingPlan.membershipPlan || null,
-          weekSchedule: withPauseShift(pendingPlan.weekSchedule),
-          generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
-          finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
-          activePlanStrategy: {
-            calorieStrategy: pendingPlan.calorieStrategy || null,
-            macroStrategy: pendingPlan.macroStrategy || null,
-          },
-        };
-      }
-    }
+    const pendingPlan =
+      pendingPlanDoc && pendingPlanDoc._id?.toString() !== dietPlanForSummary?._id?.toString()
+        ? pendingPlanDoc
+        : null;
 
     // Earlier cycles stay on the record after a renewal: the profile's
     // weekly row is built from the live plan only, so without this the old
     // cycle's weeks (e.g. Weeks 1-4) vanish from the dietician app the moment
     // the next plan becomes active. Read-only history, oldest first; a plan
     // that was never finalized (Draft) is not history.
-    let previousCycles = [];
-    if (dietPlanForSummary?.cycleNumber > 1) {
+    const findEarlierPlans = () => {
+      if (!(dietPlanForSummary?.cycleNumber > 1)) return [];
       const excludeIds = [dietPlanForSummary._id, statusSnapshot.pendingDietPlanId].filter(
         (id) => id && mongoose.Types.ObjectId.isValid(id),
       );
-      const earlierPlans = await DietPlan.find({
+      return DietPlan.find({
         patientId: patient._id,
         _id: { $nin: excludeIds },
         status: { $in: ['Finalized', 'Active', 'Completed'] },
@@ -407,23 +398,53 @@ exports.getPatientProfile = async (req, res, next) => {
         .sort({ cycleNumber: 1 })
         .select(DIET_PLAN_SUMMARY_SELECT)
         .lean();
-      previousCycles = await Promise.all(
-        earlierPlans.map(async (plan) => {
-          const weeks = await deriveWeeksForPlan(plan);
-          return {
-            dietPlanId: plan._id,
-            status: plan.status || null,
-            dataModel: plan.dataModel || null,
-            cycleNumber: plan.cycleNumber || 1,
-            membershipPlan: plan.membershipPlan || null,
-            weekSchedule: withPauseShift(plan.weekSchedule),
-            weeklyDietPlans: weeks.weeklyDietPlans,
-            generatedWeekNumbers: weeks.generatedWeekNumbers,
-            finalizedWeekNumbers: weeks.finalizedWeekNumbers,
-          };
-        }),
-      );
-    }
+    };
+
+    // Each plan's week state is derived independently (a DayPlan.distinct
+    // per plan-item plan), so the active, pending and earlier plans' lookups
+    // all run at once rather than one round trip after another.
+    const [activeWeeks, pendingWeeks, earlierPlans] = await Promise.all([
+      deriveWeeksForPlan(dietPlanForSummary),
+      pendingPlan ? deriveWeeksForPlan(pendingPlan) : null,
+      findEarlierPlans(),
+    ]);
+    const weeklyDietPlans = activeWeeks.weeklyDietPlans;
+    const generatedWeekNumbers = activeWeeks.generatedWeekNumbers;
+
+    const pendingCycle = pendingPlan
+      ? {
+        dietPlanId: pendingPlan._id,
+        status: pendingPlan.status || null,
+        workflowStatus: pendingPlan.workflowStatus || null,
+        dataModel: pendingPlan.dataModel || null,
+        cycleNumber: pendingPlan.cycleNumber || 1,
+        membershipPlan: pendingPlan.membershipPlan || null,
+        weekSchedule: withPauseShift(pendingPlan.weekSchedule),
+        generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
+        finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
+        activePlanStrategy: {
+          calorieStrategy: pendingPlan.calorieStrategy || null,
+          macroStrategy: pendingPlan.macroStrategy || null,
+        },
+      }
+      : null;
+
+    const previousCycles = await Promise.all(
+      earlierPlans.map(async (plan) => {
+        const weeks = await deriveWeeksForPlan(plan);
+        return {
+          dietPlanId: plan._id,
+          status: plan.status || null,
+          dataModel: plan.dataModel || null,
+          cycleNumber: plan.cycleNumber || 1,
+          membershipPlan: plan.membershipPlan || null,
+          weekSchedule: withPauseShift(plan.weekSchedule),
+          weeklyDietPlans: weeks.weeklyDietPlans,
+          generatedWeekNumbers: weeks.generatedWeekNumbers,
+          finalizedWeekNumbers: weeks.finalizedWeekNumbers,
+        };
+      }),
+    );
 
     // Membership badge / avatar ring on the dietician's patient profile
     // must reflect the tier the *currently active* cycle was sold as, not
