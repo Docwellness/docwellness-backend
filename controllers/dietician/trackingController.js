@@ -19,6 +19,7 @@ const {
   buildDateBuckets,
   buildWeightTrend,
   resolvePlanStartDate,
+  resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
 const { loadPatientPauses } = require('../../utils/patientPauseGuard');
@@ -94,10 +95,16 @@ exports.getPatientTrackingData = async (req, res, next) => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // 3. The plan's real start date, and the requested [startDate, endDate]
-    // range clamped to [plan start, today] - same rules the patient app's
-    // own tracking-data endpoint uses.
+    // range clamped to [history start, today] - same rules the patient app's
+    // own tracking-data endpoint uses. History starts at the patient's first
+    // plan, not the current renewal cycle, so a repurchase (e.g. Week 5)
+    // doesn't hide weeks 1-4.
     const resolvedPlanStart = resolvePlanStartDate(activePlan);
-    const { startDate, endDate } = resolveRequestedRange(req.query, resolvedPlanStart, today);
+    const allPlans = await DietPlan.find({ patientId, status: { $ne: 'Draft' } })
+      .select('weekSchedule activationDate')
+      .lean();
+    const historyStart = resolveHistoryStartDate(allPlans, resolvedPlanStart);
+    const { startDate, endDate } = resolveRequestedRange(req.query, historyStart, today);
 
     // 4. Fetch meal logs in the date range
     const mealLogs = await MealLog.find({
@@ -175,7 +182,7 @@ exports.getPatientTrackingData = async (req, res, next) => {
     const realLogs = await Progress.find({
       patientId,
       weight: { $exists: true, $ne: null },
-      date: { $gte: cumulativeStart, $lte: endDate },
+      date: { $gte: historyStart || cumulativeStart, $lte: endDate },
     })
       .sort({ date: 1 })
       .select('date weight')
@@ -225,7 +232,9 @@ exports.getPatientTrackingData = async (req, res, next) => {
       success: true,
       data: {
         granularity,
-        planStartDate: resolvedPlanStart ? resolvedPlanStart.toISOString() : null,
+        // The charts' floor (patient's first plan), which the app reads as the
+        // earliest selectable date.
+        planStartDate: historyStart ? historyStart.toISOString() : null,
         dateRange: { start: formatShortDate(startDate), end: formatShortDate(endDate) },
         startDate: localDateStr(startDate),
         endDate: localDateStr(endDate),
