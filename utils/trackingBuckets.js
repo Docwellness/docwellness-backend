@@ -132,6 +132,23 @@ function resolvePlanStartDate(dietPlan) {
   return resolved;
 }
 
+// The earliest date this patient has any plan history for - the earliest
+// resolvePlanStartDate across ALL their plans (renewal cycles included), not
+// just the currently active one. A repurchase starts a new cycle whose week 1
+// is later than the patient's first plan, so flooring the Progress charts at
+// the active cycle's start hid every earlier week. Falls back to `fallback`
+// (the active plan's start) when no plan resolves a start.
+function resolveHistoryStartDate(dietPlans, fallback = null) {
+  let earliest = null;
+  for (const plan of dietPlans || []) {
+    const start = resolvePlanStartDate(plan);
+    if (start && !Number.isNaN(start.getTime()) && (!earliest || start < earliest)) {
+      earliest = start;
+    }
+  }
+  if (!earliest) return fallback;
+  return fallback && fallback < earliest ? fallback : earliest;
+}
 
 // Resolves + clamps the requested [startDate, endDate] query params against
 // [earliestAllowed (plan start, or today if no plan), today] - shared
@@ -220,5 +237,6 @@ module.exports = {
   addDays,
   buildDateBuckets,
   resolvePlanStartDate,
+  resolveHistoryStartDate,
   resolveRequestedRange,
 };

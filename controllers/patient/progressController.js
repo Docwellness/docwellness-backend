@@ -544,6 +544,7 @@ const {
   buildDateBuckets,
   buildWeightTrend,
   resolvePlanStartDate,
+  resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
 
@@ -635,12 +636,22 @@ async function computeTrackingData(patientId, query) {
     // there's nothing meaningful to chart before it.
     const resolvedPlanStart = resolvePlanStartDate(activePlan);
 
+    // Where the patient's history begins: the first plan they ever started,
+    // not the current renewal cycle. resolvedPlanStart (above) stays the
+    // current cycle's start for the "progress on THIS plan" logic below; the
+    // charts default to and are clamped at this earlier date so a repurchase
+    // (e.g. Week 5) doesn't hide weeks 1-4.
+    const allPlans = await DietPlan.find({ patientId, status: { $ne: 'Draft' } })
+      .select('weekSchedule activationDate')
+      .lean();
+    const historyStart = resolveHistoryStartDate(allPlans, resolvedPlanStart);
+
     // Requested range - each chart (Weight/BMI/Calorie) picks its own
-    // start/end independently client-side. Defaults to [plan start, today]
+    // start/end independently client-side. Defaults to [history start, today]
     // (the patient's whole history so far) and is clamped so a stale/
-    // tampered query can't ask for dates before the plan started or after
+    // tampered query can't ask for dates before they joined or after
     // today - no data exists outside that window either way.
-    const { startDate, endDate } = resolveRequestedRange(query, resolvedPlanStart, today);
+    const { startDate, endDate } = resolveRequestedRange(query, historyStart, today);
 
     // Fetch meal logs
     const mealLogs = await MealLog.find({
@@ -701,7 +712,7 @@ async function computeTrackingData(patientId, query) {
     const realLogs = await Progress.find({
       patientId,
       weight: { $exists: true, $ne: null },
-      date: { $gte: cumulativeStart, $lte: endDate },
+      date: { $gte: historyStart || cumulativeStart, $lte: endDate },
     })
       .sort({ date: 1 })
       .select('date weight week')
@@ -891,7 +902,9 @@ async function computeTrackingData(patientId, query) {
 
     return {
       granularity,
-      planStartDate: resolvedPlanStart ? resolvedPlanStart.toISOString() : null,
+      // The charts' floor (patient's first plan), which the app reads as the
+      // earliest selectable date and the "initial weight" anchor.
+      planStartDate: historyStart ? historyStart.toISOString() : null,
       dateRange: { start: formatShortDate(startDate), end: formatShortDate(endDate) },
       startDate: localDateStr(startDate),
       endDate: localDateStr(endDate),
