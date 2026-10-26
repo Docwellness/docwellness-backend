@@ -1,4 +1,12 @@
-const { DietPlan, MealLog, User, Notification } = require('../../models');
+const {
+  DietPlan,
+  DayPlan,
+  MealSlotPlan,
+  PlanItem,
+  MealLog,
+  User,
+  Notification,
+} = require('../../models');
 const { resolveDayGroupForDate, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { resolveCurrentWeek } = require('../../utils/dietPlanWeek');
 const { getFinalizedWeeks } = require('../../utils/dietPlanLegacyView');
@@ -14,6 +22,49 @@ const dayKeyFor = (dateObj) => {
   const day = String(dateObj.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+/**
+ * Which of the given plan-item (v4.0) plans have `slot` on their current
+ * week's `dayGroup`. Those plans keep their meals in DayPlan/MealSlotPlan/
+ * PlanItem, not in finalizedPlan.weeks, so getFinalizedWeeks() sees them as
+ * empty - three batched queries cover every such plan, rather than building
+ * each patient's full plan view. Returns a Set of DietPlan id strings.
+ */
+async function planItemPlanIdsWithSlot(plans, slot, dayGroup, today) {
+  if (plans.length === 0) return new Set();
+  const currentWeekByPlan = new Map(
+    plans.map((plan) => [String(plan._id), Number(resolveCurrentWeek(plan, today))])
+  );
+
+  const dayPlans = await DayPlan.find({
+    dietPlanId: { $in: plans.map((p) => p._id) },
+    dayGroup,
+  })
+    .select('dietPlanId week')
+    .lean();
+  const dayPlanPlanId = new Map();
+  for (const dp of dayPlans) {
+    if (Number(dp.week) === currentWeekByPlan.get(String(dp.dietPlanId))) {
+      dayPlanPlanId.set(String(dp._id), String(dp.dietPlanId));
+    }
+  }
+  if (dayPlanPlanId.size === 0) return new Set();
+
+  const slots = await MealSlotPlan.find({
+    dayPlanId: { $in: [...dayPlanPlanId.keys()] },
+    servingTime: slot,
+  })
+    .select('dayPlanId')
+    .lean();
+  const planIdBySlot = new Map(slots.map((s) => [String(s._id), dayPlanPlanId.get(String(s.dayPlanId))]));
+  if (planIdBySlot.size === 0) return new Set();
+
+  // A slot with no items is an empty slot, not a meal to remind about.
+  const filledSlotIds = await PlanItem.find({ mealSlotId: { $in: [...planIdBySlot.keys()] } }).distinct(
+    'mealSlotId'
+  );
+  return new Set(filledSlotIds.map((id) => planIdBySlot.get(String(id))).filter(Boolean));
+}
 
 /**
  * Fixed-time meal reminder (see vercel.json's one cron entry per servingTime,
@@ -39,9 +90,16 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
   const activePlans = await DietPlan.find({ status: 'Active' })
-    .select('patientId finalizedPlan.weeks weekSchedule activationDate request')
+    .select('patientId dataModel finalizedPlan.weeks weekSchedule activationDate request')
     .populate('request', 'startDateForDiet')
     .lean();
+
+  const planItemPlanIds = await planItemPlanIdsWithSlot(
+    activePlans.filter((plan) => plan.dataModel === 'plan-item'),
+    slot,
+    todayDayGroup,
+    today
+  );
 
   const title = render(rule.title, { slot });
   const message = render(rule.message, { slot });
@@ -54,6 +112,13 @@ async function runMealReminderSweep({ slot, now = new Date() } = {}) {
   for (const plan of activePlans) {
     const pidStr = plan.patientId.toString();
     if (seenPatient.has(pidStr)) continue;
+    if (plan.dataModel === 'plan-item') {
+      if (planItemPlanIds.has(String(plan._id))) {
+        seenPatient.add(pidStr);
+        scheduledPatientIds.push(plan.patientId);
+      }
+      continue;
+    }
     const weeks = getFinalizedWeeks(plan);
     const currentWeek = resolveCurrentWeek(plan, today);
     const week = weeks.find((w) => Number(w.week) === Number(currentWeek));
