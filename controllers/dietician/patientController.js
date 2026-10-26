@@ -388,6 +388,43 @@ exports.getPatientProfile = async (req, res, next) => {
       }
     }
 
+    // Earlier cycles stay on the record after a renewal: the profile's
+    // weekly row is built from the live plan only, so without this the old
+    // cycle's weeks (e.g. Weeks 1-4) vanish from the dietician app the moment
+    // the next plan becomes active. Read-only history, oldest first; a plan
+    // that was never finalized (Draft) is not history.
+    let previousCycles = [];
+    if (dietPlanForSummary?.cycleNumber > 1) {
+      const excludeIds = [dietPlanForSummary._id, statusSnapshot.pendingDietPlanId].filter(
+        (id) => id && mongoose.Types.ObjectId.isValid(id),
+      );
+      const earlierPlans = await DietPlan.find({
+        patientId: patient._id,
+        _id: { $nin: excludeIds },
+        status: { $in: ['Finalized', 'Active', 'Completed'] },
+        cycleNumber: { $lt: dietPlanForSummary.cycleNumber },
+      })
+        .sort({ cycleNumber: 1 })
+        .select(DIET_PLAN_SUMMARY_SELECT)
+        .lean();
+      previousCycles = await Promise.all(
+        earlierPlans.map(async (plan) => {
+          const weeks = await deriveWeeksForPlan(plan);
+          return {
+            dietPlanId: plan._id,
+            status: plan.status || null,
+            dataModel: plan.dataModel || null,
+            cycleNumber: plan.cycleNumber || 1,
+            membershipPlan: plan.membershipPlan || null,
+            weekSchedule: withPauseShift(plan.weekSchedule),
+            weeklyDietPlans: weeks.weeklyDietPlans,
+            generatedWeekNumbers: weeks.generatedWeekNumbers,
+            finalizedWeekNumbers: weeks.finalizedWeekNumbers,
+          };
+        }),
+      );
+    }
+
     // Membership badge / avatar ring on the dietician's patient profile
     // must reflect the tier the *currently active* cycle was sold as, not
     // whatever the patient just picked for a pending renewal
@@ -497,6 +534,10 @@ exports.getPatientProfile = async (req, res, next) => {
         // Same week-state signals as the active cycle above, for the
         // "Week 5-8" cards + Create/Resume button under Weekly Diet Plans.
         pendingCycle,
+        // Finished earlier cycles (oldest first), read-only - the app shows
+        // their weeks as disabled cards before the live cycle's. Empty for a
+        // patient on their first cycle.
+        previousCycles,
         // Subscription pause state for the active cycle (see
         // utils/subscriptionPause.js) - drives the "Pause / Resume
         // subscription" control in Patient Settings.
