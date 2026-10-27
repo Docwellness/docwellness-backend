@@ -30,6 +30,9 @@ const {
   deriveComponentsFromIngredients,
   componentsAreDerivable,
 } = require('../../utils/coreIngredientHeuristic');
+const recipeVersioningService = require('../../services/recipeVersioningService');
+
+const { MICRONUTRIENT_FIELDS } = recipeVersioningService;
 const fs = require('fs');
 
 const hashRecipeInput = ({ name, servingTime, servings, dietaryHabits, freeFrom, aiNote }) =>
@@ -537,6 +540,27 @@ function sanitizeRecipeIngredients(ingredients) {
   );
 
   return { ingredients: safeIngredients, warnings };
+}
+
+const isPlainObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * True when the incoming (already sanitised) ingredients differ from the
+ * stored ones. The stored list is run through the same sanitiser so both
+ * sides are normalised alike, then compared as an unordered multiset of
+ * name (trimmed, lower-cased) + quantity + unit - a pure re-ordering is not a
+ * change. Stored ingredients that cannot be read count as changed.
+ */
+function ingredientsChanged(storedIngredients, incomingSafeIngredients) {
+  if (!Array.isArray(storedIngredients)) return true;
+  const signature = (list) =>
+    list
+      .map((i) => `${String(i?.name ?? '').trim().toLowerCase()}|${i?.quantity}|${i?.unit}`)
+      .sort()
+      .join('\n');
+  const { ingredients: storedSafe } = sanitizeRecipeIngredients(storedIngredients);
+  return signature(storedSafe) !== signature(incomingSafeIngredients);
 }
 
 /**
@@ -1237,6 +1261,11 @@ const DIRECT_UPDATE_FIELDS = [
   'freeFrom', 'nutrition', 'translations',
 ];
 
+// Recipe.nutrition keys. `nutrition` is written as dotted paths (see
+// updateRecipe) so a save that omits a key leaves it untouched - notably the
+// micronutrients, which a macros-only save must not wipe.
+const NUTRITION_KEYS = ['calories', 'protein', 'carbs', 'fats', 'fiber', ...MICRONUTRIENT_FIELDS];
+
 /**
  * @desc    Update an existing recipe - either a single field (e.g. just the
  *          main image) or the full editable set from the "Save Recipe"
@@ -1256,9 +1285,21 @@ exports.updateRecipe = async (req, res, next) => {
 
     const updates = {};
     const unsets = {};
+    let nutritionUpdated = false;
     for (const key of DIRECT_UPDATE_FIELDS) {
-      if (Object.prototype.hasOwnProperty.call(body, key)) {
+      if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+      if (key === 'nutrition' && isPlainObject(body.nutrition)) {
+        // $set only the keys the request carries (an explicit null stays a
+        // null set); unknown keys are dropped, as the schema would.
+        for (const nutrient of NUTRITION_KEYS) {
+          if (Object.prototype.hasOwnProperty.call(body.nutrition, nutrient)) {
+            updates[`nutrition.${nutrient}`] = body.nutrition[nutrient];
+          }
+        }
+        nutritionUpdated = true;
+      } else {
         updates[key] = body[key];
+        if (key === 'nutrition' && body[key]) nutritionUpdated = true;
       }
     }
     // Setting `image` through this general-purpose edit path is always a
@@ -1302,6 +1343,24 @@ exports.updateRecipe = async (req, res, next) => {
     if (Object.prototype.hasOwnProperty.call(body, 'ingredients')) {
       const { ingredients: safeIngredients } = sanitizeRecipeIngredients(body.ingredients);
       updates.ingredients = safeIngredients;
+      // The stored micronutrients were computed from the OLD ingredients, so
+      // when the ingredients really changed, any the request does not carry
+      // (a key in body.nutrition, even an explicit null, wins) are nulled
+      // rather than left showing as researched. A resend of the same
+      // ingredients (the app's plain "Save Recipe") leaves them alone.
+      // (Skipped when `nutrition` is set whole above: a dotted path under it
+      // would conflict in the same $set.)
+      if (
+        !Object.prototype.hasOwnProperty.call(updates, 'nutrition') &&
+        ingredientsChanged(existingForClassification.ingredients, safeIngredients)
+      ) {
+        const carriedNutrition = isPlainObject(body.nutrition) ? body.nutrition : {};
+        for (const micro of MICRONUTRIENT_FIELDS) {
+          if (!Object.prototype.hasOwnProperty.call(carriedNutrition, micro)) {
+            updates[`nutrition.${micro}`] = null;
+          }
+        }
+      }
       // Recipe.js's pre-save hook recomputes this from ingredient names on
       // .save() - findOneAndUpdate skips it, so a nut recipe edited here
       // would keep stale/empty allergens and slip past allergen-conflict
@@ -1384,10 +1443,9 @@ exports.updateRecipe = async (req, res, next) => {
     // version mirrors. Awaited (unlike the fire-and-forget hook) so the
     // picker reflects a freshly-fixed recipe on the very next fetch, but
     // never allowed to fail the edit.
-    if (updates.ingredients || updates.components || updates.instructions || updates.nutrition) {
+    if (updates.ingredients || updates.components || updates.instructions || nutritionUpdated) {
       try {
-        const { syncV1FromRecipe } = require('../../services/recipeVersioningService');
-        await syncV1FromRecipe(recipe);
+        await recipeVersioningService.syncV1FromRecipe(recipe);
       } catch (syncErr) {
         console.error(`updateRecipe: V1 RecipeVersion re-sync failed (non-blocking) for ${recipe._id}:`, syncErr.message);
       }
