@@ -1,0 +1,766 @@
+{
+  "_meta": {
+    "date": "2026-10-27",
+    "description": "Which food record(s) each ingredient's new micronutrient values come from. Values are per 100 g. USDA FoodData Central: SR Legacy (2018-04 download) and Foundation (2025-04-24 download). Matvaretabellen (Norwegian Food Safety Authority) is a cross-check only where its value cites its own source (not USDA, not an assumed zero).",
+    "notResearched": [
+      "Chaat Masala",
+      "Garam Masala",
+      "Sambar Powder",
+      "Pav Bhaji Masala",
+      "Ragi Flour",
+      "Bajra",
+      "Bajra (Pearl Millet) Flour",
+      "Soya Chunks",
+      "Soya Flour",
+      "Curry Leaves",
+      "Fenugreek Leaves",
+      "Flattened Rice",
+      "Ajwain",
+      "Chamomile Flowers",
+      "Licorice Root",
+      "Ashwagandha Powder",
+      "Shatavari Powder",
+      "Triphala Churna",
+      "Brahmi",
+      "Shankhpushpi",
+      "Fish",
+      "Chapati",
+      "Bhakri",
+      "Papad",
+      "Brown Bread",
+      "Lettuce",
+      "Paneer",
+      "Dijon Mustard",
+      "Mustard"
+    ]
+  },
+  "ingredients": {
+    "Salt": {
+      "usdaSrLegacy": {
+        "fdcId": "173468",
+        "description": "Salt, table"
+      },
+      "usdaFoundation": {
+        "fdcId": "746775",
+        "description": "Salt, table, iodized"
+      },
+      "preferred": "sr",
+      "basis": "as sold",
+      "note": "Plain table salt (SR 173468). The iodized Foundation entry (FDC 746775) reports iron 0; a mineral salt carries at most trace iron, so the effect on a recipe is negligible either way."
+    },
+    "Green Chilli": {
+      "usdaSrLegacy": {
+        "fdcId": "170497",
+        "description": "Peppers, hot chili, green, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.146",
+        "description": "Pepper, chili, green, raw"
+      }
+    },
+    "Black Pepper": {
+      "usdaSrLegacy": {
+        "fdcId": "170931",
+        "description": "Spices, pepper, black"
+      },
+      "matvaretabellen": {
+        "foodId": "12.111",
+        "description": "Pepper, black"
+      },
+      "basis": "dry"
+    },
+    "Turmeric Powder": {
+      "usdaSrLegacy": {
+        "fdcId": "172231",
+        "description": "Spices, turmeric, ground"
+      },
+      "matvaretabellen": {
+        "foodId": "06.153",
+        "description": "Turmeric, ground"
+      },
+      "basis": "dry"
+    },
+    "Chicken Breast": {
+      "usdaSrLegacy": {
+        "fdcId": "171077",
+        "description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw"
+      },
+      "usdaFoundation": {
+        "fdcId": "2646170",
+        "description": "Chicken, breast, boneless, skinless, raw"
+      },
+      "preferred": "fnd"
+    },
+    "Ghee": {
+      "usdaSrLegacy": {
+        "fdcId": "173412",
+        "description": "Butter oil, anhydrous"
+      },
+      "matvaretabellen": {
+        "foodId": "08.252",
+        "description": "Ghee"
+      },
+      "note": "USDA 'Butter oil, anhydrous' (ghee is clarified butterfat)."
+    },
+    "Jowar Flour": {
+      "usdaSrLegacy": {
+        "fdcId": "168943",
+        "description": "Sorghum flour, whole-grain"
+      },
+      "usdaFoundation": {
+        "fdcId": "2512373",
+        "description": "Flour, sorghum"
+      },
+      "matvaretabellen": {
+        "foodId": "05.224",
+        "description": "Sorghum"
+      },
+      "note": "Sorghum flour (jowar). The Norwegian record is whole sorghum grain."
+    },
+    "Jowar": {
+      "usdaSrLegacy": {
+        "fdcId": "169716",
+        "description": "Sorghum grain"
+      },
+      "matvaretabellen": {
+        "foodId": "05.224",
+        "description": "Sorghum"
+      },
+      "note": "Sorghum grain (jowar)."
+    },
+    "Masoor Dal": {
+      "usdaSrLegacy": {
+        "fdcId": "174284",
+        "description": "Lentils, pink or red, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.184",
+        "description": "Lentils, red, uncooked"
+      },
+      "basis": "dry"
+    },
+    "Whole Masoor Dal": {
+      "usdaSrLegacy": {
+        "fdcId": "172420",
+        "description": "Lentils, raw"
+      },
+      "basis": "dry"
+    },
+    "Low-Fat Curd": {
+      "usdaSrLegacy": {
+        "fdcId": "170886",
+        "description": "Yogurt, plain, low fat"
+      },
+      "note": "USDA plain low-fat yogurt used for low-fat curd."
+    },
+    "Curd": {
+      "usdaSrLegacy": {
+        "fdcId": "171284",
+        "description": "Yogurt, plain, whole milk"
+      },
+      "note": "USDA plain whole-milk yogurt used for curd."
+    },
+    "Fennel Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "171323",
+        "description": "Spices, fennel seed"
+      },
+      "matvaretabellen": {
+        "foodId": "06.204",
+        "description": "Fennel seeds"
+      },
+      "basis": "dry"
+    },
+    "Fenugreek Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "171324",
+        "description": "Spices, fenugreek seed"
+      },
+      "basis": "dry"
+    },
+    "Coriander Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "170922",
+        "description": "Spices, coriander seed"
+      },
+      "matvaretabellen": {
+        "foodId": "06.194",
+        "description": "Coriander seeds"
+      },
+      "basis": "dry"
+    },
+    "Coriander Powder": {
+      "usdaSrLegacy": {
+        "fdcId": "170922",
+        "description": "Spices, coriander seed"
+      },
+      "matvaretabellen": {
+        "foodId": "06.194",
+        "description": "Coriander seeds"
+      },
+      "basis": "dry",
+      "note": "Ground coriander seed; same composition as the seed."
+    },
+    "Moong Sprouts": {
+      "usdaSrLegacy": {
+        "fdcId": "169957",
+        "description": "Mung beans, mature seeds, sprouted, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.145",
+        "description": "Mung beans, sprouted, raw"
+      }
+    },
+    "Moong Beans": {
+      "usdaSrLegacy": {
+        "fdcId": "174256",
+        "description": "Mung beans, mature seeds, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.089",
+        "description": "Beans, mung, uncooked"
+      },
+      "basis": "dry"
+    },
+    "Kala Chana": {
+      "usdaSrLegacy": {
+        "fdcId": "173756",
+        "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, raw"
+      },
+      "basis": "dry",
+      "note": "USDA chickpeas (Bengal gram), mature, raw; black chickpea is a desi chickpea."
+    },
+    "Chana Dal": {
+      "usdaSrLegacy": {
+        "fdcId": "173756",
+        "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, raw"
+      },
+      "basis": "dry",
+      "note": "Split Bengal gram; USDA chickpea record used."
+    },
+    "Chickpeas": {
+      "usdaSrLegacy": {
+        "fdcId": "173756",
+        "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, raw"
+      },
+      "basis": "dry"
+    },
+    "Chia Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "170554",
+        "description": "Seeds, chia seeds, dried"
+      },
+      "usdaFoundation": {
+        "fdcId": "2710819",
+        "description": "Chia seeds, dry, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "05.380",
+        "description": "Chia seeds, dried"
+      },
+      "basis": "dry"
+    },
+    "Puffed Rice": {
+      "usdaSrLegacy": {
+        "fdcId": "171651",
+        "description": "Cereals ready-to-eat, QUAKER, QUAKER Puffed Rice"
+      },
+      "matvaretabellen": {
+        "foodId": "05.039",
+        "description": "Puffed rice"
+      },
+      "preferred": "no",
+      "note": "The USDA record is a branded cereal; the Norwegian plain puffed rice is preferred."
+    },
+    "Semolina": {
+      "usdaSrLegacy": {
+        "fdcId": "168933",
+        "description": "Semolina, unenriched"
+      },
+      "usdaFoundation": {
+        "fdcId": "2003588",
+        "description": "Flour, semolina, coarse and semi-coarse"
+      },
+      "matvaretabellen": {
+        "foodId": "05.029",
+        "description": "Semolina, wheat meal"
+      },
+      "basis": "dry"
+    },
+    "Mustard Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "170929",
+        "description": "Spices, mustard seed, ground"
+      },
+      "matvaretabellen": {
+        "foodId": "06.170",
+        "description": "Mustard seeds"
+      },
+      "basis": "dry",
+      "note": "USDA ground mustard seed used for the seed."
+    },
+    "Whole Wheat Flour": {
+      "usdaSrLegacy": {
+        "fdcId": "168893",
+        "description": "Wheat flour, whole-grain (Includes foods for USDA's Food Distribution Program)"
+      },
+      "basis": "dry"
+    },
+    "Red Kidney Beans": {
+      "usdaSrLegacy": {
+        "fdcId": "173744",
+        "description": "Beans, kidney, red, mature seeds, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.090",
+        "description": "Beans, red (kidney), uncooked"
+      },
+      "basis": "dry"
+    },
+    "Urad Dal": {
+      "usdaSrLegacy": {
+        "fdcId": "174259",
+        "description": "Mungo beans, mature seeds, raw"
+      },
+      "basis": "dry",
+      "note": "USDA 'Mungo beans' = black gram (urad)."
+    },
+    "Baking Soda": {
+      "usdaSrLegacy": {
+        "fdcId": "175040",
+        "description": "Leavening agents, baking soda"
+      },
+      "matvaretabellen": {
+        "foodId": "10.133",
+        "description": "Baking soda"
+      },
+      "basis": "as sold"
+    },
+    "Cashews": {
+      "usdaSrLegacy": {
+        "fdcId": "170162",
+        "description": "Nuts, cashew nuts, raw"
+      },
+      "usdaFoundation": {
+        "fdcId": "2515374",
+        "description": "Nuts, cashew nuts, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.582",
+        "description": "Cashew nuts"
+      }
+    },
+    "Sesame Seeds": {
+      "usdaSrLegacy": {
+        "fdcId": "170150",
+        "description": "Seeds, sesame seeds, whole, dried"
+      },
+      "matvaretabellen": {
+        "foodId": "05.030",
+        "description": "Sesame seeds, with shell"
+      },
+      "basis": "dry"
+    },
+    "Tapioca Pearls": {
+      "usdaSrLegacy": {
+        "fdcId": "169717",
+        "description": "Tapioca, pearl, dry"
+      },
+      "basis": "dry"
+    },
+    "Saffron": {
+      "usdaSrLegacy": {
+        "fdcId": "170934",
+        "description": "Spices, saffron"
+      },
+      "matvaretabellen": {
+        "foodId": "06.189",
+        "description": "Saffron, dried"
+      },
+      "basis": "dry"
+    },
+    "Cardamom": {
+      "usdaSrLegacy": {
+        "fdcId": "170919",
+        "description": "Spices, cardamom"
+      },
+      "matvaretabellen": {
+        "foodId": "06.157",
+        "description": "Cardamom, ground"
+      },
+      "basis": "dry"
+    },
+    "Doodhi (Bottle Gourd)": {
+      "usdaSrLegacy": {
+        "fdcId": "169232",
+        "description": "Gourd, white-flowered (calabash), raw"
+      },
+      "note": "USDA white-flowered (calabash) gourd, raw = bottle gourd."
+    },
+    "Ridge Gourd": {
+      "usdaSrLegacy": {
+        "fdcId": "168414",
+        "description": "Gourd, dishcloth (towelgourd), raw"
+      },
+      "note": "USDA dishcloth (towel) gourd, raw = ridge gourd (turai)."
+    },
+    "Toor Dal": {
+      "usdaSrLegacy": {
+        "fdcId": "172436",
+        "description": "Pigeon peas (red gram), mature seeds, raw"
+      },
+      "basis": "dry",
+      "note": "USDA pigeon peas (red gram), mature, raw."
+    },
+    "Makhana": {
+      "usdaSrLegacy": {
+        "fdcId": "170149",
+        "description": "Seeds, lotus seeds, dried"
+      },
+      "basis": "dry",
+      "note": "USDA lotus seeds, dried (fox nut / makhana)."
+    },
+    "Almond Milk": {
+      "usdaSrLegacy": {
+        "fdcId": "174832",
+        "description": "Beverages, almond milk, unsweetened, shelf stable"
+      },
+      "usdaFoundation": {
+        "fdcId": "1750338",
+        "description": "Almond milk, unsweetened, plain, shelf stable"
+      }
+    },
+    "Okra": {
+      "usdaSrLegacy": {
+        "fdcId": "169260",
+        "description": "Okra, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.188",
+        "description": "Okra, raw"
+      }
+    },
+    "Dried Cranberries": {
+      "usdaSrLegacy": {
+        "fdcId": "171723",
+        "description": "Cranberries, dried, sweetened (Includes foods for USDA's Food Distribution Program)"
+      },
+      "matvaretabellen": {
+        "foodId": "06.228",
+        "description": "Cranberries, dried, sweetened"
+      }
+    },
+    "Red Chilli": {
+      "usdaSrLegacy": {
+        "fdcId": "170932",
+        "description": "Spices, pepper, red or cayenne"
+      },
+      "matvaretabellen": {
+        "foodId": "06.165",
+        "description": "Pepper, cayenne, red"
+      },
+      "basis": "dry",
+      "note": "USDA red/cayenne pepper (dried, ground)."
+    },
+    "Broken Wheat": {
+      "usdaSrLegacy": {
+        "fdcId": "170688",
+        "description": "Bulgur, dry"
+      },
+      "usdaFoundation": {
+        "fdcId": "2710820",
+        "description": "Bulgur, dry, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "05.233",
+        "description": "Bulgur, uncooked"
+      },
+      "basis": "dry",
+      "note": "Bulgur (cracked wheat) used for broken wheat / daliya."
+    },
+    "Moringa Leaves": {
+      "usdaSrLegacy": {
+        "fdcId": "168416",
+        "description": "Drumstick leaves, raw"
+      },
+      "note": "USDA 'Drumstick leaves, raw' = moringa."
+    },
+    "Lemongrass": {
+      "usdaSrLegacy": {
+        "fdcId": "168573",
+        "description": "Lemon grass (citronella), raw"
+      }
+    },
+    "Flaxseed": {
+      "usdaSrLegacy": {
+        "fdcId": "169414",
+        "description": "Seeds, flaxseed"
+      },
+      "matvaretabellen": {
+        "foodId": "05.012",
+        "description": "Linseeds, flax seeds, crushed"
+      },
+      "basis": "dry"
+    },
+    "Matki (Moth Beans)": {
+      "usdaSrLegacy": {
+        "fdcId": "172425",
+        "description": "Mothbeans, mature seeds, raw"
+      },
+      "basis": "dry"
+    },
+    "Black-eyed Peas": {
+      "usdaSrLegacy": {
+        "fdcId": "173758",
+        "description": "Cowpeas, common (blackeyes, crowder, southern), mature seeds, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.191",
+        "description": "Cowpeas, blackeyes beans, uncooked"
+      },
+      "basis": "dry"
+    },
+    "Edamame": {
+      "usdaSrLegacy": {
+        "fdcId": "168410",
+        "description": "Edamame, frozen, unprepared"
+      },
+      "matvaretabellen": {
+        "foodId": "06.197",
+        "description": "Edamame, soy beans, frozen"
+      },
+      "basis": "frozen"
+    },
+    "Raisins": {
+      "usdaSrLegacy": {
+        "fdcId": "168165",
+        "description": "Raisins, dark, seedless (Includes foods for USDA's Food Distribution Program)"
+      },
+      "matvaretabellen": {
+        "foodId": "06.549",
+        "description": "Raisins"
+      }
+    },
+    "Low-Fat Milk": {
+      "usdaSrLegacy": {
+        "fdcId": "170872",
+        "description": "Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D"
+      },
+      "usdaFoundation": {
+        "fdcId": "322228",
+        "description": "Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D"
+      }
+    },
+    "Bell Pepper": {
+      "usdaSrLegacy": {
+        "fdcId": "170427",
+        "description": "Peppers, sweet, green, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.047",
+        "description": "Sweet pepper, green, raw"
+      },
+      "note": "Green sweet pepper."
+    },
+    "Rosemary": {
+      "usdaSrLegacy": {
+        "fdcId": "173473",
+        "description": "Rosemary, fresh"
+      },
+      "matvaretabellen": {
+        "foodId": "06.168",
+        "description": "Rosemary, raw"
+      },
+      "basis": "fresh"
+    },
+    "Thyme": {
+      "usdaSrLegacy": {
+        "fdcId": "173470",
+        "description": "Thyme, fresh"
+      },
+      "basis": "fresh"
+    },
+    "Chicken Leg": {
+      "usdaSrLegacy": {
+        "fdcId": "173619",
+        "description": "Chicken, broilers or fryers, leg, meat only, raw"
+      }
+    },
+    "Tofu": {
+      "usdaSrLegacy": {
+        "fdcId": "172476",
+        "description": "Tofu, raw, regular, prepared with calcium sulfate"
+      }
+    },
+    "Sweet Corn": {
+      "usdaSrLegacy": {
+        "fdcId": "169998",
+        "description": "Corn, sweet, yellow, raw"
+      },
+      "usdaFoundation": {
+        "fdcId": "2710826",
+        "description": "Corn, sweet, yellow and white kernels,  fresh, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.044",
+        "description": "Sweet corn, Norwegian, raw"
+      }
+    },
+    "Cinnamon Stick": {
+      "usdaSrLegacy": {
+        "fdcId": "171320",
+        "description": "Spices, cinnamon, ground"
+      },
+      "basis": "dry",
+      "note": "USDA ground cinnamon used for the stick."
+    },
+    "Peanut Butter": {
+      "usdaSrLegacy": {
+        "fdcId": "174266",
+        "description": "Peanut butter, smooth style, with salt (Includes foods for USDA's Food Distribution Program)"
+      },
+      "usdaFoundation": {
+        "fdcId": "324860",
+        "description": "Peanut butter, smooth style, with salt"
+      },
+      "matvaretabellen": {
+        "foodId": "06.559",
+        "description": "Peanut butter"
+      }
+    },
+    "Nutmeg": {
+      "usdaSrLegacy": {
+        "fdcId": "171326",
+        "description": "Spices, nutmeg, ground"
+      },
+      "matvaretabellen": {
+        "foodId": "06.161",
+        "description": "Nutmeg, ground"
+      },
+      "basis": "dry"
+    },
+    "Sugar": {
+      "usdaSrLegacy": {
+        "fdcId": "169655",
+        "description": "Sugars, granulated"
+      },
+      "usdaFoundation": {
+        "fdcId": "334247",
+        "description": "Sugars, granulated"
+      },
+      "matvaretabellen": {
+        "foodId": "09.002",
+        "description": "Sugar, white, caster sugar, cube sugar"
+      }
+    },
+    "Brinjal": {
+      "usdaSrLegacy": {
+        "fdcId": "169228",
+        "description": "Eggplant, raw"
+      },
+      "usdaFoundation": {
+        "fdcId": "2685577",
+        "description": "Eggplant, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.015",
+        "description": "Aubergine, raw"
+      }
+    },
+    "Basil Leaves": {
+      "usdaSrLegacy": {
+        "fdcId": "172232",
+        "description": "Basil, fresh"
+      },
+      "matvaretabellen": {
+        "foodId": "06.111",
+        "description": "Basil, fresh"
+      },
+      "basis": "fresh"
+    },
+    "Baking Powder": {
+      "usdaSrLegacy": {
+        "fdcId": "172803",
+        "description": "Leavening agents, baking powder, double-acting, sodium aluminum sulfate"
+      },
+      "matvaretabellen": {
+        "foodId": "12.018",
+        "description": "Baking powder"
+      },
+      "preferred": "sr",
+      "basis": "as sold",
+      "note": "Formulations differ between the USDA sodium-aluminum-sulfate type and the Norwegian product, so calcium disagrees."
+    },
+    "Watermelon": {
+      "usdaSrLegacy": {
+        "fdcId": "167765",
+        "description": "Watermelon, raw"
+      }
+    },
+    "Mint Leaves": {
+      "usdaSrLegacy": {
+        "fdcId": "173475",
+        "description": "Spearmint, fresh"
+      },
+      "basis": "fresh",
+      "note": "USDA spearmint, fresh."
+    },
+    "Coconut Oil": {
+      "usdaSrLegacy": {
+        "fdcId": "171412",
+        "description": "Oil, coconut"
+      },
+      "usdaFoundation": {
+        "fdcId": "330458",
+        "description": "Oil, coconut"
+      },
+      "matvaretabellen": {
+        "foodId": "08.249",
+        "description": "Oil, coconut"
+      }
+    },
+    "Egg": {
+      "usdaSrLegacy": {
+        "fdcId": "171287",
+        "description": "Egg, whole, raw, fresh"
+      },
+      "matvaretabellen": {
+        "foodId": "02.001",
+        "description": "Egg, raw"
+      }
+    },
+    "Pomegranate": {
+      "usdaSrLegacy": {
+        "fdcId": "169134",
+        "description": "Pomegranates, raw"
+      },
+      "matvaretabellen": {
+        "foodId": "06.596",
+        "description": "Pomegranate, raw"
+      }
+    },
+    "Oats": {
+      "usdaSrLegacy": {
+        "fdcId": "173904",
+        "description": "Cereals, oats, regular and quick, not fortified, dry"
+      },
+      "matvaretabellen": {
+        "foodId": "05.003",
+        "description": "Rolled oats"
+      },
+      "basis": "dry"
+    },
+    "Coconut Milk": {
+      "usdaSrLegacy": {
+        "fdcId": "170172",
+        "description": "Nuts, coconut milk, raw (liquid expressed from grated meat and water)"
+      }
+    },
+    "Mayonnaise": {
+      "usdaSrLegacy": {
+        "fdcId": "171009",
+        "description": "Salad dressing, mayonnaise, regular"
+      }
+    }
+  }
+}
