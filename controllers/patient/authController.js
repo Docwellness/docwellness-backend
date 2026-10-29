@@ -33,6 +33,7 @@ const { parseDateFromDDMMYYYY } = require('../../utils/dateUtils');
 const { isLoginLocked, registerFailedLogin, clearFailedLoginAttempts } = require('../../utils/loginLockout');
 const { dedupedRefresh } = require('../../utils/refreshDedup');
 const { logAuditEvent } = require('../../utils/auditLog');
+const { buildEntries, currentConsents } = require('../../utils/consentState');
 const { assertPasswordAcceptable } = require('../../utils/passwordPolicy');
 
 const sessionResponse = (session) => ({
@@ -221,7 +222,7 @@ exports.login = async (req, res, next) => {
  */
 exports.register = async (req, res, next) => {
   try {
-    const { profile, healthProfile } = req.body || {};
+    const { profile, healthProfile, consents } = req.body || {};
     const { id: supabaseUserId, email } = req.supabaseUser;
 
     console.log('📝 Completing registration for:', email);
@@ -263,6 +264,7 @@ exports.register = async (req, res, next) => {
         healthConcerns: normalizedHealthProfile.healthConcerns,
       },
       isVerified: true,
+      consents: buildEntries(consents, 'signup'),
     });
 
     console.log('Patient registration completed:', user._id);
@@ -435,6 +437,7 @@ exports.getMe = async (req, res, next) => {
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
         isProfileComplete,
+        consents: currentConsents(user.consents),
       },
     });
   } catch (error) {

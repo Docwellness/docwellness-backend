@@ -338,6 +338,7 @@ module.exports = {
   PATIENT_DATA_CATEGORIES,
   CATEGORY_KEYS,
   ACCOUNT_ONLY_KEYS,
+  specsForCategory,
   countPatientData,
   deletePatientData,
   erasePatientCompletely,

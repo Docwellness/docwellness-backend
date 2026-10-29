@@ -24,10 +24,12 @@ if (redisEnabled) {
     });
 }
 
-function makeLimiter({ windowMs, limit, message }) {
+function makeLimiter({ windowMs, limit, message, keyGenerator }) {
   return rateLimit({
     windowMs,
     limit,
+    // Per-IP unless the caller keys it (e.g. by the authenticated patient).
+    ...(keyGenerator ? { keyGenerator } : {}),
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message },
@@ -78,4 +80,45 @@ const uploadLimiter = makeLimiter({
   message: 'Too many uploads, please try again later.',
 });
 
-module.exports = { authLimiter, messageLimiter, aiGenerationLimiter, uploadLimiter };
+// Bulk read of the patient's whole record, so tighter than the others.
+const exportLimiter = makeLimiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  message: 'Too many data exports, please try again later.',
+});
+
+// Consent decisions get two buckets, both keyed by the authenticated patient
+// (not the IP, which phones on a shared network share), so the app's
+// background sync of analytics/crash choices can never block the patient's own
+// health-data grant or withdrawal. The key prefix keeps the two buckets apart
+// in a shared Redis store.
+const CONSENT_WINDOW_MS = 15 * 60 * 1000;
+const consentKey = (bucket) => (req) => `consent-${bucket}:${req.user._id}`;
+
+const consentHealthLimiter = makeLimiter({
+  windowMs: CONSENT_WINDOW_MS,
+  limit: 60,
+  message: 'Too many consent changes, please try again later.',
+  keyGenerator: consentKey('health'),
+});
+
+const consentSyncLimiter = makeLimiter({
+  windowMs: CONSENT_WINDOW_MS,
+  limit: 30,
+  message: 'Too many consent changes, please try again later.',
+  keyGenerator: consentKey('sync'),
+});
+
+// Picks the bucket from `req.body.type`, so it must run after auth (req.user)
+// and after the body validation (the type is known to be one of the three).
+const consentLimiter = (req, res, next) =>
+  (req.body.type === 'health_data' ? consentHealthLimiter : consentSyncLimiter)(req, res, next);
+
+module.exports = {
+  authLimiter,
+  messageLimiter,
+  aiGenerationLimiter,
+  uploadLimiter,
+  exportLimiter,
+  consentLimiter,
+};

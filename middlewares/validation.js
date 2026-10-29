@@ -1,5 +1,9 @@
 const Joi = require('joi');
 
+const policyVersionSchema = Joi.string()
+  .max(32)
+  .pattern(/^[0-9A-Za-z._-]+$/);
+
 // Validation schemas
 const schemas = {
   // Registration-completion (email comes from the verified Supabase token,
@@ -107,6 +111,24 @@ const schemas = {
       .messages({
         'any.required': 'Health profile is required',
       }),
+    // Older app builds omit this; only the health-data grant is accepted here.
+    consents: Joi.array()
+      .items(
+        Joi.object({
+          type: Joi.string().valid('health_data').required(),
+          granted: Joi.boolean().required(),
+          policyVersion: policyVersionSchema.required(),
+        })
+      )
+      .max(1),
+  }),
+
+  // POST /consent - one decision per call; the server stamps the time.
+  consent: Joi.object({
+    type: Joi.string().valid('health_data', 'analytics', 'crash_reporting').required(),
+    granted: Joi.boolean().required(),
+    policyVersion: policyVersionSchema.required(),
+    source: Joi.string().valid('signup', 'reprompt', 'settings').required(),
   }),
 
   updateProfile: Joi.object({
@@ -210,6 +232,7 @@ const validate = (schemaName) => {
 const validateRegister = validate('register');
 const validateUpdateProfile = validate('updateProfile');
 const validateManualPaymentProof = validate('manualPaymentProof');
+const validateConsent = validate('consent');
 
 module.exports = {
   validate,
@@ -217,4 +240,5 @@ module.exports = {
   validateRegister,
   validateUpdateProfile,
   validateManualPaymentProof,
+  validateConsent,
 };

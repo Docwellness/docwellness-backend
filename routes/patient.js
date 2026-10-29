@@ -15,6 +15,7 @@ const {
   validateRegister,
   validateUpdateProfile,
   validateManualPaymentProof,
+  validateConsent,
 } = require('../middlewares/validation');
 
 // Import patient controllers
@@ -39,7 +40,13 @@ const {
 // Middleware for file uploads
 const upload = require('../middlewares/upload');
 const validateObjectIdParam = require('../middlewares/validateObjectIdParam');
-const { authLimiter, messageLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
+const {
+  authLimiter,
+  messageLimiter,
+  uploadLimiter,
+  exportLimiter,
+  consentLimiter,
+} = require('../middlewares/rateLimiters');
 const { loginRole, deviceRiskGate } = require('../middlewares/deviceRisk');
 const { requireLoggingOpen, requireWeightWindowOpen } = require('../middlewares/planEndGuard');
 
@@ -201,6 +208,25 @@ router.get('/data-deletion/categories', patientOnly, profileController.getDeleta
  * @desc    Delete selected data categories (or the whole account); password required
  */
 router.post('/data-deletion', patientOnly, profileController.requestDataDeletion);
+
+/**
+ * @route   GET /api/patient/data-export
+ * @desc    Download the patient's own data as JSON (rate limited, no-store)
+ */
+router.get('/data-export', patientOnly, exportLimiter, profileController.exportMyData);
+
+/**
+ * @route   GET /api/patient/consent
+ * @desc    Current consent state per type
+ */
+router.get('/consent', patientOnly, profileController.getConsent);
+
+/**
+ * @route   POST /api/patient/consent
+ * @desc    Record a consent grant or withdrawal
+ * @body    { type, granted, policyVersion, source }
+ */
+router.post('/consent', patientOnly, validateConsent, consentLimiter, profileController.setConsent);
 
 // ==========================================
 // Health Profile Routes

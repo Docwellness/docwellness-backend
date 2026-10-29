@@ -233,6 +233,22 @@ const userSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    // Append-only consent log (health data, analytics, crash reporting). The
+    // current state per type is the latest entry (utils/consentState.js).
+    // Distinct from status.patientConsented, the first-consultation consent.
+    consents: {
+      type: [
+        {
+          type: { type: String, enum: ['health_data', 'analytics', 'crash_reporting'], required: true },
+          granted: { type: Boolean, required: true },
+          policyVersion: { type: String, required: true },
+          source: { type: String, enum: ['signup', 'reprompt', 'settings'], required: true },
+          at: { type: Date, required: true },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

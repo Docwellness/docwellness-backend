@@ -19,6 +19,8 @@ const {
   erasePatientCompletely,
 } = require('../../utils/patientDataDeletion');
 const { logAuditEvent } = require('../../utils/auditLog');
+const { buildEntries, currentConsents, isDuplicateOfLatest } = require('../../utils/consentState');
+const { buildPatientExport } = require('../../utils/patientDataExport');
 
 /**
  * @desc    Get patient profile
@@ -351,6 +353,94 @@ exports.requestDataDeletion = async (req, res, next) => {
       message: 'Selected data has been deleted.',
       data: { accountDeleted: false, deleted },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Current consent state per type (health data, analytics, crash reporting)
+ * @route   GET /api/patient/consent
+ * @access  Private (Patient)
+ */
+exports.getConsent = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('consents');
+    res.status(200).json({ success: true, data: currentConsents(user.consents) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Record one consent decision (grant or withdrawal). Appends to the
+ *          caller's own log; an identical repeat of the latest state is skipped.
+ * @route   POST /api/patient/consent
+ * @body    { type, granted, policyVersion, source }
+ * @access  Private (Patient)
+ */
+exports.setConsent = async (req, res, next) => {
+  try {
+    const { type, granted, policyVersion, source } = req.body;
+    const input = { type, granted, policyVersion };
+    let user = await User.findById(req.user._id).select('consents');
+
+    // Check-then-append must be atomic: the push only applies while the log
+    // still has the length we checked against, otherwise another request got
+    // in first and we re-check against the fresh log (a few tries at most).
+    let stored = false;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (isDuplicateOfLatest(user.consents, input)) {
+        stored = true;
+        break;
+      }
+
+      const length = user.consents.length;
+      const entries = buildEntries([input], source);
+      const unchanged = { [`consents.${length}`]: { $exists: false } };
+      if (length > 0) unchanged[`consents.${length - 1}`] = { $exists: true };
+
+      const { modifiedCount } = await User.updateOne(
+        { _id: req.user._id, ...unchanged },
+        { $push: { consents: { $each: entries } } }
+      );
+      if (modifiedCount === 1) {
+        user.consents.push(...entries);
+        logAuditEvent('consent_recorded', { patientId: String(req.user._id), type });
+        stored = true;
+        break;
+      }
+      user = await User.findById(req.user._id).select('consents');
+    }
+    // The last lost attempt re-read the log; the decision may have landed there.
+    if (!stored && !isDuplicateOfLatest(user.consents, input)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Your choice could not be saved because of a conflicting update. Please try again.',
+      });
+    }
+
+    res.status(200).json({ success: true, data: currentConsents(user.consents) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Download the patient's own data as one JSON file (portability).
+ *          Contents are never logged; the audit event carries counts only.
+ * @route   GET /api/patient/data-export
+ * @access  Private (Patient)
+ */
+exports.exportMyData = async (req, res, next) => {
+  try {
+    const { document, counts } = await buildPatientExport(req.user);
+    logAuditEvent('patient_data_exported', { patientId: String(req.user._id), counts });
+
+    const day = document.exportedAt.slice(0, 10);
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Disposition', `attachment; filename="docwellness-data-${day}.json"`);
+    res.status(200).json(document);
   } catch (error) {
     next(error);
   }

@@ -56,6 +56,7 @@ function registerTestRefreshToken(refreshToken, session) {
 
 function clearTestTokens() {
   tokenToUserId.clear();
+  supabaseIdentities.clear();
   credentials.clear();
   refreshTokens.clear();
   refreshCallCount = 0;
@@ -117,10 +118,19 @@ async function getUserFromSupabaseToken(token) {
   return user;
 }
 
-async function verifySupabaseToken() {
-  throw new Error(
-    'verifySupabaseToken is not mocked - none of the P8-01 integration tests exercise the registration-completion path that uses it'
-  );
+// token -> { id, email } for the registration-completion path (no linked profile yet).
+const supabaseIdentities = new Map();
+
+function registerTestSupabaseIdentity(token, identity) {
+  supabaseIdentities.set(token, identity);
+}
+
+async function verifySupabaseToken(token) {
+  const identity = supabaseIdentities.get(token);
+  if (!identity) {
+    throw new Error('verifySupabaseToken has no identity registered for this token');
+  }
+  return identity;
 }
 
 // Minimal stand-ins for the two admin-API password flows - just enough for
@@ -172,6 +182,7 @@ module.exports = {
   resetPasswordWithOtp,
   getSupabaseAdmin,
   registerTestToken,
+  registerTestSupabaseIdentity,
   registerTestCredentials,
   registerTestRefreshToken,
   clearTestTokens,
