@@ -113,6 +113,60 @@ function buildDateBuckets(rangeStart, rangeEnd) {
   return { buckets, granularity };
 }
 
+// One bucket per UTC day in [rangeStart, rangeEnd], whatever the range width -
+// the calorie chart is always daily (the weight/BMI series keep
+// buildDateBuckets' daily/weekly/monthly sizes).
+function buildDailyBuckets(rangeStart, rangeEnd) {
+  const start = utcDay(rangeStart);
+  const end = utcDay(rangeEnd);
+  const buckets = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    buckets.push({
+      start: d,
+      end: endOfUtcDay(d),
+      startDate: localDateStr(d),
+      endDate: localDateStr(d),
+      label: formatShortDate(d),
+    });
+  }
+  return buckets;
+}
+
+// Per-day calorie items for the Progress calorie chart. Meal logs are indexed
+// by UTC day once, so the cost is O(days + logs). `plannedByDay` maps a day key
+// to that day's target kcal; a day with no entry has no target (0).
+function buildCalorieData({ dailyBuckets, mealLogs, plannedByDay }) {
+  const logsByDay = new Map();
+  for (const log of mealLogs || []) {
+    const key = localDateStr(log.date);
+    if (!logsByDay.has(key)) logsByDay.set(key, []);
+    logsByDay.get(key).push(log);
+  }
+  return dailyBuckets.map((bucket) => {
+    const dayLogs = logsByDay.get(bucket.startDate) || [];
+    const totalCalories = dayLogs.reduce(
+      (sum, log) => sum + (log.totalCalories || sumMealCalories(log.meals)),
+      0
+    );
+    const avgCalories = dayLogs.length > 0 ? totalCalories / dayLogs.length : 0;
+    return {
+      label: bucket.label,
+      dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
+      startDate: bucket.startDate,
+      endDate: bucket.endDate,
+      calories: Math.round(avgCalories),
+      totalCalories: Math.round(totalCalories),
+      plannedCalories: plannedByDay.get(bucket.startDate) ?? 0,
+      daysLogged: dayLogs.length,
+    };
+  });
+}
+
+// Index of the bucket holding `now`, or -1 when it is outside the range.
+function currentBucketIndex(buckets, now) {
+  return buckets.findIndex((b) => now >= b.start && now <= b.end);
+}
+
 // The plan's real start date - prefers weekSchedule's week-1 start over
 // activationDate, which can predate the plan's real first week. dietPlan
 // must have weekSchedule/activationDate selected/populated by the caller.
@@ -219,6 +273,9 @@ module.exports = {
   sumMealCalories,
   addDays,
   buildDateBuckets,
+  buildDailyBuckets,
+  buildCalorieData,
+  currentBucketIndex,
   resolvePlanStartDate,
   resolvePlanStartUtcDay,
   resolveHistoryStartDate,

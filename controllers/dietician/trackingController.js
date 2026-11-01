@@ -12,13 +12,16 @@ const { resolveDayGroupForDate } = require('../../utils/dayGroups');
 const {
   localDateStr,
   formatShortDate,
-  sumMealCalories,
   buildDateBuckets,
+  buildDailyBuckets,
+  buildCalorieData,
+  currentBucketIndex,
   resolvePlanStartUtcDay,
   resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
 const { buildRebasedWeightTrend, loadWeightTrendInputs } = require('../../utils/weightTrendRebase');
+const { loadDailyCalorieTargets } = require('../../utils/planDayCalories');
 const { loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { effectiveContentDate } = require('../../utils/subscriptionPause');
 const { computeDailyMealLogSummary } = require('../../utils/dailyMealLogSummary');
@@ -138,28 +141,14 @@ exports.getPatientTrackingData = async (req, res, next) => {
     // wide it is - and aggregate calorie intake per bucket.
     const { buckets, granularity } = buildDateBuckets(startDate, endDate);
 
-    const calorieData = buckets.map((bucket) => {
-      const bucketLogs = mealLogs.filter((log) => {
-        const logDate = new Date(log.date);
-        return logDate >= bucket.start && logDate <= bucket.end;
-      });
-      const totalCalories = bucketLogs.reduce(
-        (sum, log) => sum + (log.totalCalories || sumMealCalories(log.meals)),
-        0
-      );
-      const daysWithLogs = bucketLogs.length;
-      const avgCalories = daysWithLogs > 0 ? totalCalories / daysWithLogs : 0;
-      return {
-        label: bucket.label,
-        dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
-        startDate: bucket.startDate,
-        endDate: bucket.endDate,
-        calories: Math.round(avgCalories),
-        totalCalories: Math.round(totalCalories),
-        plannedCalories: plannedDailyCalories,
-        daysLogged: daysWithLogs,
-      };
+    // The calorie chart is always one bar per day; weight/BMI keep `buckets`.
+    const dailyBuckets = buildDailyBuckets(startDate, endDate);
+    const calorieData = buildCalorieData({
+      dailyBuckets,
+      mealLogs,
+      plannedByDay: await loadDailyCalorieTargets(patientId, dailyBuckets),
     });
+    const calorieCurrentIndex = currentBucketIndex(dailyBuckets, now);
 
     // Weight trend: the planned line re-based at each checkpoint weigh-in,
     // plus each bucket's measured weight - the same inputs and builder the
@@ -219,6 +208,7 @@ exports.getPatientTrackingData = async (req, res, next) => {
         startDate: localDateStr(startDate),
         endDate: localDateStr(endDate),
         currentIndex,
+        calorieCurrentIndex,
         currentWeight: Math.round(currentWeight * 10) / 10,
         currentBmi: Math.round((currentWeight / (heightInMeters * heightInMeters)) * 10) / 10,
         plannedDailyCalories,

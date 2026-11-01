@@ -20,7 +20,7 @@ const { resolveDayGroupForDate, mealMatchesDayGroup } = require('./dayGroups');
 const { getFinalizedWeeks } = require('./dietPlanLegacyView');
 const { buildPlanItemPatientView, baseRecipeIdFromKey } = require('./dietPlanReadDispatch');
 const { resolveCurrentWeek } = require('./dietPlanWeek');
-const { computeMealRatio } = require('./weekNutritionSummary');
+const { buildPlannedRecipeIndex, plannedMealRatio } = require('./planDayCalories');
 const { loadPatientPauses } = require('./patientPauseGuard');
 const { effectiveContentDate } = require('./subscriptionPause');
 const { sumCaloriesBurnedForDate } = require('./exerciseHelpers');
@@ -113,46 +113,12 @@ async function computeDailyMealLogSummary(patientId, today) {
       .lean()
     : [];
 
-  const recipes = {};
-  recipeDocs.forEach((recipe) => {
-    const id = recipe._id.toString();
-    recipes[id] = {
-      id,
-      name: recipe.name || null,
-      image: recipe.image || null,
-      servingTime: recipe.servingTime || null,
-      servingSize: recipe.servingSize || null,
-      secondaryComponent: recipe.secondaryComponent || null,
-      components: recipe.components || null,
-      calories: recipe.nutrition?.calories || 0,
-      protein: recipe.nutrition?.protein || 0,
-      carbs: recipe.nutrition?.carbs || 0,
-      fats: recipe.nutrition?.fats || 0,
-      fiber: recipe.nutrition?.fiber || 0,
-    };
-  });
-
-  // v4.0: synthesize a per-version recipes entry (keyed by the versioned id
-  // todaysDailyMeals uses) from the dietician-customized RecipeVersion - its
-  // nutritionPerServing is the exact prescribed amount, so plannedMeals
-  // reads it with no ratio scaling. No-op for a days-array plan
-  // (recipeVersionOverrides stays {}).
-  Object.entries(recipeVersionOverrides).forEach(([versionedId, override]) => {
-    const base = recipes[override.baseRecipeId];
-    if (!base) return;
-    const n = override.nutritionPerServing || {};
-    recipes[versionedId] = {
-      ...base,
-      id: versionedId,
-      components: override.components || base.components,
-      servingSize: { ...(base.servingSize || {}), quantity: 1 },
-      calories: n.calories ?? base.calories,
-      protein: n.protein ?? base.protein,
-      carbs: n.carbs ?? base.carbs,
-      fats: n.fats ?? base.fats,
-      fiber: n.fiber ?? base.fiber,
-    };
-  });
+  // v4.0: a plan-item plan also gets a per-version recipes entry (keyed by the
+  // versioned id todaysDailyMeals uses) from the dietician-customized
+  // RecipeVersion - its nutritionPerServing is the exact prescribed amount, so
+  // plannedMeals reads it with no ratio scaling (see utils/planDayCalories.js,
+  // shared with the Progress calorie targets).
+  const recipes = buildPlannedRecipeIndex(recipeDocs, recipeVersionOverrides);
 
   // Ratio of what the dietician actually assigned vs. the recipe's own base
   // serving(s), keyed by servingTime+recipeId - the single scale factor
@@ -168,9 +134,7 @@ async function computeDailyMealLogSummary(patientId, today) {
     const recipe = recipes[meal.recipeId];
     if (!recipe) return;
     const baseId = baseRecipeIdFromKey(meal.recipeId.toString());
-    // A plan-item meal's version nutrition is already the exact prescribed
-    // amount (servings is always 1) - ratio 1, no scaling.
-    const ratio = isPlanItem ? 1 : computeMealRatio(meal, recipe);
+    const ratio = plannedMealRatio(meal, recipe, isPlanItem);
     assignedRatioByKey[`${meal.servingTime}:${recipe.id}`] = ratio;
     assignedRatioByKey[`${meal.servingTime}:${baseId}`] = ratio; // logged meals key on the base id
     plannedRecipeByKey[`${meal.servingTime}:${baseId}`] = recipe;

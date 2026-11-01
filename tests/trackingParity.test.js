@@ -4,7 +4,7 @@
  * (both go through utils/weightTrendRebase.js and utils/trackingBuckets.js).
  */
 const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/testDb');
-const { createTwoCyclePatient, utcDay, dayKey } = require('./helpers/twoCycleFixture');
+const { createTwoCyclePatient, addCycleMeals, utcDay, dayKey } = require('./helpers/twoCycleFixture');
 
 jest.mock('../utils/supabaseAuth');
 const { registerTestToken, clearTestTokens } = require('../utils/supabaseAuth');
@@ -25,8 +25,9 @@ afterAll(async () => disconnectTestDb());
 
 // A renewal fixture: Weeks 1 and 4 weighed in (72 and 64 kg), meals logged on
 // the last two weeks, and a calorie budget on the cycle 2 plan.
-async function seed() {
-  const fixture = await createTwoCyclePatient();
+async function seed({ historyStartOffset } = {}) {
+  const fixture = await createTwoCyclePatient({ historyStartOffset });
+  await addCycleMeals(fixture);
   const { patient, dietician, plan2 } = fixture;
   await Progress.create({ patientId: patient._id, date: utcDay(-28), weight: 72, week: 1, weekBasis: 'display' });
   await Progress.create({ patientId: patient._id, date: utcDay(-7), weight: 64, week: 4, weekBasis: 'display' });
@@ -67,6 +68,26 @@ describe('patient and dietician tracking-data parity', () => {
     expect(forDietician.calorieData).toEqual(forPatient.calorieData);
     expect(forDietician.plannedDailyCalories).toBe(1800);
     expect(forPatient.plannedDailyCalories).toBe(1800);
+  });
+
+  test('a 42 day range gives both apps the same 42 daily calorie items and the same weight series', async () => {
+    const { patient } = await seed({ historyStartOffset: -41 });
+    const forPatient = await patientData();
+    const forDietician = await dieticianData(patient);
+
+    expect(forPatient.calorieData).toHaveLength(42);
+    expect(forDietician.calorieData).toEqual(forPatient.calorieData);
+    // Equal including every per-day target, and those targets differ day to day
+    // (cycle 1, cycle 2 and the gap between them) so the equality is not trivial.
+    const planned = forPatient.calorieData.map((item) => item.plannedCalories);
+    expect(new Set(planned).size).toBeGreaterThan(3);
+    expect(planned).toContain(0);
+    expect(forDietician.weightTrend).toHaveLength(6);
+    expect(forDietician.weightTrend).toEqual(forPatient.weightTrend);
+    expect(forDietician.bmiTrend).toEqual(forPatient.bmiTrend);
+    expect(forDietician.plannedDailyCalories).toBe(forPatient.plannedDailyCalories);
+    expect(forPatient.calorieCurrentIndex).toBe(41);
+    expect(forDietician.calorieCurrentIndex).toBe(41);
   });
 
   test('after a renewal the planned weight on the Week 4 weigh-in day is the logged 64 kg', async () => {

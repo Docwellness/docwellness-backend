@@ -3,14 +3,104 @@
  * (utils/trackingBuckets.js). Every date is built with Date.UTC so the tests
  * pass on any host timezone.
  */
-const { buildDateBuckets, resolveRequestedRange } = require('../utils/trackingBuckets');
+const {
+  buildDateBuckets,
+  buildDailyBuckets,
+  buildCalorieData,
+  currentBucketIndex,
+  resolveRequestedRange,
+} = require('../utils/trackingBuckets');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const utc = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
 const endOfDay = (date) => new Date(date.getTime() + MS_PER_DAY - 1);
 const rangeOf = (start, days) => buildDateBuckets(start, endOfDay(new Date(start.getTime() + (days - 1) * MS_PER_DAY)));
+const dailyOf = (start, days) =>
+  buildDailyBuckets(start, endOfDay(new Date(start.getTime() + (days - 1) * MS_PER_DAY)));
 
-describe('buildDateBuckets granularity', () => {
+// The calorie chart is always daily (buildDailyBuckets); buildDateBuckets and
+// its granularity sizes now describe the weight and BMI series only.
+describe('buildDailyBuckets', () => {
+  test.each([1, 31, 32, 126, 127, 400])('a %i day range gives one bucket per day', (days) => {
+    const start = utc(2025, 12, 20);
+    const buckets = dailyOf(start, days);
+    expect(buckets).toHaveLength(days);
+    expect(buckets[0].start).toEqual(start);
+    expect(buckets[days - 1].end).toEqual(endOfDay(new Date(start.getTime() + (days - 1) * MS_PER_DAY)));
+    for (let i = 0; i < days; i += 1) {
+      expect(buckets[i].startDate).toBe(buckets[i].endDate);
+      if (i > 0) expect(buckets[i].start.getTime()).toBe(buckets[i - 1].end.getTime() + 1);
+    }
+  });
+
+  test('labels each bucket with its short date', () => {
+    expect(dailyOf(utc(2026, 10, 30), 3).map((b) => b.label)).toEqual(['30 Oct', '31 Oct', '1 Nov']);
+  });
+});
+
+describe('buildCalorieData', () => {
+  const dailyBuckets = dailyOf(utc(2026, 9, 21), 42);
+  // Monday 5 Oct has a 1800 target, Tuesday 6 Oct 1500; every other day none.
+  const plannedByDay = new Map([
+    ['2026-10-05', 1800],
+    ['2026-10-06', 1500],
+  ]);
+
+  test('gives one item per day of a 21 Sep - 1 Nov range with exactly the documented fields', () => {
+    const data = buildCalorieData({ dailyBuckets, mealLogs: [], plannedByDay });
+    expect(data).toHaveLength(42);
+    expect(Object.keys(data[0])).toEqual([
+      'label',
+      'dateRange',
+      'startDate',
+      'endDate',
+      'calories',
+      'totalCalories',
+      'plannedCalories',
+      'daysLogged',
+    ]);
+    expect(data[0]).toMatchObject({ startDate: '2026-09-21', dateRange: '21 Sep - 21 Sep' });
+    expect(data[41]).toMatchObject({ startDate: '2026-11-01', label: '1 Nov' });
+  });
+
+  test('a logged day carries its calories and an unlogged day is zero', () => {
+    const mealLogs = [{ date: utc(2026, 10, 5), totalCalories: 1840 }];
+    const data = buildCalorieData({ dailyBuckets, mealLogs, plannedByDay });
+    expect(data[14]).toMatchObject({ startDate: '2026-10-05', calories: 1840, totalCalories: 1840, plannedCalories: 1800, daysLogged: 1 });
+    expect(data[15]).toMatchObject({ calories: 0, totalCalories: 0, daysLogged: 0 });
+  });
+
+  test('each day carries its own target and a day without one gets 0', () => {
+    const data = buildCalorieData({ dailyBuckets, mealLogs: [], plannedByDay });
+    expect(data[14].plannedCalories).toBe(1800);
+    expect(data[15].plannedCalories).toBe(1500);
+    expect(data[0].plannedCalories).toBe(0);
+    expect(data[41].plannedCalories).toBe(0);
+  });
+
+  test('falls back to the meal sum and sums two docs on one day into one item', () => {
+    const mealLogs = [
+      { date: utc(2026, 10, 5), meals: [{ caloriesConsumed: 300 }, { caloriesConsumed: 500 }] },
+      { date: utc(2026, 10, 5), totalCalories: 1000 },
+    ];
+    const data = buildCalorieData({ dailyBuckets, mealLogs, plannedByDay });
+    expect(data[14]).toMatchObject({ totalCalories: 1800, calories: 900, daysLogged: 2 });
+  });
+});
+
+describe('currentBucketIndex', () => {
+  const buckets = dailyOf(utc(2026, 9, 21), 42);
+
+  test('finds the bucket holding now', () => {
+    expect(currentBucketIndex(buckets, new Date(Date.UTC(2026, 10, 1, 9, 30)))).toBe(41);
+  });
+
+  test('is -1 when now is outside the range', () => {
+    expect(currentBucketIndex(buckets, new Date(Date.UTC(2026, 10, 2, 0, 0)))).toBe(-1);
+  });
+});
+
+describe('buildDateBuckets granularity (weight and BMI series)', () => {
   test.each([
     [1, 'daily'],
     [31, 'daily'],

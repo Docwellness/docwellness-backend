@@ -599,14 +599,17 @@ exports.getGoalProgress = async (req, res, next) => {
 const {
   localDateStr,
   formatShortDate,
-  sumMealCalories,
   addDays,
   buildDateBuckets,
+  buildDailyBuckets,
+  buildCalorieData,
+  currentBucketIndex,
   resolvePlanStartUtcDay,
   resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
 const { buildRebasedWeightTrend, loadWeightTrendInputs } = require('../../utils/weightTrendRebase');
+const { loadDailyCalorieTargets } = require('../../utils/planDayCalories');
 
 exports.getTrackingData = async (req, res, next) => {
   try {
@@ -621,7 +624,7 @@ exports.getTrackingData = async (req, res, next) => {
     // writes wipe every window immediately (see invalidatePatientStats
     // call sites).
     const rangeKey = `${req.query.startDate || ''}:${req.query.endDate || ''}`;
-    const cacheKey = `pstat:tracking:v2:${patientId}:${rangeKey}`;
+    const cacheKey = `pstat:tracking:v4:${patientId}:${rangeKey}`;
     const data = await getOrSetPatientStat(String(patientId), cacheKey, 120, () =>
       computeTrackingData(patientId, req.query)
     );
@@ -731,28 +734,14 @@ async function computeTrackingData(patientId, query) {
 
     const { buckets, granularity } = buildDateBuckets(startDate, endDate);
 
-    const calorieData = buckets.map((bucket) => {
-      const bucketLogs = mealLogs.filter((log) => {
-        const logDate = new Date(log.date);
-        return logDate >= bucket.start && logDate <= bucket.end;
-      });
-      const totalCalories = bucketLogs.reduce(
-        (sum, log) => sum + (log.totalCalories || sumMealCalories(log.meals)),
-        0
-      );
-      const daysWithLogs = bucketLogs.length;
-      const avgCalories = daysWithLogs > 0 ? totalCalories / daysWithLogs : 0;
-      return {
-        label: bucket.label,
-        dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
-        startDate: bucket.startDate,
-        endDate: bucket.endDate,
-        calories: Math.round(avgCalories),
-        totalCalories: Math.round(totalCalories),
-        plannedCalories: plannedDailyCalories,
-        daysLogged: daysWithLogs,
-      };
+    // The calorie chart is always one bar per day; weight/BMI keep `buckets`.
+    const dailyBuckets = buildDailyBuckets(startDate, endDate);
+    const calorieData = buildCalorieData({
+      dailyBuckets,
+      mealLogs,
+      plannedByDay: await loadDailyCalorieTargets(patientId, dailyBuckets),
     });
+    const calorieCurrentIndex = currentBucketIndex(dailyBuckets, now);
 
     // Weight trend: the planned line re-based at each checkpoint weigh-in,
     // plus each bucket's measured weight - the same inputs and builder the
@@ -886,10 +875,12 @@ async function computeTrackingData(patientId, query) {
       }
     }
 
-    // Check calorie adherence streak: consecutive days within planned calories
+    // Check calorie adherence streak: consecutive days within that day's own
+    // planned calories. A day with no target (0) neither extends nor breaks it.
     let calorieStreak = 0;
     let maxCalorieStreak = 0;
     for (const day of calorieData) {
+      if (day.plannedCalories === 0) continue;
       if (day.calories > 0 && day.calories <= day.plannedCalories) {
         calorieStreak++;
         if (calorieStreak > maxCalorieStreak) maxCalorieStreak = calorieStreak;
@@ -934,6 +925,7 @@ async function computeTrackingData(patientId, query) {
       startDate: localDateStr(startDate),
       endDate: localDateStr(endDate),
       currentIndex,
+      calorieCurrentIndex,
       currentWeight: Math.round(currentWeight * 10) / 10,
       currentBmi:
         latestProgressWithWeight?.bmi ||
