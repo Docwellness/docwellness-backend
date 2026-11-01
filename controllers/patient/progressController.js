@@ -9,8 +9,21 @@ const { calculateBMI } = require('../../utils/helpers');
 const cloudinary = require('../../config/cloudinary');
 const { cloudinaryUserFolder } = require('../../utils/cloudinaryFolder');
 const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelpers');
-const { weeklyCheckpoints } = require('../../utils/weeklyCheckpoints');
 const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
+const {
+  displayWeekForLegacyEntry,
+  loadCheckpointWeeks,
+  loadActiveGoalCheckpointWeeks,
+} = require('../../utils/checkpointWeeks');
+
+// The patient's week-tagged entries, newest first, each with its canonical
+// display week (old per-cycle numbers translated, see utils/checkpointWeeks).
+async function weekTaggedEntries(patientId, cycles, extraQuery = {}) {
+  const entries = await Progress.find({ patientId, week: { $ne: null }, ...extraQuery })
+    .sort({ date: -1 })
+    .lean();
+  return entries.map((e) => ({ ...e, displayWeek: displayWeekForLegacyEntry(e, cycles) }));
+}
 
 /**
  * @desc    Create a new progress entry
@@ -20,6 +33,28 @@ const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/pat
 exports.createProgress = async (req, res, next) => {
   try {
     const { date, weight, notes, beforeImage, afterImage, arm, waist, hip, week } = req.body;
+
+    // A week-tagged entry must name a real checkpoint of the patient's goal
+    // and must not duplicate an already logged week (nothing is overwritten
+    // by a create). Checked before any upload or write.
+    let canonicalWeek = null;
+    if (week) {
+      canonicalWeek = parseInt(week, 10);
+      const { cycles, checkpoints } = await loadActiveGoalCheckpointWeeks(req.user._id);
+      if (!checkpoints.some((c) => c.displayWeek === canonicalWeek)) {
+        return res.status(400).json({ success: false, message: 'Unknown checkpoint week' });
+      }
+      const existing = (await weekTaggedEntries(req.user._id, cycles)).find(
+        (e) => e.displayWeek === canonicalWeek
+      );
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `Week ${canonicalWeek} already has an entry`,
+          existingId: existing._id,
+        });
+      }
+    }
 
     // Get user's height for BMI calculation
     const user = await User.findById(req.user._id).select('healthProfile');
@@ -81,8 +116,10 @@ exports.createProgress = async (req, res, next) => {
       // to be - a patient can log against an earlier reached week just as
       // easily as the current one. Not date-derived: the week a patient
       // logs against is a deliberate choice made in the sheet, independent
-      // of exactly which day `date` falls on.
-      week: week ? parseInt(week, 10) : null,
+      // of exactly which day `date` falls on. Stored as the canonical display
+      // week (weekBasis 'display'), the number the Diet screen shows.
+      week: canonicalWeek,
+      weekBasis: canonicalWeek ? 'display' : undefined,
     });
 
     // Update user's health profile with new weight and body measurements
@@ -128,19 +165,43 @@ exports.getProgress = async (req, res, next) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Which weekly checkpoint (see the `week` field set by createProgress) -
+    const { cycles } = await loadCheckpointWeeks(req.user._id, null);
+
+    // Which weekly checkpoint (canonical display week, see createProgress) -
     // used by the Log My Body sheet to fetch "Week N"'s previously-logged
-    // entry so it can be shown/edited instead of only ever creating new ones.
+    // entry so it can be shown/edited. Old entries are translated on read;
+    // only the newest entry of that week is returned, never another week's.
     if (week !== undefined) {
+      if (!/^\d+$/.test(String(week))) {
+        return res.status(400).json({ success: false, message: 'week must be a number' });
+      }
       const weekNum = parseInt(week, 10);
-      if (!Number.isNaN(weekNum)) query.week = weekNum;
+      const { date: dateFilter } = query;
+      const matches = (
+        await weekTaggedEntries(req.user._id, cycles, dateFilter ? { date: dateFilter } : {})
+      ).filter((e) => e.displayWeek === weekNum);
+      const found = matches.slice(0, 1);
+      return res.status(200).json({
+        success: true,
+        data: found,
+        pagination: {
+          total: found.length,
+          page: parseInt(page),
+          pages: found.length,
+          hasMore: false,
+        },
+      });
     }
 
-    const progress = await Progress.find(query)
+    const entries = await Progress.find(query)
       .sort({ date: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
       .lean();
+    const progress = entries.map((e) => ({
+      ...e,
+      displayWeek: displayWeekForLegacyEntry(e, cycles),
+    }));
 
     const total = await Progress.countDocuments(query);
 
@@ -536,17 +597,16 @@ exports.getGoalProgress = async (req, res, next) => {
 // ============================================================
 
 const {
-  MS_PER_DAY,
   localDateStr,
   formatShortDate,
   sumMealCalories,
   addDays,
   buildDateBuckets,
-  buildWeightTrend,
-  resolvePlanStartDate,
+  resolvePlanStartUtcDay,
   resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
+const { buildRebasedWeightTrend, loadWeightTrendInputs } = require('../../utils/weightTrendRebase');
 
 exports.getTrackingData = async (req, res, next) => {
   try {
@@ -561,7 +621,7 @@ exports.getTrackingData = async (req, res, next) => {
     // writes wipe every window immediately (see invalidatePatientStats
     // call sites).
     const rangeKey = `${req.query.startDate || ''}:${req.query.endDate || ''}`;
-    const cacheKey = `pstat:tracking:${patientId}:${rangeKey}`;
+    const cacheKey = `pstat:tracking:v2:${patientId}:${rangeKey}`;
     const data = await getOrSetPatientStat(String(patientId), cacheKey, 120, () =>
       computeTrackingData(patientId, req.query)
     );
@@ -609,7 +669,7 @@ async function computeTrackingData(patientId, query) {
     const healthConcerns = healthProfile.healthConcerns || healthProfile.illnessAttention || [];
 
     // Get active diet plan for planned calories
-    const { DietPlan, Goal } = require('../../models');
+    const { DietPlan } = require('../../models');
     // Lowest cycleNumber still Active = the cycle the patient is currently
     // living (renewal-overlap - see dietController.retireEndedPredecessorPlans).
     const activePlan = await DietPlan.findOne({ patientId, status: 'Active' })
@@ -627,14 +687,15 @@ async function computeTrackingData(patientId, query) {
       2000;
 
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // UTC calendar day, matching how MealLog.date is stored.
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     // The plan's real start date - prefers weekSchedule's week-1 start (the
     // same source dietController.js's weekStartDate/dietEnabled derive from)
     // over activationDate, which can predate the plan's real first week.
     // This is the earliest date this endpoint will ever show data for -
     // there's nothing meaningful to chart before it.
-    const resolvedPlanStart = resolvePlanStartDate(activePlan);
+    const resolvedPlanStart = resolvePlanStartUtcDay(activePlan);
 
     // Where the patient's history begins: the first plan they ever started,
     // not the current renewal cycle. resolvedPlanStart (above) stays the
@@ -684,6 +745,8 @@ async function computeTrackingData(patientId, query) {
       return {
         label: bucket.label,
         dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
+        startDate: bucket.startDate,
+        endDate: bucket.endDate,
         calories: Math.round(avgCalories),
         totalCalories: Math.round(totalCalories),
         plannedCalories: plannedDailyCalories,
@@ -691,61 +754,23 @@ async function computeTrackingData(patientId, query) {
       };
     });
 
-    // Weight trend: the planned goal trajectory (never re-anchored by logged
-    // weights - see buildWeightTrend), plus each bucket's measured weight.
-    const cumulativeStart = resolvedPlanStart || startDate;
-    const activeGoal = await Goal.findOne({ patientId, status: 'active' })
-      .select('_id startValue targetValue startDate endDate')
-      .lean();
-    const goalStartWeight = activeGoal?.startValue ?? currentWeight;
-    const goalTargetWeight = activeGoal?.targetValue ?? (targetWeight || goalStartWeight);
-    const planSpanDays =
-      activeGoal?.startDate && activeGoal?.endDate
-        ? Math.max(
-            1,
-            Math.round(
-              (new Date(activeGoal.endDate) - new Date(activeGoal.startDate)) / MS_PER_DAY
-            )
-          )
-        : 84; // ~12 weeks - only hit when the patient has no active goal yet.
-
-    const realLogs = await Progress.find({
-      patientId,
-      weight: { $exists: true, $ne: null },
-      date: { $gte: historyStart || cumulativeStart, $lte: endDate },
-    })
-      .sort({ date: 1 })
-      .select('date weight week')
-      .lean();
-    // A weigh-in logged for a weekly checkpoint belongs to that checkpoint's
-    // date, not the day it was typed in (e.g. Week 3's weight entered on the
-    // 15th still plots on the 11th checkpoint) - unless it was entered before
-    // that date, then the real day wins.
-    const checkpointDateByWeek = new Map();
-    if (activeGoal?._id) {
-      const checkpoints = await weeklyCheckpoints(activeGoal._id, resolvedPlanStart);
-      for (const c of checkpoints) checkpointDateByWeek.set(c.weekNumber, new Date(c.date));
-    }
-    // One entry per calendar day - a same-day resubmission (editing that
-    // week's log) keeps only the latest write for that day.
-    const loggedByDay = new Map();
-    for (const log of realLogs) {
-      let day = new Date(log.date);
-      const checkpoint = log.week ? checkpointDateByWeek.get(log.week) : null;
-      if (checkpoint && checkpoint < day) day = checkpoint;
-      loggedByDay.set(localDateStr(day), log.weight);
-    }
-
-    const weightTrend = buildWeightTrend({
+    // Weight trend: the planned line re-based at each checkpoint weigh-in,
+    // plus each bucket's measured weight - the same inputs and builder the
+    // dietician endpoint uses (utils/weightTrendRebase.js).
+    const trendInputs = await loadWeightTrendInputs(patientId, {
+      historyStart,
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      currentWeight,
+      profileTargetWeight: targetWeight,
+    });
+    const weightTrend = buildRebasedWeightTrend({
       buckets,
-      loggedByDay,
-      goalStartWeight,
-      goalTargetWeight,
-      planSpanDays,
-      cumulativeStart,
       today,
       now,
       currentWeight,
+      historyStart: historyStart || startDate,
+      ...trendInputs,
     });
 
     // BMI trend

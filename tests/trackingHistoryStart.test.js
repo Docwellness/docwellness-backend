@@ -9,11 +9,8 @@ const {
   resolveRequestedRange,
 } = require('../utils/trackingBuckets');
 
-const day = (iso) => {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+// UTC midnight, the convention of the tracking buckets (MealLog.date is stored the same way).
+const day = (iso) => new Date(`${iso}T00:00:00.000Z`);
 const plan = (iso) => ({ weekSchedule: [{ startDate: day(iso) }] });
 
 describe('resolveHistoryStartDate', () => {

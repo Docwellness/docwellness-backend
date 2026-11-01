@@ -3,7 +3,6 @@ const {
   DietPlan,
   DietPlanRequest,
   User,
-  Goal,
   Progress,
   ExercisePlan,
   ExerciseLog,
@@ -11,17 +10,15 @@ const {
 const WaterLog = require('../../models/WaterLog');
 const { resolveDayGroupForDate } = require('../../utils/dayGroups');
 const {
-  MS_PER_DAY,
   localDateStr,
   formatShortDate,
   sumMealCalories,
-  addDays,
   buildDateBuckets,
-  buildWeightTrend,
-  resolvePlanStartDate,
+  resolvePlanStartUtcDay,
   resolveHistoryStartDate,
   resolveRequestedRange,
 } = require('../../utils/trackingBuckets');
+const { buildRebasedWeightTrend, loadWeightTrendInputs } = require('../../utils/weightTrendRebase');
 const { loadPatientPauses } = require('../../utils/patientPauseGuard');
 const { effectiveContentDate } = require('../../utils/subscriptionPause');
 const { computeDailyMealLogSummary } = require('../../utils/dailyMealLogSummary');
@@ -80,26 +77,32 @@ exports.getPatientTrackingData = async (req, res, next) => {
     const activityLevel = healthProfile.activityLevel || 'Moderate';
 
     // 2. Get active diet plan for planned calories
+    // Lowest cycleNumber still Active = the cycle the patient is currently
+    // living - the same pick as the patient's own tracking-data endpoint.
     const activePlan = await DietPlan.findOne({
       patientId,
       status: 'Active',
     })
-      .sort({ createdAt: -1 })
+      .sort({ cycleNumber: 1 })
       .select('totalCalories weeksSummary activationDate weekSchedule calorieStrategy')
       .lean();
 
     const plannedDailyCalories =
-      activePlan?.totalCalories || activePlan?.weeksSummary?.[0]?.totalCalories || 2000;
+      activePlan?.calorieStrategy?.calorieBudget ||
+      activePlan?.totalCalories ||
+      activePlan?.weeksSummary?.[0]?.totalCalories ||
+      2000;
 
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // UTC calendar day, matching how MealLog.date is stored.
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     // 3. The plan's real start date, and the requested [startDate, endDate]
     // range clamped to [history start, today] - same rules the patient app's
     // own tracking-data endpoint uses. History starts at the patient's first
     // plan, not the current renewal cycle, so a repurchase (e.g. Week 5)
     // doesn't hide weeks 1-4.
-    const resolvedPlanStart = resolvePlanStartDate(activePlan);
+    const resolvedPlanStart = resolvePlanStartUtcDay(activePlan);
     const allPlans = await DietPlan.find({ patientId, status: { $ne: 'Draft' } })
       .select('weekSchedule activationDate')
       .lean();
@@ -149,6 +152,8 @@ exports.getPatientTrackingData = async (req, res, next) => {
       return {
         label: bucket.label,
         dateRange: `${formatShortDate(bucket.start)} - ${formatShortDate(bucket.end)}`,
+        startDate: bucket.startDate,
+        endDate: bucket.endDate,
         calories: Math.round(avgCalories),
         totalCalories: Math.round(totalCalories),
         plannedCalories: plannedDailyCalories,
@@ -156,54 +161,29 @@ exports.getPatientTrackingData = async (req, res, next) => {
       };
     });
 
-    // Weight trend: the planned goal trajectory (never re-anchored by logged
-    // weights - see buildWeightTrend), plus each bucket's measured weight.
-    const cumulativeStart = resolvedPlanStart || startDate;
-    const activeGoal = await Goal.findOne({ patientId, status: 'active' })
-      .select('startValue targetValue startDate endDate')
-      .lean();
+    // Weight trend: the planned line re-based at each checkpoint weigh-in,
+    // plus each bucket's measured weight - the same inputs and builder the
+    // patient endpoint uses (utils/weightTrendRebase.js).
     const rawTargetWeight = healthProfile.targetWeight;
     const targetWeight =
       typeof rawTargetWeight === 'number'
         ? rawTargetWeight
         : parseFloat(String(rawTargetWeight || '').replace(/[^0-9.-]/g, '')) || 0;
-    const goalStartWeight = activeGoal?.startValue ?? currentWeight;
-    const goalTargetWeight = activeGoal?.targetValue ?? (targetWeight || goalStartWeight);
-    const planSpanDays =
-      activeGoal?.startDate && activeGoal?.endDate
-        ? Math.max(
-            1,
-            Math.round(
-              (new Date(activeGoal.endDate) - new Date(activeGoal.startDate)) / MS_PER_DAY
-            )
-          )
-        : 84; // ~12 weeks - only hit when the patient has no active goal yet.
-
-    const realLogs = await Progress.find({
-      patientId,
-      weight: { $exists: true, $ne: null },
-      date: { $gte: historyStart || cumulativeStart, $lte: endDate },
-    })
-      .sort({ date: 1 })
-      .select('date weight')
-      .lean();
-    // One entry per calendar day - a same-day resubmission (editing that
-    // week's log) keeps only the latest write for that day.
-    const loggedByDay = new Map();
-    for (const log of realLogs) {
-      loggedByDay.set(localDateStr(log.date), log.weight);
-    }
-
-    const weightTrend = buildWeightTrend({
+    const trendInputs = await loadWeightTrendInputs(patientId, {
+      historyStart,
+      rangeStart: startDate,
+      rangeEnd: endDate,
+      currentWeight,
+      profileTargetWeight: targetWeight,
+    });
+    const { goalStartWeight, goalTargetWeight } = trendInputs;
+    const weightTrend = buildRebasedWeightTrend({
       buckets,
-      loggedByDay,
-      goalStartWeight,
-      goalTargetWeight,
-      planSpanDays,
-      cumulativeStart,
       today,
       now,
       currentWeight,
+      historyStart: historyStart || startDate,
+      ...trendInputs,
     });
 
     // 8. Calculate BMI trend from weight trend (0 weight = no data = 0 bmi)

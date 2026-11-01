@@ -8,32 +8,47 @@
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// Get local date string YYYY-MM-DD without timezone shift
+// Every day in this file is a UTC calendar day: MealLog.date and Progress
+// check-in days are stored at UTC midnight, so server-local getters shifted
+// bucket edges by a day on any host that is not in UTC.
+
+// UTC date string YYYY-MM-DD (name kept for the existing callers)
 function localDateStr(date) {
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 // Format date as "6 Jul" style
 function formatShortDate(date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return `${date.getDate()} ${months[date.getMonth()]}`;
+  return `${date.getUTCDate()} ${SHORT_MONTHS[date.getUTCMonth()]}`;
+}
+
+// UTC midnight of the given instant's UTC day
+function utcDay(date) {
+  const d = new Date(date);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function endOfUtcDay(day) {
+  return new Date(day.getTime() + MS_PER_DAY - 1);
 }
 
 // Sum meal calories from a meals array
@@ -44,7 +59,7 @@ function sumMealCalories(meals) {
 
 function addDays(date, n) {
   const d = new Date(date);
-  d.setDate(d.getDate() + n);
+  d.setUTCDate(d.getUTCDate() + n);
   return d;
 }
 
@@ -52,10 +67,8 @@ function addDays(date, n) {
 // regardless of how wide a range is picked - a bar per day for a short
 // range, growing to weekly then monthly as the range widens.
 function buildDateBuckets(rangeStart, rangeEnd) {
-  const start = new Date(rangeStart);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(rangeEnd);
-  end.setHours(0, 0, 0, 0);
+  const start = utcDay(rangeStart);
+  const end = utcDay(rangeEnd);
   const totalDays = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY) + 1;
 
   let granularity;
@@ -64,55 +77,36 @@ function buildDateBuckets(rangeStart, rangeEnd) {
   else granularity = 'monthly';
 
   const buckets = [];
+  // `start`/`end` are the instants (UTC midnight, last ms of the day);
+  // `startDate`/`endDate` are the same days as YYYY-MM-DD keys.
+  const pushBucket = (bStartDay, bEndDay, label) =>
+    buckets.push({
+      start: bStartDay,
+      end: endOfUtcDay(bEndDay),
+      startDate: localDateStr(bStartDay),
+      endDate: localDateStr(bEndDay),
+      label,
+    });
 
   if (granularity === 'daily') {
-    for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-      const bStart = new Date(d);
-      bStart.setHours(0, 0, 0, 0);
-      const bEnd = new Date(d);
-      bEnd.setHours(23, 59, 59, 999);
-      buckets.push({ start: bStart, end: bEnd, label: formatShortDate(bStart) });
+    for (let d = start; d <= end; d = addDays(d, 1)) {
+      pushBucket(d, d, formatShortDate(d));
     }
   } else if (granularity === 'weekly') {
-    let cur = new Date(start);
-    while (cur <= end) {
-      const bStart = new Date(cur);
-      bStart.setHours(0, 0, 0, 0);
-      const bEndRaw = addDays(cur, 6) > end ? new Date(end) : addDays(cur, 6);
-      const bEnd = new Date(bEndRaw);
-      bEnd.setHours(23, 59, 59, 999);
-      buckets.push({ start: bStart, end: bEnd, label: formatShortDate(bStart) });
-      cur = addDays(cur, 7);
+    for (let cur = start; cur <= end; cur = addDays(cur, 7)) {
+      const weekEnd = addDays(cur, 6);
+      pushBucket(cur, weekEnd > end ? end : weekEnd, formatShortDate(cur));
     }
   } else {
-    const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const spansMultipleYears = start.getFullYear() !== end.getFullYear();
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const spansMultipleYears = start.getUTCFullYear() !== end.getUTCFullYear();
+    let cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
     while (cur <= end) {
-      const bStart = cur > start ? new Date(cur) : new Date(start);
-      bStart.setHours(0, 0, 0, 0);
-      const calendarMonthEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
-      const bEndRaw = calendarMonthEnd < end ? calendarMonthEnd : end;
-      const bEnd = new Date(bEndRaw);
-      bEnd.setHours(23, 59, 59, 999);
+      const calendarMonthEnd = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 0));
       const label = spansMultipleYears
-        ? `${monthNames[cur.getMonth()]} '${String(cur.getFullYear()).slice(2)}`
-        : monthNames[cur.getMonth()];
-      buckets.push({ start: bStart, end: bEnd, label });
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+        ? `${SHORT_MONTHS[cur.getUTCMonth()]} '${String(cur.getUTCFullYear()).slice(2)}`
+        : SHORT_MONTHS[cur.getUTCMonth()];
+      pushBucket(cur > start ? cur : start, calendarMonthEnd < end ? calendarMonthEnd : end, label);
+      cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
     }
   }
 
@@ -132,6 +126,15 @@ function resolvePlanStartDate(dietPlan) {
   return resolved;
 }
 
+// Same start as resolvePlanStartDate, as a UTC calendar day - the convention
+// of the tracking buckets and of the weekSchedule dates, which are stored at
+// UTC midnight. resolvePlanStartDate keeps its local-midnight result for its
+// other callers (pastOrders, dietController).
+function resolvePlanStartUtcDay(dietPlan) {
+  const raw = dietPlan?.weekSchedule?.[0]?.startDate || dietPlan?.activationDate;
+  return raw ? utcDay(raw) : null;
+}
+
 // The earliest date this patient has any plan history for - the earliest
 // resolvePlanStartDate across ALL their plans (renewal cycles included), not
 // just the currently active one. A repurchase starts a new cycle whose week 1
@@ -141,7 +144,7 @@ function resolvePlanStartDate(dietPlan) {
 function resolveHistoryStartDate(dietPlans, fallback = null) {
   let earliest = null;
   for (const plan of dietPlans || []) {
-    const start = resolvePlanStartDate(plan);
+    const start = resolvePlanStartUtcDay(plan);
     if (start && !Number.isNaN(start.getTime()) && (!earliest || start < earliest)) {
       earliest = start;
     }
@@ -160,21 +163,23 @@ function resolveRequestedRange(query, resolvedPlanStart, today) {
   let endDate = query.endDate ? new Date(query.endDate) : today;
   if (Number.isNaN(startDate.getTime())) startDate = earliestAllowed;
   if (Number.isNaN(endDate.getTime())) endDate = today;
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(0, 0, 0, 0);
-  if (startDate < earliestAllowed) startDate = new Date(earliestAllowed);
-  if (endDate > today) endDate = new Date(today);
+  startDate = utcDay(startDate);
+  endDate = utcDay(endDate);
+  const earliestDay = utcDay(earliestAllowed);
+  const todayDay = utcDay(today);
+  if (startDate < earliestDay) startDate = earliestDay;
+  if (endDate > todayDay) endDate = todayDay;
   if (startDate > endDate) startDate = new Date(endDate);
-  endDate.setHours(23, 59, 59, 999);
-  return { startDate, endDate, earliestAllowed };
+  endDate = endOfUtcDay(endDate);
+  return { startDate, endDate, earliestAllowed: earliestDay };
 }
 
-// Weight trend for the Progress charts. The trend is the PLANNED trajectory
-// (goal start weight -> goal target weight, straight across the goal's span)
-// and is never re-anchored by a logged weight - re-anchoring made the line
-// jump at every submission and restart from the measured value. Real
-// measurements ride alongside as `measuredWeight` (null when no weigh-in
-// fell in that bucket) so the chart can plot them as separate points.
+// Weight trend for the Progress charts: the planned line, re-based at each
+// weekly-checkpoint weigh-in (see utils/weightTrendRebase.js), plus each
+// bucket's measured weight. Kept for existing imports: `loggedByDay`
+// (YYYY-MM-DD -> kg) are untagged weigh-ins, so they plot as measured points
+// and never re-base; the line runs from the goal start weight on
+// `cumulativeStart` to the target `planSpanDays` later.
 function buildWeightTrend({
   buckets,
   loggedByDay,
@@ -186,45 +191,23 @@ function buildWeightTrend({
   now,
   currentWeight,
 }) {
-  const planStart = new Date(cumulativeStart);
-  planStart.setHours(0, 0, 0, 0);
-  const round1 = (n) => Math.round(n * 10) / 10;
-  const trendOn = (day) => {
-    const d = new Date(day);
-    d.setHours(0, 0, 0, 0);
-    const elapsed = Math.max(0, Math.round((d - planStart) / MS_PER_DAY));
-    const fraction = Math.min(elapsed, planSpanDays) / planSpanDays;
-    return round1(goalStartWeight + (goalTargetWeight - goalStartWeight) * fraction);
-  };
-
-  return buckets.map((bucket) => {
-    // Compare calendar days against `today`, not `now` - a bucket that
-    // starts today must not fall into the future branch.
-    if (bucket.start > today) {
-      return { label: bucket.label, date: '', weight: 0, measuredWeight: null, measuredDate: null };
-    }
-    const effectiveEnd = bucket.end > now ? now : bucket.end;
-    const dayStr = localDateStr(effectiveEnd);
-    const trend = trendOn(effectiveEnd);
-
-    let measuredWeight = null;
-    for (const [logDay, weight] of loggedByDay) {
-      if (logDay >= localDateStr(bucket.start) && logDay <= dayStr) {
-        if (measuredWeight === null || logDay > measuredWeight.day) {
-          measuredWeight = { day: logDay, weight };
-        }
-      }
-    }
-
-    return {
-      label: bucket.label,
-      date: dayStr,
-      weight: trend > 0 ? trend : round1(currentWeight),
-      measuredWeight: measuredWeight ? round1(measuredWeight.weight) : null,
-      // Day the weigh-in was actually logged (the bucket's own `date` is just
-      // its end), so the chart can plot the real point at its real date.
-      measuredDate: measuredWeight ? measuredWeight.day : null,
-    };
+  // Required here, not at the top: weightTrendRebase imports this module.
+  const { buildRebasedWeightTrend } = require('./weightTrendRebase');
+  const historyStart = utcDay(cumulativeStart);
+  return buildRebasedWeightTrend({
+    buckets,
+    today,
+    now,
+    currentWeight,
+    goalStartWeight,
+    goalTargetWeight,
+    goalEnd: new Date(historyStart.getTime() + planSpanDays * MS_PER_DAY),
+    historyStart,
+    weighIns: [...loggedByDay].map(([day, weight]) => ({
+      date: new Date(`${day}T00:00:00.000Z`),
+      weight,
+      displayWeek: null,
+    })),
   });
 }
 
@@ -237,6 +220,7 @@ module.exports = {
   addDays,
   buildDateBuckets,
   resolvePlanStartDate,
+  resolvePlanStartUtcDay,
   resolveHistoryStartDate,
   resolveRequestedRange,
 };

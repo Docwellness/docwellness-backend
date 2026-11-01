@@ -74,6 +74,13 @@ const progressSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // 'display' = `week` holds the canonical display week (see
+    // utils/checkpointWeeks.js). Absent on older rows, whose `week` is the
+    // position inside the plan cycle current when they were written.
+    weekBasis: {
+      type: String,
+      enum: ['display'],
+    },
   },
   {
     timestamps: true,

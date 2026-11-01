@@ -178,7 +178,9 @@ describe('PATCH / DELETE subscription/pause', () => {
     expect(isoDay(payload.goal.endDate)).toBe('2099-10-04');
     expect(payload.pauses).toHaveLength(1);
     expect(isoDay(payload.pauses[0].startDate)).toBe('2099-09-08');
-    const w1 = payload.milestones.find((m) => m.title === 'W1');
+    // The weekly title is recomputed from its week number on read, so find
+    // the checkpoint by type, not by the stored title.
+    const w1 = payload.milestones.find((m) => m.type === 'weekly');
     expect(isoDay(w1.date)).toBe('2099-09-18'); // 2099-09-15 + 3
 
     // Cancel -> stored docs still untouched, read path back to originals.
@@ -191,7 +193,7 @@ describe('PATCH / DELETE subscription/pause', () => {
     const after = await buildTimelinePayload(patient._id, { from: -40000, to: 40000 });
     expect(isoDay(after.goal.endDate)).toBe('2099-10-01');
     expect(after.pauses).toHaveLength(0);
-    expect(isoDay(after.milestones.find((m) => m.title === 'W1').date)).toBe('2099-09-15');
+    expect(isoDay(after.milestones.find((m) => m.type === 'weekly').date)).toBe('2099-09-15');
   });
 
   test('a pause notifies the patient (in-app Notification)', async () => {

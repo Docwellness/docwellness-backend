@@ -1,17 +1,14 @@
 /**
- * Weight Trend chart must be anchored to the patient's real Progress
- * weight logs, projected between/after them at the active goal's own
- * pace (startValue -> targetValue), and re-anchor outright to any real
- * log for that exact day - see controllers/patient/progressController.js
- * and controllers/dietician/trackingController.js's getTrackingData
- * (they share this exact algorithm - see the latter's file header
- * comment).
+ * Weight Trend chart: the planned line runs from the goal start weight to the
+ * goal target on the goal end, and is re-based at each weekly-checkpoint
+ * weigh-in (utils/weightTrendRebase.js). Untagged weigh-ins are measured
+ * points only. See controllers/patient/progressController.js's
+ * getTrackingData (the dietician endpoint shares the algorithm).
  *
- * Dates are computed relative to `Date.now()` rather than hardcoded, so
- * this doesn't rot the way tests/timeline.test.js's hardcoded 2026-07
- * fixture dates did once the real clock moved past them.
+ * Dates are UTC days relative to now, so this does not rot.
  */
 const { connectTestDb, disconnectTestDb, clearTestDb } = require('./helpers/testDb');
+const { utcDay, dayKey } = require('./helpers/twoCycleFixture');
 
 jest.mock('../utils/supabaseAuth');
 const { registerTestToken, clearTestTokens } = require('../utils/supabaseAuth');
@@ -20,24 +17,6 @@ let request, app;
 let createPatient, createDietician;
 let DietPlan, Progress;
 let seedGoalTimeline;
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-function daysAgo(n) {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return new Date(d.getTime() - n * MS_PER_DAY);
-}
-// Must match utils/trackingBuckets.js's localDateStr exactly (local
-// calendar-date getters, not UTC) - the controller keys every trend point
-// by that function, so a UTC-based ymd() here would silently look up the
-// wrong day whenever the test machine's local timezone isn't UTC.
-function ymd(date) {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 beforeAll(async () => {
   await connectTestDb();
@@ -58,19 +37,18 @@ afterAll(async () => {
 });
 
 /**
- * A 10-day-old plan (so cumulativeStart = today-10) with an active goal
- * going from `startWeight` to `targetWeight` - matches seedGoalTimeline's
- * own priority order (latest Progress log at seed time, else request
- * currentWeight, else healthProfile.weight), so passing no Progress log
- * yet at seed time makes the goal's startValue exactly `startWeight`.
+ * A plan that started 10 days ago and ends in 18 days (28 days), with an
+ * active goal from `startWeight` to `targetWeight`. Its Week 1 checkpoint is
+ * 4 days ago (start + 6). No Progress log exists at seed time, so the goal's
+ * startValue is exactly `startWeight`.
  */
 async function seedPlanAndGoal({ startWeight, targetWeight }) {
   const dietician = await createDietician();
   const patient = await createPatient({
     healthProfile: { bmi: 22, weightIndex: 0, weight: startWeight, targetWeight: String(targetWeight) },
   });
-  const startDate = daysAgo(10);
-  const endDate = daysAgo(-18); // 28-day plan, matches other tests' convention
+  const startDate = utcDay(-10);
+  const endDate = utcDay(18);
   const plan = await DietPlan.create({
     patientId: patient._id,
     dieticianId: dietician._id,
@@ -84,78 +62,79 @@ async function seedPlanAndGoal({ startWeight, targetWeight }) {
   return { patient, plan, goal };
 }
 
-async function fetchWeightTrend(startDate, endDate) {
+async function fetchWeightTrend() {
   const res = await request(app)
-    .get(`/api/patient/tracking-data?startDate=${ymd(startDate)}&endDate=${ymd(endDate)}`)
+    .get(`/api/patient/tracking-data?startDate=${dayKey(utcDay(-10))}&endDate=${dayKey(utcDay(0))}`)
     .set('Authorization', 'Bearer patient-token');
   expect(res.status).toBe(200);
   return res.body.data.weightTrend;
 }
 
-function pointFor(trend, date) {
-  return trend.find((p) => p.date === ymd(date));
-}
+const pointFor = (trend, offset) => trend.find((p) => p.date === dayKey(utcDay(offset)));
 
-describe('GET /api/patient/tracking-data - weightTrend goal anchoring', () => {
-  test('a weight-loss goal projects downward before any real log, from the goal start weight', async () => {
+describe('GET /api/patient/tracking-data - weightTrend planned line', () => {
+  test('a weight-loss goal projects downward before any log, from the goal start weight', async () => {
     const { goal } = await seedPlanAndGoal({ startWeight: 74, targetWeight: 64 });
     expect(goal.startValue).toBe(74);
 
-    const trend = await fetchWeightTrend(daysAgo(10), daysAgo(0));
-    const start = pointFor(trend, daysAgo(10));
-    const midway = pointFor(trend, daysAgo(5));
-    const today = pointFor(trend, daysAgo(0));
-
-    expect(start.weight).toBeCloseTo(74, 1);
-    // Loss goal - the projection must trend DOWN over time with no logs.
-    expect(midway.weight).toBeLessThan(start.weight);
-    expect(today.weight).toBeLessThan(midway.weight);
+    const trend = await fetchWeightTrend();
+    expect(pointFor(trend, -10).weight).toBe(74);
+    // 74 - 10 * 5 / 28 and 74 - 10 * 10 / 28
+    expect(pointFor(trend, -5).weight).toBe(72.2);
+    expect(pointFor(trend, 0).weight).toBe(70.4);
   });
 
-  test('a weight-gain goal projects upward before any real log', async () => {
-    const { goal } = await seedPlanAndGoal({ startWeight: 58, targetWeight: 68 });
-    expect(goal.startValue).toBe(58);
-
-    const trend = await fetchWeightTrend(daysAgo(10), daysAgo(0));
-    const start = pointFor(trend, daysAgo(10));
-    const today = pointFor(trend, daysAgo(0));
-
-    // Gain goal - the projection must trend UP over time with no logs.
-    expect(today.weight).toBeGreaterThan(start.weight);
+  test('a weight-gain goal projects upward before any log', async () => {
+    await seedPlanAndGoal({ startWeight: 58, targetWeight: 68 });
+    const trend = await fetchWeightTrend();
+    expect(pointFor(trend, 0).weight).toBeGreaterThan(pointFor(trend, -10).weight);
   });
 
-  test('a real Progress log always wins outright and re-anchors the projection from there', async () => {
+  test('a checkpoint weigh-in re-bases the line from that checkpoint day', async () => {
     const { patient } = await seedPlanAndGoal({ startWeight: 74, targetWeight: 64 });
+    await Progress.create({
+      patientId: patient._id,
+      date: utcDay(-4),
+      weight: 70,
+      week: 1,
+      weekBasis: 'display',
+    });
 
-    // Patient logs a real weigh-in 5 days ago - lower than pure projection
-    // would have predicted, simulating faster-than-planned progress.
-    await Progress.create({ patientId: patient._id, date: daysAgo(5), weight: 70 });
-
-    const trend = await fetchWeightTrend(daysAgo(10), daysAgo(0));
-    const loggedDay = pointFor(trend, daysAgo(5));
-    const dayAfterLog = pointFor(trend, daysAgo(3));
-    const today = pointFor(trend, daysAgo(0));
-
-    // The logged day snaps to the REAL value, not the calorie/goal estimate.
-    expect(loggedDay.weight).toBe(70);
-    // Days after the log project onward from 70 (the new anchor), still
-    // trending down (loss goal) - never jumping back toward the stale
-    // pre-log trajectory.
-    expect(dayAfterLog.weight).toBeLessThanOrEqual(70);
-    expect(today.weight).toBeLessThan(dayAfterLog.weight);
+    const trend = await fetchWeightTrend();
+    // Before the checkpoint nothing changed.
+    expect(pointFor(trend, -5).weight).toBe(72.2);
+    // The checkpoint day is the logged weight, then a straight line from it
+    // to 64 on the goal end: 70 - 6 * 1 / 22 and 70 - 6 * 4 / 22.
+    expect(pointFor(trend, -4).weight).toBe(70);
+    expect(pointFor(trend, -3).weight).toBe(69.7);
+    expect(pointFor(trend, 0).weight).toBe(68.9);
   });
 
-  test('two real logs both win outright, with projection resuming from the later one', async () => {
+  test('an untagged weigh-in is a measured point and does not re-base the line', async () => {
     const { patient } = await seedPlanAndGoal({ startWeight: 74, targetWeight: 64 });
-    await Progress.create({ patientId: patient._id, date: daysAgo(7), weight: 73 });
-    await Progress.create({ patientId: patient._id, date: daysAgo(2), weight: 71 });
+    await Progress.create({ patientId: patient._id, date: utcDay(-5), weight: 70 });
 
-    const trend = await fetchWeightTrend(daysAgo(10), daysAgo(0));
-    expect(pointFor(trend, daysAgo(7)).weight).toBe(73);
-    expect(pointFor(trend, daysAgo(2)).weight).toBe(71);
-    // Between the two real logs, the projection runs from the day-7 log
-    // (73) toward the goal direction, not from the original goal start.
-    const between = pointFor(trend, daysAgo(4));
-    expect(between.weight).toBeLessThan(73);
+    const trend = await fetchWeightTrend();
+    const point = pointFor(trend, -5);
+    expect(point.measuredWeight).toBe(70);
+    expect(point.weight).toBe(72.2);
+    expect(pointFor(trend, 0).weight).toBe(70.4);
+  });
+
+  test('a weigh-in entered before its checkpoint plots on the day it was entered and re-bases there', async () => {
+    const { patient } = await seedPlanAndGoal({ startWeight: 74, targetWeight: 64 });
+    // Week 2's checkpoint is 3 days from now; this one is entered yesterday.
+    await Progress.create({
+      patientId: patient._id,
+      date: utcDay(-1),
+      weight: 69,
+      week: 2,
+      weekBasis: 'display',
+    });
+
+    const trend = await fetchWeightTrend();
+    expect(pointFor(trend, -1).weight).toBe(69);
+    expect(pointFor(trend, -1).measuredWeight).toBe(69);
+    expect(pointFor(trend, -2).weight).toBeGreaterThan(69);
   });
 });

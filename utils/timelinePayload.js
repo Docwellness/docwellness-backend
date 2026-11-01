@@ -10,7 +10,7 @@ const {
   computeMilestoneStatus,
   computeTaskDoneMap,
 } = require('./goalAdherence');
-const { weeklyCheckpoints } = require('./weeklyCheckpoints');
+const { loadCheckpointWeeks, displayWeekForLegacyEntry } = require('./checkpointWeeks');
 const { shiftDateForPauses, totalShiftDays } = require('./subscriptionPause');
 const { formatDayLabel, formatMonthLabel, resolvePlanStartDate } = require('./seedGoalTimeline');
 
@@ -170,16 +170,18 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
   const weekNumberById = new Map();
   let weightLogDates = [];
   if (weeklyMilestones.length > 0) {
-    const checkpoints = await weeklyCheckpoints(goal._id, planStart);
-    for (const c of checkpoints) weekNumberById.set(c.id, c.weekNumber);
+    const { cycles, checkpoints } = await loadCheckpointWeeks(patientId, goal._id);
+    for (const c of checkpoints) weekNumberById.set(c.id, c.displayWeek);
     const logs = await Progress.find({
       patientId,
       weight: { $exists: true, $ne: null },
     })
-      .select('date week')
+      .select('date week weekBasis')
       .lean();
     weightLogDates = logs.filter((l) => !l.week).map((l) => new Date(l.date));
-    for (const l of logs) if (l.week) weightLoggedWeeks.add(l.week);
+    // Old entries carry the per-cycle number; translate so a cycle 1 week
+    // never marks the same-numbered cycle 2 week as weighed in.
+    for (const l of logs) if (l.week) weightLoggedWeeks.add(displayWeekForLegacyEntry(l, cycles));
   }
   function weeklyWeightLogged(m) {
     const weekNumber = weekNumberById.get(m._id.toString());
@@ -202,6 +204,11 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
     let title = m.title;
     if (m.type === 'daily') title = formatDayLabel(m.date);
     else if (m.type === 'monthly') title = formatMonthLabel(m.date);
+    // Weekly titles are baked in at seed time and go stale (e.g. plan start
+    // moved after the goal was created) - the canonical number wins.
+    else if (m.type === 'weekly' && weekNumberById.has(m._id.toString())) {
+      title = `Week ${weekNumberById.get(m._id.toString())}`;
+    }
     // Same staleness for the end-goal node's subtitle, which embeds the
     // goal's target date as of seed time - use the pause-adjusted
     // effectiveEndDate (already computed above) instead.
