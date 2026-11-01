@@ -45,17 +45,27 @@ async function buildCheckpointWeeks({ goalId, plans, milestones }) {
     (await Milestone.find({ goalId, type: 'weekly' }).sort({ date: 1 }).select('_id date').lean());
   const cycles = buildCycles(plans);
   const countByCycle = new Map();
+  const seenWeeks = new Set();
   const result = [];
   const sorted = [...docs].sort((a, b) => new Date(a.date) - new Date(b.date));
   for (const m of sorted) {
     const cycle = cycleAt(cycles, m.date);
     if (!cycle) continue;
     const indexInCycle = (countByCycle.get(cycle.cycleNumber) || 0) + 1;
+    // A cycle has four weeks: a weekly milestone seeded in the gap after its
+    // last week is not a checkpoint and does not advance the count.
+    if (indexInCycle > WEEKS_PER_CYCLE) continue;
+    const displayWeek = (cycle.cycleNumber - 1) * WEEKS_PER_CYCLE + indexInCycle;
+    if (seenWeeks.has(displayWeek)) {
+      console.warn(`checkpointWeeks: duplicate display week ${displayWeek} skipped`);
+      continue;
+    }
     countByCycle.set(cycle.cycleNumber, indexInCycle);
+    seenWeeks.add(displayWeek);
     result.push({
       id: String(m._id),
       date: m.date,
-      displayWeek: (cycle.cycleNumber - 1) * WEEKS_PER_CYCLE + indexInCycle,
+      displayWeek,
       cycleNumber: cycle.cycleNumber,
       indexInCycle,
     });
@@ -67,10 +77,29 @@ async function buildCheckpointWeeks({ goalId, plans, milestones }) {
  * Canonical week of a Progress entry that carries `week`, or null when it has
  * none. Entries tagged weekBasis 'display' already hold it; older ones are
  * offset by the cycle they were logged in (cycle 1 when before every start).
+ *
+ * With `checkpoints`, a patient's own legacy entry is read as the newest cycle
+ * (started on or before its date) whose checkpoint of that position was
+ * already reached on the entry's date: a number saved while the checkpoint of
+ * the current cycle was still ahead belongs to an earlier cycle. No such
+ * cycle falls back to the by-date reading above.
  */
-function displayWeekForLegacyEntry(entry, cycles) {
+function displayWeekForLegacyEntry(entry, cycles, checkpoints) {
   if (!entry || !entry.week) return null;
   if (entry.weekBasis === 'display') return entry.week;
+  if (checkpoints && entry.source !== 'dietician') {
+    const t = new Date(entry.date).getTime();
+    for (let i = cycles.length - 1; i >= 0; i--) {
+      if (cycles[i].start.getTime() > t) continue;
+      const reached = checkpoints.find(
+        (c) =>
+          c.cycleNumber === cycles[i].cycleNumber &&
+          c.indexInCycle === entry.week &&
+          new Date(c.date).getTime() <= t
+      );
+      if (reached) return reached.displayWeek;
+    }
+  }
   const cycle = cycleAt(cycles, entry.date);
   return ((cycle ? cycle.cycleNumber : 1) - 1) * WEEKS_PER_CYCLE + entry.week;
 }

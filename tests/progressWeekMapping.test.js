@@ -63,7 +63,7 @@ describe('POST /api/patient/progress with a week', () => {
   test('a create for a week that already has a legacy entry is refused too', async () => {
     const { patient } = await setup();
     // Cycle 2's first entry, saved under the old per-cycle number 1.
-    const legacy = await legacyEntry(patient, 1, utcDay(-2), 70);
+    const legacy = await legacyEntry(patient, 1, utcDay(0), 70);
     const res = await call('post', '/api/patient/progress', { weight: 68, week: 5 });
     expect(res.status).toBe(409);
     expect(res.body.existingId).toBe(String(legacy._id));
@@ -115,20 +115,13 @@ describe('GET /api/patient/progress?week=', () => {
   test('two entries both numbered 1 split between Week 1 and Week 5', async () => {
     const { patient } = await setup();
     await legacyEntry(patient, 1, utcDay(-33), 72);
-    await legacyEntry(patient, 1, utcDay(-2), 70);
+    await legacyEntry(patient, 1, utcDay(0), 70);
 
     const week1 = await call('get', '/api/patient/progress?week=1');
     const week5 = await call('get', '/api/patient/progress?week=5');
     expect(week1.body.data.map((e) => e.weight)).toEqual([72]);
     expect(week5.body.data.map((e) => e.weight)).toEqual([70]);
     expect(week5.body.data[0].displayWeek).toBe(5);
-  });
-
-  test('an old number 2 saved inside cycle 2 is Week 6, not Week 2', async () => {
-    const { patient } = await setup();
-    await legacyEntry(patient, 2, utcDay(0), 69);
-    expect((await call('get', '/api/patient/progress?week=6')).body.data).toHaveLength(1);
-    expect((await call('get', '/api/patient/progress?week=2')).body.data).toEqual([]);
   });
 
   test('only the newest entry of a week is returned', async () => {
@@ -147,7 +140,7 @@ describe('GET /api/patient/progress?week=', () => {
 
   test('without a week the list keeps its shape and gains displayWeek', async () => {
     const { patient } = await setup();
-    await legacyEntry(patient, 1, utcDay(-2), 70);
+    await legacyEntry(patient, 1, utcDay(0), 70);
     const res = await call('get', '/api/patient/progress');
     expect(res.status).toBe(200);
     expect(res.body.data[0].displayWeek).toBe(5);
@@ -209,7 +202,87 @@ describe('GET /api/patient/timeline weekly checkpoint', () => {
 
   test('a legacy entry numbered 1 saved inside cycle 2 completes Week 5', async () => {
     const { patient } = await setup();
-    await legacyEntry(patient, 1, utcDay(-2), 70);
+    await legacyEntry(patient, 1, utcDay(0), 70);
     expect((await weeklyToday()).status).toBe('completed');
+  });
+});
+
+describe('legacy entries logged against a checkpoint still ahead (late log)', () => {
+  test('a number 4 saved on today is Week 4, leaving Week 8 free', async () => {
+    const { patient } = await setup();
+    await legacyEntry(patient, 4, utcDay(0), 66);
+
+    const week4 = await call('get', '/api/patient/progress?week=4');
+    expect(week4.body.data).toHaveLength(1);
+    expect(week4.body.data[0].displayWeek).toBe(4);
+    expect((await call('get', '/api/patient/progress?week=8')).body.data).toEqual([]);
+
+    const dup = await call('post', '/api/patient/progress', { weight: 65, week: 4 });
+    expect(dup.status).toBe(409);
+    expect(dup.body.existingId).toBe(String(week4.body.data[0]._id));
+    expect((await call('post', '/api/patient/progress', { weight: 65, week: 8 })).status).toBe(201);
+  });
+
+  test('the timeline Week 8 node is not completed by a late-logged number 4', async () => {
+    const { patient } = await setup();
+    await legacyEntry(patient, 4, utcDay(0), 66);
+    const res = await call('get', '/api/patient/timeline?from=-10&to=30');
+    const week8 = res.body.data.milestones.find(
+      (m) => m.type === 'weekly' && m.date.startsWith(dayKey(utcDay(21)))
+    );
+    expect(week8.status).not.toBe('completed');
+  });
+
+  test('a number 1 saved on a day when both Week 1 and Week 5 were reached is Week 5', async () => {
+    const { patient } = await setup();
+    await legacyEntry(patient, 1, utcDay(0), 70);
+    expect((await call('get', '/api/patient/progress?week=5')).body.data).toHaveLength(1);
+    expect((await call('get', '/api/patient/progress?week=1')).body.data).toEqual([]);
+  });
+});
+
+describe('gap weeks between cycles', () => {
+  const weeklyNumbers = async () => {
+    const res = await call('get', '/api/patient/timeline?from=-60&to=40');
+    expect(res.status).toBe(200);
+    return res.body.data.milestones.filter((m) => m.type === 'weekly');
+  };
+
+  test('a 7-day gap leaves the gap node out and Week 5 loggable once', async () => {
+    const { patient } = await createTwoCyclePatient({ historyStartOffset: -41 });
+    registerTestToken('patient-token', patient._id);
+
+    const nodes = await weeklyNumbers();
+    const numbers = nodes.map((m) => m.weekNumber).filter((n) => n >= 5);
+    expect(numbers).toEqual([5, 6, 7, 8]);
+    expect(new Set(nodes.map((m) => m.weekNumber)).size).toBe(nodes.length);
+    expect(nodes.some((m) => m.date.startsWith(dayKey(utcDay(-7))))).toBe(false);
+
+    const first = await call('post', '/api/patient/progress', { weight: 64, week: 5 });
+    expect(first.status).toBe(201);
+    expect(first.body.data.week).toBe(5);
+    expect((await call('post', '/api/patient/progress', { weight: 64, week: 5 })).status).toBe(409);
+  });
+
+  test('a legacy number 1 dated on a gap day is Week 1 and does not block Week 5', async () => {
+    const { patient } = await createTwoCyclePatient({ historyStartOffset: -41 });
+    registerTestToken('patient-token', patient._id);
+    await legacyEntry(patient, 1, utcDay(-7), 71);
+
+    const week1 = await call('get', '/api/patient/progress?week=1');
+    expect(week1.body.data).toHaveLength(1);
+    expect((await call('post', '/api/patient/progress', { weight: 64, week: 5 })).status).toBe(201);
+  });
+
+  test('a 21-day gap still numbers the checkpoints 1-8 once each', async () => {
+    const { patient, goal } = await createTwoCyclePatient({ historyStartOffset: -55 });
+    registerTestToken('patient-token', patient._id);
+
+    const { loadCheckpointWeeks } = require('../utils/checkpointWeeks');
+    const { checkpoints } = await loadCheckpointWeeks(patient._id, goal._id);
+    expect(checkpoints.map((c) => c.displayWeek)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    expect((await call('post', '/api/patient/progress', { weight: 64, week: 6 })).status).toBe(201);
+    expect((await call('post', '/api/patient/progress', { weight: 64, week: 6 })).status).toBe(409);
   });
 });

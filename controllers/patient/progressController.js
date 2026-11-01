@@ -12,18 +12,28 @@ const { calcAge, calcBmr, calcTdee } = require('../../utils/dieticianPatientHelp
 const { getOrSetPatientStat, invalidatePatientStats } = require('../../utils/patientStatsCache');
 const {
   displayWeekForLegacyEntry,
-  loadCheckpointWeeks,
   loadActiveGoalCheckpointWeeks,
 } = require('../../utils/checkpointWeeks');
+const { acquireProgressWeekLock } = require('../../utils/progressWeekLock');
 
 // The patient's week-tagged entries, newest first, each with its canonical
 // display week (old per-cycle numbers translated, see utils/checkpointWeeks).
-async function weekTaggedEntries(patientId, cycles, extraQuery = {}) {
+async function weekTaggedEntries(patientId, cycles, checkpoints, extraQuery = {}) {
   const entries = await Progress.find({ patientId, week: { $ne: null }, ...extraQuery })
     .sort({ date: -1 })
     .lean();
-  return entries.map((e) => ({ ...e, displayWeek: displayWeekForLegacyEntry(e, cycles) }));
+  return entries.map((e) => ({
+    ...e,
+    displayWeek: displayWeekForLegacyEntry(e, cycles, checkpoints),
+  }));
 }
+
+const alreadyLoggedResponse = (res, week, existingId) =>
+  res.status(409).json({
+    success: false,
+    message: `Week ${week} already has an entry`,
+    existingId,
+  });
 
 /**
  * @desc    Create a new progress entry
@@ -31,29 +41,33 @@ async function weekTaggedEntries(patientId, cycles, extraQuery = {}) {
  * @access  Private (Patient)
  */
 exports.createProgress = async (req, res, next) => {
+  let lock = null;
   try {
     const { date, weight, notes, beforeImage, afterImage, arm, waist, hip, week } = req.body;
 
     // A week-tagged entry must name a real checkpoint of the patient's goal
     // and must not duplicate an already logged week (nothing is overwritten
-    // by a create). Checked before any upload or write.
+    // by a create). Checked before any upload or write, under a short lock so
+    // two simultaneous creates cannot both pass the check.
     let canonicalWeek = null;
     if (week) {
       canonicalWeek = parseInt(week, 10);
+      lock = await acquireProgressWeekLock(req.user._id, canonicalWeek);
+      if (!lock) {
+        return res.status(409).json({
+          success: false,
+          message: `Week ${canonicalWeek} is already being saved`,
+          inProgress: true,
+        });
+      }
       const { cycles, checkpoints } = await loadActiveGoalCheckpointWeeks(req.user._id);
       if (!checkpoints.some((c) => c.displayWeek === canonicalWeek)) {
         return res.status(400).json({ success: false, message: 'Unknown checkpoint week' });
       }
-      const existing = (await weekTaggedEntries(req.user._id, cycles)).find(
+      const existing = (await weekTaggedEntries(req.user._id, cycles, checkpoints)).find(
         (e) => e.displayWeek === canonicalWeek
       );
-      if (existing) {
-        return res.status(409).json({
-          success: false,
-          message: `Week ${canonicalWeek} already has an entry`,
-          existingId: existing._id,
-        });
-      }
+      if (existing) return alreadyLoggedResponse(res, canonicalWeek, existing._id);
     }
 
     // Get user's height for BMI calculation
@@ -143,7 +157,22 @@ exports.createProgress = async (req, res, next) => {
       data: progress,
     });
   } catch (error) {
+    if (error.code === 11000 && req.body.week) {
+      // A unique index (if one exists) caught a duplicate the lock missed.
+      try {
+        const week = parseInt(req.body.week, 10);
+        const { cycles, checkpoints } = await loadActiveGoalCheckpointWeeks(req.user._id);
+        const existing = (await weekTaggedEntries(req.user._id, cycles, checkpoints)).find(
+          (e) => e.displayWeek === week
+        );
+        return alreadyLoggedResponse(res, week, existing?._id);
+      } catch (lookupError) {
+        return next(lookupError);
+      }
+    }
     next(error);
+  } finally {
+    if (lock) await lock.release();
   }
 };
 
@@ -165,7 +194,7 @@ exports.getProgress = async (req, res, next) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const { cycles } = await loadCheckpointWeeks(req.user._id, null);
+    const { cycles, checkpoints } = await loadActiveGoalCheckpointWeeks(req.user._id);
 
     // Which weekly checkpoint (canonical display week, see createProgress) -
     // used by the Log My Body sheet to fetch "Week N"'s previously-logged
@@ -178,7 +207,12 @@ exports.getProgress = async (req, res, next) => {
       const weekNum = parseInt(week, 10);
       const { date: dateFilter } = query;
       const matches = (
-        await weekTaggedEntries(req.user._id, cycles, dateFilter ? { date: dateFilter } : {})
+        await weekTaggedEntries(
+          req.user._id,
+          cycles,
+          checkpoints,
+          dateFilter ? { date: dateFilter } : {}
+        )
       ).filter((e) => e.displayWeek === weekNum);
       const found = matches.slice(0, 1);
       return res.status(200).json({
@@ -200,7 +234,7 @@ exports.getProgress = async (req, res, next) => {
       .lean();
     const progress = entries.map((e) => ({
       ...e,
-      displayWeek: displayWeekForLegacyEntry(e, cycles),
+      displayWeek: displayWeekForLegacyEntry(e, cycles, checkpoints),
     }));
 
     const total = await Progress.countDocuments(query);

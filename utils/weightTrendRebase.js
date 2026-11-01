@@ -158,10 +158,10 @@ async function loadWeightTrendInputs(
     date: { $gte: floor, $lte: rangeEnd },
   })
     .sort({ date: 1 })
-    .select('date weight week weekBasis')
+    .select('date weight week weekBasis source')
     .lean();
   const weighIns = logs.map((l) => {
-    const displayWeek = displayWeekForLegacyEntry(l, cycles);
+    const displayWeek = displayWeekForLegacyEntry(l, cycles, checkpoints);
     return {
       date: l.date,
       weight: l.weight,

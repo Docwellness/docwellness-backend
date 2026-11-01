@@ -176,12 +176,14 @@ async function buildTimelinePayload(patientId, { from = -14, to = 30 } = {}) {
       patientId,
       weight: { $exists: true, $ne: null },
     })
-      .select('date week weekBasis')
+      .select('date week weekBasis source')
       .lean();
     weightLogDates = logs.filter((l) => !l.week).map((l) => new Date(l.date));
     // Old entries carry the per-cycle number; translate so a cycle 1 week
     // never marks the same-numbered cycle 2 week as weighed in.
-    for (const l of logs) if (l.week) weightLoggedWeeks.add(displayWeekForLegacyEntry(l, cycles));
+    for (const l of logs) {
+      if (l.week) weightLoggedWeeks.add(displayWeekForLegacyEntry(l, cycles, checkpoints));
+    }
   }
   function weeklyWeightLogged(m) {
     const weekNumber = weekNumberById.get(m._id.toString());
