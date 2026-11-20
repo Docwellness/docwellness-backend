@@ -253,7 +253,7 @@ exports.getPatientProfile = async (req, res, next) => {
     const statusSnapshot = patient.status || {};
 
     const DIET_PLAN_SUMMARY_SELECT =
-      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan pauses startDatePending';
+      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan pauses startDatePending activationDate';
 
     // weeklyDietPlans (finalized weeks + their calories) and
     // generatedWeekNumbers (weeks with AI content ready, pre-finalize) for
@@ -485,6 +485,10 @@ exports.getPatientProfile = async (req, res, next) => {
               ? dietPlanForSummary.weekSchedule[0].startDate
               : latestRequest?.startDateForDiet
           ),
+          // When the payment was approved and the plan went live (ISO). Kept
+          // apart from the start day so the dietician can see both and spot a
+          // wrongly picked start; null for a plan that has not been activated.
+          activationDate: dietPlanForSummary?.activationDate || null,
           height: patient.healthProfile?.height ?? null,
           weight: patient.healthProfile?.weight ?? null,
           bmi: patient.healthProfile?.bmi ?? null,

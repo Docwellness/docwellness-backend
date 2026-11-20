@@ -417,6 +417,33 @@ describe('readers on a plan with an empty schedule', () => {
     expect(res.body.data.status.startDatePending).toBe(false);
   });
 
+  test('the dietician profile sends the activation date of an activated plan, apart from the start day', async () => {
+    const dietician = await createDietician();
+    const patient = await createPatient();
+    registerTestToken('dietician-token', dietician._id);
+    await createDietPlanRequest(patient, dietician);
+    const plan = await createActiveDietPlan(patient, dietician);
+    const approvedAt = new Date('2026-11-20T10:52:00.000Z');
+    await DietPlan.updateOne({ _id: plan._id }, { $set: { activationDate: approvedAt } });
+    await User.updateOne({ _id: patient._id }, { $set: { 'status.activeDietPlanId': plan._id } });
+
+    const res = await auth(request(app).get(`${base(patient)}/profile`));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.healthSummary.activationDate).toBe(approvedAt.toISOString());
+  });
+
+  test('the dietician profile has no activation date while the plan is still pending', async () => {
+    const ctx = await setup();
+    const created = await createPlanThroughApi(ctx);
+    await User.updateOne({ _id: ctx.patient._id }, { $set: { 'status.activeDietPlanId': created.body.data.dietPlanId } });
+
+    const res = await auth(request(app).get(`${base(ctx.patient)}/profile`));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.healthSummary.activationDate).toBeNull();
+  });
+
   describe('pendingCycle.startDatePending', () => {
     async function profileWithRenewal({ renewalPending }) {
       const dietician = await createDietician();
