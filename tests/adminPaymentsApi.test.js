@@ -14,14 +14,14 @@ jest.mock('../middlewares/adminAuth', () => ({
 
 let request, app;
 let createPatient, createDietician, createDietPlanRequest, createActiveDietPlan;
-let ManualPaymentProof, DietPlanRequest, Notification, AdminAuditLog, User;
+let ManualPaymentProof, DietPlanRequest, DietPlan, Notification, AdminAuditLog, User;
 
 beforeAll(async () => {
   await connectTestDb();
   request = require('supertest');
   app = require('../config/createApp')();
   ({ createPatient, createDietician, createDietPlanRequest, createActiveDietPlan } = require('./helpers/factories'));
-  ({ ManualPaymentProof, DietPlanRequest, Notification, User } = require('../models'));
+  ({ ManualPaymentProof, DietPlanRequest, DietPlan, Notification, User } = require('../models'));
   AdminAuditLog = require('../models/AdminAuditLog');
 });
 afterEach(async () => {
@@ -132,6 +132,40 @@ describe('confirm', () => {
     const detail = await get(`/payments/${proof._id}`);
     expect(detail.body.data.canConfirm).toBe(false);
     expect(detail.body.data.confirmBlockedReason).toMatch(/first payment/i);
+  });
+
+  it('refuses a renewal while its new plan has no start date yet, leaving the payment submitted', async () => {
+    const { proof, dpr, patient, dietician } = await seed();
+    await DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      request: dpr._id,
+      status: 'Finalized',
+      cycleNumber: 2,
+      startDatePending: true,
+    });
+    const r = await post(`/payments/${proof._id}/confirm`);
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('needs_plan_activation');
+    expect((await ManualPaymentProof.findById(proof._id)).status).toBe('Submitted');
+    expect((await DietPlanRequest.findById(dpr._id)).status).toBe('PaymentSubmitted');
+  });
+
+  it('refuses a renewal whose new plan is an unfinalized draft too, leaving the payment submitted', async () => {
+    const { proof, dpr, patient, dietician } = await seed();
+    await DietPlan.create({
+      patientId: patient._id,
+      dieticianId: dietician._id,
+      request: dpr._id,
+      status: 'Draft',
+      cycleNumber: 2,
+      startDatePending: true,
+    });
+    const r = await post(`/payments/${proof._id}/confirm`);
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('needs_plan_activation');
+    expect((await ManualPaymentProof.findById(proof._id)).status).toBe('Submitted');
+    expect((await DietPlanRequest.findById(dpr._id)).status).toBe('PaymentSubmitted');
   });
 
   it('cannot decide a payment twice', async () => {

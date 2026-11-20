@@ -143,6 +143,24 @@ exports.confirmRenewalPayment = async (req, res, next) => {
       });
     }
 
+    // A not-started plan can only be dated by activating it, so settling the
+    // bill here would leave a paid plan that never gets a start day. A Draft
+    // pending plan blocks too: settling its proof leaves activateDietPlan
+    // unable to run (it needs the proof Submitted).
+    if (
+      await DietPlan.exists({
+        patientId,
+        request: request._id,
+        startDatePending: true,
+      })
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'needs_plan_activation',
+        message: 'The new diet plan has no start date yet. Approve this payment by activating that plan.',
+      });
+    }
+
     await settleRenewalProof({
       proof,
       request,

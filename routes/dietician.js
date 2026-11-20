@@ -325,6 +325,12 @@ router.put(
   dietPlanController.saveDraftWeek
 );
 
+router.get(
+  '/patients/:patientId/diet-plans/:dietPlanId/start-date-options',
+  dieticianOnlyMiddleware,
+  dietPlanController.getStartDateOptions
+);
+
 router.post(
   '/patients/:patientId/diet-plans/:dietPlanId/activate',
   dieticianOnlyMiddleware,

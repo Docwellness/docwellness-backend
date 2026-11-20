@@ -253,7 +253,7 @@ exports.getPatientProfile = async (req, res, next) => {
     const statusSnapshot = patient.status || {};
 
     const DIET_PLAN_SUMMARY_SELECT =
-      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan pauses';
+      '_id status workflowStatus dataModel weeksSummary generatedPlan calorieStrategy macroStrategy cycleNumber weekSchedule membershipPlan pauses startDatePending';
 
     // weeklyDietPlans (finalized weeks + their calories) and
     // generatedWeekNumbers (weeks with AI content ready, pre-finalize) for
@@ -420,6 +420,7 @@ exports.getPatientProfile = async (req, res, next) => {
         cycleNumber: pendingPlan.cycleNumber || 1,
         membershipPlan: pendingPlan.membershipPlan || null,
         weekSchedule: withPauseShift(pendingPlan.weekSchedule),
+        startDatePending: Boolean(pendingPlan.startDatePending),
         generatedWeekNumbers: pendingWeeks.generatedWeekNumbers,
         finalizedWeekNumbers: pendingWeeks.finalizedWeekNumbers,
         activePlanStrategy: {
@@ -477,7 +478,13 @@ exports.getPatientProfile = async (req, res, next) => {
           profileImage: patient.profile?.profileImage || null,
         },
         healthSummary: {
-          startDateForDiet: formatDate(latestRequest?.startDateForDiet),
+          // During a renewal the request's date is the renewal's preferred
+          // date; the editable row is the running plan's week 1 start.
+          startDateForDiet: formatDate(
+            pendingPlan && dietPlanForSummary?.weekSchedule?.[0]?.startDate
+              ? dietPlanForSummary.weekSchedule[0].startDate
+              : latestRequest?.startDateForDiet
+          ),
           height: patient.healthProfile?.height ?? null,
           weight: patient.healthProfile?.weight ?? null,
           bmi: patient.healthProfile?.bmi ?? null,
@@ -531,6 +538,9 @@ exports.getPatientProfile = async (req, res, next) => {
               ? statusSnapshot.hasPaymentUpdate
               : false,
           isActive: patient.isActive !== false,
+          // The newest cycle has no start date yet: it is chosen when the
+          // payment is approved, so the profile shows the date read-only.
+          startDatePending: Boolean(pendingPlan ? pendingPlan.startDatePending : dietPlanForSummary?.startDatePending),
           paymentSummary,
         },
         weeklyDietPlans,

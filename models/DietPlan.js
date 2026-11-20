@@ -28,6 +28,13 @@ const dietPlanSchema = new mongoose.Schema(
     endDate: {
       type: Date,
     },
+    // True from creation until the dietician approves the payment and picks the
+    // start day (activateDietPlan). A pending plan has no startDate and an empty
+    // weekSchedule. Absent/false = plan created with its dates up front.
+    startDatePending: {
+      type: Boolean,
+      default: false,
+    },
     mealsPerDay: {
       type: Number,
       default: 3,

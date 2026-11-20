@@ -448,6 +448,13 @@ async function buildRequestDetail(request, patientId) {
     healthConcerns,
     membershipPlan: request.membershipPlan || null,
     membershipAmount: request.membershipAmount ?? null,
+    // The plan has no start date yet: the dietician picks it when approving
+    // the payment, so the app must not show a date for it. A renewal shares the
+    // request with the running Active cycle, which keeps showing its date.
+    // Additive.
+    startPending:
+      Boolean(await DietPlan.exists({ patientId, request: request._id, startDatePending: true })) &&
+      !(await DietPlan.exists({ patientId, request: request._id, status: 'Active' })),
   };
 }
 
@@ -519,6 +526,23 @@ exports.listRequests = async (req, res, next) => {
           .lean()
       : [];
 
+    // One query for every row: which requests have a plan still waiting for
+    // its start date, and which already have a running (Active) plan. A
+    // renewal shares its request with the running cycle, which keeps its date.
+    const waitingPlans = requests.length
+      ? await DietPlan.find({
+          patientId: req.user._id,
+          request: { $in: requests.map((r) => r._id) },
+          $or: [{ startDatePending: true }, { status: 'Active' }],
+        })
+          .select('request startDatePending status')
+          .lean()
+      : [];
+    const activeIds = new Set(waitingPlans.filter((p) => p.status === 'Active').map((p) => String(p.request)));
+    const startPendingIds = new Set(
+      waitingPlans.filter((p) => p.startDatePending && !activeIds.has(String(p.request))).map((p) => String(p.request))
+    );
+
     res.status(200).json({
       success: true,
       data: requests.flatMap((r) => [
@@ -528,6 +552,7 @@ exports.listRequests = async (req, res, next) => {
           isEditable: r.status === 'Unpaid',
           createdAt: r.createdAt,
           startDateForDiet: r.startDateForDiet,
+          startPending: startPendingIds.has(String(r._id)),
           membershipPlan: r.membershipPlan || null,
           membershipAmount: r.membershipAmount ?? null,
         },

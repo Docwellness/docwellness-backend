@@ -79,6 +79,19 @@ async function loadCurrentPlan(patientId) {
 }
 
 /**
+ * End day of the cycle the patient is running now (lowest-cycle Active plan
+ * other than `excludePlanId`), pause-shifted; null when there is none. A new
+ * cycle must start after this day.
+ */
+async function runningCycleEndDay(patientId, excludePlanId = null) {
+  const filter = { patientId, status: 'Active' };
+  if (excludePlanId) filter._id = { $ne: excludePlanId };
+  const running = await DietPlan.findOne(filter).sort({ cycleNumber: 1 }).select('weekSchedule').lean();
+  if (!running) return null;
+  return lastWeekEndDayOf(running.weekSchedule, await loadPatientPauses(patientId));
+}
+
+/**
  * Earliest pause-shifted weekly milestone strictly after `endDay`, else the
  * day after `endDay`. `weeklyMilestoneDates` may be unsorted.
  */
@@ -179,6 +192,7 @@ module.exports = {
   endDayOf,
   lastWeekEndDayOf,
   loadPlanEndDays,
+  runningCycleEndDay,
   computeLastWeighInDate,
   loadPlanEnd,
   isNonWeightLogClosed,

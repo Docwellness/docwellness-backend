@@ -218,6 +218,23 @@ exports.confirmPayment = async (req, res, next) => {
     const request = await DietPlanRequest.findById(proof.request);
     if (!request) return res.status(404).json({ success: false, message: 'The plan request for this payment is missing' });
 
+    // Any not-started plan blocks, a Draft too: settling its proof leaves
+    // activateDietPlan unable to run (it needs the proof Submitted), so the
+    // plan could never be dated.
+    if (
+      await DietPlan.exists({
+        patientId: proof.patient,
+        request: request._id,
+        startDatePending: true,
+      })
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'needs_plan_activation',
+        message: 'The new diet plan has no start date yet. It is confirmed when the dietician activates that plan.',
+      });
+    }
+
     const note = String(req.body?.note || '').trim();
     await audited(
       req,

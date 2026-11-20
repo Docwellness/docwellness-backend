@@ -64,6 +64,7 @@ function pastOrderRow(request, plan) {
     // created.
     createdAt: (plan.cycleNumber || 1) === 1 ? request.createdAt : plan.createdAt,
     startDateForDiet: resolvePlanStartDate(plan),
+    startPending: false,
     membershipPlan,
     membershipAmount: getMembershipPrice(membershipPlan) ?? null,
   };
@@ -83,6 +84,7 @@ function pastOrderDetailOverrides(request, plan) {
     paymentRequestedAt: null,
     paymentSummary: null,
     startDateForDiet: row.startDateForDiet,
+    startPending: false,
     createdAt: row.createdAt,
     subscriptionStartDate: null,
     subscriptionExpiresAt: null,

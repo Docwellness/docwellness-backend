@@ -46,6 +46,13 @@ test('config captured DIET_PLAN_DATA_MODEL=plan-item for this test file', () => 
   expect(config.dietPlanDataModel).toBe('plan-item');
 });
 
+test('startDatePending defaults to false on a plan built without it', async () => {
+  const dietician = await createDietician();
+  const patient = await createPatient();
+  const plan = await DietPlan.create({ patientId: patient._id, dieticianId: dietician._id });
+  expect(plan.startDatePending).toBe(false);
+});
+
 test('creating a diet plan with the flag on produces a plan-item plan and skips the old generation engine', async () => {
   const dietician = await createDietician();
   const patient = await createPatient();

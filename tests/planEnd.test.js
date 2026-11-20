@@ -231,3 +231,43 @@ describe('loadPlanEnd follows the last plan week, not the membership expiry', ()
   });
 });
 
+describe('runningCycleEndDay', () => {
+  const week = (n, start, end) => ({ week: n, startDate: D(start), endDate: D(end) });
+  const cycleOne = [week(1, '2026-11-02', '2026-11-08'), week(4, '2026-11-23', '2026-11-29')];
+  const cycleTwo = [week(1, '2026-11-30', '2026-12-06'), week(4, '2026-12-21', '2026-12-27')];
+
+  async function setup() {
+    return { patient: await createPatient(), dietician: await createDietician() };
+  }
+
+  test('no other Active plan gives null', async () => {
+    const { patient, dietician } = await setup();
+    const draft = await createActiveDietPlan(patient, dietician, { status: 'Draft', weekSchedule: cycleOne });
+    expect(await planEnd.runningCycleEndDay(patient._id, draft._id)).toBeNull();
+  });
+
+  test('the plan being excluded is not the running cycle', async () => {
+    const { patient, dietician } = await setup();
+    const only = await createActiveDietPlan(patient, dietician, { weekSchedule: cycleOne });
+    expect(await planEnd.runningCycleEndDay(patient._id, only._id)).toBeNull();
+  });
+
+  test('the lowest-cycle Active plan is used', async () => {
+    const { patient, dietician } = await setup();
+    await createActiveDietPlan(patient, dietician, { cycleNumber: 2, weekSchedule: cycleTwo });
+    await createActiveDietPlan(patient, dietician, { cycleNumber: 1, weekSchedule: cycleOne });
+    const pending = await createActiveDietPlan(patient, dietician, { status: 'Draft', cycleNumber: 3 });
+    expect(await planEnd.runningCycleEndDay(patient._id, pending._id)).toBe('2026-11-29');
+  });
+
+  test('a pause shifts the end day', async () => {
+    const { patient, dietician } = await setup();
+    await createActiveDietPlan(patient, dietician, {
+      weekSchedule: cycleOne,
+      pauses: [{ startDate: D('2026-11-10'), resumeDate: D('2026-11-15') }],
+    });
+    const pending = await createActiveDietPlan(patient, dietician, { status: 'Draft', cycleNumber: 2 });
+    expect(await planEnd.runningCycleEndDay(patient._id, pending._id)).toBe('2026-12-04');
+  });
+});
+

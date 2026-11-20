@@ -64,8 +64,16 @@ const {
 const { DAY_GROUPS, mealMatchesDayGroup } = require('../../utils/dayGroups');
 const { computeWeekSummary } = require('../../utils/weekNutritionSummary');
 const { buildWeekSchedule, cascadeWeekScheduleFrom } = require('../../utils/weekSchedule');
+const { istDayKey, runningCycleEndDay } = require('../../utils/planEnd');
+const { parseStartDay, earliestStartDay, dayToUtcDate, activationDates } = require('../../utils/planStartDate');
 const { generateWeekPlan } = require('../../services/dietPlanGenerationService');
 const { getFinalizedWeeks, getDraftWeeks, applyLegacyWeekPayload } = require('../../utils/dietPlanLegacyView');
+
+const START_DATE_PENDING_MESSAGE =
+  'The start date is chosen when the payment is approved, so it cannot be changed yet.';
+
+const WEEK_LOCKED_UNTIL_ACTIVATION_MESSAGE =
+  'Weeks after Week 1 open once the payment is approved and the start date is set.';
 
 const REQUIRED_SERVING_TIMES = [
   'Morning Drink',
@@ -1281,8 +1289,7 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
   try {
     const { patientId } = req.params;
     const dieticianId = req.user._id;
-    const { requestId, firstConsultationId, calorieStrategy, macroStrategy, startDate, currentWeight } =
-      req.body;
+    const { requestId, firstConsultationId, calorieStrategy, macroStrategy, currentWeight } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(patientId)) {
       return res.status(400).json({
@@ -1361,22 +1368,10 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       });
     }
 
-    // Always resolved, since weekSchedule needs an anchor date regardless
-    // of whether the dietician picked one. When they didn't: for a renewal
-    // (hasActivePlan - there's a running cycle) fall back to the start date
-    // the patient chose on the request, which is constrained to be on/after
-    // the current cycle's expiry so the two don't overlap. For a first-time
-    // plan the same field is the date the patient asked to begin on, so a
-    // future date is honoured too; otherwise "now".
-    const renewalStartFallback =
-      dietPlanRequest?.startDateForDiet &&
-      new Date(dietPlanRequest.startDateForDiet) > new Date()
-        ? new Date(dietPlanRequest.startDateForDiet)
-        : new Date();
-    const rawParsedStartDate = startDate ? new Date(startDate) : renewalStartFallback;
-    const parsedStartDate = Number.isNaN(rawParsedStartDate.getTime())
-      ? renewalStartFallback
-      : rawParsedStartDate;
+    // The plan is created without a start date or week dates: the dietician
+    // picks the start day when approving the payment (activateDietPlan), so a
+    // late payment never starts a plan in the past. Any startDate in the body
+    // (older app builds still send one) is ignored.
 
     // This endpoint doubles as "start a new renewal cycle" whenever it's
     // called for a patient who already has plan history (no separate
@@ -1427,10 +1422,10 @@ exports.createAndGenerateDietPlan = async (req, res, next) => {
       calorieStrategy,
       macroStrategy,
       status: 'Draft',
-      startDate: parsedStartDate,
+      startDatePending: true,
       cycleNumber,
       membershipPlan: dietPlanRequest.membershipPlan || null,
-      weekSchedule: buildWeekSchedule(parsedStartDate),
+      weekSchedule: [],
       // v4.0: fixed for this plan's whole lifetime at creation time - never
       // re-evaluated later even if the env flag changes, matching the
       // engine flag's own "generation-time decision" precedent
@@ -1571,6 +1566,20 @@ exports.generateWeekForExistingPlan = async (req, res, next) => {
 
     if (!dietPlan) {
       return res.status(404).json({ success: false, message: 'Diet plan not found for this patient' });
+    }
+
+    // A plan with no start date has no dated weeks, so the "last 2 days of
+    // the prior week" wait cannot be checked: only Week 1 may be (re)built
+    // until the payment is approved and the weeks are dated.
+    if (
+      dietPlan.startDatePending &&
+      !(sortedWeekNumbers.length === 1 && sortedWeekNumbers[0] === 1)
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'week_locked_until_activation',
+        message: WEEK_LOCKED_UNTIL_ACTIVATION_MESSAGE,
+      });
     }
 
     const tier = getMembershipTier(dietPlan.request?.membershipPlan);
@@ -1722,6 +1731,10 @@ exports.updateWeekScheduleDate = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Diet plan not found for this patient' });
     }
 
+    if (dietPlan.startDatePending) {
+      return res.status(409).json({ success: false, message: START_DATE_PENDING_MESSAGE });
+    }
+
     dietPlan.weekSchedule = cascadeWeekScheduleFrom(dietPlan.weekSchedule, weekNumber, parsedStartDate);
     await dietPlan.save();
 
@@ -1743,6 +1756,11 @@ exports.updateWeekScheduleDate = async (req, res, next) => {
  *          - the patient's ExercisePlan startDate if one exists
  *          Nothing is required to exist beyond the request itself - the
  *          cascades are best-effort.
+ *          While a renewal plan is not started (startDatePending) the edit
+ *          targets the running Active plan (lowest cycleNumber) instead: its
+ *          weeks and the exercise plan move, the request (which holds the
+ *          renewal's preferred date) and the renewal plan are left alone.
+ *          With no Active plan (first-time pending plan) it answers 409.
  * @route   PATCH /api/dietician/patients/:patientId/diet-start-date
  * @access  Private (Dietician)
  */
@@ -1772,11 +1790,26 @@ exports.updateDietStartDate = async (req, res, next) => {
     if (!request) {
       return res.status(404).json({ success: false, message: 'No diet plan request found for this patient' });
     }
-    request.startDateForDiet = parsedStartDate;
-    await request.save();
+
+    // The most-recent diet plan is the one this edit cascades to.
+    let dietPlan = await DietPlan.findOne({ patientId, dieticianId }).sort({ createdAt: -1 });
+    let renewalEdit = false;
+    if (dietPlan?.startDatePending) {
+      // A not-started renewal: the edit moves the running plan instead.
+      const runningPlan = await DietPlan.findOne({ patientId, dieticianId, status: 'Active' }).sort({ cycleNumber: 1 });
+      if (!runningPlan) {
+        return res.status(409).json({ success: false, message: START_DATE_PENDING_MESSAGE });
+      }
+      dietPlan = runningPlan;
+      renewalEdit = true;
+    }
+
+    if (!renewalEdit) {
+      request.startDateForDiet = parsedStartDate;
+      await request.save();
+    }
 
     // Cascade to the active/most-recent diet plan's week schedule, if one exists.
-    const dietPlan = await DietPlan.findOne({ patientId, dieticianId }).sort({ createdAt: -1 });
     if (dietPlan) {
       dietPlan.weekSchedule =
         Array.isArray(dietPlan.weekSchedule) && dietPlan.weekSchedule.length > 0
@@ -1795,7 +1828,7 @@ exports.updateDietStartDate = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: {
-        startDateForDiet: request.startDateForDiet,
+        startDateForDiet: renewalEdit ? parsedStartDate : request.startDateForDiet,
         dietPlanUpdated: Boolean(dietPlan),
         exercisePlanUpdated: Boolean(exercisePlan),
       },
@@ -2491,7 +2524,74 @@ exports.saveDraftWeek = async (req, res, next) => {
 };
 
 /**
- * @desc    Activate a finalized diet plan for a patient after payment verification
+ * Where a not-started plan may begin. A renewal (another Active plan exists)
+ * starts the day after the running cycle ends, never before today (IST).
+ */
+async function getStartDayBounds(patientId, dietPlanId, now = new Date()) {
+  const isRenewal = Boolean(await DietPlan.exists({ patientId, status: 'Active', _id: { $ne: dietPlanId } }));
+  const runningEndDay = isRenewal ? await runningCycleEndDay(patientId, dietPlanId) : null;
+  return {
+    isRenewal,
+    runningEndDay,
+    defaultDay: istDayKey(now),
+    minDay: earliestStartDay({ now, runningEndDay }),
+  };
+}
+
+// The 400 body for a start day before the earliest allowed one, or null.
+function startDayTooEarlyBody(startDay, bounds) {
+  if (startDay >= bounds.minDay) return null;
+  return {
+    success: false,
+    code: 'START_DATE_INVALID',
+    message: bounds.isRenewal
+      ? `The renewal cannot start before ${bounds.minDay}, the day after the current plan ends.`
+      : `The diet cannot start before ${bounds.minDay}.`,
+  };
+}
+
+/**
+ * @desc    The day the dietician may pick for a plan's start while approving
+ *          its payment: default, earliest allowed, and whether it is a renewal.
+ *          `required` is false for a plan that already has its dates.
+ * @route   GET /api/dietician/patients/:patientId/diet-plans/:dietPlanId/start-date-options
+ * @access  Private (Dietician)
+ */
+exports.getStartDateOptions = async (req, res, next) => {
+  try {
+    const { patientId, dietPlanId } = req.params;
+    const dietPlan = await DietPlan.findOne({ _id: dietPlanId, patientId, dieticianId: req.user._id })
+      .select('startDatePending')
+      .lean();
+    if (!dietPlan) {
+      return res.status(404).json({ success: false, message: 'Diet plan not found' });
+    }
+    if (!dietPlan.startDatePending) {
+      return res.status(200).json({
+        success: true,
+        data: { required: false, defaultDate: null, minDate: null, isRenewal: false, runningCycleEndDate: null },
+      });
+    }
+    const bounds = await getStartDayBounds(patientId, dietPlanId);
+    return res.status(200).json({
+      success: true,
+      data: {
+        required: true,
+        defaultDate: bounds.defaultDay,
+        minDate: bounds.minDay,
+        isRenewal: bounds.isRenewal,
+        runningCycleEndDate: bounds.runningEndDay,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Activate a finalized diet plan for a patient after payment verification.
+ *          A plan created without dates (startDatePending) also takes the start
+ *          day picked here (`startDate`, yyyy-MM-dd) and dates itself from it.
  * @route   POST /api/dietician/patients/:patientId/diet-plans/:dietPlanId/activate
  * @access  Private (Dietician)
  */
@@ -2499,7 +2599,7 @@ exports.activateDietPlan = async (req, res, next) => {
   try {
     const { patientId, dietPlanId } = req.params;
     const dieticianId = req.user._id;
-    const { proofId, amountReceived, amountPending } = req.body || {};
+    const { proofId, amountReceived, amountPending, startDate: rawStartDate } = req.body || {};
 
     let parsedAmountReceived = null;
     let parsedAmountPending = null;
@@ -2561,6 +2661,41 @@ exports.activateDietPlan = async (req, res, next) => {
       });
     }
 
+    // A not-started plan takes its dates from the day picked here. Validated
+    // before the proof is touched so a bad date leaves every document unchanged.
+    let pendingStartDay = null;
+    let startsAsRenewal = false;
+    if (dietPlan.startDatePending) {
+      if (rawStartDate === undefined || rawStartDate === null || rawStartDate === '') {
+        return res.status(400).json({
+          success: false,
+          code: 'START_DATE_REQUIRED',
+          message: 'Choose the day the diet starts before approving the payment.',
+        });
+      }
+      const startDay = parseStartDay(rawStartDate);
+      if (!startDay) {
+        return res.status(400).json({
+          success: false,
+          code: 'START_DATE_INVALID',
+          message: 'The start date must be a real day in yyyy-MM-dd format.',
+        });
+      }
+      const bounds = await getStartDayBounds(patientId, dietPlan._id);
+      const tooEarly = startDayTooEarlyBody(startDay, bounds);
+      if (tooEarly) return res.status(400).json(tooEarly);
+      pendingStartDay = startDay;
+      startsAsRenewal = bounds.isRenewal;
+    }
+
+    // The earliest day can move while the proof is loaded (the running cycle
+    // changes, or the IST day rolls over), so check it again right before the
+    // first write.
+    const recheckStartDay = async () => {
+      if (!pendingStartDay) return null;
+      return startDayTooEarlyBody(pendingStartDay, await getStartDayBounds(patientId, dietPlan._id));
+    };
+
     let proofDocument = null;
     const resolvedProofId = proofId || dietPlan.request?.latestPaymentProof;
 
@@ -2616,10 +2751,16 @@ exports.activateDietPlan = async (req, res, next) => {
         proofDocument.amountPending = parsedAmountPending;
       }
 
+      const movedOnProof = await recheckStartDay();
+      if (movedOnProof) return res.status(400).json(movedOnProof);
+
       proofDocument.status = 'Approved';
       proofDocument.reviewedBy = dieticianId;
       proofDocument.reviewedAt = new Date();
       await proofDocument.save();
+    } else {
+      const moved = await recheckStartDay();
+      if (moved) return res.status(400).json(moved);
     }
 
     if (dietPlan.request) {
@@ -2642,31 +2783,40 @@ exports.activateDietPlan = async (req, res, next) => {
       // a plan that was generated before that date was known (week 1 stamped
       // "now") is re-anchored to it so the diet begins on the agreed day
       // instead of immediately.
-      const now = new Date();
-      let effectiveStart = now;
-      const requestedStart = dietPlan.request.startDateForDiet
-        ? new Date(dietPlan.request.startDateForDiet)
-        : null;
-      if (requestedStart && !Number.isNaN(requestedStart.getTime())) {
-        requestedStart.setHours(0, 0, 0, 0);
-        if (requestedStart > now) {
-          effectiveStart = requestedStart;
-          const week1Start = dietPlan.weekSchedule?.[0]?.startDate
-            ? new Date(dietPlan.weekSchedule[0].startDate)
-            : null;
-          if (week1Start) week1Start.setHours(0, 0, 0, 0);
-          if (!week1Start || week1Start < requestedStart) {
-            dietPlan.startDate = requestedStart;
-            dietPlan.weekSchedule =
-              Array.isArray(dietPlan.weekSchedule) && dietPlan.weekSchedule.length > 0
-                ? cascadeWeekScheduleFrom(dietPlan.weekSchedule, 1, requestedStart)
-                : buildWeekSchedule(requestedStart);
+      if (pendingStartDay) {
+        // Dated from the picked day (see the pending-plan block below); every
+        // date comes from the same activationDates call so they cannot drift.
+        const dates = activationDates(pendingStartDay);
+        dietPlan.request.startDateForDiet = dates.startDate;
+        dietPlan.request.subscriptionStartDate = dates.startDate;
+        dietPlan.request.subscriptionExpiresAt = dates.subscriptionExpiresAt;
+      } else {
+        const now = new Date();
+        let effectiveStart = now;
+        const requestedStart = dietPlan.request.startDateForDiet
+          ? new Date(dietPlan.request.startDateForDiet)
+          : null;
+        if (requestedStart && !Number.isNaN(requestedStart.getTime())) {
+          requestedStart.setHours(0, 0, 0, 0);
+          if (requestedStart > now) {
+            effectiveStart = requestedStart;
+            const week1Start = dietPlan.weekSchedule?.[0]?.startDate
+              ? new Date(dietPlan.weekSchedule[0].startDate)
+              : null;
+            if (week1Start) week1Start.setHours(0, 0, 0, 0);
+            if (!week1Start || week1Start < requestedStart) {
+              dietPlan.startDate = requestedStart;
+              dietPlan.weekSchedule =
+                Array.isArray(dietPlan.weekSchedule) && dietPlan.weekSchedule.length > 0
+                  ? cascadeWeekScheduleFrom(dietPlan.weekSchedule, 1, requestedStart)
+                  : buildWeekSchedule(requestedStart);
+            }
           }
         }
+        const expiresAt = new Date(effectiveStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+        dietPlan.request.subscriptionStartDate = effectiveStart;
+        dietPlan.request.subscriptionExpiresAt = expiresAt;
       }
-      const expiresAt = new Date(effectiveStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-      dietPlan.request.subscriptionStartDate = effectiveStart;
-      dietPlan.request.subscriptionExpiresAt = expiresAt;
       // Fresh expiry window (first activation or a renewal) means any prior
       // "expiring soon" reminder is stale - clear it so the renewal-reminder
       // sweep (controllers/internal/renewalReminderController.js) can notify
@@ -2684,6 +2834,13 @@ exports.activateDietPlan = async (req, res, next) => {
     // Active and every "current diet plan" lookup takes the lower
     // cycleNumber; getActiveDietPlanForPatient's sweep finishes the old one
     // on the day the new cycle's Week 1 begins.
+    if (pendingStartDay) {
+      const dates = activationDates(pendingStartDay);
+      dietPlan.startDate = dates.startDate;
+      dietPlan.weekSchedule = dates.weekSchedule;
+      dietPlan.startDatePending = false;
+    }
+
     const activationNow = new Date();
     const priorActive = await DietPlan.find({
       patientId,
@@ -2710,6 +2867,26 @@ exports.activateDietPlan = async (req, res, next) => {
     dietPlan.isPaid = true;
     dietPlan.activationDate = dietPlan.activationDate || activationNow;
     await dietPlan.save();
+
+    // A first-time plan's exercise plan starts with the diet, as the profile
+    // start-date edit does. A renewal leaves it alone: it is one running plan
+    // across cycles. Best-effort, after the save, so it can never undo or
+    // block the approval.
+    if (pendingStartDay && !startsAsRenewal) {
+      try {
+        const exercisePlan = await ExercisePlan.findOne({
+          patientId,
+          dieticianId,
+          status: { $ne: 'Completed' },
+        }).sort({ createdAt: -1 });
+        if (exercisePlan) {
+          exercisePlan.startDate = dayToUtcDate(pendingStartDay);
+          await exercisePlan.save();
+        }
+      } catch (err) {
+        console.error('[activateDietPlan] moving the exercise plan start failed (non-fatal):', err.message);
+      }
+    }
 
     // Goal Journey Timeline seeding (fire-and-forget - must never fail or
     // delay activation). See utils/seedGoalTimeline.js for the create-vs-
